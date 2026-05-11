@@ -1,0 +1,32 @@
+{
+  "name": "@mcp-hangar/docs",
+  "version": "0.0.0",
+  "description": "Public documentation for MCP Hangar",
+  "keywords": [
+    "mcp",
+    "mcp-hangar",
+    "documentation",
+    "model-context-protocol"
+  ],
+  "homepage": "https://mcp-hangar.io/docs",
+  "bugs": {
+    "url": "https://github.com/mcp-hangar/docs/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-hangar/docs.git"
+  },
+  "license": "MIT",
+  "author": "mcp-hangar contributors",
+  "files": [
+    "**/*.md",
+    "**/*.mdx",
+    "!**/README.md",
+    "!CONTRIBUTING.md",
+    "!node_modules/**"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

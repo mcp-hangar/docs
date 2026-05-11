@@ -1,0 +1,56 @@
+# Enforces Conventional Commits on PR titles, mirroring the policy used in
+# mcp-hangar/mcp-hangar. Scopes are tailored to this docs repo's content tree.
+name: pr-title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    steps:
+      - name: Validate PR title (Conventional Commits)
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            chore
+            ci
+            refactor
+            revert
+          scopes: |
+            architecture
+            getting-started
+            guides
+            operations
+            observability
+            security
+            runbooks
+            development
+            reference
+            cookbook
+            adr
+            integrations
+            testing
+            blog
+            repo
+            ci
+            deps
+            release
+          requireScope: false
+          subjectPattern: ^[a-z].+$
+          subjectPatternError: |
+            The subject "{subject}" must start with a lowercase letter.

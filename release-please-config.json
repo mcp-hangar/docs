@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "packages": {
+    ".": {
+      "package-name": "@mcp-hangar/docs",
+      "release-type": "node",
+      "bump-minor-pre-major": false,
+      "draft": false,
+      "prerelease": false,
+      "include-component-in-tag": false,
+      "pull-request-title-pattern": "chore(release): release ${version}",
+      "changelog-sections": [
+        { "type": "feat", "section": "Added", "hidden": false },
+        { "type": "fix", "section": "Fixed", "hidden": false },
+        { "type": "docs", "section": "Changed", "hidden": false },
+        { "type": "chore", "section": "Changed", "hidden": true },
+        { "type": "ci", "section": "Changed", "hidden": true }
+      ]
+    }
+  }
+}

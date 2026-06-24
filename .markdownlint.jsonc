@@ -1,0 +1,16 @@
+{
+  // Codifies the established house style so markdownlint is a meaningful,
+  // passing gate. Without a config, markdownlint-cli2 applies its 80-column
+  // defaults, which the entire committed corpus violates by design. Each rule
+  // below is disabled because it conflicts with an intentional convention used
+  // across the docs (verified against the existing tree, not just new files).
+  "default": true,
+  "MD013": false, // line-length: prose and tables run past 80 columns repo-wide
+  "MD040": false, // fenced-code-language: bare ``` fences are the house style
+  "MD024": false, // no-duplicate-heading: changelog/recipes repeat ### Changed, etc.
+  "MD004": false, // ul-style: mixed "-" and "*" bullets (release-please output)
+  "MD012": false, // no-multiple-blanks: release-please emits double blank lines
+  "MD034": false, // no-bare-urls
+  "MD033": false, // no-inline-html: diagrams/tables use occasional inline HTML
+  "MD036": false  // no-emphasis-as-heading
+}

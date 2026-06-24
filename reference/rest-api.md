@@ -4,6 +4,8 @@ Complete reference for all REST API endpoints exposed by MCP Hangar in HTTP mode
 
 **Base URL:** `http://localhost:8000/api`
 
+All endpoint paths shown below are relative to this base URL. Every route resolves only under the `/api` prefix (e.g. `GET /mcp_servers` is served at `GET /api/mcp_servers`).
+
 All responses are JSON. Error responses return:
 
 ```json
@@ -86,7 +88,10 @@ GET /mcp_servers/{mcp_server_id}
 
 ```
 PUT /mcp_servers/{mcp_server_id}
+PATCH /mcp_servers/{mcp_server_id}
 ```
+
+Both `PUT` and `PATCH` are accepted and behave identically (partial update).
 
 **Request body (all fields optional):**
 
@@ -138,6 +143,20 @@ POST /mcp_servers/{mcp_server_id}/stop
 | `reason` | string | `"user_request"` | Reason for stopping |
 
 **Response 200:** Stop result object.
+
+### Block MCP Server
+
+```
+POST /mcp_servers/{mcp_server_id}/block
+```
+
+Permanently blocks an MCP server for detection enforcement (stops it with reason `detection_enforcement:block`).
+
+**Response 200:**
+
+```json
+{"mcp_server_id": "math", "blocked": true}
+```
 
 ### Get MCP Server Tools
 
@@ -576,6 +595,80 @@ GET /system
 }
 ```
 
+### Get Current User
+
+```
+GET /system/me
+```
+
+Returns the current authentication status. Used by the SPA to check whether a user is logged in. When auth is not enabled, returns `authenticated: false`.
+
+**Response 200:**
+
+```json
+{"authenticated": true, "principal": {"id": "...", "type": "user"}}
+```
+
+---
+
+## Tools
+
+### List All Tools
+
+```
+GET /tools
+```
+
+Lists all tools across all MCP servers (used by the supervisor to sync tool inventory).
+
+**Response 200:**
+
+```json
+{
+  "tools": [
+    {"mcp_server_id": "math", "tool_name": "add", "description": "Add two numbers", "input_schema": "..."}
+  ]
+}
+```
+
+---
+
+## Sessions
+
+### Suspend Session
+
+```
+POST /sessions/{session_id}/suspend
+```
+
+Adds a session to the in-memory suspended registry.
+
+**Request body (optional):**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `reason` | string | -- | Reason for suspension |
+
+**Response 200:**
+
+```json
+{"session_id": "...", "suspended": true}
+```
+
+### Unsuspend Session
+
+```
+DELETE /sessions/{session_id}/suspend
+```
+
+Removes a session from the suspended registry.
+
+**Response 200:**
+
+```json
+{"session_id": "...", "suspended": false}
+```
+
 ---
 
 ## Auth Management
@@ -709,6 +802,20 @@ GET /auth/principals/roles
 | `principal_id` | query | string | Yes | Principal whose roles to list |
 | `scope` | query | string | No | Scope filter (default `*` = all) |
 
+### List Permissions
+
+```
+GET /auth/permissions
+```
+
+Lists all known permission resource types and their available actions.
+
+**Response 200:**
+
+```json
+{"permissions": [{"resource_type": "mcp_servers", "actions": ["read", "write", "..."]}]}
+```
+
 ### Check Permission
 
 ```
@@ -749,6 +856,123 @@ POST /auth/policies/{scope}/{target_id}
 ```
 DELETE /auth/policies/{scope}/{target_id}
 ```
+
+---
+
+## Agent Policy
+
+### Push Agent Policy
+
+```
+POST /agent/policy
+```
+
+Applies a batch of tool access policies (allow/deny/require-approval/audit) per MCP server. Use `mcp_server_id: "*"` for a global policy.
+
+**Request body:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `tool_policies` | list[dict] | `[]` | Policy entries (`mcp_server_id`, `action`, `tool_name`, `approval_timeout_seconds`) |
+| `version` | int | `0` | Policy version |
+
+**Response 200:**
+
+```json
+{"status": "ok", "version": 3, "applied": 2}
+```
+
+---
+
+## Admin Tools
+
+Runtime tool withdrawal/restore. Requires admin (`mcp_servers` resource, `lifecycle` action).
+
+### Withdraw Tool
+
+```
+POST /admin/tools/{server}/{tool}/withdraw
+```
+
+Withdraws a tool at runtime (survives reload). Withdrawal persists in the runtime overlay.
+
+**Request body (optional):**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `tenant_id` | string | `null` | Tenant to withdraw for. Omit/null withdraws globally for all tenants. |
+
+**Response 200:**
+
+```json
+{"withdrawn": true, "mcp_server": "math", "tool": "add", "tenant_id": null}
+```
+
+### Restore Tool
+
+```
+POST /admin/tools/{server}/{tool}/restore
+```
+
+Removes a runtime withdrawal (config-declared withdrawals persist independently).
+
+**Request body (optional):**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `tenant_id` | string | `null` | Tenant to restore. Omit/null removes the entire runtime entry. |
+
+**Response 200:**
+
+```json
+{"restored": true, "mcp_server": "math", "tool": "add", "tenant_id": null}
+```
+
+---
+
+## Enterprise Approvals
+
+Available when the enterprise approval service is enabled.
+
+### List Approvals
+
+```
+GET /enterprise/approvals?state={state}&provider_id={id}
+```
+
+| Parameter | In | Type | Default | Description |
+|-----------|------|------|---------|-------------|
+| `state` | query | string | `pending` | Filter: `pending`, `approved`, `denied`, `expired` |
+| `provider_id` | query | string | -- | Optional provider filter |
+
+**Response 200:** JSON array of approval request objects.
+
+### Get Approval
+
+```
+GET /enterprise/approvals/{approval_id}
+```
+
+**Response 200:** Approval request object.
+
+**Response 404:** Approval not found.
+
+### Resolve Approval
+
+```
+POST /enterprise/approvals/{approval_id}/resolve
+```
+
+Approves or denies a pending approval. Accepts JWT auth (with `approval:resolve` permission) or a Slack HMAC callback.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `decision` | string | Yes | `approve` or `deny` |
+| `reason` | string | No | Optional resolution reason |
+
+**Response 200:** Resolution result.
 
 ---
 

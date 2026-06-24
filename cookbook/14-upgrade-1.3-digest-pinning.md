@@ -1,20 +1,22 @@
-# 14 -- Upgrade 1.3: Digest Pinning
+# 14 -- Upgrade: Digest Pinning (v1.2.1 JCS change)
 
 > **Prerequisite:** [13 -- Production Checklist](13-production-checklist.md)
-> **You will need:** Docker, MCP Hangar 1.2.x with pinned tool digests
+> **You will need:** Docker, MCP Hangar 1.2.0 (or earlier) with pinned tool digests
 > **Time:** 20 minutes plus one audit window
-> **Adds:** Safe migration to v1.3 JCS digests
+> **Adds:** Safe migration to RFC 8785 JCS digests (introduced in v1.2.1)
 
 ## The Problem
 
-MCP Hangar 1.3 changes how tool digests are computed. Older releases used
-Python `json.dumps` canonicalization. v1.3 uses RFC 8785 JSON Canonicalization
-Scheme (JCS), normalizes empty optional values, and rejects malformed tool
-entries before hashing.
+MCP Hangar v1.2.1 changed how tool digests are computed. Releases up to v1.2.0
+used Python `json.dumps` canonicalization. Starting in v1.2.1, Hangar uses
+RFC 8785 JSON Canonicalization Scheme (JCS), normalizes empty optional values,
+and rejects malformed tool entries before hashing. That digest behavior carries
+forward unchanged through the current release (v1.3.0), so this migration
+applies whether you land on v1.2.1 or any later version.
 
-If you upgrade directly with strict digest enforcement, valid tools can look
-like drift because their old pins were computed with the previous algorithm.
-You need to refresh pins without creating a production outage.
+If you upgrade across the v1.2.1 boundary with strict digest enforcement, valid
+tools can look like drift because their old pins were computed with the previous
+algorithm. You need to refresh pins without creating a production outage.
 
 ## The Config
 
@@ -30,7 +32,7 @@ done
 ```
 
 If any policy still uses `allow_degraded`, change it to `allow_unverified`
-before moving to v1.3:
+(the rename also shipped in v1.2.1):
 
 ```diff
 - allow_degraded
@@ -38,7 +40,7 @@ before moving to v1.3:
 ```
 
 During the migration window, run digest enforcement in `audit` or `warn` mode.
-Do not use `block` until every pin has been recomputed under v1.3.
+Do not use `block` until every pin has been recomputed under the JCS algorithm.
 
 For the Docker smoke test below, create a minimal config:
 
@@ -60,7 +62,10 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
 
    Keep this file until the migration is complete. It is your rollback map.
 
-1. Verify the v1.3 package in Docker
+1. Verify the package in Docker
+
+   This recipe pins the current release (v1.3.0), which includes the v1.2.1 JCS
+   digest behavior. Any version `>=1.2.1` works.
 
    ```bash
    docker run --rm python:3.11-slim sh -lc '
@@ -75,7 +80,7 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
    mcp-hangar 1.3.0
    ```
 
-1. Start Hangar 1.3 in HTTP mode
+1. Start Hangar in HTTP mode
 
    ```bash
    docker run -d --name hangar-1.3-cookbook \
@@ -104,7 +109,7 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
    {"status":"healthy","ready_mcp_servers":0,"total_mcp_servers":0}
    ```
 
-1. Verify v1.3 interceptor discovery
+1. Verify interceptor discovery
 
    ```bash
    curl -s http://localhost:8000/interceptors/list | jq '.interceptors[].name'
@@ -193,10 +198,10 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
    Treat each event as a candidate new pin, not as an automatic approval. Review
    the tool name, MCP server ID, and schema before accepting the new digest.
 
-1. Replace old pins with v1.3 pins
+1. Replace old pins with JCS pins
 
    For each approved drift event, update the stored pin from the old digest to
-   the JCS digest emitted by v1.3.
+   the JCS digest emitted by v1.2.1 and later.
 
    ```diff
    - sha256:old-json-dumps-digest
@@ -205,9 +210,9 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
 
 1. Fix malformed tool entries before returning to `block`
 
-   v1.3 rejects tool entries where `name` is missing, empty, or not a string.
-   If a server emits one of these, fix the MCP server schema instead of pinning
-   around the error.
+   Since v1.2.1, Hangar rejects tool entries where `name` is missing, empty, or
+   not a string. If a server emits one of these, fix the MCP server schema
+   instead of pinning around the error.
 
    Bad examples:
 
@@ -242,13 +247,14 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
 
 ## What Just Happened
 
-v1.3 makes digest computation deterministic across runtimes by using RFC 8785
+v1.2.1 made digest computation deterministic across runtimes by using RFC 8785
 JCS before SHA-256 hashing. That is stricter and more portable than relying on
-Python `json.dumps` output, but it means old pins may not match the same tool
-schema after upgrade.
+Python `json.dumps` output, but it means old pins from v1.2.0 and earlier may not
+match the same tool schema after upgrade. This behavior is unchanged in the
+current release.
 
-v1.3 also avoids false drift from optional empty values. These are now treated as
-absent during digest computation:
+v1.2.1 also avoids false drift from optional empty values. These are now treated
+as absent during digest computation:
 
 - `None`
 - `{}`
@@ -258,13 +264,14 @@ absent during digest computation:
 This prevents two otherwise equivalent servers from producing different digests
 only because one omits an optional field while another sends it empty.
 
-The `allow_degraded` name was also retired. Use `allow_unverified` for unknown
-tools that are allowed to run without a verified digest. v1.3 still accepts the
-old string with a `DeprecationWarning`, but v1.4 is expected to remove it.
+The `allow_degraded` name was also retired in v1.2.1. Use `allow_unverified` for
+unknown tools that are allowed to run without a verified digest. Hangar still
+accepts the old string with a `DeprecationWarning`, but v1.4 is expected to
+remove it.
 
 ## Key Config Reference
 
-| Setting | Use in v1.3 |
+| Setting | Use (v1.2.1+) |
 | ------- | ------------- |
 | `audit` | Allow calls and record digest drift during migration |
 | `warn` | Allow calls and emit warnings during migration |
@@ -274,8 +281,8 @@ old string with a `DeprecationWarning`, but v1.4 is expected to remove it.
 
 ## What's Next
 
-Keep `/interceptors/list` clients up to date. v1.3 returns two explicit
-interceptor names: `mcp-hangar-validator` and `mcp-hangar-mutator`.
+Keep `/interceptors/list` clients up to date. Since v1.2.1, Hangar returns two
+explicit interceptor names: `mcp-hangar-validator` and `mcp-hangar-mutator`.
 
 For the full background, see
 [Interceptor Framework](../architecture/INTERCEPTOR_FRAMEWORK.md) and

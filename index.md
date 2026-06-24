@@ -81,6 +81,7 @@ mcp-hangar serve --http --port 8000
 - [REST API Guide](guides/REST_API.md)
 - [Container Guide](guides/CONTAINERS.md)
 - [Authentication & RBAC](guides/AUTHENTICATION.md)
+- [Front-Door Mode & Per-Tenant Tool Governance](guides/FRONT_DOOR.md)
 - [Observability](guides/OBSERVABILITY.md)
 
 ## Contributing

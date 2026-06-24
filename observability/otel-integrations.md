@@ -138,8 +138,8 @@ when behavioral profiling is active. The scorer aggregates signals from
 | `mcp_hangar_tool_calls_total` | Counter | Total tool invocations |
 | `mcp_hangar_tool_call_duration_seconds` | Histogram | Tool call latency distribution |
 | `mcp_hangar_mcp_server_state` | Gauge | Current MCP server lifecycle state (0=cold, 1=initializing, 2=ready, 3=degraded, 4=dead) |
-| `mcp_hangar_cold_start_phase_duration_seconds` | Histogram | Duration of cold start phases (labels: `mcp_server`, `phase`) |
-| `mcp_hangar_cold_starts_in_progress` | Gauge | Cold starts currently in progress |
+| `mcp_hangar_mcp_server_cold_start_seconds` | Histogram | Cold start duration (labels: `mcp_server`, `mode`) |
+| `mcp_hangar_mcp_server_cold_start_in_progress` | Gauge | Cold starts currently in progress (labels: `mcp_server`) |
 | `mcp_hangar_health_checks_total` | Counter | Total health checks |
 | `mcp_hangar_circuit_breaker_state` | Gauge | Circuit breaker state per MCP server |
 | `mcp_hangar_capability_violations_total` | Counter | Total capability violations |

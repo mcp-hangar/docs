@@ -58,10 +58,11 @@ mcp-hangar init [OPTIONS]
 |--------|-------|------|---------|-------------|
 | `--non-interactive` | `-y` | FLAG | false | Run without prompts, using defaults |
 | `--bundle` | `-b` | TEXT | - | MCP Server bundle to install |
-| `--mcp-servers` | - | TEXT | - | Comma-separated list of MCP servers |
+| `--mcp_servers` | - | TEXT | - | Comma-separated list of MCP servers |
 | `--config-path` | - | PATH | - | Custom path for config file |
 | `--claude-config` | - | PATH | - | Custom path to Claude Desktop config |
 | `--skip-claude` | - | FLAG | false | Skip Claude Desktop config modification |
+| `--skip-test` | - | FLAG | false | Skip smoke test after configuration |
 | `--reset` | - | FLAG | false | Reset existing configuration |
 
 ### MCP Server Bundles
@@ -82,7 +83,7 @@ mcp-hangar init
 mcp-hangar init --bundle starter
 
 # Install specific mcp_servers
-mcp-hangar init --mcp-servers filesystem,github,sqlite
+mcp-hangar init --mcp_servers filesystem,github,sqlite
 
 # Non-interactive with developer bundle
 mcp-hangar init -y --bundle developer
@@ -321,6 +322,9 @@ mcp-hangar [OPTIONS]
 | `--log-file` | - | PATH | - | - | Path to log file |
 | `--log-level` | - | TEXT | INFO | `MCP_LOG_LEVEL` | Log level |
 | `--json-logs` | - | FLAG | false | `MCP_JSON_LOGS` | Format logs as JSON |
+| `--unsafe-no-auth` | - | FLAG | false | - | Allow non-loopback HTTP binding without authentication (unsafe) |
+| `--cloud-key` | - | TEXT | - | `MCP_CLOUD_KEY` | License key for Hangar Cloud connectivity |
+| `--cloud-url` | - | TEXT | - | `MCP_CLOUD_URL` | Hangar Cloud API endpoint |
 
 ### Transport Modes
 

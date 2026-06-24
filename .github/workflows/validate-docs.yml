@@ -1,0 +1,43 @@
+name: validate-docs
+
+# Drift detector: checks that identifiers referenced in the docs (MCP tool
+# names, Prometheus metrics, env vars) still exist in the mcp-hangar product
+# source. See development/DOCS_VALIDATION.md for scope and limitations.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, so docs drift is caught even when nobody edits the docs repo.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout docs
+        uses: actions/checkout@v4
+        with:
+          path: docs
+
+      - name: Checkout mcp-hangar source
+        uses: actions/checkout@v4
+        with:
+          repository: mcp-hangar/mcp-hangar
+          path: source
+          # Public repo: no token needed. For a private source, set a PAT in
+          # the MCP_HANGAR_REPO_TOKEN secret and uncomment the next line.
+          # token: ${{ secrets.MCP_HANGAR_REPO_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate docs against source
+        run: python docs/scripts/validate_docs.py --docs docs --source source

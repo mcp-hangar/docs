@@ -1,6 +1,6 @@
 # 15 -- Interceptor Discovery
 
-> **Prerequisite:** [14 -- Upgrade 1.3: Digest Pinning](14-upgrade-1.3-digest-pinning.md)
+> **Prerequisite:** [14 -- Upgrade: Digest Pinning](14-upgrade-1.3-digest-pinning.md)
 > **You will need:** Docker, `curl`, `jq`
 > **Time:** 10 minutes
 > **Adds:** SEP-1763 interceptor discovery client checks
@@ -11,7 +11,8 @@ MCP Hangar exposes its validator and mutator capabilities through
 `/interceptors/list`. Clients can use this endpoint to discover what Hangar can
 validate or mutate before sending traffic through it.
 
-In v1.3, the two interceptor entries have distinct names:
+The interceptor framework shipped in v1.2.0, and since v1.2.1 the two interceptor
+entries have distinct names:
 
 - `mcp-hangar-validator`
 - `mcp-hangar-mutator`
@@ -32,7 +33,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
 
 ## Try It
 
-1. Start Hangar 1.3 in HTTP mode
+1. Start Hangar in HTTP mode
 
    ```bash
    docker run -d --name hangar-interceptors \
@@ -150,9 +151,9 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
 
 ## What Just Happened
 
-`/interceptors/list` returns a list of Hangar interceptor instances. In v1.3 the
-validator and mutator entries use different names so SEP-1763 clients can treat
-them as separate capabilities.
+`/interceptors/list` returns a list of Hangar interceptor instances. Since v1.2.1
+the validator and mutator entries use different names so SEP-1763 clients can
+treat them as separate capabilities.
 
 The important client rule is: key interceptors by `name`, then validate the
 fields you care about (`type`, `supportedEvents`, and `modes`). Do not collapse

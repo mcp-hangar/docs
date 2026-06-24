@@ -165,7 +165,7 @@ HTTP transport exposes the following metrics:
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `mcp_hangar_http_requests_total` | Counter | Total HTTP requests by MCP server, method, status |
+| `mcp_hangar_http_requests_total` | Counter | Total HTTP requests, labeled by mcp_server, method, status_code |
 | `mcp_hangar_http_request_duration_seconds` | Histogram | Request latency |
 | `mcp_hangar_http_errors_total` | Counter | HTTP errors by type |
 | `mcp_hangar_http_retries_total` | Counter | Retry attempts |

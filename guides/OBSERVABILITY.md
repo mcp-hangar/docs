@@ -224,9 +224,9 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `mcp_hangar_http_requests_total` | Counter | method, status | HTTP requests to remote MCP servers |
+| `mcp_hangar_http_requests_total` | Counter | mcp_server, method, status_code | HTTP requests to remote MCP servers |
 | `mcp_hangar_http_request_duration_seconds` | Histogram | method | HTTP request latency |
-| `mcp_hangar_http_connections` | Gauge | mcp_server | Active HTTP connections |
+| `mcp_hangar_http_connection_pool_size` | Gauge | mcp_server | Current HTTP connection pool size |
 
 #### Rate Limiting
 
@@ -308,6 +308,8 @@ Alert rules are defined in `monitoring/prometheus/alerts.yaml` and organized by 
 | `MCPHangarBatchHighFailureRate` | Batch failure > 20% | 3m | Batch operations failing |
 | `MCPHangarCircuitBreakerTripped` | CB rejections > 10/5m | 2m | MCP Server isolated |
 | `MCPHangarProviderUnhealthy` | Consecutive failures > 5 | 2m | MCP Server critically unhealthy |
+| `MCPHangarAllProvidersDown` | All MCP servers down (with servers configured) | 1m | Total outage |
+| `MCPHangarCriticalDetectionMatch` | Critical detection rule match | 0m | Security: critical behavioral detection |
 
 #### Warning Alerts (Investigate)
 
@@ -325,12 +327,19 @@ Alert rules are defined in `monitoring/prometheus/alerts.yaml` and organized by 
 | `MCPHangarGCSlowCycles` | P95 GC > 0.5s | 5m | GC performance issue |
 | `MCPHangarHighMemoryUsage` | Memory > 2GB | 10m | Memory pressure |
 | `MCPHangarHighCPUUsage` | CPU > 80% | 10m | CPU saturation |
+| `MCPHangarProviderDegraded` | MCP server state = DEGRADED | 5m | MCP Server degraded |
+| `MCPHangarRemoteProviderUnreachable` | Connection-refused errors > 10/5m | 5m | Remote MCP server unreachable |
+| `MCPHangarDiscoverySourceUnhealthy` | No healthy discovery sources | 5m | Discovery sources down |
+| `MCPHangarHighRateLimitRejections` | Rejected rate-limit hits > 1/s | 5m | Clients being throttled |
+| `MCPHangarCapabilityViolations` | Capability violations > 0/5m | 5m | Security: capability breach |
+| `MCPHangarConcurrencyQueueBuildup` | Concurrency queue building > 1/5m | 5m | Backpressure / saturation |
+| `MCPHangarEnforcementActionsActive` | Enforcement actions firing | 5m | Security: enforcement active |
 
 #### Info Alerts (Tracking)
 
 | Alert | Condition | Description |
 |-------|-----------|-------------|
-| `MCPHangarMcpServerStarted` | Any MCP server start | MCP Server lifecycle event |
+| `MCPHangarProviderStarted` | Any MCP server start | MCP Server lifecycle event |
 | `MCPHangarHighToolCallVolume` | Rate > 100/s | High traffic notification |
 
 ### Alertmanager Configuration

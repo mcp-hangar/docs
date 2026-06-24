@@ -1,6 +1,6 @@
 # Cookbook
 
-From zero to production in 15 recipes. Start at 01 and go in order, or jump to
+From zero to production in 16 recipes. Start at 01 and go in order, or jump to
 what you need.
 
 ## The Path (sequential)
@@ -30,8 +30,9 @@ recipe 01.
 | 11 | [Discovery: Kubernetes](11-discovery-kubernetes.md) | 01 |
 | 12 | [Auth & RBAC](12-auth-rbac.md) | 01 |
 | 13 | [Production Checklist](13-production-checklist.md) | 01-06 |
-| 14 | [Upgrade 1.3: Digest Pinning](14-upgrade-1.3-digest-pinning.md) | 13 |
+| 14 | [Upgrade: Digest Pinning](14-upgrade-1.3-digest-pinning.md) | 13 |
 | 15 | [Interceptor Discovery](15-interceptor-discovery.md) | 14 |
+| 16 | [Front-Door Multi-Tenant](16-front-door-multi-tenant.md) | 12 |
 
 ## How to Use This Cookbook
 

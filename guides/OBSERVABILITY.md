@@ -224,9 +224,9 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `mcp_hangar_http_requests_total` | Counter | method, status | HTTP requests to remote MCP servers |
+| `mcp_hangar_http_requests_total` | Counter | mcp_server, method, status_code | HTTP requests to remote MCP servers |
 | `mcp_hangar_http_request_duration_seconds` | Histogram | method | HTTP request latency |
-| `mcp_hangar_http_connections` | Gauge | mcp_server | Active HTTP connections |
+| `mcp_hangar_http_connection_pool_size` | Gauge | mcp_server | Current HTTP connection pool size |
 
 #### Rate Limiting
 
@@ -330,7 +330,7 @@ Alert rules are defined in `monitoring/prometheus/alerts.yaml` and organized by 
 
 | Alert | Condition | Description |
 |-------|-----------|-------------|
-| `MCPHangarMcpServerStarted` | Any MCP server start | MCP Server lifecycle event |
+| `MCPHangarProviderStarted` | Any MCP server start | MCP Server lifecycle event |
 | `MCPHangarHighToolCallVolume` | Rate > 100/s | High traffic notification |
 
 ### Alertmanager Configuration

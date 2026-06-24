@@ -52,14 +52,28 @@ All endpoints return JSON. Error responses follow the envelope format:
 | `GET` | `/api/mcp_servers` | List all MCP servers (optional `?state=ready` filter) |
 | `POST` | `/api/mcp_servers` | Create a new MCP server |
 | `GET` | `/api/mcp_servers/{id}` | Get MCP server details |
-| `PUT` | `/api/mcp_servers/{id}` | Update MCP server configuration |
+| `PUT`/`PATCH` | `/api/mcp_servers/{id}` | Update MCP server configuration |
 | `DELETE` | `/api/mcp_servers/{id}` | Delete a MCP server (stops it first) |
 | `POST` | `/api/mcp_servers/{id}/start` | Start a MCP server |
 | `POST` | `/api/mcp_servers/{id}/stop` | Stop a MCP server |
+| `POST` | `/api/mcp_servers/{id}/block` | Block a MCP server |
 | `GET` | `/api/mcp_servers/{id}/tools` | List MCP server tools |
 | `GET` | `/api/mcp_servers/{id}/health` | Get health status |
 | `GET` | `/api/mcp_servers/{id}/logs` | Get buffered log lines (`?lines=100`) |
 | `GET` | `/api/mcp_servers/{id}/tools/history` | Tool invocation history |
+
+### Sessions
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/sessions/{id}/suspend` | Suspend a session |
+| `DELETE` | `/api/sessions/{id}/suspend` | Resume (unsuspend) a session |
+
+### Tools
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/tools` | List all tools aggregated across MCP servers |
 
 ### Groups
 
@@ -107,6 +121,20 @@ All endpoints return JSON. Error responses follow the envelope format:
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/system` | System info (uptime, version, metrics summary) |
+| `GET` | `/api/system/me` | Current authenticated principal info |
+
+### Agent Policy
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/agent/policy` | Push an agent policy |
+
+### Admin Tools
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/admin/tools/{server}/{tool}/withdraw` | Withdraw a tool |
+| `POST` | `/api/admin/tools/{server}/{tool}/restore` | Restore a withdrawn tool |
 
 ### Auth Management (Enterprise)
 
@@ -130,6 +158,14 @@ All endpoints return JSON. Error responses follow the envelope format:
 | `GET` | `/api/auth/policies/{scope}/{target_id}` | Get tool access policy |
 | `POST` | `/api/auth/policies/{scope}/{target_id}` | Set tool access policy |
 | `DELETE` | `/api/auth/policies/{scope}/{target_id}` | Clear tool access policy |
+
+### Approvals (Enterprise)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/enterprise/approvals` | List approval requests |
+| `GET` | `/api/enterprise/approvals/{id}` | Get an approval request |
+| `POST` | `/api/enterprise/approvals/{id}/resolve` | Resolve an approval request |
 
 ### Health Probes and Metrics
 
@@ -217,9 +253,8 @@ CORS is configured via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_CORS_ORIGINS` | `*` | Allowed origins (comma-separated) |
-| `MCP_CORS_METHODS` | `*` | Allowed methods |
-| `MCP_CORS_HEADERS` | `*` | Allowed headers |
+| `MCP_CORS_ORIGINS` | `http://localhost:5173` | Allowed origins (comma-separated) |
+| `MCP_CORS_CREDENTIALS` | `false` | Allow credentials (requires explicit non-wildcard origins) |
 
 For production, restrict origins to your dashboard URL:
 

@@ -134,7 +134,7 @@ Commands modify state, queries read state. They never mix.
 
 - **Commands**: `StartMcpServerCommand`, `CreateMcpServerCommand`, `CreateGroupCommand`, etc.
 - **Queries**: `ListMcpServersQuery`, `GetMcpServerQuery`, `GetSystemMetricsQuery`, etc.
-- **Events**: `McpServerStarted`, `ToolInvocationCompleted`, `McpServerHealthCheckFailed`, etc.
+- **Events**: `McpServerStarted`, `ToolInvocationCompleted`, `HealthCheckFailed`, etc.
 
 All state changes emit domain events via `AggregateRoot._record_event()`. Events are persisted to the Event Store for auditing and can be replayed. See [Event Sourcing](EVENT_SOURCING.md).
 

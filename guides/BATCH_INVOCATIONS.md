@@ -29,7 +29,7 @@ hangar_call(calls=[
 # With retry for reliability
 hangar_call(
     calls=[{"mcp_server": "math", "tool": "add", "arguments": {"a": 1, "b": 2}}],
-    max_retries=3
+    max_attempts=3
 )
 ```
 
@@ -52,10 +52,10 @@ hangar_call(calls=[
 ```python
 hangar_call(
     calls: list[dict],           # List of invocations to execute
-    max_concurrency: int = 10,   # Max parallel invocations (1-20)
+    max_concurrency: int = 10,   # Max parallel invocations (1-50)
     timeout: float = 60.0,       # Global timeout in seconds (1-300)
     fail_fast: bool = False,     # Abort on first error
-    max_retries: int = 1,        # Retry attempts per call (1-10)
+    max_attempts: int = 1,       # Total attempts per call including retries (1-10)
 ) -> dict
 ```
 
@@ -64,10 +64,10 @@ hangar_call(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `calls` | `list[dict]` | required | List of call specifications |
-| `max_concurrency` | `int` | 10 | Maximum parallel workers (1-20) |
+| `max_concurrency` | `int` | 10 | Maximum parallel workers (1-50) |
 | `timeout` | `float` | 60.0 | Global timeout for entire batch (1-300s) |
 | `fail_fast` | `bool` | False | If True, abort remaining calls on first error |
-| `max_retries` | `int` | 1 | Retry attempts per call (1-10, default 1 = no retry) |
+| `max_attempts` | `int` | 1 | Total attempts per call including retries (1-10, default 1 = no retry) |
 
 **Call specification:**
 
@@ -99,7 +99,7 @@ Each item in `calls` must be a dictionary with:
             "error": None,                   # Error message if failed
             "error_type": None,              # Error classification
             "elapsed_ms": 45.2,              # Individual call duration
-            "retry_metadata": {              # Present if max_retries > 1
+            "retry_metadata": {              # Present if max_attempts > 1
                 "attempts": 2,
                 "retries": ["TimeoutError"],
                 "total_time_ms": 1234.5
@@ -120,7 +120,7 @@ hangar_call(
     calls=[
         {"mcp_server": "fetch", "tool": "get", "arguments": {"url": "https://api.example.com"}}
     ],
-    max_retries=3
+    max_attempts=3
 )
 
 # Response includes retry metadata:
@@ -237,7 +237,7 @@ hangar_call(calls=[
 
 ### Retry Behavior
 
-When `max_retries > 1`:
+When `max_attempts > 1`:
 
 - Retries use exponential backoff
 - Only transient errors trigger retry (timeout, network errors, malformed JSON)
@@ -280,9 +280,9 @@ Truncated responses have `truncated: true` flag:
 | Limit | Value | Behavior |
 |-------|-------|----------|
 | Max calls per batch | 100 | Validation error |
-| Max concurrency | 20 | Clamped to limit |
+| Max concurrency | 50 | Clamped to limit |
 | Max timeout | 300s | Clamped to limit |
-| Max retries | 10 | Clamped to limit |
+| Max attempts | 10 | Clamped to limit |
 | Max response per call | 10MB | Truncated |
 | Max total response | 50MB | Truncated |
 
@@ -307,7 +307,7 @@ Optional configuration in `config.yaml`:
 ```yaml
 batch:
   max_calls: 100
-  max_concurrency: 20
+  max_concurrency: 50
   default_timeout: 60.0
   max_timeout: 300.0
   max_response_size_bytes: 10485760      # 10MB per call
@@ -321,13 +321,13 @@ If you were using the previous tools, here's how to migrate:
 | Old API | New API |
 |---------|---------|
 | `registry_invoke(mcp_server, tool, arguments)` | `hangar_call(calls=[{"mcp_server": ..., "tool": ..., "arguments": ...}])` |
-| `registry_invoke_ex(..., max_retries=5)` | `hangar_call(calls=[...], max_retries=5)` |
+| `registry_invoke_ex(..., max_retries=5)` | `hangar_call(calls=[...], max_attempts=5)` |
 | `registry_invoke_stream(...)` | `hangar_call(calls=[...])` (progress logged internally) |
 | `hangar_batch(calls=[...])` | `hangar_call(calls=[...])` |
 
 ## Best Practices
 
-1. **Use retry for external calls** - Set `max_retries=3` for fetch, database, and network operations
+1. **Use retry for external calls** - Set `max_attempts=3` for fetch, database, and network operations
 2. **Group related calls** - Batch calls that can run independently
 3. **Set appropriate timeouts** - Use per-call timeouts for varying workloads
 4. **Monitor metrics** - Watch `mcp_hangar_batch_duration_seconds` and `mcp_hangar_batch_size`

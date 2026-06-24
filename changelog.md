@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.0](https://github.com/mcp-hangar/mcp-hangar/compare/v1.2.1...v1.3.0) (2026-06-24)
+## [Unreleased]
+
+The MIT relicense and the remaining tool-digest hardening below are merged but
+not yet attributed to a tagged release. The JCS canonicalization (#171),
+empty-value handling (#173), `ALLOW_UNVERIFIED` rename (#175), and interceptor
+name disambiguation (#176) referenced by these issues already shipped in
+**1.2.1** (see #186, #188, #189, #190); only the items listed here remain
+unreleased.
 
 ### Changed
 
@@ -13,10 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **core:** remove `LicenseTier` enum, `LicenseValidation`, and license-key gating from bootstrap; `load_enterprise_modules` loads unconditionally (#196)
 - **core:** `HANGAR_LICENSE_KEY` env var is deprecated and emits `DeprecationWarning` when set (#196)
 - **core:** `EnterpriseComponents` no longer carries a `license_tier` field; `ApplicationContext.license_tier` removed (#196)
-- **core:** absorb `enterprise/` modules (auth, compliance, approvals, integrations, persistence) into `src/mcp_hangar/`; single unified package (#200)
-- **core:** **BREAKING** replace `json.dumps` with RFC 8785 JCS canonicalization in `compute_tool_digest`; all previously pinned digests must be recomputed (#171)
 - **core:** reject tool entries with missing, empty, or non-string `name` field in `compute_tool_digest` (#172)
-- **core:** rename `DigestUnknownPolicy.ALLOW_DEGRADED` to `ALLOW_UNVERIFIED`; old `allow_degraded` string accepted with `DeprecationWarning` (removal in v1.4) (#175)
 
 ### Removed
 
@@ -26,14 +30,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **core:** remove CLA references from contributing guides (#197)
 - **core:** strip BSL prose from `CONTRIBUTING.md`, `ROADMAP.md`, enterprise docstrings, and `PRODUCT_ARCHITECTURE.md` decision log (#195)
 
-### Fixed
-
-- **core:** treat `None`, `{}`, `[]`, and `""` as absent when computing tool digests to prevent spurious drift between servers that toggle between missing and empty values (#173)
-- **core:** disambiguate `interceptors/list` instance names to `mcp-hangar-validator` and `mcp-hangar-mutator` per SEP-1763 unique-name requirement (#176)
-
 ### Added
 
 - **tests:** schema validation for `interceptors/list` response against local JSON Schema derived from SEP-1763 (pinned @ `5bd7ab4`) (#185)
+
+## [1.3.0](https://github.com/mcp-hangar/mcp-hangar/compare/v1.2.3...v1.3.0) (2026-06-23)
+
+### Highlights
+
+**Per-tenant tool governance for external agents.** Hangar can now act as a front
+door: external agents authenticate over OAuth (discoverable per RFC 9728), are
+identified per tenant, and see and invoke only the tools their tenant is allowed --
+enforced on every call, independent of the client's cached tool list.
+
+- **Front-door mode** (`tool_access.mode: front_door`) -- opt-in. Unauthenticated
+  callers are denied; the default `egress` behavior is unchanged.
+- **Per-tenant tool access** -- member-scope allow/deny policy resolved on the live
+  call path.
+- **Tool withdrawal** -- withdraw a tool for a tenant via config (reload) or the
+  runtime admin API; rejected at call time. The guarantee is per-process-after-reload
+  (fleet-wide synchronous withdrawal is future work).
+- **Flat tool re-export** -- in front-door mode, external agents see clean backend
+  tool names instead of the `hangar_*` meta-API.
+- **OAuth Resource Server discovery** (RFC 9728) -- Protected Resource Metadata and a
+  `WWW-Authenticate` challenge advertise the authorization server. Hangar validates
+  tokens; it does not issue them. Multi-issuer trust and audience binding are
+  tracked as follow-ups.
+
+### Added
+
+- **core:** add front_door fail-closed default for unauthenticated calls (#242), closes #236
+- **core:** add runtime tool withdraw/restore mutation API (#246), closes #235
+- **core:** add tenant_id to CallerIdentity from JWT claim (#238), closes #228
+- **core:** add ToolProjectionRegistry read-model (#237), closes #230
+- **core:** enforce tool withdrawal on the call path (#243), closes #231
+- **core:** flat per-tenant tool re-export in front_door mode (#252), closes #232
+- **core:** populate tool withdrawal from config (reload-driven overlay) (#245), closes #244
+- **core:** populate ToolProjectionRegistry from tool discovery (#250), closes #248
+- **core:** resolve member-scope tool policy on the live call path (#241), closes #229
+- **security:** advertise OAuth Protected Resource Metadata (RFC 9728) (#257), closes #256
+
+### Fixed
+
+- **core:** bind caller identity on the MCP request path (#249), closes #247
+- **core:** propagate request context into batch worker threads (#239), closes #227
+- **core:** satisfy mypy and ruff format CI gates (#258)
+
+## [1.2.3](https://github.com/mcp-hangar/mcp-hangar/compare/v1.2.2...v1.2.3) (2026-06-23)
+
+### Fixed
+
+- **core:** add auth/tls/http config serialization to `to_config_dict()` (#209)
+- **security:** make `_sanitize()` recursive to strip nested secrets (#210), closes #206
+
+## [1.2.2](https://github.com/mcp-hangar/mcp-hangar/compare/v1.2.1...v1.2.2) (2026-05-17)
+
+### Changed
+
+- **core:** absorb `enterprise/` into `src/mcp_hangar/` (#201)
+- **docs:** move `adr/AGENTS.md` to `docs/internal/ADR_AGENTS.md`
+
+### Fixed
+
+- **core:** remove CLA nav entry and fix ruff formatting in `cef_formatter`
 
 ## [1.2.1](https://github.com/mcp-hangar/mcp-hangar/compare/v1.2.0...v1.2.1) (2026-05-11)
 

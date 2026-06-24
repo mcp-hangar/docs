@@ -52,6 +52,7 @@ mcp_servers:
 | `tls` | `dict` | -- | -- | TLS configuration (remote mode only) |
 | `http` | `dict` | -- | -- | HTTP transport configuration (remote mode only) |
 | `max_concurrency` | `int` | -- | -- | Per-MCP server concurrency limit |
+| `capabilities` | `dict` | -- | -- | Declared capability contract (network, filesystem, environment, tools, resources, `enforcement_mode`). Hangar enforces these at runtime and flags deviations. |
 
 ### `tools` dual format
 
@@ -98,12 +99,19 @@ v1.3.0, digests are computed from RFC 8785 JSON Canonicalization Scheme (JCS)
 output. Recompute existing pins after upgrading from versions that used
 `json.dumps` canonicalization.
 
-Unknown-tool handling uses `DigestUnknownPolicy` values:
+Unknown-tool handling uses `DigestUnknownPolicy` values (`block`, `warn`,
+`allow_unverified`):
 
 - `block` -- reject tools that do not have a known pinned digest.
-- `audit` -- allow unknown tools and record the event for audit.
 - `warn` -- allow unknown tools and emit a warning.
 - `allow_unverified` -- allow tools without a verified digest.
+
+Mismatch handling (when a tool's schema does not match its pinned digest) uses
+the separate `DigestEnforcement` levels (`audit`, `warn`, `block`):
+
+- `audit` -- allow the mismatched tool and record the event for audit.
+- `warn` -- allow the mismatched tool and emit a warning.
+- `block` -- reject tools whose schema does not match the pinned digest.
 
 `allow_degraded` was renamed to `allow_unverified` in v1.3.0. The old string is
 accepted with a `DeprecationWarning` and is scheduled for removal in v1.4.
@@ -324,9 +332,16 @@ auth:
     issuer: https://auth.example.com
     audience: mcp-hangar
   rate_limit:
-    rps: 10
-    burst: 20
+    enabled: true
+    max_attempts: 10
+    window_seconds: 60
+    lockout_seconds: 300
 ```
+
+> **Note:** The `auth.rate_limit` block configures login-attempt lockout (failed
+> authentication throttling). The runtime token-bucket request rate limiter
+> (`rps`/`burst`) is configured separately via the `MCP_RATE_LIMIT_RPS` and
+> `MCP_RATE_LIMIT_BURST` environment variables.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|

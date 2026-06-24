@@ -43,7 +43,7 @@ rejected before digest computation.
 
 | Type | Location | Purpose |
 |------|----------|---------|
-| `HookPhase` | `domain/value_objects/hook.py` | Enum: `BEFORE`, `AROUND`, `AFTER`, `ON_ERROR`, `OBSERVE` |
+| `HookPhase` | `domain/value_objects/hook.py` | `StrEnum`: `PRE_VALIDATE` (`"pre_validate"`), `POST_VALIDATE` (`"post_validate"`), `PRE_MUTATE` (`"pre_mutate"`), `POST_MUTATE` (`"post_mutate"`), `OBSERVE` (`"observe"`) |
 | `Hook` | `domain/value_objects/hook.py` | Wraps `(event, phase, sequence_number)` |
 | `IHookSubscriber` | `domain/contracts/hook_subscriber.py` | Protocol for phase-aware event delivery |
 | `EventBus` | `infrastructure/event_bus.py` | Fan-out to both flat subscribers and hook subscribers |

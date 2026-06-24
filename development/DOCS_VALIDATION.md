@@ -1,10 +1,3 @@
----
-title: Documentation Validation
-description: How MCP Hangar docs are kept in sync with the product source.
-sidebar_label: Docs Validation
-sidebar_order: 60
----
-
 # Documentation Validation
 
 These docs are published independently of the [`mcp-hangar`][src] product, so

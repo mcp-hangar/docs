@@ -308,6 +308,8 @@ Alert rules are defined in `monitoring/prometheus/alerts.yaml` and organized by 
 | `MCPHangarBatchHighFailureRate` | Batch failure > 20% | 3m | Batch operations failing |
 | `MCPHangarCircuitBreakerTripped` | CB rejections > 10/5m | 2m | MCP Server isolated |
 | `MCPHangarProviderUnhealthy` | Consecutive failures > 5 | 2m | MCP Server critically unhealthy |
+| `MCPHangarAllProvidersDown` | All MCP servers down (with servers configured) | 1m | Total outage |
+| `MCPHangarCriticalDetectionMatch` | Critical detection rule match | 0m | Security: critical behavioral detection |
 
 #### Warning Alerts (Investigate)
 
@@ -325,6 +327,13 @@ Alert rules are defined in `monitoring/prometheus/alerts.yaml` and organized by 
 | `MCPHangarGCSlowCycles` | P95 GC > 0.5s | 5m | GC performance issue |
 | `MCPHangarHighMemoryUsage` | Memory > 2GB | 10m | Memory pressure |
 | `MCPHangarHighCPUUsage` | CPU > 80% | 10m | CPU saturation |
+| `MCPHangarProviderDegraded` | MCP server state = DEGRADED | 5m | MCP Server degraded |
+| `MCPHangarRemoteProviderUnreachable` | Connection-refused errors > 10/5m | 5m | Remote MCP server unreachable |
+| `MCPHangarDiscoverySourceUnhealthy` | No healthy discovery sources | 5m | Discovery sources down |
+| `MCPHangarHighRateLimitRejections` | Rejected rate-limit hits > 1/s | 5m | Clients being throttled |
+| `MCPHangarCapabilityViolations` | Capability violations > 0/5m | 5m | Security: capability breach |
+| `MCPHangarConcurrencyQueueBuildup` | Concurrency queue building > 1/5m | 5m | Backpressure / saturation |
+| `MCPHangarEnforcementActionsActive` | Enforcement actions firing | 5m | Security: enforcement active |
 
 #### Info Alerts (Tracking)
 

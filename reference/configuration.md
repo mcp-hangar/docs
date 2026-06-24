@@ -91,6 +91,26 @@ mcp_servers:
 
 When `allow_list` is set, only matching tools are exposed. When only `deny_list` is set, all tools except matches are exposed.
 
+## Digest Pinning
+
+Digest pinning validates tool schemas against precomputed SHA-256 digests. Since
+v1.3.0, digests are computed from RFC 8785 JSON Canonicalization Scheme (JCS)
+output. Recompute existing pins after upgrading from versions that used
+`json.dumps` canonicalization.
+
+Unknown-tool handling uses `DigestUnknownPolicy` values:
+
+- `block` -- reject tools that do not have a known pinned digest.
+- `audit` -- allow unknown tools and record the event for audit.
+- `warn` -- allow unknown tools and emit a warning.
+- `allow_unverified` -- allow tools without a verified digest.
+
+`allow_degraded` was renamed to `allow_unverified` in v1.3.0. The old string is
+accepted with a `DeprecationWarning` and is scheduled for removal in v1.4.
+
+Digest computation also normalizes `None`, `{}`, `[]`, and `""` as absent values
+and rejects tool entries with a missing, empty, or non-string `name` field.
+
 ## `execution`
 
 System-wide concurrency limits.
@@ -465,6 +485,16 @@ Environment variables override corresponding YAML settings. Variables follow the
     `HANGAR_LANGFUSE_SAMPLE_RATE` maps to `MCP_LANGFUSE_SAMPLE_RATE`,
     `HANGAR_LANGFUSE_SCRUB_INPUTS` maps to `MCP_LANGFUSE_SCRUB_INPUTS`,
     `HANGAR_LANGFUSE_SCRUB_OUTPUTS` maps to `MCP_LANGFUSE_SCRUB_OUTPUTS`.
+
+### Deprecated Variables
+
+`HANGAR_LICENSE_KEY` is deprecated in v1.3.0. MCP Hangar ignores it and emits a
+`DeprecationWarning` when the variable is set. Remove it from deployment
+manifests; MCP Hangar is MIT-licensed and no longer uses license keys.
+
+License-tier configuration and API fields were removed in v1.3.0. Remove any
+custom deployment checks for `license_tier`, `LicenseTier`, or
+`ApplicationContext.license_tier`.
 
 ### Container Runtime
 

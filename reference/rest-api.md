@@ -571,7 +571,7 @@ GET /system
     "total_tools": 15,
     "total_tool_calls": 42,
     "uptime_seconds": 3600.5,
-    "version": "1.1.0"
+    "version": "1.3.0"
   }
 }
 ```

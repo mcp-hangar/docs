@@ -18,8 +18,8 @@ handler that forwards `ToolInvocationCompleted`, `ToolInvocationFailed`, and
 `McpServerStateChanged` events to the chosen exporter. This handler runs
 independently of the OTLP audit exporter.
 
-If the enterprise module is not installed, Hangar logs a warning and continues
-without the compliance handler.
+Compliance exporters are included in the main `mcp_hangar` package since
+v1.3.0; no separate enterprise module or license key is required.
 
 ## Format reference
 

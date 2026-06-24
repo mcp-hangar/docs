@@ -33,6 +33,12 @@ EventBus.publish()
 | `compute_tool_digest()` | `domain/services/digest_computation.py` | Deterministic SHA-256 over canonical JSON |
 | `DigestValidator` | `domain/services/digest_validator.py` | Validates tools against policy, emits `DigestMismatchEvent` |
 
+`compute_tool_digest()` uses RFC 8785 JSON Canonicalization Scheme (JCS) before
+hashing. v1.3.0 treats `None`, `{}`, `[]`, and `""` as absent values to avoid
+false drift between servers that alternate between missing and empty optional
+fields. Tool entries with a missing, empty, or non-string `name` field are
+rejected before digest computation.
+
 ### Hook-Based Event Model (ADR-005)
 
 | Type | Location | Purpose |
@@ -72,7 +78,7 @@ method per SEP-1763 (PR #2624).
 {
   "interceptors": [
     {
-      "name": "mcp-hangar",
+      "name": "mcp-hangar-validator",
       "version": "<package version>",
       "type": "validator",
       "supportedEvents": ["tools/call", "tools/list"],
@@ -80,7 +86,7 @@ method per SEP-1763 (PR #2624).
       "trustBoundary": "host"
     },
     {
-      "name": "mcp-hangar",
+      "name": "mcp-hangar-mutator",
       "version": "<package version>",
       "type": "mutator",
       "supportedEvents": ["tools/call"],

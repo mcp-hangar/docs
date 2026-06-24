@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/mcp-hangar/mcp-hangar/compare/v1.2.1...v1.3.0) (2026-06-24)
+
+### Changed
+
+- **core:** **BREAKING** relicense from BSL 1.1 dual-license to MIT; all enterprise features are now freely available (#198)
+- **core:** remove `LicenseTier` enum, `LicenseValidation`, and license-key gating from bootstrap; `load_enterprise_modules` loads unconditionally (#196)
+- **core:** `HANGAR_LICENSE_KEY` env var is deprecated and emits `DeprecationWarning` when set (#196)
+- **core:** `EnterpriseComponents` no longer carries a `license_tier` field; `ApplicationContext.license_tier` removed (#196)
+- **core:** absorb `enterprise/` modules (auth, compliance, approvals, integrations, persistence) into `src/mcp_hangar/`; single unified package (#200)
+- **core:** **BREAKING** replace `json.dumps` with RFC 8785 JCS canonicalization in `compute_tool_digest`; all previously pinned digests must be recomputed (#171)
+- **core:** reject tool entries with missing, empty, or non-string `name` field in `compute_tool_digest` (#172)
+- **core:** rename `DigestUnknownPolicy.ALLOW_DEGRADED` to `ALLOW_UNVERIFIED`; old `allow_degraded` string accepted with `DeprecationWarning` (removal in v1.4) (#175)
+
+### Removed
+
+- **core:** delete `enterprise/auth/license.py` (HMAC license-key validator) (#196)
+- **core:** delete `src/mcp_hangar/domain/value_objects/license.py` (`LicenseTier` enum) (#196)
+- **core:** delete `enterprise/LICENSE.BSL` and `CLA.md` (#194, #197)
+- **core:** remove CLA references from contributing guides (#197)
+- **core:** strip BSL prose from `CONTRIBUTING.md`, `ROADMAP.md`, enterprise docstrings, and `PRODUCT_ARCHITECTURE.md` decision log (#195)
+
+### Fixed
+
+- **core:** treat `None`, `{}`, `[]`, and `""` as absent when computing tool digests to prevent spurious drift between servers that toggle between missing and empty values (#173)
+- **core:** disambiguate `interceptors/list` instance names to `mcp-hangar-validator` and `mcp-hangar-mutator` per SEP-1763 unique-name requirement (#176)
+
+### Added
+
+- **tests:** schema validation for `interceptors/list` response against local JSON Schema derived from SEP-1763 (pinned @ `5bd7ab4`) (#185)
+
 ## [1.2.1](https://github.com/mcp-hangar/mcp-hangar/compare/v1.2.0...v1.2.1) (2026-05-11)
 
 
@@ -18,39 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 * **core:** rename ALLOW_DEGRADED to ALLOW_UNVERIFIED in DigestUnknownPolicy ([#189](https://github.com/mcp-hangar/mcp-hangar/issues/189)) ([00a44b4](https://github.com/mcp-hangar/mcp-hangar/commit/00a44b4fddae32fec1538c6b0517eed6c1311756)), closes [#175](https://github.com/mcp-hangar/mcp-hangar/issues/175)
-
-## [Unreleased]
-
-### Changed
-
-- **core:** **BREAKING** relicense from BSL 1.1 dual-license to MIT; all enterprise features are now freely available (#198)
-- **core:** remove `LicenseTier` enum, `LicenseValidation`, and license-key gating from bootstrap; `load_enterprise_modules` loads unconditionally (#196)
-- **core:** `HANGAR_LICENSE_KEY` env var is deprecated and emits `DeprecationWarning` when set (#196)
-- **core:** `EnterpriseComponents` no longer carries a `license_tier` field; `ApplicationContext.license_tier` removed (#196)
-- **core:** absorbed `enterprise/` modules (auth, compliance, approvals, integrations, persistence) into `src/mcp_hangar/`; single unified package (#200)
-
-### Removed
-
-- **core:** delete `enterprise/auth/license.py` (HMAC license-key validator) (#196)
-- **core:** delete `src/mcp_hangar/domain/value_objects/license.py` (`LicenseTier` enum) (#196)
-- **core:** delete `enterprise/LICENSE.BSL` and `CLA.md` (#194, #197)
-- **core:** remove CLA references from contributing guides (#197)
-- **core:** strip BSL prose from `CONTRIBUTING.md`, `ROADMAP.md`, enterprise docstrings, and `PRODUCT_ARCHITECTURE.md` decision log (#195)
-
-### Changed
-
-- **core:** **BREAKING** replace `json.dumps` with RFC 8785 JCS canonicalization in `compute_tool_digest`; all previously pinned digests must be recomputed (#171)
-- **core:** reject tool entries with missing, empty, or non-string `name` field in `compute_tool_digest` (#172)
-- **core:** rename `DigestUnknownPolicy.ALLOW_DEGRADED` to `ALLOW_UNVERIFIED`; old `allow_degraded` string accepted with `DeprecationWarning` (removal in v1.4) (#175)
-
-### Fixed
-
-- **core:** treat `None`, `{}`, `[]`, and `""` as absent when computing tool digests to prevent spurious drift between servers that toggle between missing and empty values (#173)
-- **core:** disambiguate `interceptors/list` instance names to `mcp-hangar-validator` and `mcp-hangar-mutator` per SEP-1763 unique-name requirement (#176)
-
-### Added
-
-- **tests:** schema validation for `interceptors/list` response against local JSON Schema derived from SEP-1763 (pinned @ `5bd7ab4`) (#185)
 
 ## [1.2.0](https://github.com/mcp-hangar/mcp-hangar/compare/v1.1.0...v1.2.0) (2026-05-11)
 

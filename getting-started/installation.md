@@ -52,11 +52,11 @@ make setup
 ## Docker
 
 ```bash
-docker pull ghcr.io/mcp-hangar/mcp-hangar:1.1.0
+docker pull ghcr.io/mcp-hangar/mcp-hangar:1.3.0
 
 # Run with config
 docker run -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  ghcr.io/mcp-hangar/mcp-hangar:1.1.0
+  ghcr.io/mcp-hangar/mcp-hangar:1.3.0
 ```
 
 ## Verify Installation

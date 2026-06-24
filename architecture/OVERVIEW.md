@@ -8,8 +8,11 @@ MCP Hangar is organized as a monorepo:
 
 | Package | Description | Location |
 |---------|-------------|----------|
-| **Core** | Python library (PyPI: `mcp-hangar`) | `src/mcp_hangar/` |
-| **Core package** | MIT-only features | `src/mcp_hangar/` |
+| **Core package** | Python library (PyPI: `mcp-hangar`), including auth, compliance, approvals, integrations, and persistence | `src/mcp_hangar/` |
+
+Since v1.3.0, MCP Hangar is a single MIT-licensed package. The former
+`enterprise/` package was absorbed into `src/mcp_hangar/`; features are no
+longer split by license tier or gated by license keys.
 
 **Key concepts:**
 

@@ -157,7 +157,7 @@ State machine transitions:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `health_check_interval_s` | int | `30` | Per-MCP server health check interval (seconds) |
+| `health_check_interval_s` | int | `60` | Per-MCP server health check interval (seconds) |
 | `max_consecutive_failures` | int | `3` | Failures before state transition to DEGRADED |
 
 ## What's Next

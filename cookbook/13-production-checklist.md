@@ -37,7 +37,7 @@
 ## Configuration
 
 - [ ] Config file reviewed for correctness (no `validate` subcommand exists)
-- [ ] Hot-reload tested via `mcp-hangar add` API (no SIGHUP handler exists)
+- [ ] Hot-reload tested via the `add`/`remove` API and via `SIGHUP` (graceful config reload)
 - [ ] Environment-specific configs separated (dev/staging/prod)
 
 ## Deployment

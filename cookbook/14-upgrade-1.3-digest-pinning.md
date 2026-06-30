@@ -11,7 +11,7 @@ MCP Hangar v1.2.1 changed how tool digests are computed. Releases up to v1.2.0
 used Python `json.dumps` canonicalization. Starting in v1.2.1, Hangar uses
 RFC 8785 JSON Canonicalization Scheme (JCS), normalizes empty optional values,
 and rejects malformed tool entries before hashing. That digest behavior carries
-forward unchanged through the current release (v1.3.0), so this migration
+forward unchanged through the current release (v1.4.0), so this migration
 applies whether you land on v1.2.1 or any later version.
 
 If you upgrade across the v1.2.1 boundary with strict digest enforcement, valid
@@ -64,12 +64,12 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
 
 1. Verify the package in Docker
 
-   This recipe pins the current release (v1.3.0), which includes the v1.2.1 JCS
-   digest behavior. Any version `>=1.2.1` works.
+   This recipe installs v1.3.0 or newer (the current release is v1.4.0), which
+   includes the v1.2.1 JCS digest behavior. Any version `>=1.2.1` works.
 
    ```bash
    docker run --rm python:3.11-slim sh -lc '
-     pip install --quiet "mcp-hangar==1.3.0" &&
+     pip install --quiet "mcp-hangar>=1.3.0" &&
      mcp-hangar --version
    '
    ```
@@ -77,7 +77,7 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
    Expected output:
 
    ```text
-   mcp-hangar 1.3.0
+   mcp-hangar 1.4.0
    ```
 
 1. Start Hangar in HTTP mode
@@ -87,7 +87,7 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
      -p 127.0.0.1:8000:8000 \
      -v /tmp/hangar-1.3-cookbook/config.yaml:/config.yaml:ro \
      python:3.11-slim sh -lc '
-       pip install --quiet "mcp-hangar==1.3.0" &&
+       pip install --quiet "mcp-hangar>=1.3.0" &&
        mcp-hangar --config /config.yaml serve \
          --http --host 0.0.0.0 --port 8000 --unsafe-no-auth \
          --log-file /tmp/hangar-1.3-digest.log

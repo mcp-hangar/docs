@@ -16,19 +16,19 @@ You have two MCP servers in a failover group. All traffic goes to the primary --
 mcp_servers:
   my-mcp:
     mode: remote
-    endpoint: "http://localhost:8080"
+    endpoint: "http://localhost:8080/mcp"
     health_check_interval_s: 10          # from recipe 02
     max_consecutive_failures: 3          # from recipe 03
 
   my-mcp-backup:
     mode: remote
-    endpoint: "http://localhost:8081"
+    endpoint: "http://localhost:8081/mcp"
     health_check_interval_s: 10
     max_consecutive_failures: 3
 
   my-mcp-3:                              # NEW: third instance
     mode: remote
-    endpoint: "http://localhost:8082"
+    endpoint: "http://localhost:8082/mcp"
     health_check_interval_s: 10
     max_consecutive_failures: 3
 
@@ -49,15 +49,28 @@ mcp_servers:
 
 1. Start all three MCP server instances on ports 8080, 8081, 8082.
 
-2. Start Hangar and verify the group:
+2. Start Hangar and confirm the group is configured (it stays COLD until the
+   first call):
 
    ```bash
    mcp-hangar status
    ```
 
    ```
-   my-mcp-group    group     ready    strategy=round_robin  members=3/3 healthy
+   ╭──────────────────────────────────────────────────────────────────────────────╮
+   │ Server not running | McpServers: 1                                           │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+                MCP Hangar Status
+   ╭─────┬───────────┬───────┬────────┬───────╮
+   │     │ McpServer │ State │ Health │ Tools │
+   ├─────┼───────────┼───────┼────────┼───────┤
+   │ --  │ my-mcp-group │ COLD │      - │     - │
+   ╰─────┴───────────┴───────┴────────┴───────╯
    ```
+
+   `status` shows the group as a single COLD row -- it does not report the
+   strategy or per-member health. To observe load distribution, watch which
+   member serves successive calls in the logs (next step).
 
 3. Make several tool calls through the group and observe distribution in
    the logs. Use the JSON-RPC approach from recipe 03:
@@ -78,15 +91,25 @@ mcp_servers:
 4. Stop one instance and observe redistribution:
 
    ```bash
-   # Kill the process on port 8082
+   # Kill the process on port 8082, then re-run status
    mcp-hangar status
    ```
 
    ```
-   my-mcp-group    group     partial  strategy=round_robin  members=2/3 healthy
+   ╭──────────────────────────────────────────────────────────────────────────────╮
+   │ Server not running | McpServers: 1                                           │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+                MCP Hangar Status
+   ╭─────┬───────────┬───────┬────────┬───────╮
+   │     │ McpServer │ State │ Health │ Tools │
+   ├─────┼───────────┼───────┼────────┼───────┤
+   │ --  │ my-mcp-group │ COLD │      - │     - │
+   ╰─────┴───────────┴───────┴────────┴───────╯
    ```
 
-   Traffic automatically redistributes to the remaining two healthy members.
+   `status` still reports the group as a single COLD row; it does not surface
+   per-member health. Traffic automatically redistributes to the remaining two
+   healthy members -- watch the logs to confirm calls only land on the survivors.
 
 ## What Just Happened
 

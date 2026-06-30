@@ -283,6 +283,18 @@ Alert monitoring and trends:
 - Alert condition trends (error rate, latency, health)
 - Historical alert timeline
 
+### Governance Dashboard
+
+**File:** `governance.json`
+**URL:** http://localhost:3000/d/mcp-hangar-governance
+
+MCP Hangar 1.4.0 adds a governance dashboard for tenant and policy operations:
+
+- Cost attribution by MCP server, tool, and cost model
+- Capability violations, behavioral deviations, tool schema drifts, detection rule matches, and enforcement actions
+- Tool access denials, filtered tools, and active tool-access policies
+- Batch in-flight calls, concurrency queueing, P95 wait time, and circuit-breaker state
+
 ### Importing Dashboards Manually
 
 If not using provisioning:
@@ -334,6 +346,17 @@ Alert rules are defined in `monitoring/prometheus/alerts.yaml` and organized by 
 | `MCPHangarCapabilityViolations` | Capability violations > 0/5m | 5m | Security: capability breach |
 | `MCPHangarConcurrencyQueueBuildup` | Concurrency queue building > 1/5m | 5m | Backpressure / saturation |
 | `MCPHangarEnforcementActionsActive` | Enforcement actions firing | 5m | Security: enforcement active |
+
+#### Governance and Availability Alert Groups
+
+1.4.0 adds two dedicated Prometheus groups in `monitoring/prometheus/alerts.yaml`:
+
+- `mcp-hangar-governance` -- security, policy/enforcement, and concurrency saturation signals. (Cost is tracked on the governance dashboard but is not alerted.)
+- `mcp-hangar-availability` -- MCP server state, discovery health, remote transport errors, and runtime rate limiting.
+
+Use these groups when routing alerts to different teams; for example, security
+teams can subscribe to governance alerts while platform on-call owns
+availability and transport alerts.
 
 #### Info Alerts (Tracking)
 

@@ -211,7 +211,7 @@ hit this path. In `egress` mode the handlers are not replaced and the full
 
 ## OAuth Protected Resource Discovery (RFC 9728)
 
-Hangar 1.3 acts as an OAuth 2.0 **resource server**. It **validates** bearer
+Hangar acts as an OAuth 2.0 **resource server**. It **validates** bearer
 tokens (JWT/OIDC) but it does **not** issue them, perform dynamic client
 registration, or run any authorization-server logic. To let clients discover
 where to obtain a token, Hangar implements RFC 9728 Protected Resource
@@ -225,19 +225,28 @@ When an OIDC issuer is configured, Hangar serves the metadata document at:
 GET /.well-known/oauth-protected-resource
 ```
 
-The response advertises the resource server and its authorization server:
+The response advertises the resource server and its trusted authorization
+servers:
 
 ```json
 {
   "resource": "https://hangar.example.com",
-  "authorization_servers": ["https://auth.company.com"]
+  "authorization_servers": [
+    "https://issuer-a.example.com",
+    "https://issuer-b.example.com"
+  ]
 }
 ```
 
 - `resource` — the public URI identifying this resource server. It comes from
   `auth.oidc.resource_uri` if set, otherwise it is derived from the request.
-- `authorization_servers` — a single-element list containing
-  `auth.oidc.issuer`.
+- `authorization_servers` — every trusted issuer from `auth.oidc.issuers`, or
+  the legacy single `auth.oidc.issuer` when no issuer list is configured.
+
+When `auth.oidc.resource_uri` is set, Hangar also uses that value as the
+required JWT `aud` claim. This binds accepted tokens to the advertised resource
+URI (RFC 8707). Without `resource_uri`, validation falls back to each issuer's
+configured `audience`.
 
 This endpoint is unauthenticated (discovery must work without a token). If no
 OIDC issuer is configured, it returns `404`.
@@ -259,10 +268,15 @@ auth:
   allow_anonymous: false
   oidc:
     enabled: true
-    issuer: https://auth.company.com
-    audience: mcp-hangar
     resource_uri: https://hangar.example.com   # advertised as "resource" in PRM
     tenant_claim: tenant_id
+    issuers:
+      - issuer: https://issuer-a.example.com
+        audience: https://hangar.example.com
+        jwks_uri: https://issuer-a.example.com/jwks
+      - issuer: https://issuer-b.example.com
+        audience: https://hangar.example.com
+        jwks_uri: https://issuer-b.example.com/jwks
 ```
 
 > Source: `src/mcp_hangar/auth/prm.py` (PRM body and `WWW-Authenticate`
@@ -286,10 +300,15 @@ auth:
   allow_anonymous: false
   oidc:
     enabled: true
-    issuer: https://auth.company.com
-    audience: mcp-hangar
     resource_uri: https://hangar.example.com
     tenant_claim: tenant_id
+    issuers:
+      - issuer: https://issuer-a.example.com
+        audience: https://hangar.example.com
+        jwks_uri: https://issuer-a.example.com/jwks
+      - issuer: https://issuer-b.example.com
+        audience: https://hangar.example.com
+        jwks_uri: https://issuer-b.example.com/jwks
 
 mcp_servers:
   payments:

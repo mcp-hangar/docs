@@ -1,6 +1,6 @@
 # Cookbook
 
-From zero to production in 16 recipes. Start at 01 and go in order, or jump to
+From zero to production in 19 recipes. Start at 01 and go in order, or jump to
 what you need.
 
 ## The Path (sequential)
@@ -33,6 +33,9 @@ recipe 01.
 | 14 | [Upgrade: Digest Pinning](14-upgrade-1.3-digest-pinning.md) | 13 |
 | 15 | [Interceptor Discovery](15-interceptor-discovery.md) | 14 |
 | 16 | [Front-Door Multi-Tenant](16-front-door-multi-tenant.md) | 12 |
+| 17 | [Multi-Issuer Front Door](17-multi-issuer-front-door.md) | 16 |
+| 18 | [Per-Tenant Digest Pins](18-tenant-digest-pins.md) | 16 |
+| 19 | [Canary Group Routing](19-canary-group-routing.md) | 05 |
 
 ## How to Use This Cookbook
 

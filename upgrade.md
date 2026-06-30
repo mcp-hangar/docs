@@ -4,6 +4,115 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 1.4.0
+
+MCP Hangar 1.4.0 builds on the 1.3 front-door release. It adds tenant-scoped
+digest pins, multi-issuer OIDC trust, resource-bound JWT audiences, and
+per-tenant canary routing for MCP server groups.
+
+### Review OIDC audience binding
+
+If `auth.oidc.resource_uri` is set, it now becomes the expected JWT `aud` value
+for every trusted issuer. This aligns token validation with the RFC 9728
+Protected Resource Metadata `resource` value and RFC 8707 resource indicators.
+
+Before upgrading production front-door deployments:
+
+- Confirm the authorization server issues tokens with `aud` equal to
+  `auth.oidc.resource_uri`.
+- If you need legacy audience values per issuer, leave `resource_uri` unset and
+  configure `audience` on each issuer instead.
+- Prefer setting `resource_uri` behind proxies; otherwise Hangar derives the
+  resource from the incoming request scheme and host.
+
+### Move multi-issuer deployments to `auth.oidc.issuers`
+
+Single-issuer config still works:
+
+```yaml
+auth:
+  oidc:
+    enabled: true
+    issuer: https://issuer-a.example.com
+    audience: mcp-hangar
+```
+
+Use `auth.oidc.issuers` when one Hangar instance trusts multiple authorization
+servers:
+
+```yaml
+auth:
+  oidc:
+    enabled: true
+    resource_uri: https://hangar.example.com
+    tenant_claim: tenant_id
+    issuers:
+      - issuer: https://issuer-a.example.com
+        audience: https://hangar.example.com
+        jwks_uri: https://issuer-a.example.com/jwks
+      - issuer: https://issuer-b.example.com
+        audience: https://hangar.example.com
+        jwks_uri: https://issuer-b.example.com/jwks
+        groups_claim: roles
+```
+
+Tokens with a missing, empty, non-string, or untrusted `iss` claim now fail
+closed with a 401 instead of reaching any issuer validator.
+
+### Add tenant-scoped digest pins intentionally
+
+1.4.0 can enforce schema pins per tenant on the live invocation path:
+
+```yaml
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: https://payments.example.com/mcp
+    tool_projection:
+      digest_enforcement: block
+      tenant_overrides:
+        "tenant:a":
+          pins:
+            refund: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+```
+
+`digest_enforcement` is scoped per MCP server. If unset, pin mismatches default
+to `block`. Roll out pins with `audit` or `warn` first when you are recomputing
+digests or onboarding a new tenant.
+
+The deprecated `allow_degraded` unknown-tool policy is still accepted with a
+`DeprecationWarning` in 1.4.0, but `allow_unverified` remains the canonical value.
+Do not add new `allow_degraded` config.
+
+### Gate canary routing by tenant identity
+
+Group canary routing only applies when Hangar has a `tenant_id` for the caller.
+Explicit tenant pins win first, then the sticky percentage split, then the
+regular load-balancing strategy.
+
+```yaml
+mcp_servers:
+  search:
+    mode: group
+    strategy: weighted_round_robin
+    canary:
+      member: search-v2
+      split_pct: 10
+      pinned_tenants:
+        "tenant:beta": search-v2
+    members:
+      - id: search-v1
+        mode: remote
+        endpoint: https://search-v1.example.com/mcp
+      - id: search-v2
+        mode: remote
+        endpoint: https://search-v2.example.com/mcp
+```
+
+Invalid canary targets are skipped with a warning. If a pinned or canary member
+is not in rotation, Hangar falls back to the group load balancer instead of
+routing traffic to an unhealthy member.
+
 ## Upgrade to 1.3.0
 
 MCP Hangar 1.3.0 relicenses the project to MIT, folds the former enterprise
@@ -36,7 +145,8 @@ Recommended rollout:
 
 If your YAML or code uses the string value `allow_degraded`, change it to
 `allow_unverified`. MCP Hangar 1.3 still accepts `allow_degraded` with a
-`DeprecationWarning`; support is scheduled for removal in v1.4.
+`DeprecationWarning`; 1.4.0 still accepts the alias, but new configuration should
+use only `allow_unverified`.
 
 ### Remove license-tier assumptions
 

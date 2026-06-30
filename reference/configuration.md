@@ -114,10 +114,36 @@ the separate `DigestEnforcement` levels (`audit`, `warn`, `block`):
 - `block` -- reject tools whose schema does not match the pinned digest.
 
 `allow_degraded` was renamed to `allow_unverified` in v1.3.0. The old string is
-accepted with a `DeprecationWarning` and is scheduled for removal in v1.4.
+still accepted with a `DeprecationWarning` in v1.4.0, but new configuration
+should use only `allow_unverified`.
 
 Digest computation also normalizes `None`, `{}`, `[]`, and `""` as absent values
 and rejects tool entries with a missing, empty, or non-string `name` field.
+
+Since v1.4.0, digest pins can be scoped per tenant and enforced on the live
+invocation path:
+
+```yaml
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: https://payments.example.com/mcp
+    tool_projection:
+      digest_enforcement: block
+      tenant_overrides:
+        "tenant:a":
+          pins:
+            refund: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `tool_projection.digest_enforcement` | `str` | `block` | Per-MCP server mismatch handling: `audit`, `warn`, or `block` |
+| `tool_projection.tenant_overrides.<tenant>.pins` | `dict[str, str]` | `{}` | Tool name to 64-character lowercase SHA-256 digest pins for one tenant |
+
+Tenant pins are independent per MCP server. A tenant pin only applies when the
+caller identity has a matching `tenant_id`; otherwise Hangar uses the normal
+projection and withdrawal logic.
 
 ## `execution`
 
@@ -331,6 +357,11 @@ auth:
     enabled: false
     issuer: https://auth.example.com
     audience: mcp-hangar
+    resource_uri: https://hangar.example.com
+    issuers:
+      - issuer: https://issuer-a.example.com
+        audience: https://hangar.example.com
+        jwks_uri: https://issuer-a.example.com/jwks
   rate_limit:
     enabled: true
     max_attempts: 10
@@ -352,6 +383,13 @@ auth:
 | `oidc.enabled` | `bool` | -- | Enable OpenID Connect authentication |
 | `oidc.issuer` | `str` | -- | OIDC issuer URL |
 | `oidc.audience` | `str` | -- | Expected token audience |
+| `oidc.resource_uri` | `str` | -- | Public resource URI. When set, this is advertised in RFC 9728 metadata and enforced as JWT `aud` for all issuers. |
+| `oidc.issuers` | `list[dict]` | `[]` | Multi-issuer trust entries. When non-empty, these override the legacy top-level `oidc.issuer`. |
+| `oidc.issuers[].issuer` | `str` | inherited | Trusted OIDC issuer URL |
+| `oidc.issuers[].audience` | `str` | inherited | Expected audience when `resource_uri` is unset |
+| `oidc.issuers[].jwks_uri` | `str` | inherited | JWKS endpoint for this issuer |
+| `oidc.issuers[].client_id` | `str` | inherited | Optional client ID for additional validation |
+| `oidc.issuers[].max_token_lifetime_seconds` | `int` | inherited | Maximum JWT lifetime for this issuer; `0` disables the check |
 | `oidc.subject_claim` | `str` | -- | JWT subject claim field |
 | `oidc.groups_claim` | `str` | -- | JWT groups claim field |
 | `oidc.email_claim` | `str` | -- | JWT email claim field |
@@ -401,6 +439,11 @@ mcp_servers:
       reset_timeout_s: 60.0
     tools:
       allow_list: ["generate_*"]
+    canary:
+      member: llm-2
+      split_pct: 10
+      pinned_tenants:
+        "tenant:beta": llm-2
     members:
       - id: llm-1
         mode: subprocess
@@ -426,6 +469,9 @@ mcp_servers:
 | `circuit_breaker.failure_threshold` | `int` | `10` | >= 1 | Total group failures before the circuit opens |
 | `circuit_breaker.reset_timeout_s` | `float` | `60.0` | >= 1.0 | Seconds before the circuit auto-resets |
 | `tools` | `dict` | -- | -- | Group-level tool access policy (`allow_list`, `deny_list`) |
+| `canary.member` | `str` | -- | -- | Member that receives canary split traffic |
+| `canary.split_pct` | `int` | `0` | 0--100 | Deterministic percentage of tenants routed to `canary.member` |
+| `canary.pinned_tenants` | `dict[str, str]` | `{}` | -- | Tenant ID to member ID pins; explicit pins win over split routing |
 | `members` | `list[dict]` | `[]` | -- | Member MCP server configurations |
 
 ### Member configuration

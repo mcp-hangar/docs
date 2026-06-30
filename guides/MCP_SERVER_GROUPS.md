@@ -291,6 +291,52 @@ CLOSED (normal operation resumes)
 
 The `hangar_group_rebalance` tool resets the circuit breaker immediately, regardless of the timeout.
 
+## Per-Tenant Canary Routing
+
+MCP Hangar 1.4.0 can route tenants to specific group members before applying
+the normal load-balancing strategy. This is useful for canary releases, version
+pinning, and controlled tenant migrations.
+
+```yaml
+mcp_servers:
+  search:
+    mode: group
+    strategy: weighted_round_robin
+    canary:
+      member: search-v2
+      split_pct: 10
+      pinned_tenants:
+        "tenant:beta": search-v2
+        "tenant:legacy": search-v1
+    members:
+      - id: search-v1
+        mode: remote
+        endpoint: https://search-v1.example.com/mcp
+        weight: 90
+      - id: search-v2
+        mode: remote
+        endpoint: https://search-v2.example.com/mcp
+        weight: 10
+```
+
+Resolution order:
+
+1. `canary.pinned_tenants` sends an explicit tenant to the named member.
+2. `canary.split_pct` sends a deterministic percentage of tenant IDs to `canary.member`.
+3. All other traffic uses the configured group strategy.
+
+The split is sticky across processes because it hashes `tenant_id`; a tenant in
+the 10% bucket keeps routing to the canary member until the policy changes.
+Canary routing only applies when the caller identity has a tenant ID. If the
+pinned or canary member is not in rotation, Hangar falls back to the normal load
+balancer instead of routing to an unavailable member.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `canary.member` | `str` | -- | Group member that receives split traffic |
+| `canary.split_pct` | `int` | `0` | Percentage of tenants routed to `canary.member` (`0`--`100`) |
+| `canary.pinned_tenants` | `dict[str, str]` | `{}` | Tenant ID to member ID pins |
+
 ## Tool Access Filtering
 
 Tool access filtering controls which tools are visible when invoking a group or its members. Filters use a three-level policy hierarchy with fnmatch glob pattern matching (`*`, `?`, `[seq]`).

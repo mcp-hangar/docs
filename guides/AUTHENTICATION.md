@@ -87,6 +87,37 @@ auth:
     tenant_claim: org_id
 ```
 
+Since MCP Hangar 1.4.0, front-door deployments can trust multiple OIDC issuers
+and bind accepted JWT audiences to the public resource URI.
+
+```yaml
+auth:
+  enabled: true
+  allow_anonymous: false
+  oidc:
+    enabled: true
+    resource_uri: https://hangar.example.com
+    tenant_claim: tenant_id
+    issuers:
+      - issuer: https://issuer-a.example.com
+        audience: https://hangar.example.com
+        jwks_uri: https://issuer-a.example.com/jwks
+      - issuer: https://issuer-b.example.com
+        audience: https://hangar.example.com
+        jwks_uri: https://issuer-b.example.com/jwks
+        groups_claim: roles
+```
+
+When `resource_uri` is set, Hangar validates each token's `aud` claim against
+that URI, regardless of the issuer entry's `audience`. This makes the value
+advertised as RFC 9728 `resource` the same value enforced as the RFC 8707
+resource indicator. Without `resource_uri`, each issuer uses its own configured
+`audience`.
+
+`auth.oidc.issuers` takes precedence over the legacy top-level `issuer` field.
+Per-issuer entries inherit omitted claim mappings from top-level `oidc.*` fields.
+Tokens with a missing, empty, non-string, or untrusted `iss` claim fail closed.
+
 ## Authorization (RBAC)
 
 ### Built-in Roles
@@ -227,9 +258,11 @@ auth:
     issuer: str          # OIDC issuer URL
     audience: str        # Expected audience claim
     jwks_uri: str        # JWKS endpoint (auto-discovered if not set)
+    resource_uri: str    # Public resource URI; also enforced as JWT aud when set
     subject_claim: str   # JWT claim for subject (default: sub)
     groups_claim: str    # JWT claim for groups (default: groups)
     tenant_claim: str    # JWT claim for tenant (default: tenant_id)
+    issuers: []          # Multi-issuer trust entries; overrides top-level issuer
 
   opa:
     enabled: bool        # Enable OPA policy engine (default: false)

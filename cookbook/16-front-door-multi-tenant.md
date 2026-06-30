@@ -1,7 +1,7 @@
 # 16 -- Front-Door Multi-Tenant
 
 > **Prerequisite:** [12 -- Auth & RBAC](12-auth-rbac.md)
-> **You will need:** MCP Hangar 1.3.0, Docker, an OIDC issuer that mints JWTs with a `tenant_id` claim
+> **You will need:** MCP Hangar 1.4.0, Docker, an OIDC issuer that mints JWTs with a `tenant_id` claim
 > **Time:** 20 minutes
 > **Adds:** Front-door topology mode, per-tenant tool access, runtime tool withdrawal, RFC 9728 discovery
 
@@ -14,7 +14,7 @@ call only the tools you allow them, not the full `hangar_*` meta-API. And when a
 back-end tool misbehaves, you need to pull it for one tenant without restarting
 or redeploying.
 
-Hangar 1.3 adds a `front_door` topology mode that does exactly this: fail-closed
+Hangar's `front_door` topology mode does exactly this: fail-closed
 per-tenant tool governance, a flat per-tenant tool surface, and OAuth resource
 server discovery.
 
@@ -221,3 +221,7 @@ Hangar **validates** the JWTs your IdP issues; it never issues tokens itself.
 For the conceptual model, egress-vs-front-door comparison, and the full
 endpoint and config reference, see the
 [Front-Door Mode](../guides/FRONT_DOOR.md) guide.
+
+To trust more than one authorization server and bind accepted token audiences
+to your resource URI (RFC 8707), continue with
+[17 -- Multi-Issuer Front Door](17-multi-issuer-front-door.md).

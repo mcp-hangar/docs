@@ -266,8 +266,8 @@ only because one omits an optional field while another sends it empty.
 
 The `allow_degraded` name was also retired in v1.2.1. Use `allow_unverified` for
 unknown tools that are allowed to run without a verified digest. Hangar still
-accepts the old string with a `DeprecationWarning`, but v1.4 is expected to
-remove it.
+accepts the old string with a `DeprecationWarning` in v1.4.0, but new
+configuration should use only `allow_unverified`.
 
 ## Key Config Reference
 
@@ -277,7 +277,7 @@ remove it.
 | `warn` | Allow calls and emit warnings during migration |
 | `block` | Reject unapproved digest drift after migration |
 | `allow_unverified` | Allow unknown tools without a verified digest |
-| `allow_degraded` | Deprecated alias; replace before v1.4 |
+| `allow_degraded` | Deprecated alias; replace with `allow_unverified` |
 
 ## What's Next
 

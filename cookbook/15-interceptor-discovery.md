@@ -40,7 +40,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
      -p 127.0.0.1:8000:8000 \
      -v /tmp/hangar-interceptors/config.yaml:/config.yaml:ro \
      python:3.11-slim sh -lc '
-       pip install --quiet "mcp-hangar==1.3.0" &&
+       pip install --quiet "mcp-hangar>=1.3.0" &&
        mcp-hangar --config /config.yaml serve \
          --http --host 0.0.0.0 --port 8000 --unsafe-no-auth
      '
@@ -74,7 +74,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
      "interceptors": [
        {
          "name": "mcp-hangar-validator",
-         "version": "1.3.0",
+         "version": "1.4.0",
          "type": "validator",
          "supportedEvents": ["tools/call", "tools/list"],
          "modes": ["audit", "enforce"],
@@ -82,7 +82,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
        },
        {
          "name": "mcp-hangar-mutator",
-         "version": "1.3.0",
+         "version": "1.4.0",
          "type": "mutator",
          "supportedEvents": ["tools/call"],
          "modes": ["enforce"],

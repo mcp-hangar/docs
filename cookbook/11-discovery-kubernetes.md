@@ -47,9 +47,8 @@ discovery:
   sources:
     - type: kubernetes                   # NEW: Kubernetes source
       mode: authoritative                # NEW: add AND remove on pod changes
-      config:                            # NEW: K8s-specific config
-        namespace: "mcp-servers"       # NEW: watch this namespace
-        label_selector: "app.kubernetes.io/part-of=mcp"  # NEW: filter pods
+      namespaces: ["mcp-servers"]        # NEW: watch these namespaces (top-level, plural list)
+      label_selector: "app.kubernetes.io/part-of=mcp"  # NEW: filter pods
 ```
 
 ## Try It
@@ -127,8 +126,8 @@ For declarative management, use the MCP-Hangar Operator CRDs instead. See the [K
 |-----|------|---------|-------------|
 | `discovery.sources[].type` | string | -- | Set to `kubernetes` |
 | `discovery.sources[].mode` | string | -- | `additive` or `authoritative` |
-| `discovery.sources[].config.namespace` | string | `default` | Kubernetes namespace to watch |
-| `discovery.sources[].config.label_selector` | string | -- | Pod label selector |
+| `discovery.sources[].namespaces` | list | `default` | Kubernetes namespaces to watch |
+| `discovery.sources[].label_selector` | string | -- | Pod label selector |
 
 ### Kubernetes Annotations
 

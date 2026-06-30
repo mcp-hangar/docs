@@ -45,8 +45,13 @@ discovery:                               # NEW: discovery configuration
 3. Trigger a discovery scan:
 
    ```bash
-   curl -X POST http://localhost:8000/api/discovery/sources/docker/scan
+   curl -X POST http://localhost:8000/api/discovery/sources/{source_id}/scan
    ```
+
+   `{source_id}` is the UUID of the registered source, which you can read from
+   `GET /api/discovery/sources` (the source defined in `config.yaml` is
+   registered at bootstrap and addressed by its UUID, not by the literal type
+   `docker`).
 
 4. Check pending MCP servers:
 
@@ -96,7 +101,7 @@ Set `auto_register: true` if you trust all labeled containers and want zero-touc
 |-------|----------|---------|-------------|
 | `mcp.hangar.enabled` | Yes | -- | Must be `"true"` |
 | `mcp.hangar.name` | No | Container name | MCP Server name |
-| `mcp.hangar.mode` | No | `http` | MCP Server mode |
+| `mcp.hangar.mode` | No | `container` | MCP Server mode |
 | `mcp.hangar.port` | No | `8080` | MCP Server port |
 | `mcp.hangar.group` | No | -- | Auto-add to group |
 

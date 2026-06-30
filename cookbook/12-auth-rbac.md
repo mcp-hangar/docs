@@ -97,7 +97,7 @@ Built-in roles:
 | Role | Can do |
 |------|--------|
 | `admin` | Everything |
-| `operator` | Start, stop, reload, manage groups |
+| `provider-admin` | Manage MCP servers and providers (start, stop, reload, manage groups) |
 | `developer` | Invoke tools, read status |
 | `viewer` | Read-only access |
 
@@ -108,7 +108,7 @@ Tool access policies add fine-grained control per (principal, MCP server, tool) 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `auth.enabled` | bool | `false` | Enable authentication |
-| `auth.allow_anonymous` | bool | `true` | Allow unauthenticated requests |
+| `auth.allow_anonymous` | bool | `false` | Allow unauthenticated requests |
 | `auth.api_key.enabled` | bool | `true` | Enable API key authentication |
 | `auth.api_key.header_name` | string | `X-API-Key` | HTTP header for API key |
 

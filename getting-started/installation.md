@@ -1,5 +1,9 @@
 # Installation
 
+> Looking for the operator image or Helm charts? See
+> [Releases & Artifacts](releases.md) for every published artifact and its
+> install command.
+
 ## Requirements
 
 - Python 3.11 or higher

@@ -36,7 +36,7 @@ recipe 01.
 | 17 | [Multi-Issuer Front Door](17-multi-issuer-front-door.md) | 16 |
 | 18 | [Per-Tenant Digest Pins](18-tenant-digest-pins.md) | 16 |
 | 19 | [Canary Group Routing](19-canary-group-routing.md) | 05 |
-| 20 | [External Multi-Tenant OIDC](20-external-multitenant-oidc.md) | 16 |
+| 22 | [External Multi-Tenant OIDC](22-external-multitenant-oidc.md) | 16 |
 
 ## How to Use This Cookbook
 

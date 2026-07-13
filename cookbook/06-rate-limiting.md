@@ -54,57 +54,62 @@ export MCP_RATE_LIMIT_BURST=10       # NEW: allow short bursts up to 10
 
 ## Try It
 
-1. Start Hangar with rate limiting configured:
+Rate limiting guards the MCP tool-call path -- the command bus that every `hangar_call` (and the other `hangar_*` tools) flows through. Exercise it by firing a burst of tool calls in a single session.
+
+1. Configure a tight limit so the burst is easy to hit:
 
    ```bash
-   MCP_RATE_LIMIT_RPS=1 MCP_RATE_LIMIT_BURST=10 \
-     mcp-hangar serve --http --port 8000
+   export MCP_RATE_LIMIT_RPS=1          # 1 request per second steady-state
+   export MCP_RATE_LIMIT_BURST=3        # allow a short burst of 3
    ```
 
-2. Send requests within the limit:
+2. Fire a burst of `hangar_call`s back-to-back in one session, using the JSON-RPC approach from recipe 05. Print only the responses:
 
    ```bash
-   for i in $(seq 1 5); do
-     curl -s http://localhost:8000/api/mcp_servers | jq .mcp_servers[0].state
-   done
+   (
+     echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+     sleep 0.5
+     echo '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
+     sleep 0.5
+     for i in $(seq 2 7); do
+       echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}},"id":'"$i"'}'
+     done
+     sleep 2
+   ) | mcp-hangar serve 2>/dev/null | grep '"id":'
    ```
 
-   All 5 requests succeed.
+   The first calls (up to the burst size) return a tool result. Once the burst is exhausted, the command bus rejects the remaining `hangar_call`s with a `RateLimitExceeded` error whose message reads `Rate limit exceeded: ...`:
 
-3. Flood the API to trigger rate limiting:
+   ```
+   {"jsonrpc":"2.0","id":2,"result": ... "3" ... }
+   {"jsonrpc":"2.0","id":3,"result": ... "3" ... }
+   {"jsonrpc":"2.0","id":4,"result": ... "3" ... }
+   {"jsonrpc":"2.0","id":5,"result": ... "Rate limit exceeded: ..." ... }
+   {"jsonrpc":"2.0","id":6,"result": ... "Rate limit exceeded: ..." ... }
+   {"jsonrpc":"2.0","id":7,"result": ... "Rate limit exceeded: ..." ... }
+   ```
+
+3. Wait for the token bucket to refill, then a fresh call succeeds again:
 
    ```bash
-   for i in $(seq 1 100); do
-     curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/mcp_servers
-   done
+   sleep 2
+   (
+     echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+     sleep 0.5
+     echo '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
+     sleep 0.5
+     echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}},"id":2}'
+     sleep 2
+   ) | mcp-hangar serve 2>/dev/null | grep '"id":2'
    ```
 
-   After the burst limit, you see `429` responses:
-
-   ```
-   200
-   200
-   ...
-   429
-   429
-   ```
-
-4. Wait 60 seconds and verify the limit resets:
-
-   ```bash
-   sleep 60
-   curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/mcp_servers
-   ```
-
-   ```
-   200
-   ```
+   The bucket refills at `MCP_RATE_LIMIT_RPS` tokens per second, so once enough time passes the next call is allowed through.
 
 ## What Just Happened
 
-Rate limiting is enforced per-tool via `check_rate_limit()`. When the rate exceeds `MCP_RATE_LIMIT_RPS` (requests per second), subsequent requests receive `429 Too Many Requests`. The `MCP_RATE_LIMIT_BURST` setting allows short spikes above the steady-state rate.
+Rate limiting is enforced by a token-bucket limiter wired into the command bus as middleware -- every MCP tool call (`hangar_call` and the other `hangar_*` tools) is dispatched through it. When a call would exceed `MCP_RATE_LIMIT_RPS` (requests per second) and the burst allowance is spent, the middleware raises `RateLimitExceeded` before the command reaches its handler. That error is surfaced back to the MCP client in the tool response. The `MCP_RATE_LIMIT_BURST` setting sizes the bucket, allowing short spikes above the steady-state rate.
 
-Rate limiting applies to both MCP tool calls and REST API requests.
+Scope: the limiter covers the MCP tool-call (command-bus) path only. The REST `/api/*` routes are **not** rate-limited by these settings -- protecting those endpoints is out of scope for this recipe and handled by separate infrastructure (for example a reverse proxy or gateway in front of Hangar).
 
 ## Key Config Reference
 

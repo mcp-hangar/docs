@@ -1,6 +1,6 @@
 # Cookbook
 
-From zero to production in 19 recipes. Start at 01 and go in order, or jump to
+From zero to production in 22 recipes. Start at 01 and go in order, or jump to
 what you need.
 
 ## The Path (sequential)
@@ -36,6 +36,9 @@ recipe 01.
 | 17 | [Multi-Issuer Front Door](17-multi-issuer-front-door.md) | 16 |
 | 18 | [Per-Tenant Digest Pins](18-tenant-digest-pins.md) | 16 |
 | 19 | [Canary Group Routing](19-canary-group-routing.md) | 05 |
+| 20 | [Read-Only Rootfs & Controlled Writes](20-readonly-controlled-write.md) | 13 |
+| 21 | [Local Dev & Staging Profiles](21-dev-staging-profiles.md) | 01, 12 |
+| 22 | [External Multi-Tenant OIDC](22-external-multitenant-oidc.md) | 16 |
 
 ## How to Use This Cookbook
 

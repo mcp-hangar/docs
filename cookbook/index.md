@@ -36,7 +36,7 @@ recipe 01.
 | 17 | [Multi-Issuer Front Door](17-multi-issuer-front-door.md) | 16 |
 | 18 | [Per-Tenant Digest Pins](18-tenant-digest-pins.md) | 16 |
 | 19 | [Canary Group Routing](19-canary-group-routing.md) | 05 |
-| 20 | [Local Dev & Staging Profiles](20-dev-staging-profiles.md) | 01, 12 |
+| 21 | [Local Dev & Staging Profiles](21-dev-staging-profiles.md) | 01, 12 |
 
 ## How to Use This Cookbook
 

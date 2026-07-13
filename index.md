@@ -78,6 +78,7 @@ mcp-hangar serve --http --port 8000
 - [Installation](getting-started/installation.md)
 - [Quick Start Guide](getting-started/quickstart.md)
 - [Architecture Overview](architecture/OVERVIEW.md)
+- [Progressive Deployment Playbook](guides/DEPLOYMENT_PLAYBOOK.md)
 - [REST API Guide](guides/REST_API.md)
 - [Container Guide](guides/CONTAINERS.md)
 - [Authentication & RBAC](guides/AUTHENTICATION.md)

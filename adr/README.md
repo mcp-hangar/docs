@@ -19,6 +19,7 @@ taxonomy, and formatting conventions.
 | [006](ADR-006-tetragon.md) | Runtime Enforcement Strategy -- Tetragon-First, Pluggable Backend | Accepted | 2026-05-10 |
 | [007](ADR-007-langfuse-integration.md) | Langfuse Integration for LLM Observability | Accepted | 2026-01-12 |
 | [008](ADR-008-tasks-relay-only.md) | Task Governance is Relay-Only -- Hangar is a Task Relay, Not a Task Executor | Accepted | 2026-07-02 |
+| [009](ADR-009-independent-release-topology.md) | Independent Release Topology -- Core, Operator Image, Agent Image, and OCI Helm Charts Release on Their Own SemVer | Accepted | 2026-07-14 |
 
 ## Summaries
 
@@ -83,6 +84,20 @@ tested but dormant), never convert calls into tasks or own background execution.
 The relay is deferred until both a real upstream emits tasks and the mcp task API
 leaves `mcp.server.experimental`; in the interim, upstream task handles are
 rejected with a clear error rather than passed through as unusable dead handles.
+
+### [ADR-009](ADR-009-independent-release-topology.md): Independent Release Topology -- Core, Operator Image, Agent Image, and OCI Helm Charts Release on Their Own SemVer
+
+Ratifies four independent release lanes -- Python core (`release-please` ->
+PyPI), operator image + install manifest (tag-triggered -> GHCR), agent image
+(tag-triggered -> GHCR, workflow still to be authored), and OCI Helm charts
+(idempotent push -> `ghcr.io/mcp-hangar/charts`, guarded by a `Chart.yaml`
+version-bump check) -- each with its own SemVer and owner, related by a
+compatibility matrix rather than a shared version. Chart `appVersion` tracks the
+released component image; chart `version` is independent. Docs advertises only
+verified digests. Accepted as a decision, but the topology is *decided and
+asleep*: a live audit found zero releases on every lane but the core, so rollout
+is gated on the first operator/agent/chart releases and the GHCR/compatibility
+policy (`mcp-hangar-operator#26`, `helm-charts#7`, `#453`).
 
 ## Conventions
 

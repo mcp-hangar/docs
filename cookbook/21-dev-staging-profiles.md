@@ -1,4 +1,4 @@
-# 20 -- Local Dev & Staging Profiles
+# 21 -- Local Dev & Staging Profiles
 
 > **Prerequisite:** [01 -- HTTP Gateway](01-http-gateway.md), [12 -- Auth & RBAC](12-auth-rbac.md)
 > **You will need:** Python 3.11+, `pip install mcp-hangar==1.4.0`
@@ -30,7 +30,7 @@ and run one deterministic subprocess provider so you can verify a tool call
 without any network dependency.
 
 ```yaml
-# config.dev.yaml -- Recipe 20: local development profile
+# config.dev.yaml -- Recipe 21: local development profile
 mcp_servers:
   # Deterministic, no-network provider: the bundled example math server.
   # `add` returns a fixed result, so verification is reproducible.
@@ -99,7 +99,7 @@ structured logs so a telemetry collector can parse them. Rate limiting is set
 explicitly rather than left to defaults.
 
 ```yaml
-# config.staging.yaml -- Recipe 20: staging profile
+# config.staging.yaml -- Recipe 21: staging profile
 mcp_servers:
   math:
     mode: subprocess

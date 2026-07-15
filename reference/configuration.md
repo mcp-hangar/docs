@@ -369,10 +369,20 @@ auth:
     lockout_seconds: 300
 ```
 
-> **Note:** The `auth.rate_limit` block configures login-attempt lockout (failed
-> authentication throttling). The runtime token-bucket request rate limiter
-> (`rps`/`burst`) is configured separately via the `MCP_RATE_LIMIT_RPS` and
-> `MCP_RATE_LIMIT_BURST` environment variables.
+> **Note:** The `auth.rate_limit` block above configures login-attempt lockout
+> (failed authentication throttling), distinct from the runtime command-bus
+> token-bucket limiter that throttles command dispatch.
+
+Since 1.5.0 the command-bus token-bucket limiter is configurable via a top-level
+`rate_limit` block; its values take precedence over the `MCP_RATE_LIMIT_RPS` /
+`MCP_RATE_LIMIT_BURST` environment variables (which remain a fallback). Omit the
+block to keep the env/default behavior (10 rps, burst 20):
+
+```yaml
+rate_limit:
+  rps: 10     # tokens refilled per second (default 10)
+  burst: 20   # burst capacity / bucket size (default 20)
+```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|

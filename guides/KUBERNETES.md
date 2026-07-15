@@ -46,12 +46,12 @@ helm repo update
 
 # Install operator
 helm install mcp-hangar-operator mcp-hangar/mcp-hangar-operator \
-  --namespace mcp-system \
+  --namespace mcp-hangar \
   --create-namespace \
   --set hangar.url=http://mcp-hangar-core:8080
 
 # Verify
-kubectl get pods -n mcp-system
+kubectl get pods -n mcp-hangar
 ```
 
 ### Configuration
@@ -67,7 +67,7 @@ operator:
     enabled: true
 
 hangar:
-  url: "http://mcp-hangar-core.mcp-system.svc.cluster.local:8080"
+  url: "http://mcp-hangar-core.mcp-hangar.svc.cluster.local:8080"
   existingSecret: "mcp-hangar-credentials"
   secretKey: "api-key"
 
@@ -250,7 +250,7 @@ apiVersion: mcp-hangar.io/v1alpha1
 kind: MCPDiscoverySource
 metadata:
   name: team-mcp-servers
-  namespace: mcp-system
+  namespace: mcp-hangar
 spec:
   type: Namespace
   mode: Authoritative  # Additive or Authoritative
@@ -384,7 +384,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: mcp-hangar-operator
-  namespace: mcp-system
+  namespace: mcp-hangar
 spec:
   selector:
     matchLabels:
@@ -440,7 +440,7 @@ kubectl get mcpserver my-mcp-server -o jsonpath='{.status.conditions}'
 ### Check Operator Logs
 
 ```bash
-kubectl logs -n mcp-system deployment/mcp-hangar-operator -f
+kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 ```
 
 ### Common Issues

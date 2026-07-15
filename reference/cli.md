@@ -39,6 +39,7 @@ These options are available for all commands:
 | [`remove`](#remove) | Remove MCP server from configuration |
 | [`serve`](#serve) | Start the MCP server |
 | [`completion`](#completion) | Generate shell completion scripts |
+| [`auth`](#auth) | Manage authentication (bootstrap the initial admin) |
 
 ---
 
@@ -451,6 +452,50 @@ mcp-hangar completion install
 
 # Specify shell
 mcp-hangar completion install zsh
+```
+
+---
+
+## auth
+
+Authentication management. Currently exposes a one-time administrator bootstrap.
+
+### auth bootstrap-admin
+
+Grant the one-time global `admin` role to an existing external (OIDC) principal,
+using the server's own durable auth backend. Solves the chicken-and-egg problem
+where a fresh durable auth store with anonymous access disabled cannot create
+its first administrator through the protected API. Added in 1.5.0.
+
+#### Synopsis
+
+```
+mcp-hangar auth bootstrap-admin --config PATH --principal PRINCIPAL [OPTIONS]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--config PATH` | Path to the server `config.yaml` whose durable auth backend to bootstrap. |
+| `--principal PRINCIPAL` | Existing external principal to grant global admin (e.g. `user:admin`). |
+| `--key-name NAME` | Human-readable label recorded for the bootstrap claim. |
+
+#### Behavior
+
+- Uses the same durable backend the server uses (never an in-memory store); the
+  claim is a single atomic operation.
+- **Fails closed** when `auth.enabled` is false, `allow_anonymous` is true, or the
+  storage driver is non-durable (`memory` / `event_sourcing`).
+- A second run is refused without mutating storage — exactly one bootstrap
+  succeeds.
+- Grants a global `admin` role to an existing external principal; it does **not**
+  create or print an API key or any raw secret. The grant is auditable.
+
+#### Example
+
+```bash
+mcp-hangar auth bootstrap-admin --config /etc/mcp-hangar/config.yaml --principal user:alice@example.com
 ```
 
 ---

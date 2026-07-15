@@ -11,7 +11,7 @@ governs how the images and charts are published and verified.
 > **Status: all lanes released and signed; owner sign-off pending.**
 > As of 2026-07-15 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
-> image `1.4.0`, operator `0.12.2`, agent `0.1.1`, and all three Helm charts.
+> image `1.5.0`, operator `0.12.2`, agent `0.1.1`, and all three Helm charts.
 > Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done. Independent release
 > is still **not formally declared supported**: the remaining **Verification
 > status** items are human-gated — Kubernetes-range validation, a named
@@ -35,12 +35,12 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Agent image | Helm charts (core / operator / agent) | Kubernetes |
 | --- | --- | --- | --- | --- |
-| `1.4.x` | `0.12.2` | `0.1.1` | `0.13.1` / `0.12.1` / `0.1.1` | *(pending validation)* |
+| `1.5.x` | `0.12.2` | `0.1.1` | `0.13.1` / `0.12.1` / `0.1.1` | *(pending validation)* |
 
 Rules for reading and extending the matrix:
 
 - **Core** is the reference axis: every supported combination pins a concrete
-  core minor (`v1.4.0` is the current published core).
+  core minor (`v1.5.0` is the current published core).
 - **Operator / Agent / Helm** columns carry the released version; the verified
   digests are in *Released artifacts* below. All lanes have landed
   (`mcp-hangar-operator#26`, `mcp-hangar-agent#30`, `helm-charts#7`). The row is
@@ -62,7 +62,7 @@ cosign signature and an SBOM/provenance attestation.
 
 | Artifact | Version | Digest | Signed |
 | --- | --- | --- | --- |
-| Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `1.4.0` | `sha256:ae1b09acb45997cffa9dd176f01f6e181650d98e5132d3bf956ad5d116bdbd3f` | ✅ |
+| Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `1.5.0` | `sha256:d50cdd092a3d8d6a1b3103c95ebf2f75a22ba6297f768ea50c859d578984aaef` | ✅ |
 | Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.12.2` | `sha256:91f8fea38adc02f84ed2c77b6efbeab38363616f088b03baf7d2eee5c34ce42f` | ✅ |
 | Agent image (`ghcr.io/mcp-hangar/hangar-agent`) | `0.1.1` | `sha256:c88eb21930f6a189246748de975f616f03dde69d775ee7992db2226c12cc307a` | ✅ |
 | Chart `charts/mcp-hangar` (appVersion `1.4.0`) | `0.13.1` | `sha256:cf09ea818ae5acb41f6c2e46423864417f9f66d2bd60984678308e3245be8912` | ✅ |
@@ -74,6 +74,10 @@ Superseded (do not use): operator image `0.12.0`/`0.12.1` and agent `0.1.0`
 pointed at a non-existent core image tag). The core image is versioned on its
 own `1.x` line (matching PyPI core); its release workflow already cosign-signs
 and attaches build provenance.
+
+> **Follow-up:** the `mcp-hangar` chart (`0.13.1`) still declares `appVersion
+> 1.4.0`, so it deploys the previous core image. Bump it to `1.5.0` and
+> republish so the chart tracks the current signed core image.
 
 ## CRD upgrade and rollback policy
 

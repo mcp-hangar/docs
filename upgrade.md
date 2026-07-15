@@ -4,6 +4,54 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 1.5.0
+
+MCP Hangar 1.5.0 adds a one-time admin bootstrap, a configurable command-bus
+rate limit, the interceptor invocation surface with phase-aware hooks,
+task-lifecycle audit events, and a per-tenant discovery entry point. It also
+**fixes OIDC bearer authentication over the HTTP surface**. Upgrade is drop-in
+(`pip install -U mcp-hangar==1.5.0`, or pull
+`ghcr.io/mcp-hangar/mcp-hangar:1.5.0`); the notes below cover the behavior
+changes worth reviewing.
+
+### OIDC bearer auth over `serve --http` now works
+
+If you configured OIDC/JWT front-door auth (`auth.oidc`) on the HTTP server in
+1.4.x and every request returned `401` with `auth_method: none` even for a valid
+token, that was a header-casing bug in the JWT authenticator -- it is fixed in
+1.5.0. No config change is needed; existing `auth.oidc` config now authenticates
+bearer tokens as intended.
+
+### Bootstrap the initial admin
+
+A fresh durable auth store with anonymous access disabled could not create its
+first administrator through the protected API. `mcp-hangar auth bootstrap-admin
+--config PATH --principal PRINCIPAL` now grants the one-time global `admin` role
+to an existing external (OIDC) principal using the server's own durable backend.
+It fails closed when auth is disabled, anonymous access is allowed, or the store
+is non-durable (`memory` / `event_sourcing`), and a second run is refused without
+mutating storage. No secret is printed.
+
+### Behavior changes to review
+
+- **Tool `isError` results now count as failures.** A backend MCP tool result
+  with `isError: true` is treated as a tool failure -- reflected in the per-call
+  result, batch `succeeded`/`failed` counts, health, and `ToolInvocationFailed`
+  events. If you previously treated error results as successes, expect failure
+  counts to rise.
+- **The SQLite event store fails fast.** When a durable event store cannot be
+  initialized (path not writable / backend unavailable), Hangar now refuses to
+  start instead of silently degrading to a non-durable in-memory store. Opt into
+  the fallback with `event_store.driver: memory` or
+  `event_store.allow_memory_fallback: true`. `/health/ready` returns 503 if the
+  store degraded to in-memory while a durable driver was configured.
+- **Group circuit breaker.** A tripped circuit breaker on one group member no
+  longer blocks a healthy remaining member from serving.
+- **Command-bus rate limit is configurable.** The previously-fixed command-bus
+  rate limit can now be tuned in `config.yaml`; review the
+  [configuration reference](reference/configuration) if you relied on the old
+  fixed value.
+
 ## Upgrade to 1.4.0
 
 MCP Hangar 1.4.0 builds on the 1.3 front-door release. It adds tenant-scoped

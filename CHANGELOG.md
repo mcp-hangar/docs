@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/mcp-hangar/docs/compare/v1.0.0...v1.0.1) (2026-07-15)
+
+
+### Changed
+
+* **reference:** document the config.yaml command-bus rate_limit block (1.5.0) ([#40](https://github.com/mcp-hangar/docs/issues/40)) ([49768f3](https://github.com/mcp-hangar/docs/commit/49768f3a505370678d927cb11bb1f4042abb31e9))
+
 ## 1.0.0 (2026-07-15)
 
 

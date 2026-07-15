@@ -17,7 +17,7 @@ Install via Helm (from the [helm-charts](https://github.com/mcp-hangar/helm-char
 helm repo add mcp-hangar https://mcp-hangar.github.io/helm-charts
 helm repo update
 helm install mcp-hangar-operator mcp-hangar/mcp-hangar-operator \
-  --namespace mcp-system \
+  --namespace mcp-hangar \
   --create-namespace
 ```
 

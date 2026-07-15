@@ -62,7 +62,7 @@ cosign signature and an SBOM/provenance attestation.
 
 | Artifact | Version | Digest | Signed |
 | --- | --- | --- | --- |
-| Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `1.4.0` | *(tag `1.4.0`, public; pin from the registry)* | — |
+| Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `1.4.0` | `sha256:ae1b09acb45997cffa9dd176f01f6e181650d98e5132d3bf956ad5d116bdbd3f` | ✅ |
 | Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.12.2` | `sha256:91f8fea38adc02f84ed2c77b6efbeab38363616f088b03baf7d2eee5c34ce42f` | ✅ |
 | Agent image (`ghcr.io/mcp-hangar/hangar-agent`) | `0.1.1` | `sha256:c88eb21930f6a189246748de975f616f03dde69d775ee7992db2226c12cc307a` | ✅ |
 | Chart `charts/mcp-hangar` (appVersion `1.4.0`) | `0.13.1` | `sha256:cf09ea818ae5acb41f6c2e46423864417f9f66d2bd60984678308e3245be8912` | ✅ |
@@ -72,7 +72,8 @@ cosign signature and an SBOM/provenance attestation.
 Superseded (do not use): operator image `0.12.0`/`0.12.1` and agent `0.1.0`
 (unsigned), and the `mcp-hangar` chart `0.12.0`/`0.13.0` (the `0.12.0` chart
 pointed at a non-existent core image tag). The core image is versioned on its
-own `1.x` line (matching PyPI core) and is not yet cosign-signed.
+own `1.x` line (matching PyPI core); its release workflow already cosign-signs
+and attaches build provenance.
 
 ## CRD upgrade and rollback policy
 
@@ -128,11 +129,11 @@ cosign verify ghcr.io/mcp-hangar/mcp-hangar-operator@sha256:<digest> \
 Charts are verified the same way against
 `oci://ghcr.io/mcp-hangar/charts/<chart>`.
 
-> **Active (2026-07-15):** the operator, agent, and chart release workflows sign
-> keyless with cosign and attach SBOM/provenance (`mcp-hangar/mcp-hangar#467`),
-> so the recipe above succeeds against every signed artifact in *Released
-> artifacts*. The core image (`1.4.0`) is the one exception — it is not yet
-> signed.
+> **Active (2026-07-15):** every release workflow signs keyless with cosign and
+> attaches SBOM/provenance — the operator, agent, and chart lanes
+> (`mcp-hangar/mcp-hangar#467`) and the core image lane (which already signed and
+> attached provenance) — so the recipe above succeeds against every artifact in
+> *Released artifacts*.
 
 ## Verification status
 
@@ -151,11 +152,10 @@ sign-off).
       `hangar-agent 0.1.1` (digests in *Released artifacts*).
 - [x] Agent image release lane authored and first image released
       (`mcp-hangar-agent#30`) — signed `0.1.1`, public, `sha256:c88eb219…c12cc307a`.
-- [x] GHCR signing + SBOM/provenance (`mcp-hangar/mcp-hangar#467`) — operator,
-      agent, and all charts carry a keyless cosign signature + attestation,
-      confirmed present in the registry; public visibility confirmed for all
-      artifacts. (Immutability/retention follow GHCR defaults; the core image is
-      not yet signed.)
+- [x] GHCR signing + SBOM/provenance (`mcp-hangar/mcp-hangar#467`) — the core
+      image, operator, agent, and all charts carry a keyless cosign signature +
+      attestation, confirmed present in the registry; public visibility confirmed
+      for all artifacts. (Immutability/retention follow GHCR defaults.)
 - [ ] CRD rollback / compatibility limits validated against a real operator
       release.
 - [ ] Security policy approved by the release and security owners.

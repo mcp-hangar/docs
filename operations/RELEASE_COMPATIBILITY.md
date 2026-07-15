@@ -8,13 +8,15 @@ together" is answered by the compatibility matrix below, not by a shared
 version number. This page is that matrix plus the artifact-security policy that
 governs how the images and charts are published and verified.
 
-> **Status: draft policy, rollout pending.**
-> A live audit (2026-07-14) found releases only on the Python core lane; the
-> operator image, agent image, and Helm charts have not yet cut a first
-> release. The *policy* below is ratified as the target; the **Verification
-> status** section tracks what must be proven before independent releases are
-> declared supported. This mirrors ADR-009's "decided and asleep" framing —
-> nothing here claims the topology is operational today.
+> **Status: partial rollout — operator and agent images released; charts and
+> sign-off pending.**
+> As of 2026-07-15 the operator image (`v0.12.0`) and the agent image
+> (`v0.1.0`) are published, public, and verified by digest (see *Released
+> artifacts*); the Helm charts have not yet cut a first release. Independent
+> release is **not yet declared supported**: the **Verification status** section
+> still has open, human-gated items — notably that the release workflows do
+> **not yet sign images or attach SBOM/provenance**, so the `cosign verify`
+> recipe below does not succeed against today's images.
 
 ## Ownership and update procedure
 
@@ -34,21 +36,34 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Agent image | Helm charts | Kubernetes |
 | --- | --- | --- | --- | --- |
-| `1.4.x` | *(unreleased)* | *(unreleased)* | *(unreleased)* | — |
+| `1.4.x` | `0.12.0` | `0.1.0` | *(unreleased)* | — |
 
 Rules for reading and extending the matrix:
 
-- **Core** is the reference axis: it is the only lane with published releases
-  today (`v1.4.0`). Every supported combination pins a concrete core minor.
-- **Operator / Agent / Helm** columns are filled with the first verified
-  release digests as `mcp-hangar-operator#26`, `mcp-hangar-agent#30`, and
-  `helm-charts#7` land. Until then they read `(unreleased)` and no combination
-  involving them is supported.
+- **Core** is the reference axis: every supported combination pins a concrete
+  core minor (`v1.4.0` is the current published core).
+- **Operator / Agent / Helm** columns carry the released version; the verified
+  digests are in *Released artifacts* below. Operator (`mcp-hangar-operator#26`)
+  and agent (`mcp-hangar-agent#30`) have landed; the Helm column stays
+  `(unreleased)` until `helm-charts#7`, so this row is **not yet a fully
+  supported combination** — it also awaits Kubernetes range validation and
+  sign-off (see Verification status).
 - **Kubernetes** records the tested server range for combinations that include
-  the operator or a chart; it is left `—` while those lanes are unreleased.
+  the operator or a chart; it is left `—` until that range is validated against
+  a real operator install.
 - **SemVer boundaries:** a change that breaks a documented combination is a
   MAJOR bump of the artifact that changed. Adding a newly-tested combination is
   a MINOR/docs change to this matrix, not a version bump of any artifact.
+
+### Released artifacts (verified)
+
+Pinned digests for the published images, confirmed by anonymous pull on
+2026-07-15. Charts are added when `helm-charts#7` lands.
+
+| Artifact | Version | Digest | Visibility |
+| --- | --- | --- | --- |
+| Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.12.0` | `sha256:445148d02e6ccd68253f5a14c65b879dbe2cb91b01561f78b1c0a204a468a523` | Public |
+| Agent image (`ghcr.io/mcp-hangar/hangar-agent`) | `0.1.0` | `sha256:768072be16b181162276907eada2ff17bb0f22b3b37c030ab5be9a848a19e3fe` | Public |
 
 ## CRD upgrade and rollback policy
 
@@ -104,24 +119,34 @@ cosign verify ghcr.io/mcp-hangar/mcp-hangar-operator@sha256:<digest> \
 Charts are verified the same way against
 `oci://ghcr.io/mcp-hangar/charts/<chart>`.
 
+> **Not yet active (2026-07-15):** the operator and agent release workflows
+> currently build and push images but do **not** sign them or attach
+> SBOM/provenance, so `cosign verify` fails against today's images. Wiring
+> keyless signing + SBOM into the release workflows is a tracked follow-up and a
+> prerequisite for checking the GHCR-posture box below. Until then, pin by digest
+> from *Released artifacts* and treat the signature step as pending.
+
 ## Verification status
 
-The policy above is declared *supported* only when every box is checked. These
-are the human- and rollout-gated acceptance criteria from `#453`; they stay
-unchecked until the first releases land and the owners sign off.
+The policy above is declared *supported* only when every box is checked. The
+image lanes have landed; the remaining boxes are the human- and rollout-gated
+criteria from `#453` (charts, image signing, validation, and owner sign-off).
 
 - [ ] Matrix has a named owner in `CODEOWNERS` and the update procedure is in
       effect.
-- [ ] First operator image + manifest released with a verified digest and
-      install instructions (`mcp-hangar-operator#26`).
+- [x] First operator image + manifest released with a verified digest and
+      install instructions (`mcp-hangar-operator#26`) — `0.12.0`, public,
+      `sha256:445148d0…a468a523`, `install.yaml` attached to the release.
 - [ ] First charts published with verified digests and a verified `helm pull`
       (`helm-charts#7`).
-- [ ] Agent image release lane authored and first image released
-      (`mcp-hangar-agent#30`).
+- [x] Agent image release lane authored and first image released
+      (`mcp-hangar-agent#30`) — `0.1.0`, public, `sha256:768072be…a19e3fe`.
 - [ ] CRD rollback / compatibility limits validated against a real operator
       release.
 - [ ] GHCR posture (visibility, immutability, signing, SBOM/provenance,
-      retention) verified against the live registry.
+      retention) verified against the live registry. Visibility is confirmed
+      public for both images; **signing and SBOM/provenance are not yet
+      implemented** in the release workflows (tracked follow-up).
 - [ ] Security policy approved by the release and security owners.
 
 ## References

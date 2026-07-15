@@ -1,0 +1,35 @@
+# Changelog
+
+## 1.0.0 (2026-07-15)
+
+
+### Added
+
+* **content:** migrate public docs from mcp-hangar/docs/ ([0e4232f](https://github.com/mcp-hangar/docs/commit/0e4232f3906ba780baf4edb520b4e0459744529a)), closes [#2](https://github.com/mcp-hangar/docs/issues/2)
+
+
+### Changed
+
+* **architecture:** add ADR-008 -- task governance is relay-only ([#12](https://github.com/mcp-hangar/docs/issues/12)) ([9321f43](https://github.com/mcp-hangar/docs/commit/9321f439847b14a8eb52bb23f8a4e04768c85a6c))
+* **architecture:** draft ADR-009 independent release topology ([#32](https://github.com/mcp-hangar/docs/issues/32)) ([cf5c4de](https://github.com/mcp-hangar/docs/commit/cf5c4ded9e0e9af430d904445f48872258b501a8))
+* **content:** document mcp-hangar 1.3.0 ([710b29a](https://github.com/mcp-hangar/docs/commit/710b29a89672a8d9fd302afab70ffa3a9f594c44))
+* **cookbook:** add 1.3 digest pinning upgrade recipe ([a3832ce](https://github.com/mcp-hangar/docs/commit/a3832cee41f6f8c2b54275bf2d0fc86dfdc42acf))
+* **cookbook:** add interceptor discovery recipe ([73e8d08](https://github.com/mcp-hangar/docs/commit/73e8d086d07a0663ac4b80a19c5b16927b02af68))
+* **guides:** add a progressive deployment playbook ([#23](https://github.com/mcp-hangar/docs/issues/23)) ([9f21a91](https://github.com/mcp-hangar/docs/commit/9f21a91d90cb4f1314a13e93d08a4b30193e3de5))
+* **guides:** add external multi-tenant OIDC front door cookbook ([#26](https://github.com/mcp-hangar/docs/issues/26)) ([982bbe2](https://github.com/mcp-hangar/docs/commit/982bbe23a445e567a458c53c55eeccb9defeafa6))
+* **guides:** add local dev and staging deployment profiles cookbook ([#25](https://github.com/mcp-hangar/docs/issues/25)) ([20f3cb0](https://github.com/mcp-hangar/docs/commit/20f3cb00de9650e38c90e2abaa33f7c640191a15))
+* **guides:** add production read-only and controlled-write boundaries cookbook ([#24](https://github.com/mcp-hangar/docs/issues/24)) ([71c5248](https://github.com/mcp-hangar/docs/commit/71c5248d8743f44ed03bff31d77332469ee0b93a))
+* **guides:** cookbook harden a public authenticated MCP gateway ([#29](https://github.com/mcp-hangar/docs/issues/29)) ([37b7172](https://github.com/mcp-hangar/docs/commit/37b7172ca523d3508d8560a2e11c0f99d6cc54a9)), closes [#21](https://github.com/mcp-hangar/docs/issues/21)
+* **guides:** correct rate-limit scope in cookbook 06 ([#15](https://github.com/mcp-hangar/docs/issues/15)) ([c20f65a](https://github.com/mcp-hangar/docs/commit/c20f65ac2dbf6eebd9bea2cc0f90ee12675e6d4d))
+* **guides:** document mcp-hangar 1.4.0 and add 1.4 cookbooks ([#8](https://github.com/mcp-hangar/docs/issues/8)) ([9cda48c](https://github.com/mcp-hangar/docs/commit/9cda48c1e9b4dfb96397f0e00518b54be0533513))
+* **guides:** fix drifted cookbook recipes against 1.4.0 source ([#9](https://github.com/mcp-hangar/docs/issues/9)) ([9591ffc](https://github.com/mcp-hangar/docs/commit/9591ffce2b4acf464c562693b2bd6073e3b2b011))
+* **guides:** fix duplicated recipe numbers in cookbook 21 and 22 ([#31](https://github.com/mcp-hangar/docs/issues/31)) ([a52521f](https://github.com/mcp-hangar/docs/commit/a52521f245e23be164ddce86972303bdb24df0d1)), closes [#30](https://github.com/mcp-hangar/docs/issues/30)
+* **guides:** use mcp-hangar as the Kubernetes namespace in examples ([#36](https://github.com/mcp-hangar/docs/issues/36)) ([62d9806](https://github.com/mcp-hangar/docs/commit/62d9806efe7f82e22b1d81b01736cbf9a4155686))
+* **release:** add 1.5.0 upgrade notes, CLI auth command, and compatibility matrix ([#39](https://github.com/mcp-hangar/docs/issues/39)) ([57bbe9b](https://github.com/mcp-hangar/docs/commit/57bbe9bbf6108249506ae1538639d7804bd0ff4e))
+* **release:** add release compatibility and GHCR security policy ([#33](https://github.com/mcp-hangar/docs/issues/33)) ([08a41c9](https://github.com/mcp-hangar/docs/commit/08a41c993d2285cf5c61f445e1e91a65cd8d4fb1))
+* **release:** add Releases & Artifacts install index ([#11](https://github.com/mcp-hangar/docs/issues/11)) ([6808a91](https://github.com/mcp-hangar/docs/commit/6808a91a25137f7d7a3ac11f51c50ff48ce58b2d))
+* **release:** correct the core image as signed (it already is) ([#38](https://github.com/mcp-hangar/docs/issues/38)) ([3483627](https://github.com/mcp-hangar/docs/commit/34836277ef239e34c47bf5cef196e521938aa4bb))
+* **release:** record cosign signing done; all artifacts signed ([#37](https://github.com/mcp-hangar/docs/issues/37)) ([27b75b7](https://github.com/mcp-hangar/docs/commit/27b75b7dceaa760cd774a6f58bc55b0cb67b143d))
+* **release:** record verified Helm chart releases; all lanes published ([#35](https://github.com/mcp-hangar/docs/issues/35)) ([ef65e84](https://github.com/mcp-hangar/docs/commit/ef65e84ac16e80c2df7bf060e184cdfbe83cedf6))
+* **release:** record verified operator and agent image releases ([#34](https://github.com/mcp-hangar/docs/issues/34)) ([18aba8c](https://github.com/mcp-hangar/docs/commit/18aba8c3108bdfacc662ea5681e69523b2e15c26))
+* sync with mcp-hangar source, document 1.3.0, add drift validation ([#7](https://github.com/mcp-hangar/docs/issues/7)) ([45bef08](https://github.com/mcp-hangar/docs/commit/45bef08e07222c2b9062a3ee93810a9ea655772d))

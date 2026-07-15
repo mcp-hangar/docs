@@ -1,10 +1,20 @@
 {
   "name": "@mcp-hangar/docs",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Public documentation for MCP Hangar",
-  "files": ["**/*.md", "**/*.mdx", "!**/README.md"],
-  "publishConfig": { "access": "public", "provenance": true },
-  "repository": { "type": "git", "url": "https://github.com/mcp-hangar/docs.git" },
+  "files": [
+    "**/*.md",
+    "**/*.mdx",
+    "!**/README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mcp-hangar/docs.git"
+  },
   "license": "MIT",
   "homepage": "https://mcp-hangar.io/docs"
 }

@@ -11,9 +11,9 @@ governs how the images and charts are published and verified.
 > **Status: released and signed; the published charts carry their fixes — but
 > chart tags are mutable, which is a release-integrity bug
 > (`mcp-hangar/helm-charts#36`).**
-> As of 2026-07-15 every lane has a published, public, **cosign-signed**,
+> As of 2026-07-16 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
-> image `1.5.0`, operator `0.12.2`, and both Helm charts.
+> image `1.5.1`, operator `0.12.2`, and both Helm charts.
 > Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done.
 >
 > Live cluster testing found defects that made a default `helm install` fail
@@ -62,7 +62,7 @@ table is **not** a supported combination — it may work, but it is not covered.
 Rules for reading and extending the matrix:
 
 - **Core** is the reference axis: every supported combination pins a concrete
-  core minor (`v1.5.0` is the current published core).
+  core minor (`v1.5.1` is the current published core).
 - **Operator / Helm** columns carry the released version; the verified
   digests are in *Released artifacts* below. Both lanes have landed
   (`mcp-hangar-operator#26`, `helm-charts#7`) and the
@@ -97,9 +97,11 @@ will drift again on the next merge; the image digests (2026-07-15) are stable.
 
 | Artifact | Version | Digest | Signed |
 | --- | --- | --- | --- |
-| Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `1.5.0` | `sha256:d50cdd092a3d8d6a1b3103c95ebf2f75a22ba6297f768ea50c859d578984aaef` | ✅ |
+| Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `1.5.1` | `sha256:a2d6ed0fe32b04b6cd248df33f9e89b88a88b242e5a8d46a670adf766dc180f4` | ✅ |
 | Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.12.2` | `sha256:91f8fea38adc02f84ed2c77b6efbeab38363616f088b03baf7d2eee5c34ce42f` | ✅ |
 | Chart `charts/mcp-hangar` (appVersion `1.5.0`) | `0.13.2` | `sha256:0d2141f802bea556f998cce13ac6fd672a966fb3133da88f0552f8a55e075341` | ✅ |
+
+> **Chart re-release in flight:** the published `mcp-hangar` chart above still deploys core `1.5.0` by default. A bump to appVersion `1.5.1` — so `helm install` ships the CVE-2026-59950 fix — is tracked in `mcp-hangar/helm-charts#48`; this row updates when that chart release lands.
 | Chart `charts/mcp-hangar-operator` (appVersion `0.12.2`) | `0.12.1` | `sha256:fa73756b590c26478ab93ad15fe218dd5bf168a52e0bfe66faf697aa8a127702` | ✅ |
 
 Superseded (do not use): operator image `0.12.0`/`0.12.1`

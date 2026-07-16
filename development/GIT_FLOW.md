@@ -7,7 +7,8 @@ It covers routine development, bug fixes, feature implementation, and administra
 Adherence ensures a clean, searchable history and reliable automation.
 
 This document does not cover Architectural Decision Record (ADR) governance.
-ADR governance rules reside in docs/adr/AGENTS.md.
+ADR governance rules reside in the core repo's [docs/internal/ADR_AGENTS.md](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/internal/ADR_AGENTS.md).
+The ADRs themselves live in this repo under [adr/](../adr/README.md).
 General repository conventions, such as language requirements and source layout, are in the root AGENTS.md.
 External contributors should also consult CONTRIBUTING.md for environment setup.
 
@@ -256,18 +257,42 @@ Detailed manual steps are in [HOTFIX_RUNBOOK.md](HOTFIX_RUNBOOK.md).
 
 ### Active today
 
-- enterprise-import-boundary (enforced in security.yml)
-- pr-validation.yml (lint and basic unit tests)
-- ci-core.yml (domain and application tests)
-- ci-helm.yml (chart linting)
-- ci-operator.yml (operator SDK tests)
-- ci-docs.yml (MkDocs build validation)
+This is the core repo's (`mcp-hangar/mcp-hangar`) full workflow set.
+Per ADR-009, chart and operator CI live in their own repos -- `mcp-hangar/helm-charts`
+and `mcp-hangar/mcp-hangar-operator` respectively -- not here.
+
+PR gates:
+
+- pr-title.yml (Conventional Commits title, scope required)
+- pr-body.yml (required PR template sections)
+- branch-name.yml (branch prefix validation)
+- changelog-check.yml (changelog entry present)
+- pr-validation.yml (change detection and the required-check aggregate)
+- ci-core.yml (lint, domain and application tests, integration, build)
+- ci-docs.yml (markdown linting via markdownlint-cli2)
+- actionlint.yml (workflow file linting)
+- security.yml (dependency-audit, codeql, container-scan, secrets-scan, semgrep, sbom)
+
+Release:
+
 - release.yml (TestPyPI and PyPI publishing)
 - release-please.yml (automated version bump and Release PR)
-- security.yml (static analysis and boundary checks)
+
+Housekeeping:
 
 - stale bot (stale.yml)
 - Dependabot auto-merge (dependabot-automerge.yml)
+- project-add.yml (adds new issues and PRs to the project board)
+- live-verify.yml (black-box live verification; opt-in via workflow_dispatch and nightly, not on PRs)
+
+### Retained but enforcing nothing
+
+The former enterprise import boundary is **no longer enforced**.
+Both `security.yml`'s `import-boundary` job and `pr-validation.yml`'s
+`enterprise-boundary` job are no-op stubs whose only step echoes a message,
+v1.3 having folded the enterprise package into `src/mcp_hangar/`.
+Both jobs still run and still report green.
+Do not rely on either to catch a boundary violation.
 
 ### Reviewer-only (not auto-enforced)
 

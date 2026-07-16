@@ -4,7 +4,7 @@ This directory contains the Architecture Decision Records (ADRs) for MCP
 Hangar. Each ADR captures a single architectural decision -- the context
 that led to it, what was decided, and the consequences. ADRs are immutable
 once accepted; changing a decision requires a new ADR that supersedes the
-old one. See [AGENTS.md](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/adr/AGENTS.md) for the full governance rules, status
+old one. See [ADR_AGENTS.md](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/internal/ADR_AGENTS.md) for the full governance rules, status
 taxonomy, and formatting conventions.
 
 ## Index
@@ -108,9 +108,9 @@ three-line header (Status, Date, Authors), three required body sections
 Considered and References. Once accepted, ADR bodies are immutable --
 changing a decision requires a new ADR. Five statuses are permitted:
 Proposed, Accepted, Superseded by ADR-NNN, Deprecated, and Rejected. For the full
-specification, see [AGENTS.md](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/adr/AGENTS.md).
+specification, see [ADR_AGENTS.md](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/internal/ADR_AGENTS.md).
 
 ## Quick links
 
-- [How to propose a new ADR](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/adr/AGENTS.md#2-when-to-write-an-adr)
-- [ADR governance and formatting rules](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/adr/AGENTS.md)
+- [How to propose a new ADR](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/internal/ADR_AGENTS.md#2-when-to-write-an-adr)
+- [ADR governance and formatting rules](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/internal/ADR_AGENTS.md)

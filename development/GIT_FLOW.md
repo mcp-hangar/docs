@@ -14,7 +14,7 @@ External contributors should also consult CONTRIBUTING.md for environment setup.
 
 Rules defined here are enforced by CI via required status checks (pr-title.yml,
 branch-name.yml, changelog-check.yml, pr-body.yml, pr-validation.yml, security.yml).
-Enforcement details are listed in Section 12.
+Enforcement details are listed under Automation surface.
 
 ## Decision log
 
@@ -31,7 +31,7 @@ The following table tracks the evolution of git and workflow standards.
 | 7 | Deprecation policy | post-1.0 SemVer: deprecate in minor, remove in next major | Project is at v1.5.0. Breaking changes require a major version bump. |
 | 8 | Dependabot auto-merge | auto-merge dev, actions, and runtime CVE patches | Runtime CVE patches are included in auto-merge to maintain security posture with minimal manual intervention. |
 | 9 | ADR authorship | agents may draft, maintainer authors PR | - |
-| 10 | Pre-release flow location | documented in this file (section 9) | - |
+| 10 | Pre-release flow location | documented in this file (see Pre-release flow) | - |
 | 11 | Hotfix forward-port automation | deferred, manual cherry-pick | - |
 
 ## Branch naming and merge strategy
@@ -219,7 +219,7 @@ Reference .github/workflows/release.yml for the specific logic of tag-driven pub
 ## Release cadence and process
 
 Releases are currently ad-hoc based on feature readiness and security needs.
-This follows the decision made in section 2, row 6.
+This follows decision-log row 6.
 
 release-please runs on every push to `main` and maintains a long-running
 Release PR (`release-please--branches--main`) summarizing the next release.

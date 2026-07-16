@@ -27,7 +27,7 @@ The following table tracks the evolution of git and workflow standards.
 | 4 | Stale bot | 90-day stale, 30-day close (applied via stale.yml) | Tightened from 180/90 post-1.0 per PR #113. |
 | 5 | CC scope list | 13 approved, 3 rejected, 1 deferred | Auth, events, and cqrs were collapsed into core or security to reduce noise. Proto deferred pending higher change frequency. |
 | 6 | Release cadence | ad-hoc, release-please planned | - |
-| 7 | Deprecation policy | post-1.0 SemVer: deprecate in minor, remove in next major | Project is at v1.1.0. Breaking changes require a major version bump. |
+| 7 | Deprecation policy | post-1.0 SemVer: deprecate in minor, remove in next major | Project is at v1.5.0. Breaking changes require a major version bump. |
 | 8 | Dependabot auto-merge | auto-merge dev, actions, and runtime CVE patches | Runtime CVE patches are included in auto-merge to maintain security posture with minimal manual intervention. |
 | 9 | ADR authorship | agents may draft, maintainer authors PR | - |
 | 10 | Pre-release flow location | documented in this file (section 9) | - |
@@ -67,14 +67,25 @@ Including issue numbers in branch names is optional but encouraged for complex f
 Scopes provide context to the nature of a change.
 They are used in commit messages: `<type>(<scope>): <subject>`.
 
+Since the multi-repo split (ADR-009), scopes are enforced **per repo**, not
+from one shared list. Each repo's `.github/workflows/pr-title.yml` sets
+`requireScope: true` with its own accepted-scopes list -- that file is the
+source of truth, not this table. The three verified lists below (checked
+against each repo's `pr-title.yml`) illustrate the shape; other repos
+(`mcp-hangar-operator`, `mcp-hangar-agent`, `mcp-hangar-website`,
+`terraform-provider`) each define their own the same way.
+
+### `mcp-hangar/mcp-hangar` (core)
+
 | Scope | Description |
 |-------|-------------|
 | core | Logic in src/mcp_hangar/domain/ or application/ |
-| enterprise | Logic in src/mcp_hangar/auth, compliance, integrations, approvals, and infrastructure/persistence |
+| enterprise | **Legacy.** Pre-MIT-relicense name for logic in src/mcp_hangar/auth, compliance, integrations, approvals, and infrastructure/persistence. The scope is still CI-accepted for compatibility; prefer `core` or `security` in new commits. |
 | cli | Command line interface and Typer registration |
+| ci | Continuous integration workflow changes |
 | operator | Kubernetes operator components |
 | helm | Helm chart templates and values |
-| ui | Frontend or dashboard components |
+| ui | Frontend or dashboard components. Currently vacant/reserved: no `ui` code exists in this repo, but the scope remains CI-accepted for future use. |
 | observability | Metrics, tracing, and logging infrastructure |
 | security | Authentication, authorization, and secret management |
 | docs | Markdown documentation and MkDocs config |
@@ -93,6 +104,18 @@ Rejected scopes:
 Deferred:
 
 - proto (revisit when protobuf change frequency justifies)
+
+### `mcp-hangar/helm-charts`
+
+Accepted scopes: `agent`, `ci`, `deps`, `docs`, `hangar`, `infra`,
+`operator`, `release`, `repo`. Note this repo uses `hangar` where the core
+table above uses `helm` -- the two lists are independent, not aliases of
+each other.
+
+### `mcp-hangar/docs` (this repo)
+
+Accepted scopes: `architecture`, `ci`, `deps`, `guides`, `infra`,
+`reference`, `release`, `repo`.
 
 ## Flow 1: Bug fix
 
@@ -174,7 +197,7 @@ Agents may draft ADRs in issue comments but never author the PR.
 
 ## Deprecation policy
 
-The project is at v1.1.0 and follows standard SemVer deprecation rules:
+The project is at v1.5.0 and follows standard SemVer deprecation rules:
 
 - Deprecations must be marked in at least one minor release.
 - Removal occurs earliest in the next major release.
@@ -202,6 +225,23 @@ Release PR (`release-please--branches--main`) summarizing the next release.
 Merging that PR creates the version tag, which `release.yml` consumes to
 publish to PyPI and GHCR. There is no scheduled release cron -- the Release PR
 sits open until a maintainer decides "enough has accumulated."
+
+### Release topology (ADR-009)
+
+The above describes the core repo only. Per [ADR-009](../adr/ADR-009-independent-release-topology.md),
+core, operator, agent, and Helm charts each release independently on their
+own SemVer line; there is no unified "MCP Hangar version." All published
+images and charts are cosign-signed.
+
+- **core** (`mcp-hangar/mcp-hangar`): release-please Release PR on `main`;
+  merging it tags `vX.Y.Z`, consumed by `release.yml` to publish to PyPI and
+  a signed Docker image on GHCR.
+- **operator** (`mcp-hangar/mcp-hangar-operator`): pushing a `v*.*.*` tag
+  publishes a signed image and an `install.yaml` manifest to GHCR.
+- **agent** (`mcp-hangar/mcp-hangar-agent`): pushing a tag publishes a
+  signed image to GHCR.
+- **helm-charts** (`mcp-hangar/helm-charts`): push-to-main publishes the OCI
+  charts to GHCR.
 
 ## Hotfix process
 

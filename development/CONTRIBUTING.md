@@ -13,36 +13,58 @@ pip install -e ".[dev]"
 make setup
 ```
 
-## Monorepo Structure
+## Repository Structure
 
-MCP Hangar is a monorepo:
+MCP Hangar is **multi-repo**, not a monorepo (see ADR-009 for the release
+topology this implies). The org has separate repos per shippable artifact:
+
+- `mcp-hangar/mcp-hangar` -- Python core (PyPI: `mcp-hangar`). This is the repo
+  you cloned in Setup above, and what the rest of this guide describes.
+- `mcp-hangar/mcp-hangar-operator` -- Kubernetes operator (Go).
+- `mcp-hangar/mcp-hangar-agent` -- Hangar Agent (Go); runs in customer
+  clusters and connects to Hangar Cloud over gRPC.
+- `mcp-hangar/helm-charts` -- the `mcp-hangar`, `mcp-hangar-operator`, and
+  `hangar-agent` Helm charts.
+- `mcp-hangar/docs` -- this documentation site.
+- `mcp-hangar/mcp-hangar-website` -- the marketing site.
+- `mcp-hangar/terraform-provider` -- Terraform provider.
+
+Each has its own CONTRIBUTING guide, CI, and (per ADR-009) its own release
+lane. This document only covers `mcp-hangar/mcp-hangar`.
+
+Top-level layout of this repo:
 
 ```
 mcp-hangar/
-├── src/mcp_hangar/          # Python package (PyPI: mcp-hangar) -- MIT
-│   ├── auth/                # RBAC, API key, JWT/OIDC
-│   ├── behavioral/          # Network profiling, deviation detection
-│   ├── identity/            # Caller identity propagation, audit
-│   ├── compliance/          # SIEM export (CEF, LEEF, JSON-lines)
-│   ├── persistence/         # SQLite/Postgres event stores
-│   ├── semantic/            # Pattern engine, detection rules
-│   └── integrations/        # Langfuse adapter
-├── tests/                   # Python tests
+├── src/mcp_hangar/       # Python package (PyPI: mcp-hangar) -- MIT
+│   ├── auth/             # RBAC, API key, JWT/OIDC
+│   ├── approvals/        # Human-in-the-loop approval gate for tool calls
+│   ├── bootstrap/        # DI composition root, module loading
+│   ├── cloud/            # Hangar Cloud connector (event forwarding)
+│   ├── compliance/       # SIEM export (CEF, LEEF, JSON-lines)
+│   ├── integrations/     # Partner integrations (Langfuse adapter)
+│   ├── domain/           # DDD domain layer (see below)
+│   ├── application/      # Application layer (see below)
+│   ├── infrastructure/   # Infrastructure adapters (see below)
+│   ├── observability/    # Tracing, metrics, health (see below)
+│   ├── server/           # MCP server module (see below)
+│   └── fastmcp_server/   # MCP-over-HTTP server (FastMCP-based)
+├── tests/                # Python tests
 ├── packages/
-│   ├── operator/            # Kubernetes operator (Go)
-│   │   ├── api/             # CRD definitions
-│   │   ├── cmd/             # Main entrypoints
-│   │   ├── internal/        # Controller logic
-│   │   └── go.mod           # Go module config
-│   ├── ui/                  # React dashboard
-│   └── helm-charts/         # Helm charts
-│       ├── mcp-hangar/      # Core Helm chart
-│       └── mcp-hangar-operator/  # Operator Helm chart
-├── docs/                    # MkDocs documentation
-├── examples/                # Quick starts, OTEL recipes
-├── monitoring/              # Grafana, Prometheus configs
-└── Makefile                 # Root orchestration
+│   └── core/             # vestigial pre-v0.13 package location; real source
+│                         # is src/mcp_hangar/, tracked for removal
+├── docs/                 # internal architecture/design docs (not this docs
+│                         # site -- that's the separate docs repo)
+├── examples/             # Quick starts, OTEL recipes
+├── monitoring/           # Grafana, Prometheus configs
+├── docker/               # Per-example-server Dockerfiles
+├── security/             # Seccomp profiles, network policies
+├── scripts/              # Dev/release tooling
+└── Makefile              # Root orchestration
 ```
+
+There is no `packages/operator/`, `packages/ui/`, or `packages/helm-charts/`
+in this repo -- those live in the separate repos listed above.
 
 ## Python Core Structure
 

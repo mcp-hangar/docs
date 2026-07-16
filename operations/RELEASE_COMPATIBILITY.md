@@ -8,14 +8,27 @@ together" is answered by the compatibility matrix below, not by a shared
 version number. This page is that matrix plus the artifact-security policy that
 governs how the images and charts are published and verified.
 
-> **Status: all lanes released and signed; owner sign-off pending.**
+> **Status: images released and signed. The published Helm charts do not install
+> and must be re-released.**
 > As of 2026-07-15 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
 > image `1.5.0`, operator `0.12.2`, agent `0.1.1`, and all three Helm charts.
-> Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done. Independent release
+> Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done.
+>
+> **The published charts `mcp-hangar 0.13.1` and `mcp-hangar-operator 0.12.1` are
+> known non-installable.** Live cluster testing found defects that make a default
+> `helm install` fail outright — a config key the 1.5 server rejects, flags the
+> operator image does not accept, CRDs that do not match the kinds the image
+> watches, and a CRD that the API server refuses. The fixes are merged to
+> `helm-charts` `main` but **not yet released**. Until a re-release, install the
+> charts from a checkout of `main`, not from the published versions in the matrix
+> below. Chart CI that would have caught all of this is being added — the
+> `helm-charts` repo had no chart lint, render, or install test at all.
+>
+> Kubernetes-range validation is **done** (see the matrix). Independent release
 > is still **not formally declared supported**: the remaining **Verification
-> status** items are human-gated — Kubernetes-range validation, a named
-> `CODEOWNERS` owner, and security/owner sign-off.
+> status** items are human-gated — a named `CODEOWNERS` owner and security/owner
+> sign-off.
 
 ## Ownership and update procedure
 
@@ -35,7 +48,7 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Agent image | Helm charts (core / operator / agent) | Kubernetes |
 | --- | --- | --- | --- | --- |
-| `1.5.x` | `0.12.2` | `0.1.1` | `0.13.1` / `0.12.1` / `0.1.1` | *(pending validation)* |
+| `1.5.x` | `0.12.2` | `0.1.1` | `0.13.1` / `0.12.1` / `0.1.1` *(do not install -- see Status)* | `1.25` -- `1.36` |
 
 Rules for reading and extending the matrix:
 
@@ -47,9 +60,16 @@ Rules for reading and extending the matrix:
   still **not formally a supported combination** until the Kubernetes range is
   validated and the owners sign off (see Verification status).
 - **Kubernetes** records the tested server range for combinations that include
-  the operator or a chart; it is left `(pending validation)` until that range is
-  validated against a real operator install (the charts declare a `>=1.25` floor,
-  not yet test-confirmed).
+  the operator or a chart. The declared `>=1.25` floor is **test-confirmed**: on a
+  real **v1.25.16** control plane both charts install, the operator's CRDs reach
+  `Established`, an `MCPServer` reconciles into a child resource with correct
+  owner references, and the core gateway serves `/health/ready` 200. The same
+  charts run on **v1.36.1**. Every apiVersion the charts render (`autoscaling/v2`,
+  `policy/v1`, `networking.k8s.io/v1`, `admissionregistration.k8s.io/v1`,
+  `apiextensions.k8s.io/v1`) has been GA since v1.16--v1.23, so nothing in them is
+  version-fragile inside that window. This was validated against the **fixed
+  charts on `helm-charts` `main`** — not the published chart versions in the row
+  above, which do not install on any Kubernetes version.
 - **SemVer boundaries:** a change that breaks a documented combination is a
   MAJOR bump of the artifact that changed. Adding a newly-tested combination is
   a MINOR/docs change to this matrix, not a version bump of any artifact.
@@ -75,9 +95,11 @@ pointed at a non-existent core image tag). The core image is versioned on its
 own `1.x` line (matching PyPI core); its release workflow already cosign-signs
 and attaches build provenance.
 
-> **Follow-up:** the `mcp-hangar` chart (`0.13.1`) still declares `appVersion
-> 1.4.0`, so it deploys the previous core image. Bump it to `1.5.0` and
-> republish so the chart tracks the current signed core image.
+> **Follow-up:** the published `mcp-hangar` chart (`0.13.1`) still declares
+> `appVersion 1.4.0`, so it deploys the previous core image. The bump has landed
+> on `helm-charts` `main` (`0.13.2`, `appVersion 1.5.0`, `helm-charts#14`) but has
+> not been republished — the same re-release that ships the install fixes should
+> carry it.
 
 ## CRD upgrade and rollback policy
 
@@ -142,9 +164,9 @@ Charts are verified the same way against
 ## Verification status
 
 The policy above is declared *supported* only when every box is checked. All
-release lanes are published and signed; the remaining boxes are the human-gated
-criteria from `#453` (a named owner, Kubernetes validation, and security
-sign-off).
+release lanes are published and signed and the Kubernetes range is now
+validated; the remaining boxes are the human-gated criteria from `#453` (a named
+owner and security sign-off) plus a chart re-release.
 
 - [ ] Matrix has a named owner in `CODEOWNERS` and the update procedure is in
       effect.
@@ -153,7 +175,15 @@ sign-off).
       `sha256:91f8fea3…c34ce42f`, `install.yaml` attached to the release.
 - [x] First charts published with verified digests (`helm-charts#7`) — all three
       charts public and signed: `mcp-hangar 0.13.1`, `mcp-hangar-operator 0.12.1`,
-      `hangar-agent 0.1.1` (digests in *Released artifacts*).
+      `hangar-agent 0.1.1` (digests in *Released artifacts*). **Published ≠
+      working:** live testing showed `0.13.1` and `0.12.1` do not install at all.
+- [ ] Charts re-released with the install fixes from `helm-charts` `main`, so a
+      published chart version is actually installable (see *Status*).
+- [x] Kubernetes support range validated (`1.25` -- `1.36`) against a real
+      control plane at the declared floor `v1.25.16` and at `v1.36.1`: charts
+      install, CRDs reach `Established`, an `MCPServer` reconciles into a child
+      with correct owner references, and the gateway serves `/health/ready` 200.
+      Validated against the fixed charts on `main`.
 - [x] Agent image release lane authored and first image released
       (`mcp-hangar-agent#30`) — signed `0.1.1`, public, `sha256:c88eb219…c12cc307a`.
 - [x] GHCR signing + SBOM/provenance (`mcp-hangar/mcp-hangar#467`) — the core

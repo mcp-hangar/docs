@@ -13,7 +13,7 @@ governs how the images and charts are published and verified.
 > (`mcp-hangar/helm-charts#36`).**
 > As of 2026-07-15 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
-> image `1.5.0`, operator `0.12.2`, agent `0.1.1`, and all three Helm charts.
+> image `1.5.0`, operator `0.12.2`, and both Helm charts.
 > Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done.
 >
 > Live cluster testing found defects that made a default `helm install` fail
@@ -102,7 +102,7 @@ will drift again on the next merge; the image digests (2026-07-15) are stable.
 | Chart `charts/mcp-hangar` (appVersion `1.5.0`) | `0.13.2` | `sha256:0d2141f802bea556f998cce13ac6fd672a966fb3133da88f0552f8a55e075341` | ✅ |
 | Chart `charts/mcp-hangar-operator` (appVersion `0.12.2`) | `0.12.1` | `sha256:fa73756b590c26478ab93ad15fe218dd5bf168a52e0bfe66faf697aa8a127702` | ✅ |
 
-Superseded (do not use): operator image `0.12.0`/`0.12.1` and agent `0.1.0`
+Superseded (do not use): operator image `0.12.0`/`0.12.1`
 (unsigned), and the `mcp-hangar` chart `0.12.0`/`0.13.0`/`0.13.1` (the `0.12.0`
 chart pointed at a non-existent core image tag; `0.13.1` predates the install
 fixes and still declares `appVersion 1.4.0`). The core image is versioned on its
@@ -164,7 +164,7 @@ Charts are verified the same way against
 `oci://ghcr.io/mcp-hangar/charts/<chart>`.
 
 > **Active (2026-07-15):** every release workflow signs keyless with cosign and
-> attaches SBOM/provenance — the operator, agent, and chart lanes
+> attaches SBOM/provenance — the operator and chart lanes
 > (`mcp-hangar/mcp-hangar#467`) and the core image lane (which already signed and
 > attached provenance) — so the recipe above succeeds against every artifact in
 > *Released artifacts*.
@@ -201,7 +201,7 @@ owner and security sign-off) plus a chart re-release.
   agent product; it never reached general availability and is no longer
   part of this matrix or the verification checklist.)*
 - [x] GHCR signing + SBOM/provenance (`mcp-hangar/mcp-hangar#467`) — the core
-      image, operator, agent, and all charts carry a keyless cosign signature +
+      image, operator, and all charts carry a keyless cosign signature +
       attestation, confirmed present in the registry; public visibility confirmed
       for all artifacts. (Immutability/retention follow GHCR defaults.)
 - [ ] CRD rollback / compatibility limits validated against a real operator

@@ -73,8 +73,8 @@ from one shared list. Each repo's `.github/workflows/pr-title.yml` sets
 `requireScope: true` with its own accepted-scopes list -- that file is the
 source of truth, not this table. The three verified lists below (checked
 against each repo's `pr-title.yml`) illustrate the shape; other repos
-(`mcp-hangar-operator`, `mcp-hangar-agent`, `mcp-hangar-website`,
-`terraform-provider`) each define their own the same way.
+(`mcp-hangar-operator`, `mcp-hangar-website`, `terraform-provider`) each
+define their own the same way.
 
 ### `mcp-hangar/mcp-hangar` (core)
 
@@ -230,7 +230,7 @@ sits open until a maintainer decides "enough has accumulated."
 ### Release topology (ADR-009)
 
 The above describes the core repo only. Per [ADR-009](../adr/ADR-009-independent-release-topology.md),
-core, operator, agent, and Helm charts each release independently on their
+core, operator, and Helm charts each release independently on their
 own SemVer line; there is no unified "MCP Hangar version." All published
 images and charts are cosign-signed.
 
@@ -239,8 +239,6 @@ images and charts are cosign-signed.
   a signed Docker image on GHCR.
 - **operator** (`mcp-hangar/mcp-hangar-operator`): pushing a `v*.*.*` tag
   publishes a signed image and an `install.yaml` manifest to GHCR.
-- **agent** (`mcp-hangar/mcp-hangar-agent`): pushing a tag publishes a
-  signed image to GHCR.
 - **helm-charts** (`mcp-hangar/helm-charts`): push-to-main publishes the OCI
   charts to GHCR.
 

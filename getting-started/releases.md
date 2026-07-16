@@ -47,13 +47,12 @@ kubectl apply -f https://github.com/mcp-hangar/mcp-hangar-operator/releases/late
 
 ## Helm charts (OCI)
 
-Three charts are published to the GHCR OCI registry — no `helm repo add` needed:
+Two charts are published to the GHCR OCI registry — no `helm repo add` needed:
 
 | Chart | Purpose |
 | --- | --- |
 | `mcp-hangar` | Core gateway |
 | `mcp-hangar-operator` | Kubernetes operator |
-| `hangar-agent` | Cluster-side agent |
 
 Install a chart (pin a version):
 

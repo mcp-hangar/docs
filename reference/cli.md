@@ -348,6 +348,13 @@ mcp-hangar serve --http --port 9000
 mcp-hangar serve --http --host 127.0.0.1 --port 8080
 ```
 
+> **Binding a non-loopback host requires authentication.** When `--host` is
+> anything other than a loopback address (e.g. the default `0.0.0.0`), Hangar
+> refuses to start unless authentication is configured (`auth`) or the
+> `--unsafe-no-auth` flag is passed to explicitly accept an unauthenticated
+> listener. A loopback bind (`--host 127.0.0.1`) is exempt. This prevents
+> accidentally exposing an unauthenticated gateway on a routable interface.
+
 ### HTTP Endpoints
 
 When running in HTTP mode:

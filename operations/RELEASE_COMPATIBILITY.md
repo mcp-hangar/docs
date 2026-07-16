@@ -8,27 +8,36 @@ together" is answered by the compatibility matrix below, not by a shared
 version number. This page is that matrix plus the artifact-security policy that
 governs how the images and charts are published and verified.
 
-> **Status: images released and signed. The published Helm charts do not install
-> and must be re-released.**
+> **Status: released and signed; the published charts carry their fixes — but
+> chart tags are mutable, which is a release-integrity bug
+> (`mcp-hangar/helm-charts#36`).**
 > As of 2026-07-15 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
 > image `1.5.0`, operator `0.12.2`, agent `0.1.1`, and all three Helm charts.
 > Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done.
 >
-> **The published charts `mcp-hangar 0.13.1` and `mcp-hangar-operator 0.12.1` are
-> known non-installable.** Live cluster testing found defects that make a default
-> `helm install` fail outright — a config key the 1.5 server rejects, flags the
-> operator image does not accept, CRDs that do not match the kinds the image
-> watches, and a CRD that the API server refuses. The fixes are merged to
-> `helm-charts` `main` but **not yet released**. Until a re-release, install the
-> charts from a checkout of `main`, not from the published versions in the matrix
-> below. Chart CI that would have caught all of this is being added — the
-> `helm-charts` repo had no chart lint, render, or install test at all.
+> Live cluster testing found defects that made a default `helm install` fail
+> outright — a config key the 1.5 server rejects, flags the operator image does
+> not accept, CRDs that do not match the kinds the image watches, and a CRD the
+> API server refuses. Those are **fixed, and the fixes are present in the
+> currently-published charts**: verified by pulling `charts/mcp-hangar 0.13.2` and
+> `charts/mcp-hangar-operator 0.12.1` from GHCR and inspecting their contents, not
+> by inference. The `helm-charts` repo also had no chart lint/render/install CI at
+> all — that gate now exists, which is why this class of defect will not ship
+> again.
+>
+> **The fixes reached the registry the wrong way.** `release-charts` re-pushes an
+> already-published version on every merge to `main`, so a released tag's content
+> changes over time (`mcp-hangar/helm-charts#36`): `mcp-hangar-operator 0.12.1`
+> today is not the `0.12.1` published before those fixes landed. That contradicts
+> the tag-immutability rule in the *Artifact security policy* below, and it is why
+> the digests recorded in *Released artifacts* drift. Until #36 lands, treat those
+> digests as a **snapshot, not a pin**, and expect a chart tag to move under you.
 >
 > Kubernetes-range validation is **done** (see the matrix). Independent release
 > is still **not formally declared supported**: the remaining **Verification
 > status** items are human-gated — a named `CODEOWNERS` owner and security/owner
-> sign-off.
+> sign-off — plus the mutable-tag fix.
 
 ## Ownership and update procedure
 
@@ -48,7 +57,7 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Agent image | Helm charts (core / operator / agent) | Kubernetes |
 | --- | --- | --- | --- | --- |
-| `1.5.x` | `0.12.2` | `0.1.1` | `0.13.1` / `0.12.1` / `0.1.1` *(do not install -- see Status)* | `1.25` -- `1.36` |
+| `1.5.x` | `0.12.2` | `0.1.1` | `0.13.2` / `0.12.1` / `0.1.1` | `1.25` -- `1.36` |
 
 Rules for reading and extending the matrix:
 
@@ -56,9 +65,10 @@ Rules for reading and extending the matrix:
   core minor (`v1.5.0` is the current published core).
 - **Operator / Agent / Helm** columns carry the released version; the verified
   digests are in *Released artifacts* below. All lanes have landed
-  (`mcp-hangar-operator#26`, `mcp-hangar-agent#30`, `helm-charts#7`). The row is
-  still **not formally a supported combination** until the Kubernetes range is
-  validated and the owners sign off (see Verification status).
+  (`mcp-hangar-operator#26`, `mcp-hangar-agent#30`, `helm-charts#7`) and the
+  Kubernetes range is now validated. The row is still **not formally a supported
+  combination** until the owners sign off and chart releases become immutable
+  (see Verification status).
 - **Kubernetes** records the tested server range for combinations that include
   the operator or a chart. The declared `>=1.25` floor is **test-confirmed**: on a
   real **v1.25.16** control plane both charts install, the operator's CRDs reach
@@ -67,39 +77,39 @@ Rules for reading and extending the matrix:
   charts run on **v1.36.1**. Every apiVersion the charts render (`autoscaling/v2`,
   `policy/v1`, `networking.k8s.io/v1`, `admissionregistration.k8s.io/v1`,
   `apiextensions.k8s.io/v1`) has been GA since v1.16--v1.23, so nothing in them is
-  version-fragile inside that window. This was validated against the **fixed
-  charts on `helm-charts` `main`** — not the published chart versions in the row
-  above, which do not install on any Kubernetes version.
+  version-fragile inside that window. Validated against the charts on `helm-charts`
+  `main`, whose content is what the published tags currently serve (see *Status*
+  and `mcp-hangar/helm-charts#36`).
 - **SemVer boundaries:** a change that breaks a documented combination is a
   MAJOR bump of the artifact that changed. Adding a newly-tested combination is
   a MINOR/docs change to this matrix, not a version bump of any artifact.
 
 ### Released artifacts (verified)
 
-Pinned digests for every published artifact, confirmed by anonymous pull on
-2026-07-15. All are public; images and charts marked *signed* carry a keyless
-cosign signature and an SBOM/provenance attestation.
+Digests for every published artifact, confirmed by anonymous pull. All are
+public; images and charts marked *signed* carry a keyless cosign signature and an
+SBOM/provenance attestation.
+
+**Image digests are pins. Chart digests are not** -- `release-charts` re-pushes an
+existing chart version on every merge to `main`, so a chart tag's digest moves
+(`mcp-hangar/helm-charts#36`). The chart digests below were read on 2026-07-16 and
+will drift again on the next merge; the image digests (2026-07-15) are stable.
 
 | Artifact | Version | Digest | Signed |
 | --- | --- | --- | --- |
 | Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `1.5.0` | `sha256:d50cdd092a3d8d6a1b3103c95ebf2f75a22ba6297f768ea50c859d578984aaef` | ✅ |
 | Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.12.2` | `sha256:91f8fea38adc02f84ed2c77b6efbeab38363616f088b03baf7d2eee5c34ce42f` | ✅ |
 | Agent image (`ghcr.io/mcp-hangar/hangar-agent`) | `0.1.1` | `sha256:c88eb21930f6a189246748de975f616f03dde69d775ee7992db2226c12cc307a` | ✅ |
-| Chart `charts/mcp-hangar` (appVersion `1.4.0`) | `0.13.1` | `sha256:cf09ea818ae5acb41f6c2e46423864417f9f66d2bd60984678308e3245be8912` | ✅ |
-| Chart `charts/mcp-hangar-operator` (appVersion `0.12.2`) | `0.12.1` | `sha256:2d21c90b3cafd96f5589d12044b9d7630c3787eb772a4d701d5fc2a998892ef5` | ✅ |
-| Chart `charts/hangar-agent` (appVersion `0.1.1`) | `0.1.1` | `sha256:efd9af6445cc1296be4fd0c9e9825727041e0d7b53ec771a359ae7724b0fa4ee` | ✅ |
+| Chart `charts/mcp-hangar` (appVersion `1.5.0`) | `0.13.2` | `sha256:0d2141f802bea556f998cce13ac6fd672a966fb3133da88f0552f8a55e075341` | ✅ |
+| Chart `charts/mcp-hangar-operator` (appVersion `0.12.2`) | `0.12.1` | `sha256:fa73756b590c26478ab93ad15fe218dd5bf168a52e0bfe66faf697aa8a127702` | ✅ |
+| Chart `charts/hangar-agent` (appVersion `0.1.1`) | `0.1.1` | `sha256:4b8ea6e8347099bab8fbfe2f4e66502feb956db9fb04ee08f84fb04cdb56bda9` | ✅ |
 
 Superseded (do not use): operator image `0.12.0`/`0.12.1` and agent `0.1.0`
-(unsigned), and the `mcp-hangar` chart `0.12.0`/`0.13.0` (the `0.12.0` chart
-pointed at a non-existent core image tag). The core image is versioned on its
+(unsigned), and the `mcp-hangar` chart `0.12.0`/`0.13.0`/`0.13.1` (the `0.12.0`
+chart pointed at a non-existent core image tag; `0.13.1` predates the install
+fixes and still declares `appVersion 1.4.0`). The core image is versioned on its
 own `1.x` line (matching PyPI core); its release workflow already cosign-signs
 and attaches build provenance.
-
-> **Follow-up:** the published `mcp-hangar` chart (`0.13.1`) still declares
-> `appVersion 1.4.0`, so it deploys the previous core image. The bump has landed
-> on `helm-charts` `main` (`0.13.2`, `appVersion 1.5.0`, `helm-charts#14`) but has
-> not been republished — the same re-release that ships the install fixes should
-> carry it.
 
 ## CRD upgrade and rollback policy
 
@@ -175,10 +185,15 @@ owner and security sign-off) plus a chart re-release.
       `sha256:91f8fea3…c34ce42f`, `install.yaml` attached to the release.
 - [x] First charts published with verified digests (`helm-charts#7`) — all three
       charts public and signed: `mcp-hangar 0.13.1`, `mcp-hangar-operator 0.12.1`,
-      `hangar-agent 0.1.1` (digests in *Released artifacts*). **Published ≠
-      working:** live testing showed `0.13.1` and `0.12.1` do not install at all.
-- [ ] Charts re-released with the install fixes from `helm-charts` `main`, so a
-      published chart version is actually installable (see *Status*).
+      `hangar-agent 0.1.1` (digests in *Released artifacts*). The current core
+      chart is `0.13.2`; `0.13.1` predates the install fixes and is superseded.
+- [x] The published charts install: the fixes found by live testing are present
+      in `charts/mcp-hangar 0.13.2` and `charts/mcp-hangar-operator 0.12.1` as
+      served today (verified by pulling and inspecting them).
+- [ ] **Chart releases are immutable** — `release-charts` currently re-pushes an
+      existing version on every merge to `main`, so a released tag's content
+      changes over time (`mcp-hangar/helm-charts#36`). Until this is fixed, no
+      chart tag or digest here is a stable pin.
 - [x] Kubernetes support range validated (`1.25` -- `1.36`) against a real
       control plane at the declared floor `v1.25.16` and at `v1.36.1`: charts
       install, CRDs reach `Established`, an `MCPServer` reconciles into a child

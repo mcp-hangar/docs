@@ -1,0 +1,16 @@
+# CODEOWNERS for mcp-hangar/docs
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: the maintainer reviews everything.
+*                                  @mapyr
+
+# Release compatibility matrix & artifact-security policy — the single named
+# owner required by the publication policy (mcp-hangar/helm-charts#7). Changes
+# here must be reviewed by this owner.
+/operations/RELEASE_COMPATIBILITY.md   @mapyr
+
+# Architecture Decision Records — governed per docs/development/GIT_FLOW.md.
+/adr/                              @mapyr
+
+# Contributing / workflow governance.
+/development/                      @mapyr

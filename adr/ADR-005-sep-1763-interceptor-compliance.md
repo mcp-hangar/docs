@@ -1,6 +1,6 @@
 # ADR-005: SEP-1763 Interceptor Framework Compliance
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-010](ADR-010-retire-agent-cloud-tier.md) (the hangar-agent interceptor sidecar is retired)
 **Date:** 2026-05-01
 **Authors:** MCP Hangar Team
 

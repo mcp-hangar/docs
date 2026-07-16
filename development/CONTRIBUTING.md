@@ -21,10 +21,8 @@ topology this implies). The org has separate repos per shippable artifact:
 - `mcp-hangar/mcp-hangar` -- Python core (PyPI: `mcp-hangar`). This is the repo
   you cloned in Setup above, and what the rest of this guide describes.
 - `mcp-hangar/mcp-hangar-operator` -- Kubernetes operator (Go).
-- `mcp-hangar/mcp-hangar-agent` -- Hangar Agent (Go); runs in customer
-  clusters and connects to Hangar Cloud over gRPC.
-- `mcp-hangar/helm-charts` -- the `mcp-hangar`, `mcp-hangar-operator`, and
-  `hangar-agent` Helm charts.
+- `mcp-hangar/helm-charts` -- the `mcp-hangar` and `mcp-hangar-operator` Helm
+  charts.
 - `mcp-hangar/docs` -- this documentation site.
 - `mcp-hangar/mcp-hangar-website` -- the marketing site.
 - `mcp-hangar/terraform-provider` -- Terraform provider.
@@ -40,7 +38,6 @@ mcp-hangar/
 │   ├── auth/             # RBAC, API key, JWT/OIDC
 │   ├── approvals/        # Human-in-the-loop approval gate for tool calls
 │   ├── bootstrap/        # DI composition root, module loading
-│   ├── cloud/            # Hangar Cloud connector (event forwarding)
 │   ├── compliance/       # SIEM export (CEF, LEEF, JSON-lines)
 │   ├── integrations/     # Partner integrations (Langfuse adapter)
 │   ├── domain/           # DDD domain layer (see below)

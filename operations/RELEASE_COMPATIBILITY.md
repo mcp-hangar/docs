@@ -13,7 +13,7 @@ governs how the images and charts are published and verified.
 > (`mcp-hangar/helm-charts#36`).**
 > As of 2026-07-15 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
-> image `1.5.0`, operator `0.12.2`, agent `0.1.1`, and all three Helm charts.
+> image `1.5.0`, operator `0.12.2`, and both Helm charts.
 > Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done.
 >
 > Live cluster testing found defects that made a default `helm install` fail
@@ -55,17 +55,17 @@ governs how the images and charts are published and verified.
 Each row is a supported *combination*. An artifact version absent from this
 table is **not** a supported combination — it may work, but it is not covered.
 
-| Core (`mcp-hangar`) | Operator image | Agent image | Helm charts (core / operator / agent) | Kubernetes |
-| --- | --- | --- | --- | --- |
-| `1.5.x` | `0.12.2` | `0.1.1` | `0.13.2` / `0.12.1` / `0.1.1` | `1.25` -- `1.36` |
+| Core (`mcp-hangar`) | Operator image | Helm charts (core / operator) | Kubernetes |
+| --- | --- | --- | --- |
+| `1.5.x` | `0.12.2` | `0.13.2` / `0.12.1` | `1.25` -- `1.36` |
 
 Rules for reading and extending the matrix:
 
 - **Core** is the reference axis: every supported combination pins a concrete
   core minor (`v1.5.0` is the current published core).
-- **Operator / Agent / Helm** columns carry the released version; the verified
-  digests are in *Released artifacts* below. All lanes have landed
-  (`mcp-hangar-operator#26`, `mcp-hangar-agent#30`, `helm-charts#7`) and the
+- **Operator / Helm** columns carry the released version; the verified
+  digests are in *Released artifacts* below. Both lanes have landed
+  (`mcp-hangar-operator#26`, `helm-charts#7`) and the
   Kubernetes range is now validated. The row is still **not formally a supported
   combination** until the owners sign off and chart releases become immutable
   (see Verification status).
@@ -99,12 +99,10 @@ will drift again on the next merge; the image digests (2026-07-15) are stable.
 | --- | --- | --- | --- |
 | Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `1.5.0` | `sha256:d50cdd092a3d8d6a1b3103c95ebf2f75a22ba6297f768ea50c859d578984aaef` | ✅ |
 | Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.12.2` | `sha256:91f8fea38adc02f84ed2c77b6efbeab38363616f088b03baf7d2eee5c34ce42f` | ✅ |
-| Agent image (`ghcr.io/mcp-hangar/hangar-agent`) | `0.1.1` | `sha256:c88eb21930f6a189246748de975f616f03dde69d775ee7992db2226c12cc307a` | ✅ |
 | Chart `charts/mcp-hangar` (appVersion `1.5.0`) | `0.13.2` | `sha256:0d2141f802bea556f998cce13ac6fd672a966fb3133da88f0552f8a55e075341` | ✅ |
 | Chart `charts/mcp-hangar-operator` (appVersion `0.12.2`) | `0.12.1` | `sha256:fa73756b590c26478ab93ad15fe218dd5bf168a52e0bfe66faf697aa8a127702` | ✅ |
-| Chart `charts/hangar-agent` (appVersion `0.1.1`) | `0.1.1` | `sha256:4b8ea6e8347099bab8fbfe2f4e66502feb956db9fb04ee08f84fb04cdb56bda9` | ✅ |
 
-Superseded (do not use): operator image `0.12.0`/`0.12.1` and agent `0.1.0`
+Superseded (do not use): operator image `0.12.0`/`0.12.1`
 (unsigned), and the `mcp-hangar` chart `0.12.0`/`0.13.0`/`0.13.1` (the `0.12.0`
 chart pointed at a non-existent core image tag; `0.13.1` predates the install
 fixes and still declares `appVersion 1.4.0`). The core image is versioned on its
@@ -166,7 +164,7 @@ Charts are verified the same way against
 `oci://ghcr.io/mcp-hangar/charts/<chart>`.
 
 > **Active (2026-07-15):** every release workflow signs keyless with cosign and
-> attaches SBOM/provenance — the operator, agent, and chart lanes
+> attaches SBOM/provenance — the operator and chart lanes
 > (`mcp-hangar/mcp-hangar#467`) and the core image lane (which already signed and
 > attached provenance) — so the recipe above succeeds against every artifact in
 > *Released artifacts*.
@@ -183,9 +181,9 @@ owner and security sign-off) plus a chart re-release.
 - [x] First operator image + manifest released with a verified digest and
       install instructions (`mcp-hangar-operator#26`) — signed `0.12.2`, public,
       `sha256:91f8fea3…c34ce42f`, `install.yaml` attached to the release.
-- [x] First charts published with verified digests (`helm-charts#7`) — all three
-      charts public and signed: `mcp-hangar 0.13.1`, `mcp-hangar-operator 0.12.1`,
-      `hangar-agent 0.1.1` (digests in *Released artifacts*). The current core
+- [x] First charts published with verified digests (`helm-charts#7`) — both
+      charts public and signed: `mcp-hangar 0.13.1`, `mcp-hangar-operator 0.12.1`
+      (digests in *Released artifacts*). The current core
       chart is `0.13.2`; `0.13.1` predates the install fixes and is superseded.
 - [x] The published charts install: the fixes found by live testing are present
       in `charts/mcp-hangar 0.13.2` and `charts/mcp-hangar-operator 0.12.1` as
@@ -199,10 +197,11 @@ owner and security sign-off) plus a chart re-release.
       install, CRDs reach `Established`, an `MCPServer` reconciles into a child
       with correct owner references, and the gateway serves `/health/ready` 200.
       Validated against the fixed charts on `main`.
-- [x] Agent image release lane authored and first image released
-      (`mcp-hangar-agent#30`) — signed `0.1.1`, public, `sha256:c88eb219…c12cc307a`.
+- *(Agent image release lane retired along with the discontinued cluster
+  agent product; it never reached general availability and is no longer
+  part of this matrix or the verification checklist.)*
 - [x] GHCR signing + SBOM/provenance (`mcp-hangar/mcp-hangar#467`) — the core
-      image, operator, agent, and all charts carry a keyless cosign signature +
+      image, operator, and all charts carry a keyless cosign signature +
       attestation, confirmed present in the registry; public visibility confirmed
       for all artifacts. (Immutability/retention follow GHCR defaults.)
 - [ ] CRD rollback / compatibility limits validated against a real operator

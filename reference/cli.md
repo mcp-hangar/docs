@@ -324,8 +324,6 @@ mcp-hangar [OPTIONS]
 | `--log-level` | - | TEXT | INFO | `MCP_LOG_LEVEL` | Log level |
 | `--json-logs` | - | FLAG | false | `MCP_JSON_LOGS` | Format logs as JSON |
 | `--unsafe-no-auth` | - | FLAG | false | - | Allow non-loopback HTTP binding without authentication (unsafe) |
-| `--cloud-key` | - | TEXT | - | `MCP_CLOUD_KEY` | License key for Hangar Cloud connectivity |
-| `--cloud-url` | - | TEXT | - | `MCP_CLOUD_URL` | Hangar Cloud API endpoint |
 
 ### Transport Modes
 

@@ -27,7 +27,7 @@ This audit covers the authentication, authorization, and request-enforcement pat
 - `/api/agent/policy` no longer trusts a magic internal header.
 - Policy push now requires an authenticated principal plus `policy:write` authorization.
 - Failed policy pushes emit `PolicyPushRejected` audit events.
-- The `agent` role includes the explicit `policy:write` permission required by hangar-agent.
+- The `agent` role was retired along with the (now-discontinued) cluster agent product; `policy:write` remains a valid permission and is now granted via the `admin` role.
 
 ### Browser CSRF Defense
 

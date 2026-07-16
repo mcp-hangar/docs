@@ -1,6 +1,6 @@
 # ADR-006: Runtime Enforcement Strategy -- Tetragon-First, Pluggable Backend
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-010](ADR-010-retire-agent-cloud-tier.md) (kernel-level runtime enforcement retired with the agent/cloud tier)
 **Date:** 2026-05-10
 **Authors:** MCP Hangar Team
 

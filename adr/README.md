@@ -14,12 +14,13 @@ taxonomy, and formatting conventions.
 | [001](ADR-001-cqrs.md) | Command Query Responsibility Segregation (CQRS) | Accepted | 2026-04-17 |
 | [002](ADR-002-event-sourcing.md) | Event Sourcing | Accepted | 2026-04-17 |
 | [003](ADR-003-sagas.md) | Saga Pattern | Accepted | 2026-04-17 |
-| [004](ADR-004-sep-1766-digest-pinning.md) | Preemptive Implementation of SEP-1766 (Digest Pinning) and SEP-1763 (Interceptor Framework) | Accepted | 2026-05-01 |
-| [005](ADR-005-sep-1763-interceptor-compliance.md) | SEP-1763 Interceptor Framework Compliance | Accepted | 2026-05-01 |
-| [006](ADR-006-tetragon.md) | Runtime Enforcement Strategy -- Tetragon-First, Pluggable Backend | Accepted | 2026-05-10 |
+| [004](ADR-004-sep-1766-digest-pinning.md) | Preemptive Implementation of SEP-1766 (Digest Pinning) and SEP-1763 (Interceptor Framework) | Accepted (partial → [010](ADR-010-retire-agent-cloud-tier.md)) | 2026-05-01 |
+| [005](ADR-005-sep-1763-interceptor-compliance.md) | SEP-1763 Interceptor Framework Compliance | Superseded by [010](ADR-010-retire-agent-cloud-tier.md) | 2026-05-01 |
+| [006](ADR-006-tetragon.md) | Runtime Enforcement Strategy -- Tetragon-First, Pluggable Backend | Superseded by [010](ADR-010-retire-agent-cloud-tier.md) | 2026-05-10 |
 | [007](ADR-007-langfuse-integration.md) | Langfuse Integration for LLM Observability | Accepted | 2026-01-12 |
 | [008](ADR-008-tasks-relay-only.md) | Task Governance is Relay-Only -- Hangar is a Task Relay, Not a Task Executor | Accepted | 2026-07-02 |
-| [009](ADR-009-independent-release-topology.md) | Independent Release Topology -- Core, Operator Image, Agent Image, and OCI Helm Charts Release on Their Own SemVer | Accepted | 2026-07-14 |
+| [009](ADR-009-independent-release-topology.md) | Independent Release Topology -- Core, Operator Image, Agent Image, and OCI Helm Charts Release on Their Own SemVer | Accepted (partial → [010](ADR-010-retire-agent-cloud-tier.md)) | 2026-07-14 |
+| [010](ADR-010-retire-agent-cloud-tier.md) | Retire the Agent + Hangar Cloud Product Tier | Accepted | 2026-07-16 |
 
 ## Summaries
 
@@ -98,6 +99,15 @@ verified digests. Accepted as a decision, but the topology is *decided and
 asleep*: a live audit found zero releases on every lane but the core, so rollout
 is gated on the first operator/agent/chart releases and the GHCR/compatibility
 policy (`mcp-hangar-operator#26`, `helm-charts#7`, `#453`).
+
+### [ADR-010](ADR-010-retire-agent-cloud-tier.md): Retire the Agent + Hangar Cloud Product Tier
+
+Retires the hangar-agent interceptor sidecar and the Hangar Cloud SaaS as a
+product surface (repos archived; the agent chart, the core cloud connector, the
+`/agent/policy` endpoint, the `--cloud-*` CLI flags, and the `agent` RBAC role
+removed; terraform-provider archived). Governance stays in-process in core;
+kernel-level runtime enforcement is retired with the tier. Supersedes ADR-005 and
+ADR-006 fully, and ADR-004 and ADR-009 in part.
 
 ## Conventions
 

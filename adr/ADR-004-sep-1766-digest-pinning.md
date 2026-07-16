@@ -1,6 +1,6 @@
 # ADR-004: Preemptive Implementation of SEP-1766 (Digest Pinning) and SEP-1763 (Interceptor Framework)
 
-**Status:** Accepted
+**Status:** Accepted — partially superseded by [ADR-010](ADR-010-retire-agent-cloud-tier.md) (the agent/cloud enforcement split; the digest-pinning capability remains in core)
 **Date:** 2026-05-01
 **Authors:** MCP Hangar Team
 

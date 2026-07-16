@@ -1,6 +1,6 @@
 # ADR-009: Independent Release Topology -- Core, Operator Image, Agent Image, and OCI Helm Charts Release on Their Own SemVer
 
-**Status:** Accepted
+**Status:** Accepted — partially superseded by [ADR-010](ADR-010-retire-agent-cloud-tier.md) (the agent image lane is retired; four lanes become three)
 **Date:** 2026-07-14
 **Authors:** MCP Hangar Team
 

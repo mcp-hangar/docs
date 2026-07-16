@@ -254,6 +254,7 @@ event_store:
   enabled: true
   driver: sqlite
   path: data/events.db
+  allow_memory_fallback: false
 ```
 
 | Key | Type | Default | Description |
@@ -261,6 +262,19 @@ event_store:
 | `enabled` | `bool` | -- | Enable event persistence |
 | `driver` | `str` | -- | Storage driver: `sqlite` or `memory` |
 | `path` | `str` | -- | SQLite database path (sqlite driver only) |
+| `allow_memory_fallback` | `bool` | `false` | Permit degrading to an in-memory store when a durable driver cannot initialize, instead of refusing to start |
+
+### Durable-store fail-fast
+
+When a durable driver (`sqlite`) cannot initialize its store -- for example the
+`path` is not writable -- Hangar **refuses to start** rather than silently
+degrading to a non-durable in-memory store. To opt into the fallback, set
+`driver: memory` or `allow_memory_fallback: true`.
+
+If the store degrades to in-memory while a durable driver was configured,
+`/health/ready` returns **503** (the process stays live, but reports not-ready)
+so an orchestrator does not route traffic to an instance that is silently
+dropping its audit trail.
 
 ## `logging`
 

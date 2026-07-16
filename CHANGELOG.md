@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.2](https://github.com/mcp-hangar/docs/compare/v1.0.1...v1.0.2) (2026-07-16)
+
+
+### Changed
+
+* **guides:** correct contributing and git-flow for the multi-repo topology ([#44](https://github.com/mcp-hangar/docs/issues/44)) ([ed5a858](https://github.com/mcp-hangar/docs/commit/ed5a8580adcde05a7e6f21a10ea23b753777da4b))
+* **reference:** document event_store fail-fast and non-loopback auth requirement ([#42](https://github.com/mcp-hangar/docs/issues/42)) ([1fe2671](https://github.com/mcp-hangar/docs/commit/1fe267131ebcabdce5de18ba00877d448cf36be9))
+* **release:** record the validated kubernetes range and the chart install status ([#45](https://github.com/mcp-hangar/docs/issues/45)) ([6bfb7aa](https://github.com/mcp-hangar/docs/commit/6bfb7aafbb5cdd0a77ec4ba83801a46652d6c18c))
+
 ## [1.0.1](https://github.com/mcp-hangar/docs/compare/v1.0.0...v1.0.1) (2026-07-15)
 
 

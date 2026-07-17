@@ -20,7 +20,7 @@ governs how the images and charts are published and verified.
 > outright — a config key the 1.5 server rejects, flags the operator image does
 > not accept, CRDs that do not match the kinds the image watches, and a CRD the
 > API server refuses. Those are **fixed, and the fixes are present in the
-> currently-published charts**: verified by pulling `charts/mcp-hangar 0.13.2` and
+> currently-published charts**: verified by pulling `charts/mcp-hangar 0.13.3` and
 > `charts/mcp-hangar-operator 0.12.1` from GHCR and inspecting their contents, not
 > by inference. The `helm-charts` repo also had no chart lint/render/install CI at
 > all — that gate now exists, which is why this class of defect will not ship
@@ -57,7 +57,7 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Helm charts (core / operator) | Kubernetes |
 | --- | --- | --- | --- |
-| `1.5.x` | `0.12.2` | `0.13.2` / `0.12.1` | `1.25` -- `1.36` |
+| `1.5.x` | `0.12.2` | `0.13.3` / `0.12.1` | `1.25` -- `1.36` |
 
 Rules for reading and extending the matrix:
 
@@ -99,9 +99,7 @@ will drift again on the next merge; the image digests (2026-07-15) are stable.
 | --- | --- | --- | --- |
 | Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `1.5.1` | `sha256:a2d6ed0fe32b04b6cd248df33f9e89b88a88b242e5a8d46a670adf766dc180f4` | ✅ |
 | Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.12.2` | `sha256:91f8fea38adc02f84ed2c77b6efbeab38363616f088b03baf7d2eee5c34ce42f` | ✅ |
-| Chart `charts/mcp-hangar` (appVersion `1.5.0`) | `0.13.2` | `sha256:0d2141f802bea556f998cce13ac6fd672a966fb3133da88f0552f8a55e075341` | ✅ |
-
-> **Chart re-release in flight:** the published `mcp-hangar` chart above still deploys core `1.5.0` by default. A bump to appVersion `1.5.1` — so `helm install` ships the CVE-2026-59950 fix — is tracked in `mcp-hangar/helm-charts#48`; this row updates when that chart release lands.
+| Chart `charts/mcp-hangar` (appVersion `1.5.1`) | `0.13.3` | `sha256:6c0130f1f79e24e9b0f21b5f87c21faefce66bcfcb08a5de99cf53a356294f22` | ✅ |
 | Chart `charts/mcp-hangar-operator` (appVersion `0.12.2`) | `0.12.1` | `sha256:fa73756b590c26478ab93ad15fe218dd5bf168a52e0bfe66faf697aa8a127702` | ✅ |
 
 Superseded (do not use): operator image `0.12.0`/`0.12.1`
@@ -186,9 +184,9 @@ owner and security sign-off) plus a chart re-release.
 - [x] First charts published with verified digests (`helm-charts#7`) — both
       charts public and signed: `mcp-hangar 0.13.1`, `mcp-hangar-operator 0.12.1`
       (digests in *Released artifacts*). The current core
-      chart is `0.13.2`; `0.13.1` predates the install fixes and is superseded.
+      chart is `0.13.3`; `0.13.1` predates the install fixes and is superseded.
 - [x] The published charts install: the fixes found by live testing are present
-      in `charts/mcp-hangar 0.13.2` and `charts/mcp-hangar-operator 0.12.1` as
+      in `charts/mcp-hangar 0.13.3` and `charts/mcp-hangar-operator 0.12.1` as
       served today (verified by pulling and inspecting them).
 - [ ] **Chart releases are immutable** — `release-charts` currently re-pushes an
       existing version on every merge to `main`, so a released tag's content

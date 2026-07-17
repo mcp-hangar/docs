@@ -4,6 +4,10 @@ Hangar can forward audit events to a SIEM or log aggregator in a structured
 format. Four formats are supported: CEF, LEEF 2.0, JSON-lines, and RFC 5424
 syslog.
 
+> For how these exports and the rest of Hangar's controls map to the **EU AI Act
+> and SOC 2** — and, importantly, what Hangar does *not* claim — see
+> [Compliance Posture](./COMPLIANCE_POSTURE.md).
+
 ## Configuration
 
 Two environment variables control the compliance pipeline:

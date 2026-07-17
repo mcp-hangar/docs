@@ -8,9 +8,9 @@ together" is answered by the compatibility matrix below, not by a shared
 version number. This page is that matrix plus the artifact-security policy that
 governs how the images and charts are published and verified.
 
-> **Status: released and signed; the published charts carry their fixes — but
-> chart tags are mutable, which is a release-integrity bug
-> (`mcp-hangar/helm-charts#36`).**
+> **Status: released, signed, and pinned — the published charts carry their
+> fixes and chart tags are now immutable (`mcp-hangar/helm-charts#36`, closed;
+> fixed by the fail-safe publish guard #37).**
 > As of 2026-07-16 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
 > image `1.5.1`, operator `0.12.2`, and both Helm charts.
@@ -26,18 +26,15 @@ governs how the images and charts are published and verified.
 > all — that gate now exists, which is why this class of defect will not ship
 > again.
 >
-> **The fixes reached the registry the wrong way.** `release-charts` re-pushes an
-> already-published version on every merge to `main`, so a released tag's content
-> changes over time (`mcp-hangar/helm-charts#36`): `mcp-hangar-operator 0.12.1`
-> today is not the `0.12.1` published before those fixes landed. That contradicts
-> the tag-immutability rule in the *Artifact security policy* below, and it is why
-> the digests recorded in *Released artifacts* drift. Until #36 lands, treat those
-> digests as a **snapshot, not a pin**, and expect a chart tag to move under you.
+> **Chart tags are immutable (`mcp-hangar/helm-charts#36`, closed).** The publish
+> guard probes with `crane manifest` and skips any version already in the registry
+> (#37), so a released chart tag's content never changes after publication — the
+> digests recorded in *Released artifacts* are stable pins.
 >
 > Kubernetes-range validation is **done** (see the matrix). Independent release
 > is still **not formally declared supported**: the remaining **Verification
 > status** items are human-gated — a named `CODEOWNERS` owner and security/owner
-> sign-off — plus the mutable-tag fix.
+> sign-off.
 
 ## Ownership and update procedure
 
@@ -67,8 +64,7 @@ Rules for reading and extending the matrix:
   digests are in *Released artifacts* below. Both lanes have landed
   (`mcp-hangar-operator#26`, `helm-charts#7`) and the
   Kubernetes range is now validated. The row is still **not formally a supported
-  combination** until the owners sign off and chart releases become immutable
-  (see Verification status).
+  combination** until the owners sign off (see Verification status).
 - **Kubernetes** records the tested server range for combinations that include
   the operator or a chart. The declared `>=1.25` floor is **test-confirmed**: on a
   real **v1.25.16** control plane both charts install, the operator's CRDs reach
@@ -90,10 +86,10 @@ Digests for every published artifact, confirmed by anonymous pull. All are
 public; images and charts marked *signed* carry a keyless cosign signature and an
 SBOM/provenance attestation.
 
-**Image digests are pins. Chart digests are not** -- `release-charts` re-pushes an
-existing chart version on every merge to `main`, so a chart tag's digest moves
-(`mcp-hangar/helm-charts#36`). The chart digests below were read on 2026-07-16 and
-will drift again on the next merge; the image digests (2026-07-15) are stable.
+**Image and chart digests are pins.** The publish guard (`mcp-hangar/helm-charts#37`)
+skips re-push of any already-published version, so a released tag's digest is
+stable — verified de-facto: the earlier-recorded `0.13.2` chart digest is
+unchanged today. Read once, pin by digest.
 
 | Artifact | Version | Digest | Signed |
 | --- | --- | --- | --- |
@@ -188,10 +184,10 @@ owner and security sign-off) plus a chart re-release.
 - [x] The published charts install: the fixes found by live testing are present
       in `charts/mcp-hangar 0.13.3` and `charts/mcp-hangar-operator 0.12.1` as
       served today (verified by pulling and inspecting them).
-- [ ] **Chart releases are immutable** — `release-charts` currently re-pushes an
-      existing version on every merge to `main`, so a released tag's content
-      changes over time (`mcp-hangar/helm-charts#36`). Until this is fixed, no
-      chart tag or digest here is a stable pin.
+- [x] **Chart releases are immutable** — the publish guard skips re-push of an
+      already-published version (`mcp-hangar/helm-charts#36`, closed; fixed by the
+      `crane manifest` probe in #37), so a released chart tag's digest is a stable
+      pin.
 - [x] Kubernetes support range validated (`1.25` -- `1.36`) against a real
       control plane at the declared floor `v1.25.16` and at `v1.36.1`: charts
       install, CRDs reach `Established`, an `MCPServer` reconciles into a child

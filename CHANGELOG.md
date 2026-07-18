@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.3](https://github.com/mcp-hangar/docs/compare/v1.0.2...v1.0.3) (2026-07-18)
+
+
+### Changed
+
+* **architecture:** add ADR-010 retiring the agent + Hangar Cloud tier ([#52](https://github.com/mcp-hangar/docs/issues/52)) ([858c173](https://github.com/mcp-hangar/docs/commit/858c173a94b22c2090cae286133eaed5284cf7a1))
+* **reference:** add EU AI Act / SOC 2 compliance posture doc ([#55](https://github.com/mcp-hangar/docs/issues/55)) ([b5fd9d9](https://github.com/mcp-hangar/docs/commit/b5fd9d97292c47bfb92f863dfae1d398a9b6b7ff))
+* **reference:** generate the released-artifacts matrix + immutable-tags status (Track 2) ([#56](https://github.com/mcp-hangar/docs/issues/56)) ([c52fd54](https://github.com/mcp-hangar/docs/commit/c52fd54755f11d626b73c741b7f55c8f105a4ffb))
+* **reference:** update compatibility matrix to core 1.5.1 ([#53](https://github.com/mcp-hangar/docs/issues/53)) ([fb1cace](https://github.com/mcp-hangar/docs/commit/fb1cace69190714111ad701acc0e81ae8da6f3c2))
+* **release:** correct the chart install status and record mutable chart tags ([#46](https://github.com/mcp-hangar/docs/issues/46)) ([2bd19ff](https://github.com/mcp-hangar/docs/commit/2bd19ff0febb119340ce97ab4e0e588a35183ac8))
+* **repo:** retire hangar-agent / Hangar Cloud references ([#51](https://github.com/mcp-hangar/docs/issues/51)) ([91561fd](https://github.com/mcp-hangar/docs/commit/91561fd65297afc4f6d0ffa5ef6f059caaccaac5))
+
 ## [1.0.2](https://github.com/mcp-hangar/docs/compare/v1.0.1...v1.0.2) (2026-07-16)
 
 

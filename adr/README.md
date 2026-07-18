@@ -22,6 +22,7 @@ taxonomy, and formatting conventions.
 | [009](ADR-009-independent-release-topology.md) | Independent Release Topology -- Core, Operator Image, Agent Image, and OCI Helm Charts Release on Their Own SemVer | Accepted (partial → [010](ADR-010-retire-agent-cloud-tier.md)) | 2026-07-14 |
 | [010](ADR-010-retire-agent-cloud-tier.md) | Retire the Agent + Hangar Cloud Product Tier | Accepted | 2026-07-16 |
 | [011](ADR-011-single-source-of-truth-cross-repo-facts.md) | Single Source of Truth for Cross-Repo Facts | Accepted | 2026-07-18 |
+| [012](ADR-012-interceptor-sep-pin-tracking-policy.md) | Interceptor SEP-Pin Tracking Policy | Accepted | 2026-07-18 |
 
 ## Summaries
 
@@ -119,6 +120,17 @@ order: link > generate > hand-copy, with a reusable CI lint guarding the domain
 where a value must appear literally. The governing decision for epic #501;
 resolves the four drift symptoms (#485/#486/helm#44/operator#36) as
 implementations rather than one-off edits.
+
+### [ADR-012](ADR-012-interceptor-sep-pin-tracking-policy.md): Interceptor SEP-Pin Tracking Policy
+
+The in-process interceptor surface validates against a locally-vendored schema
+derived from an experimental upstream pin (`experimental-ext-interceptors @
+99bc7c9`, SEP-2133) that has already renumbered and may still move. Policy:
+vendor + freeze at a known-good SHA, bump only on a deliberate cadence (not
+reactively), keep the surface experimental + off-by-default (capability-
+negotiated), and run a scheduled drift check so re-pins are planned. Revisit
+toward a hard freeze once the SEP is accepted. Governs the interceptor pin that
+survived ADR-010's retirement of the (superseded) ADR-005 surface. From #488.
 
 ## Conventions
 

@@ -14,9 +14,7 @@ The operator ships from a separate repository:
 Install via Helm (from the [helm-charts](https://github.com/mcp-hangar/helm-charts) repo):
 
 ```bash
-helm repo add mcp-hangar https://mcp-hangar.github.io/helm-charts
-helm repo update
-helm install mcp-hangar-operator mcp-hangar/mcp-hangar-operator \
+helm install mcp-hangar-operator oci://ghcr.io/mcp-hangar/charts/mcp-hangar-operator \
   --namespace mcp-hangar \
   --create-namespace
 ```

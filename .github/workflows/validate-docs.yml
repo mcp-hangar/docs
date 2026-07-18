@@ -21,12 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout docs
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: docs
 
       - name: Checkout mcp-hangar source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: mcp-hangar/mcp-hangar
           path: source

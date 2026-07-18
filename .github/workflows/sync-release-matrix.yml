@@ -1,0 +1,64 @@
+# Regenerates the "Released artifacts" table in RELEASE_COMPATIBILITY.md from the
+# GHCR registry (versions + digests + chart appVersions) and opens a PR when it
+# drifts — replacing the by-hand maintenance that got the numbers wrong three
+# times. Fires on a schedule, on demand, and (instantly) on a `core-released`
+# repository_dispatch from the core release workflow.
+name: sync-release-matrix
+
+on:
+  schedule:
+    - cron: "41 6 * * 1" # weekly; release dispatch + manual cover the rest
+  workflow_dispatch: {}
+  repository_dispatch:
+    types: [core-released]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  RELEASE_BOT_APP_ID: ${{ secrets.RELEASE_BOT_APP_ID }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        if: ${{ env.RELEASE_BOT_APP_ID != '' }}
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+
+      - uses: azure/setup-helm@v4
+      - uses: imjasonh/setup-crane@v0.4
+        with:
+          version: v0.20.2 # pin, not latest-release (see helm-charts#51)
+
+      - name: Regenerate the released-artifacts table
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+        run: bash scripts/gen-artifact-matrix.sh
+
+      - name: Open PR on drift
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          branch: chore/sync-release-matrix
+          delete-branch: true
+          commit-message: "docs(reference): regenerate the released-artifacts matrix from GHCR"
+          title: "docs(reference): regenerate the released-artifacts matrix from GHCR"
+          body: |
+            Automated by `sync-release-matrix` — the released-artifacts table in `RELEASE_COMPATIBILITY.md` drifted from what's published in GHCR.
+
+            ## Why
+
+            The versions, digests, and chart appVersions in that table are read live from the registry (`gh release`, `crane`, `helm show chart`). They had been hand-maintained and got out of sync (e.g. a chart version bumped but the row didn't). This regenerates them.
+
+            ## How tested
+
+            The generator (`scripts/gen-artifact-matrix.sh`) only rewrites the block between the `generated: released-artifacts` markers and refuses to write if any value comes back empty; the surrounding prose is untouched.

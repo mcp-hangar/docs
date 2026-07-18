@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.4](https://github.com/mcp-hangar/docs/compare/v1.0.3...v1.0.4) (2026-07-18)
+
+
+### Changed
+
+* **architecture:** add ADR-011 (single source of truth for cross-repo facts) ([#68](https://github.com/mcp-hangar/docs/issues/68)) ([ae530b5](https://github.com/mcp-hangar/docs/commit/ae530b5dfa36ccbb882afe43e9ea7362b9dadba4))
+* **guides:** fix stale github.io helm-repo refs to OCI + add domain-lint (ADR-011) ([#69](https://github.com/mcp-hangar/docs/issues/69)) ([cd9360e](https://github.com/mcp-hangar/docs/commit/cd9360eb2dc91a1e54560c61e885f0b9afb33001))
+* **reference:** add OWASP MCP Top 10 coverage page ([#66](https://github.com/mcp-hangar/docs/issues/66)) ([a01ce74](https://github.com/mcp-hangar/docs/commit/a01ce7440be9163d99e2ecb8fa8a20f100f5a982))
+
 ## [1.0.3](https://github.com/mcp-hangar/docs/compare/v1.0.2...v1.0.3) (2026-07-18)
 
 

@@ -40,12 +40,8 @@ kubectl get crds | grep mcp-hangar.io
 ### Install Operator via Helm
 
 ```bash
-# Add Helm repository
-helm repo add mcp-hangar https://mcp-hangar.github.io/helm-charts
-helm repo update
-
-# Install operator
-helm install mcp-hangar-operator mcp-hangar/mcp-hangar-operator \
+# Install operator (latest published chart; pin --version from the compatibility matrix)
+helm install mcp-hangar-operator oci://ghcr.io/mcp-hangar/charts/mcp-hangar-operator \
   --namespace mcp-hangar \
   --create-namespace \
   --set hangar.url=http://mcp-hangar-core:8080

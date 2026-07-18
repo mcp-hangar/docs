@@ -23,6 +23,7 @@ taxonomy, and formatting conventions.
 | [010](ADR-010-retire-agent-cloud-tier.md) | Retire the Agent + Hangar Cloud Product Tier | Accepted | 2026-07-16 |
 | [011](ADR-011-single-source-of-truth-cross-repo-facts.md) | Single Source of Truth for Cross-Repo Facts | Accepted | 2026-07-18 |
 | [012](ADR-012-interceptor-sep-pin-tracking-policy.md) | Interceptor SEP-Pin Tracking Policy | Accepted | 2026-07-18 |
+| [013](ADR-013-egress-policy-enforcement-model.md) | Egress Policy Enforcement Model (MCPEgressPolicy) | Accepted | 2026-07-18 |
 
 ## Summaries
 
@@ -131,6 +132,20 @@ reactively), keep the surface experimental + off-by-default (capability-
 negotiated), and run a scheduled drift check so re-pins are planned. Revisit
 toward a hard freeze once the SEP is accepted. Governs the interceptor pin that
 survived ADR-010's retirement of the (superseded) ADR-005 surface. From #488.
+
+### [ADR-013](ADR-013-egress-policy-enforcement-model.md): Egress Policy Enforcement Model (MCPEgressPolicy)
+
+Fixes the enforcement model for the policy language above the binary
+registration switch that phases 1–3 (operator #50/#51/#52, v0.13.0) delivered.
+Decision: explicit-proxy enforcement plus a policy-generated network backstop —
+L7 (tools/arguments/responses) is enforced on the connections Hangar already
+originates, and policy compilation generates the L3/L4 default-deny/`toFQDNs`
+backstop so the data plane cannot be bypassed. No transparent TLS interception
+and no eBPF protocol parsing in v1 (both rejected as over-broad for the trust
+they add). Introduces the `MCPEgressPolicy` CRD (Audit-default, `targetRef`,
+deny-by-default upstream allow-list referencing existing digest/approval/issuer
+primitives, deterministic argument limits only). Trust boundary stated verbatim:
+a policy without the backstop is a suggestion. From epic #53.
 
 ## Conventions
 

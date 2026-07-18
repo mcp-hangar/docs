@@ -21,6 +21,7 @@ taxonomy, and formatting conventions.
 | [008](ADR-008-tasks-relay-only.md) | Task Governance is Relay-Only -- Hangar is a Task Relay, Not a Task Executor | Accepted | 2026-07-02 |
 | [009](ADR-009-independent-release-topology.md) | Independent Release Topology -- Core, Operator Image, Agent Image, and OCI Helm Charts Release on Their Own SemVer | Accepted (partial → [010](ADR-010-retire-agent-cloud-tier.md)) | 2026-07-14 |
 | [010](ADR-010-retire-agent-cloud-tier.md) | Retire the Agent + Hangar Cloud Product Tier | Accepted | 2026-07-16 |
+| [011](ADR-011-single-source-of-truth-cross-repo-facts.md) | Single Source of Truth for Cross-Repo Facts | Accepted | 2026-07-18 |
 
 ## Summaries
 
@@ -108,6 +109,16 @@ product surface (repos archived; the agent chart, the core cloud connector, the
 removed; terraform-provider archived). Governance stays in-process in core;
 kernel-level runtime enforcement is retired with the tier. Supersedes ADR-005 and
 ADR-006 fully, and ADR-004 and ADR-009 in part.
+
+### [ADR-011](ADR-011-single-source-of-truth-cross-repo-facts.md): Single Source of Truth for Cross-Repo Facts
+
+Every fact shared across repos (domain, released versions, install commands,
+server security behavior, version compatibility) gets exactly one owner;
+everything else links to or generates from it, never hand-copies. Preference
+order: link > generate > hand-copy, with a reusable CI lint guarding the domain
+where a value must appear literally. The governing decision for epic #501;
+resolves the four drift symptoms (#485/#486/helm#44/operator#36) as
+implementations rather than one-off edits.
 
 ## Conventions
 

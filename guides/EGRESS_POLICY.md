@@ -17,9 +17,10 @@ The trust boundary is explicit: **a policy without the network backstop is a sug
 
 ## Prerequisites
 
-- The operator (>= v0.13.0 for the enforcement roadmap; the `MCPEgressPolicy` reconciler ships after that).
+- The operator, with the `MCPEgressPolicy` CRD installed (v0.13.0 shipped the enforcement roadmap; the `MCPEgressPolicy` reconciler ships in the release after it).
 - The target namespace should be opted into egress enforcement with the label `mcp-hangar.io/enforce-egress=true`, so the namespace default-deny is in place and the backstop has something to build on.
 - **For FQDN upstreams:** a cluster running **Cilium**. A vanilla `NetworkPolicy` cannot match on DNS names, so hostname upstreams are only enforceable under the Cilium flavor (see [Backstop flavors](#backstop-flavors)).
+- **For L7 enforcement** (tool-call / argument rules): the operator must be run with `--hangar-url` pointing at the core, so it can deliver the compiled policy to the data plane. Without it, only the L3/L4 backstop is applied.
 
 ## A complete example
 
@@ -32,7 +33,7 @@ metadata:
 spec:
   mode: Enforce                 # Audit (default) observes; Enforce blocks
   targetRef:
-    kind: MCPServer             # or MCPServerGroup (planned)
+    kind: MCPServer             # or MCPServerGroup
     name: srv
   defaultAction: Deny           # applied to tool names no rule matches
   upstreams:
@@ -60,6 +61,43 @@ Degraded=False (NotDegraded)
 
 A pod behind this policy reaches `api.github.com` (HTTP 200) but not any other host (connection times out), while DNS still resolves.
 
+### Governing a group
+
+`targetRef.kind: MCPServerGroup` applies one policy to every member of a group. The operator resolves the group's member servers and scopes the backstop to all of them (`mcp-hangar.io/provider In [members]`):
+
+```yaml
+apiVersion: mcp-hangar.io/v1alpha2
+kind: MCPEgressPolicy
+metadata:
+  name: web-egress
+  namespace: prod
+spec:
+  mode: Enforce
+  targetRef:
+    kind: MCPServerGroup
+    name: web-servers
+  upstreams:
+    - name: github
+      match: {host: api.github.com}
+      tools: {allow: ["get_*", "list_*"]}
+```
+
+### Deny everything
+
+With `defaultAction: Deny` (the default) and no `upstreams`, the policy denies all egress except the always-permitted DNS/backstop paths — a locked-down server that can resolve names but reach no upstream:
+
+```yaml
+apiVersion: mcp-hangar.io/v1alpha2
+kind: MCPEgressPolicy
+metadata:
+  name: lockdown
+  namespace: prod
+spec:
+  mode: Enforce
+  targetRef: {kind: MCPServer, name: srv}
+  # no upstreams -> nothing is allowed out
+```
+
 ## Spec reference
 
 ### Top level
@@ -67,7 +105,7 @@ A pod behind this policy reaches `api.github.com` (HTTP 200) but not any other h
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `mode` | `Audit` \| `Enforce` | `Audit` | `Audit` observes violations; `Enforce` blocks. Audit-default gives a Gatekeeper-style adoption path. |
-| `targetRef.kind` | `MCPServer` \| `MCPServerGroup` | — | What the policy attaches to. Group targets are planned. |
+| `targetRef.kind` | `MCPServer` \| `MCPServerGroup` | — | What the policy attaches to. A group applies the policy to every member server. |
 | `targetRef.name` | string | — | Referent name, resolved in the policy's namespace. |
 | `defaultAction` | `Deny` \| `Allow` | `Deny` | Outcome for a tool name that no `upstreams[].tools` rule matches. |
 | `upstreams[]` | list | — | The allow-list. With `defaultAction: Deny`, an empty list denies everything except the DNS/backstop paths. |
@@ -116,7 +154,9 @@ The L7 half runs in the core, on the connections Hangar already proxies. It is *
 
 Globs are case-sensitive for determinism (`get_*` does not match `GET_user`).
 
-**Argument scanning** rejects a tool call whose arguments contain a configured secret pattern or exceed `maxPayloadBytes`. A secret or oversized payload **denies the call even when the tool itself is allowed** — deny always wins.
+**Argument scanning** rejects a tool call whose arguments contain a configured secret pattern or exceed `maxPayloadBytes`. A secret or oversized payload **denies the call even when the tool itself is allowed** — deny always wins. Arguments that cannot be serialized for inspection also fail closed.
+
+**How the L7 policy is delivered.** The operator compiles the policy's per-upstream `tools`/`arguments` rules into a single per-server policy — the union of the upstreams' allow/deny/require-approval globs and secret-pattern groups, and the most restrictive (smallest) `maxPayloadBytes` — and pushes it to the core (requires `--hangar-url`). The core enforces it at the tool-invocation chokepoint: a denied call raises before it reaches the upstream; an approval-gated call is blocked pending approval. Deleting the policy clears it from the core.
 
 ### Secret-pattern groups
 
@@ -144,11 +184,12 @@ Unknown group names are ignored by the scanner (they are caught by CRD validatio
 | `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`). |
 | `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), or `TargetNotFound`. |
 
-## Limitations and roadmap
+## Limitations and notes
 
-- **L7 wiring:** the L7 engine is complete and tested; wiring it into the live tool-invocation path (fed by the operator's compiled policy document over the config-pull channel) is in progress.
-- **`MCPServerGroup` targets** are planned; today a policy targets a single `MCPServer`.
+- **L7 needs core integration.** The tool-call / argument rules are enforced only when the operator runs with `--hangar-url`; otherwise a policy applies its L3/L4 backstop but its L7 rules are not delivered.
 - **FQDN enforcement requires Cilium.** Under other CNIs, list upstreams as CIDRs, or accept that hostname upstreams are denied (fail closed) and surfaced via `Degraded`.
+- **L7 rules are merged per server.** Because the core enforces one policy per server (not per upstream connection), a policy's upstream `tools`/`arguments` rules are flattened together (see [above](#l7-semantics)). Scope host-specific tool rules with separate policies if you need them kept apart.
+- **`requireApproval` currently fails closed** — a gated call is blocked pending out-of-band approval; routing it into the interactive approval queue is a follow-up.
 - `toFQDNs` interacts with NodeLocal DNSCache; the operator's DNS-topology configuration (`ExtraDNSEgressPeers`) covers the same ground.
 
 ## See also

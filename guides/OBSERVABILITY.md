@@ -226,7 +226,14 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 |--------|------|--------|-------------|
 | `mcp_hangar_http_requests_total` | Counter | mcp_server, method, status_code | HTTP requests to remote MCP servers |
 | `mcp_hangar_http_request_duration_seconds` | Histogram | method | HTTP request latency |
-| `mcp_hangar_http_connection_pool_size` | Gauge | mcp_server | Current HTTP connection pool size |
+
+#### Messages (stdio + HTTP)
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `mcp_hangar_messages_sent_total` | Counter | mcp_server, method | JSON-RPC messages sent to an upstream server |
+| `mcp_hangar_messages_received_total` | Counter | mcp_server, type | JSON-RPC messages received (`type`: response/notification/error) |
+| `mcp_hangar_message_size_bytes` | Histogram | mcp_server, direction | JSON-RPC message payload size (`direction`: sent/received) |
 
 #### Rate Limiting
 
@@ -419,7 +426,7 @@ curl -s http://localhost:9090/api/v1/alerts | jq '.data.alerts[] | select(.state
 
 MCP Hangar supports distributed tracing via OpenTelemetry. Every tool invocation
 produces an OTEL span carrying MCP governance attributes (`mcp.server.id`,
-`mcp.tool.name`, `mcp.tool.status`, enforcement context, and identity context
+`gen_ai.tool.name`, `mcp.tool.status`, enforcement context, and identity context
 when available).
 
 For the full MCP attribute taxonomy, partner backend recipes (OTEL Collector,
@@ -477,8 +484,8 @@ Events exported:
 Caller identity attributes (`mcp.caller.type`, `mcp.caller.id`, `mcp.caller.roles`)
 are automatically propagated from the event's `identity_context` when available.
 
-Cost attributes (`mcp.cost.cents`, `mcp.cost.model`, `mcp.cost.input_tokens`,
-`mcp.cost.output_tokens`) are included when cost attribution is configured.
+Cost attributes (`mcp.cost.cents`, `mcp.cost.model`, `gen_ai.usage.input_tokens`,
+`gen_ai.usage.output_tokens`) are included when cost attribution is configured.
 
 ### Compliance Export Formats (Enterprise)
 

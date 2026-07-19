@@ -83,6 +83,7 @@ mcp-hangar serve --http --port 8000
 - [Container Guide](guides/CONTAINERS.md)
 - [Authentication & RBAC](guides/AUTHENTICATION.md)
 - [Front-Door Mode & Per-Tenant Tool Governance](guides/FRONT_DOOR.md)
+- [Egress Policy (MCPEgressPolicy)](guides/EGRESS_POLICY.md)
 - [Observability](guides/OBSERVABILITY.md)
 
 ## Contributing

@@ -169,9 +169,9 @@ HTTP transport exposes the following metrics:
 | `mcp_hangar_http_request_duration_seconds` | Histogram | Request latency |
 | `mcp_hangar_http_errors_total` | Counter | HTTP errors by type |
 | `mcp_hangar_http_retries_total` | Counter | Retry attempts |
-| `mcp_hangar_http_connection_pool_size` | Gauge | Connection pool size |
-| `mcp_hangar_http_sse_streams_active` | Gauge | Active SSE streams |
-| `mcp_hangar_http_sse_events_total` | Counter | SSE events received |
+| `mcp_hangar_messages_sent_total` | Counter | JSON-RPC messages sent, labeled by mcp_server, method |
+| `mcp_hangar_messages_received_total` | Counter | JSON-RPC messages received, labeled by mcp_server, type (response/notification/error) |
+| `mcp_hangar_message_size_bytes` | Histogram | Message payload size, labeled by mcp_server, direction (sent/received) |
 
 ## Error Handling
 

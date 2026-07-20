@@ -4,6 +4,40 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 1.6.0
+
+MCP Hangar 1.6.0 is an observability-hardening release: tool-invocation
+telemetry now follows the OpenTelemetry GenAI/MCP semantic conventions, the
+transport message metrics are wired, and it ships the L7 egress-policy
+([`MCPEgressPolicy`](guides/EGRESS_POLICY.md)) enforcement plane end to end.
+Upgrade is drop-in (`pip install -U mcp-hangar==1.6.0`, or pull
+`ghcr.io/mcp-hangar/mcp-hangar:1.6.0`); the notes below cover what changed for
+telemetry consumers.
+
+### Span attributes moved to OTel semantic conventions (breaking for trace consumers)
+
+Tool-invocation spans now use the OTel GenAI/MCP semconv names. If you query,
+filter, or alert on Hangar's traces or OTLP audit records by attribute, update:
+
+- `mcp.tool.name` → `gen_ai.tool.name`
+- `mcp.cost.input_tokens` → `gen_ai.usage.input_tokens`
+- `mcp.cost.output_tokens` → `gen_ai.usage.output_tokens`
+- the application span name `tool.invoke.{tool}` → `execute_tool {tool}`; the
+  outgoing transport call is now a `SpanKind.CLIENT` span carrying
+  `gen_ai.operation.name` and `mcp.method.name`.
+
+The Hangar-specific governance namespaces (`mcp.enforcement.*`, `mcp.risk.*`,
+`mcp.audit.*`, `mcp.cost.cents`/`model`/`currency`, `mcp.session.id`) are
+unchanged. `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG` are now honored.
+
+### Metrics: new transport message metrics; three dead metrics removed
+
+New, labeled per upstream server: `mcp_hangar_messages_sent_total`,
+`mcp_hangar_messages_received_total`, and the `mcp_hangar_message_size_bytes`
+histogram. **Removed** (they were never emitted): `mcp_hangar_http_connection_pool_size`,
+`mcp_hangar_http_sse_streams_active`, and `mcp_hangar_http_sse_events_total` —
+drop any dashboard panel or alert that still references them.
+
 ## Upgrade to 1.5.0
 
 MCP Hangar 1.5.0 adds a one-time admin bootstrap, a configurable command-bus

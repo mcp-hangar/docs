@@ -36,7 +36,7 @@ stable contract that partner backends consume without Hangar-specific plugins.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `mcp.tool.name` | string | Tool name as advertised by the MCP server |
+| `gen_ai.tool.name` | string | Tool name as advertised by the MCP server |
 | `mcp.tool.duration_ms` | float | Call duration in milliseconds |
 | `mcp.tool.status` | string | Result: `success`, `error`, `timeout`, `blocked` |
 | `mcp.tool.cold_start` | string | Whether this call triggered a cold start (`true`/`false`) |
@@ -94,8 +94,8 @@ stable contract that partner backends consume without Hangar-specific plugins.
 |-----------|------|-------------|
 | `mcp.cost.cents` | int | Cost of invocation in hundredths of a cent |
 | `mcp.cost.model` | string | Pricing model: `token`, `duration`, `fixed`, `composite` |
-| `mcp.cost.input_tokens` | int | Input tokens consumed (LLM-backed tools) |
-| `mcp.cost.output_tokens` | int | Output tokens produced (LLM-backed tools) |
+| `gen_ai.usage.input_tokens` | int | Input tokens consumed (LLM-backed tools) |
+| `gen_ai.usage.output_tokens` | int | Output tokens produced (LLM-backed tools) |
 | `mcp.cost.currency` | string | ISO 4217 currency code (default: `USD`) |
 
 ### Risk attributes (semantic analysis)
@@ -189,7 +189,7 @@ debugging. Replace the `logging` exporter with your production backend.
 
 ### What flows through the collector
 
-- **Traces:** Tool invocation spans carrying `mcp.server.id`, `mcp.tool.name`,
+- **Traces:** Tool invocation spans carrying `mcp.server.id`, `gen_ai.tool.name`,
   `mcp.tool.status`, and enforcement attributes.
 - **Logs:** Audit log records for tool invocation events and MCP server state
   transitions, exported by `OTLPAuditExporter`.
@@ -229,7 +229,7 @@ MCP_TRACING_ENABLED=true
 In the OpenLIT trace explorer, filter on MCP governance attributes:
 
 - **By MCP server:** `mcp.server.id = "math-server"`
-- **By tool:** `mcp.tool.name = "add"`
+- **By tool:** `gen_ai.tool.name = "add"`
 - **By user:** `mcp.user.id = "alice"`
 - **By enforcement action:** `mcp.enforcement.action = "block"`
 - **By violation type:** `mcp.enforcement.violation_type = "egress_undeclared"`

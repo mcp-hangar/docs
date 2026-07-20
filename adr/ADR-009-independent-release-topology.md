@@ -210,9 +210,12 @@ This amendment records that lane; it *adds to* Decision 1 without changing it.
   `-rc.N`) on the pre-GA branch, **outside `release-please`** -- a deliberate,
   human-cut event, consistent with the image lanes' tag-gating and Decision 7's
   framing, and appropriate while the branch has no automated release PR.
-- **Prereleases publish to TestPyPI, not prod PyPI**, carry no `latest` docker
-  tag, and mark the GitHub release as prerelease. This was already `release.yml`'s
-  `is_prerelease` behavior; the ADR now reflects it.
+- **Prereleases publish to prod PyPI** (the `pypi` environment), carry no `latest`
+  docker tag, and mark the GitHub release as prerelease. `pip` ignores a prerelease
+  unless `--pre` or an explicit prerelease pin is used, so an alpha on prod PyPI does
+  not affect a plain `pip install mcp-hangar`. (TestPyPI was the original target but
+  was dropped -- its trusted publisher was never configured, and prod PyPI already
+  hosts the `pypi`-environment trusted publisher; `mcp-hangar#558`.)
 - **PEP 440 <-> semver-tag reconciliation:** the package version is PEP 440
   (`2.0.0a1`); the git tag is semver (`v2.0.0-alpha.1`). `release.yml` normalizes
   the tag suffix (`-alpha.N`->`aN`, `-beta.N`->`bN`, `-rc.N`->`rcN`) so the two

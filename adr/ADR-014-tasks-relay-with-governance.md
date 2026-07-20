@@ -1,6 +1,6 @@
 # ADR-014: Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute
 
-**Status:** Proposed (DRAFT -- awaiting maintainer ratification; human-required)
+**Status:** Accepted
 **Date:** 2026-07-20
 **Authors:** MCP Hangar Team
 **Supersedes:** ADR-008 (in part) -- lifts Decision 1's "relay-only *permanently*" absolutism and Decision 3's "do not build the relay yet"; carries ADR-008's other decisions forward unchanged.

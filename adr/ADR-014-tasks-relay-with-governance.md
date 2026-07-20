@@ -84,6 +84,7 @@ still does not run jobs.
    the explicit unblocker named by `#322`.
 
 **Carried forward from ADR-008 unchanged** (these were already the right calls):
+
 - **Digest drift fails the task**, it does not merely refuse the result -- a task with a
   permanently-unavailable result is a zombie (ADR-008; `TaskDigestGuard`, `#320`).
 - **Cancellation is best-effort relay** of `tasks/cancel`, no more responsibility.

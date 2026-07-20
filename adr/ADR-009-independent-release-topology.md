@@ -198,6 +198,32 @@ until these complete; nothing here claims it is operational today.
   ratified explicitly (Decision 4) and made safe with the version-bump guard,
   rather than eliminated.
 
+## Amendment (2026-07-20): Prerelease / pre-GA branch lane for core
+
+Decision 1 scopes the core lane to `release-please` on `main` cutting **stable**
+`vX.Y.Z` tags to PyPI. It did not address **prereleases** (`alpha`/`beta`/`rc`)
+cut ahead of a GA from a **pre-GA integration branch** (`mcp2`, the 2.x line).
+This amendment records that lane; it *adds to* Decision 1 without changing it.
+
+- **Stable GA stays `release-please` on `main` -> PyPI** (Decision 1, unchanged).
+- **Prereleases are cut by a hand-pushed semver tag** (`v2.0.0-alpha.1`, `-beta.N`,
+  `-rc.N`) on the pre-GA branch, **outside `release-please`** -- a deliberate,
+  human-cut event, consistent with the image lanes' tag-gating and Decision 7's
+  framing, and appropriate while the branch has no automated release PR.
+- **Prereleases publish to TestPyPI, not prod PyPI**, carry no `latest` docker
+  tag, and mark the GitHub release as prerelease. This was already `release.yml`'s
+  `is_prerelease` behavior; the ADR now reflects it.
+- **PEP 440 <-> semver-tag reconciliation:** the package version is PEP 440
+  (`2.0.0a1`); the git tag is semver (`v2.0.0-alpha.1`). `release.yml` normalizes
+  the tag suffix (`-alpha.N`->`aN`, `-beta.N`->`bN`, `-rc.N`->`rcN`) so the two
+  forms validate against each other (`mcp-hangar#549`).
+- **Decision 7 (immutable tags) still holds** for prereleases: each `aN`/`bN`/`rcN`
+  is cut once and never moved.
+
+The 2.x GA (`2.0.0`) is still cut by `release-please` on `main` once the pre-GA
+ladder soaks; the branch lane is a pre-GA convenience, not a second permanent
+release authority. (Filed alongside `mcp-hangar#549`.)
+
 ## References
 
 - Parent / ratification: `mcp-hangar/mcp-hangar#410` (proposed ADR-009),

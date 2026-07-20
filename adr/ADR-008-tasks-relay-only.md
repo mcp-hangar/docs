@@ -1,6 +1,6 @@
 # ADR-008: Task Governance is Relay-Only -- Hangar is a Task Relay, Not a Task Executor
 
-**Status:** Accepted
+**Status:** Accepted -- partially superseded by [ADR-014](ADR-014-tasks-relay-with-governance.md) (the "relay-only *permanently*" and "do not build the relay yet" decisions are lifted; other decisions carried forward)
 **Date:** 2026-07-02
 **Authors:** MCP Hangar Team
 

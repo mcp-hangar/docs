@@ -18,12 +18,13 @@ taxonomy, and formatting conventions.
 | [005](ADR-005-sep-1763-interceptor-compliance.md) | SEP-1763 Interceptor Framework Compliance | Superseded by [010](ADR-010-retire-agent-cloud-tier.md) | 2026-05-01 |
 | [006](ADR-006-tetragon.md) | Runtime Enforcement Strategy -- Tetragon-First, Pluggable Backend | Superseded by [010](ADR-010-retire-agent-cloud-tier.md) | 2026-05-10 |
 | [007](ADR-007-langfuse-integration.md) | Langfuse Integration for LLM Observability | Accepted | 2026-01-12 |
-| [008](ADR-008-tasks-relay-only.md) | Task Governance is Relay-Only -- Hangar is a Task Relay, Not a Task Executor | Accepted | 2026-07-02 |
+| [008](ADR-008-tasks-relay-only.md) | Task Governance is Relay-Only -- Hangar is a Task Relay, Not a Task Executor | Accepted (partial → [014](ADR-014-tasks-relay-with-governance.md)) | 2026-07-02 |
 | [009](ADR-009-independent-release-topology.md) | Independent Release Topology -- Core, Operator Image, Agent Image, and OCI Helm Charts Release on Their Own SemVer | Accepted (partial → [010](ADR-010-retire-agent-cloud-tier.md)) | 2026-07-14 |
 | [010](ADR-010-retire-agent-cloud-tier.md) | Retire the Agent + Hangar Cloud Product Tier | Accepted | 2026-07-16 |
 | [011](ADR-011-single-source-of-truth-cross-repo-facts.md) | Single Source of Truth for Cross-Repo Facts | Accepted | 2026-07-18 |
 | [012](ADR-012-interceptor-sep-pin-tracking-policy.md) | Interceptor SEP-Pin Tracking Policy | Accepted | 2026-07-18 |
 | [013](ADR-013-egress-policy-enforcement-model.md) | Egress Policy Enforcement Model (MCPEgressPolicy) | Accepted | 2026-07-18 |
+| [014](ADR-014-tasks-relay-with-governance.md) | Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute | Proposed (DRAFT) | 2026-07-20 |
 
 ## Summaries
 
@@ -146,6 +147,21 @@ they add). Introduces the `MCPEgressPolicy` CRD (Audit-default, `targetRef`,
 deny-by-default upstream allow-list referencing existing digest/approval/issuer
 primitives, deterministic argument limits only). Trust boundary stated verbatim:
 a policy without the backstop is a suggestion. From epic #53.
+
+### [ADR-014](ADR-014-tasks-relay-with-governance.md): Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute
+
+**Proposed (DRAFT — awaiting maintainer ratification.)** Partially supersedes
+ADR-008. Two facts changed since the relay-only decision: the SDK v2 beta
+(mcp 2.0.0b2, spike #547) promotes Tasks out of `experimental` into a first-class
+negotiated extension (clearing ADR-008 trigger (b)), and the built-but-dormant
+governance stack (#319/#320/#321/#322) is stranded. Decision: **relay-with-governance**
+— Hangar relays upstream-created tasks and interposes governance (ownership, digest
+re-verification, consent) at the proxy/store seam, recording `task_id`→provenance as an
+append-only event chain (ADR-002). It still does **not** execute: no task creation, no
+scheduler, no worker→main-loop bridge. Lifts only ADR-008's "relay-only *permanently*"
+and "do not build yet"; carries the rest forward. Build the seam now (trigger (b) met),
+activate per-upstream on first real task; behavior is unchanged until then. Unblocks the
+p1-high consent gate #322. Answers PR #368's objections point by point.
 
 ## Conventions
 

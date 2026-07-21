@@ -24,7 +24,7 @@ taxonomy, and formatting conventions.
 | [011](ADR-011-single-source-of-truth-cross-repo-facts.md) | Single Source of Truth for Cross-Repo Facts | Accepted | 2026-07-18 |
 | [012](ADR-012-interceptor-sep-pin-tracking-policy.md) | Interceptor SEP-Pin Tracking Policy | Accepted | 2026-07-18 |
 | [013](ADR-013-egress-policy-enforcement-model.md) | Egress Policy Enforcement Model (MCPEgressPolicy) | Accepted | 2026-07-18 |
-| [014](ADR-014-tasks-relay-with-governance.md) | Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute | Proposed (DRAFT) | 2026-07-20 |
+| [014](ADR-014-tasks-relay-with-governance.md) | Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute | Accepted | 2026-07-20 |
 
 ## Summaries
 
@@ -150,7 +150,7 @@ a policy without the backstop is a suggestion. From epic #53.
 
 ### [ADR-014](ADR-014-tasks-relay-with-governance.md): Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute
 
-**Proposed (DRAFT — awaiting maintainer ratification.)** Partially supersedes
+**Accepted.** Partially supersedes
 ADR-008. Two facts changed since the relay-only decision: the SDK v2 beta
 (mcp 2.0.0b2, spike #547) promotes Tasks out of `experimental` into a first-class
 negotiated extension (clearing ADR-008 trigger (b)), and the built-but-dormant

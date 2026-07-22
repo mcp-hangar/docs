@@ -23,7 +23,7 @@ handler that forwards `ToolInvocationCompleted`, `ToolInvocationFailed`, and
 independently of the OTLP audit exporter.
 
 Compliance exporters are included in the main `mcp_hangar` package since
-v1.3.0; no separate enterprise module or license key is required.
+v1.3.0; no separate module or license key is required.
 
 ## Format reference
 

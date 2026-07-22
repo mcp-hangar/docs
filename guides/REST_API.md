@@ -159,7 +159,7 @@ All endpoints return JSON. Error responses follow the envelope format:
 | `POST` | `/api/auth/policies/{scope}/{target_id}` | Set tool access policy |
 | `DELETE` | `/api/auth/policies/{scope}/{target_id}` | Clear tool access policy |
 
-### Approvals (Enterprise)
+### Approvals
 
 | Method | Path | Description |
 |--------|------|-------------|

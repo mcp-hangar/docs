@@ -30,7 +30,7 @@ We will implement SEP-1766 and SEP-1763 compliance **preemptively**, treating ou
 1. **First-mover advantage.** Being the reference implementation of both SEPs positions MCP Hangar as the canonical MCP governance tool.
 2. **Directional stability.** Both proposals solve real problems (tool mutation detection, runtime enforcement) that will not go away regardless of final spec shape.
 3. **Low adaptation cost.** The core concepts (digest field, interceptor hooks) are stable. Only wire format or field naming might change, which is a mechanical refactor.
-4. **Customer demand.** Enterprise buyers already ask for tool supply chain integrity. Waiting for spec ratification delays value delivery by 6-12 months.
+4. **Operator demand.** Operators and teams already ask for tool supply chain integrity. Waiting for spec ratification delays value delivery by 6-12 months.
 
 ### Design Choices
 

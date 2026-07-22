@@ -105,4 +105,4 @@ add-on. This section covers the import hygiene around that module boundary.
 ## Open Items
 
 - Repo-wide Ruff debt in historical tests remains outside the scope of this hardening pass.
-- If enterprise packaging is split into a separately installed distribution later, the fallback loader can be retired in favor of entry-point-only discovery.
+- If the optional-integrations module is split into a separately installed distribution later, the fallback loader can be retired in favor of entry-point-only discovery.

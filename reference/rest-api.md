@@ -964,9 +964,9 @@ Removes a runtime withdrawal (config-declared withdrawals persist independently)
 
 ---
 
-## Enterprise Approvals
+## Approvals
 
-Available when the enterprise approval service is enabled.
+Available when the approval service is enabled. (The `/enterprise/approvals` path is the released 1.6.x route; it is renamed to `/approvals` on the v2 line.)
 
 ### List Approvals
 

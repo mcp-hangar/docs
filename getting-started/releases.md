@@ -78,6 +78,30 @@ Each artifact follows SemVer and versions **independently** — the Python core,
 the operator image, and the charts do not share a version line. Check each
 repo's Releases page and changelog for its current version.
 
+## Upgrade notes
+
+Per-release, user-visible migration steps live in the [Upgrade Guide](../upgrade.md).
+
+### 1.6.0 — breaking for trace/metrics consumers
+
+The current stable Python core is **1.6.0**, an observability-hardening release.
+It contains a **silent breaking change for telemetry consumers**: tool-invocation
+spans were renamed to the OpenTelemetry GenAI/MCP semantic conventions, so any
+dashboard, saved query, or alert keyed on the **old** span/attribute names keeps
+running but matches nothing after upgrade. The renames include:
+
+- `mcp.tool.name` → `gen_ai.tool.name`
+- `mcp.cost.input_tokens` → `gen_ai.usage.input_tokens`
+- `mcp.cost.output_tokens` → `gen_ai.usage.output_tokens`
+- span name `tool.invoke.{tool}` → `execute_tool {tool}`
+
+Three never-emitted HTTP/SSE metrics were also removed. Audit your Grafana/PromQL
+and OTLP audit queries **before** upgrading. See
+[Upgrade to 1.6.0](../upgrade.md#upgrade-to-160) for the full attribute mapping
+and the new transport message metrics, and the
+[Egress Policy guide](../guides/EGRESS_POLICY.md) for the L7 `MCPEgressPolicy`
+enforcement plane that also ships in this release.
+
 ## Where to watch
 
 - **All GHCR artifacts (image + charts):** <https://github.com/orgs/mcp-hangar/packages>

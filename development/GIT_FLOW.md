@@ -28,7 +28,7 @@ The following table tracks the evolution of git and workflow standards.
 | 4 | Stale bot | 90-day stale, 30-day close (applied via stale.yml) | Tightened from 180/90 post-1.0 per PR #113. |
 | 5 | CC scope list | 13 approved, 3 rejected, 1 deferred | Auth, events, and cqrs were collapsed into core or security to reduce noise. Proto deferred pending higher change frequency. |
 | 6 | Release cadence | ad-hoc, release-please planned | - |
-| 7 | Deprecation policy | post-1.0 SemVer: deprecate in minor, remove in next major | Project is at v1.5.0. Breaking changes require a major version bump. |
+| 7 | Deprecation policy | post-1.0 SemVer: deprecate in minor, remove in next major | Project is at v1.6.0. Breaking changes require a major version bump. |
 | 8 | Dependabot auto-merge | auto-merge dev, actions, and runtime CVE patches | Runtime CVE patches are included in auto-merge to maintain security posture with minimal manual intervention. |
 | 9 | ADR authorship | agents may draft, maintainer authors PR | - |
 | 10 | Pre-release flow location | documented in this file (see Pre-release flow) | - |
@@ -73,7 +73,7 @@ from one shared list. Each repo's `.github/workflows/pr-title.yml` sets
 `requireScope: true` with its own accepted-scopes list -- that file is the
 source of truth, not this table. The three verified lists below (checked
 against each repo's `pr-title.yml`) illustrate the shape; other repos
-(`mcp-hangar-operator`, `mcp-hangar-website`, `terraform-provider`) each
+(`mcp-hangar-operator`, `mcp-hangar-website`) each
 define their own the same way.
 
 ### `mcp-hangar/mcp-hangar` (core)
@@ -198,7 +198,7 @@ Agents may draft ADRs in issue comments but never author the PR.
 
 ## Deprecation policy
 
-The project is at v1.5.0 and follows standard SemVer deprecation rules:
+The project is at v1.6.0 and follows standard SemVer deprecation rules:
 
 - Deprecations must be marked in at least one minor release.
 - Removal occurs earliest in the next major release.

@@ -71,6 +71,11 @@ stable contract that partner backends consume without Hangar-specific plugins.
 
 ### Behavioral attributes
 
+> **Roadmap / planned — not emitted in the current release.** These attributes
+> are reserved for the behavioral/anomaly-detection path, which is held back.
+> Deterministic enforcement does not populate them today; the table documents the
+> reserved contract for a future release.
+
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `mcp.behavioral.matches_baseline` | string | Whether call matches baseline pattern (`true`/`false`) |
@@ -106,11 +111,11 @@ agent session against detection rules (e.g. credential exfiltration, privilege
 escalation). Partner backends such as OpenLIT, Grafana, and SIEM tools can filter
 spans by `mcp.risk.severity = critical` to surface high-risk events.
 
-Requires the ENTERPRISE license tier. The `mcp.risk.score` and
-`mcp.risk.session_anomaly_score` attributes are populated by the `WeightedRiskScorer`
-when behavioral profiling is active. The scorer aggregates signals from
-`BehavioralDeviationDetected`, `DetectionRuleMatched`, and
-`CapabilityViolationDetected` events with exponential time decay.
+`DetectionRuleMatched` and `CapabilityViolationDetected` signals are emitted today
+(enforcement is deterministic — rule- and threshold-based). The `mcp.risk.score` and
+`mcp.risk.session_anomaly_score` attributes are reserved for the aggregate
+behavioral anomaly-scoring path, which is **not yet enabled**: these session-level
+scores are not populated in the current release.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|

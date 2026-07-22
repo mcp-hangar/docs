@@ -123,11 +123,11 @@ All endpoints return JSON. Error responses follow the envelope format:
 | `GET` | `/api/system` | System info (uptime, version, metrics summary) |
 | `GET` | `/api/system/me` | Current authenticated principal info |
 
-### Agent Policy
+### L7 Egress Policy
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/agent/policy` | Push an agent policy |
+| `POST` | `/api/mcp_servers/{id}/l7_policy` | Push a compiled L7 egress policy for a server (operator → core) |
 
 ### Admin Tools
 
@@ -136,7 +136,7 @@ All endpoints return JSON. Error responses follow the envelope format:
 | `POST` | `/api/admin/tools/{server}/{tool}/withdraw` | Withdraw a tool |
 | `POST` | `/api/admin/tools/{server}/{tool}/restore` | Restore a withdrawn tool |
 
-### Auth Management (Enterprise)
+### Auth Management
 
 | Method | Path | Description |
 |--------|------|-------------|

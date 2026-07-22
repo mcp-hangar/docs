@@ -29,7 +29,7 @@ The enforcement mechanism is the load-bearing decision. The realistic options ar
 
 3. **The trust model is documented verbatim, in the API and the docs:** *a policy without the network backstop is a suggestion; if a pod can bypass DNS + NetworkPolicy, it can bypass Hangar.* The backstop is not optional decoration — it is what makes the L7 policy an enforcement rather than a recommendation.
 
-4. **New CRD `MCPEgressPolicy` (existing group, v1alpha1)**, shape fixed by this ADR:
+4. **New CRD `MCPEgressPolicy` (existing group, v1alpha2)**, shape fixed by this ADR:
    - `spec.mode: Audit | Enforce` — **Audit is the default**, giving a Gatekeeper-style adoption path (observe violations before they block).
    - `spec.targetRef` attaches policy to an `MCPServer`/`MCPServerGroup`, never to raw pods.
    - `spec.defaultAction: Deny` — deny-by-default; `upstreams[]` is the allow-list.

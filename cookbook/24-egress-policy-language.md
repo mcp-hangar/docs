@@ -6,6 +6,13 @@
 > the operator run with `--hangar-url` (for the L7 half), and **Cilium** if any
 > upstream is an FQDN. See the [Egress Policy guide](../guides/EGRESS_POLICY.md)
 > for the full prerequisites and trust model.
+>
+> **Delivery status:** the core L7 engine and REST intake are armed in core
+> **v1.6.0**, but the operator's `MCPEgressPolicy` controller — the half that
+> compiles the CR and pushes L7 to the core — lands in **operator v0.14.0
+> (unreleased)**. Until that operator release, a policy is not delivered
+> end-to-end; only the L3/L4 network backstop applies. Plan against this now,
+> but do not treat end-to-end L7 as shipped.
 > **Time:** Read first, then plan -- this is a policy-language reference, not a
 > 20-minute run
 > **Adds:** A declarative, deny-by-default `MCPEgressPolicy` that controls which

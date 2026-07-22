@@ -24,7 +24,7 @@ This is not a disclaimer of convenience; it is the architecture. MCP Hangar runs
 
 - Policy enforcement is **deterministic**: rules in, decisions out. Same input, same output, every time.
 - There is no ML model in the codebase (verifiable by inspection — this claim is re-checked at each release). The only component with "classifier" in its name (`ErrorClassifier`) is heuristic retry logic that labels technical errors as transient or permanent. It has no effect on any person and involves no learned behavior.
-- Behavioral profiling of MCP servers is threshold- and rule-based anomaly detection over recorded events — statistics, not inference in the Art. 3(1) sense.
+- Detection over recorded events is threshold- and rule-based — deterministic statistics, not inference in the Art. 3(1) sense. (Behavioral/anomaly-based profiling is a roadmap item, not a shipped capability; today's enforcement is fully deterministic, with no learned baseline.)
 
 Therefore MCP Hangar carries **no direct obligations as an AI system provider**. Its relevance to the AI Act is entirely instrumental: it is infrastructure that AI system providers and deployers can use to satisfy *their* obligations.
 
@@ -65,7 +65,7 @@ SOC 2 is an attestation of **your organization's** controls, performed by a lice
 | TSC | Criteria area | MCP Hangar as control / evidence |
 |---|---|---|
 | CC6.1–CC6.3 | Logical access controls | RBAC over tool access and approvals; OAuth resource-server enforcement with audience binding (RFC 8707); multi-issuer trust with explicit issuer allow-lists; end-to-end identity propagation making tool calls attributable to a principal (when configured — anonymous access paths, if you allow them, are your scoping decision). |
-| CC7.2–CC7.3 | System monitoring, anomaly detection and evaluation | Behavioral profiling of MCP server activity; detection events; export to your SIEM in CEF/LEEF 2.0, RFC 5424 syslog, JSONL, and OTLP — meaning the evidence lands where your auditor already looks ([COMPLIANCE.md](./COMPLIANCE.md) covers the formats). |
+| CC7.2–CC7.3 | System monitoring and evaluation | Deterministic, rule- and threshold-based detection events; export to your SIEM in CEF/LEEF 2.0, RFC 5424 syslog, JSONL, and OTLP — meaning the evidence lands where your auditor already looks ([COMPLIANCE.md](./COMPLIANCE.md) covers the formats). (Behavioral/anomaly-based profiling is on the roadmap, not yet shipped.) |
 | CC7.4 | Incident response support | Suspension controls and human-in-the-loop gates give responders an enforcement point; the event log gives them a timeline. Append-only is enforced at the application layer; the deployer controls the underlying storage, so pair it with database-level immutability or WORM/object-lock storage where your audit requires tamper *evidence*, not just tamper *resistance*. |
 | CC8.1 | Change management | Per-tenant digest pinning (only reviewed, pinned server images run), canary and version routing (controlled rollout of tool-server changes), with every change recorded in the audit trail. |
 

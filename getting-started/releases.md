@@ -100,7 +100,10 @@ and OTLP audit queries **before** upgrading. See
 [Upgrade to 1.6.0](../upgrade.md#upgrade-to-160) for the full attribute mapping
 and the new transport message metrics, and the
 [Egress Policy guide](../guides/EGRESS_POLICY.md) for the L7 `MCPEgressPolicy`
-enforcement plane that also ships in this release.
+engine armed in this release. Note the split: the core policy engine and REST
+intake ship in 1.6.0, but a policy is not enforced end-to-end until the
+operator's `MCPEgressPolicy` controller lands in operator **v0.14.0**
+(unreleased).
 
 ## v2 preview (prerelease)
 

@@ -1,7 +1,7 @@
 # 16 -- Front-Door Multi-Tenant
 
 > **Prerequisite:** [12 -- Auth & RBAC](12-auth-rbac.md)
-> **You will need:** MCP Hangar 1.4.0, Docker, an OIDC issuer that mints JWTs with a `tenant_id` claim
+> **You will need:** MCP Hangar 1.6.0, Docker, an OIDC issuer that mints JWTs with a `tenant_id` claim
 > **Time:** 20 minutes
 > **Adds:** Front-door topology mode, per-tenant tool access, runtime tool withdrawal, RFC 9728 discovery
 

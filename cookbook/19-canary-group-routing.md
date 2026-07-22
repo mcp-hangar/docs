@@ -1,7 +1,7 @@
 # 19 -- Canary Group Routing
 
 > **Prerequisite:** [05 -- Load Balancing](05-load-balancing.md) (canary routing extends groups and load balancing; see also [16 -- Front-Door Multi-Tenant](16-front-door-multi-tenant.md) for tenant identity)
-> **You will need:** MCP Hangar 1.4.0, two versions of a backend MCP server, an OIDC issuer minting JWTs with a `tenant_id` claim
+> **You will need:** MCP Hangar 1.6.0, two versions of a backend MCP server, an OIDC issuer minting JWTs with a `tenant_id` claim
 > **Time:** ~15 minutes
 > **Adds:** Per-tenant canary and version routing for groups (pins + sticky split + LB fallback)
 

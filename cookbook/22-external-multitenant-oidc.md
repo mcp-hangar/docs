@@ -1,7 +1,7 @@
 # 22 -- External Multi-Tenant OIDC Front Door
 
 > **Prerequisite:** [16 -- Front-Door Multi-Tenant](16-front-door-multi-tenant.md)
-> **You will need:** MCP Hangar 1.4.0, Docker (for a local, test-only Keycloak), `jq`, `curl`
+> **You will need:** MCP Hangar 1.6.0, Docker (for a local, test-only Keycloak), `jq`, `curl`
 > **Time:** ~30 minutes
 > **Adds:** An end-to-end external OIDC front door -- local Keycloak dev realm, two tenants with distinct tool surfaces, cross-tenant isolation proof, RFC 9728 discovery, and token-validation troubleshooting
 

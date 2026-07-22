@@ -56,12 +56,15 @@ make setup
 ## Docker
 
 ```bash
-docker pull ghcr.io/mcp-hangar/mcp-hangar:1.3.0
+docker pull ghcr.io/mcp-hangar/mcp-hangar:1.6.0
 
 # Run with config
 docker run -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  ghcr.io/mcp-hangar/mcp-hangar:1.3.0
+  ghcr.io/mcp-hangar/mcp-hangar:1.6.0
 ```
+
+> The tag above pins the current stable release. See
+> [Releases & Artifacts](releases.md) for the authoritative version index.
 
 ## Verify Installation
 

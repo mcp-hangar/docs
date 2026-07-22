@@ -7,12 +7,11 @@
 > upstream is an FQDN. See the [Egress Policy guide](../guides/EGRESS_POLICY.md)
 > for the full prerequisites and trust model.
 >
-> **Delivery status:** the core L7 engine and REST intake are armed in core
-> **v1.6.0**, but the operator's `MCPEgressPolicy` controller — the half that
-> compiles the CR and pushes L7 to the core — lands in **operator v0.14.0
-> (unreleased)**. Until that operator release, a policy is not delivered
-> end-to-end; only the L3/L4 network backstop applies. Plan against this now,
-> but do not treat end-to-end L7 as shipped.
+> **Version requirement:** end-to-end L7 delivery needs **core v1.6.0+** (the L7
+> engine and REST intake) **and operator v0.14.0+** (the `MCPEgressPolicy`
+> controller — the half that compiles the CR and pushes L7 to the core). Both are
+> released, so a policy delivers end-to-end today. On an operator older than
+> v0.14.0 the controller is absent and only the L3/L4 network backstop applies.
 > **Time:** Read first, then plan -- this is a policy-language reference, not a
 > 20-minute run
 > **Adds:** A declarative, deny-by-default `MCPEgressPolicy` that controls which

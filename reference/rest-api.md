@@ -590,7 +590,7 @@ GET /system
     "total_tools": 15,
     "total_tool_calls": 42,
     "uptime_seconds": 3600.5,
-    "version": "1.3.0"
+    "version": "1.6.0"
   }
 }
 ```
@@ -859,27 +859,61 @@ DELETE /auth/policies/{scope}/{target_id}
 
 ---
 
-## Agent Policy
+## L7 Egress Policy
 
-### Push Agent Policy
+Attach, replace, or clear the L7 egress policy (compiled `MCPEgressPolicy`) on a
+single MCP server. The core policy engine and this REST intake are available in
+v1.6.0; end-to-end delivery from a Kubernetes `MCPEgressPolicy` custom resource
+depends on the operator's controller compiling and pushing the policy (shipping
+in a later operator release). L7 egress is the **last** gate on the invocation
+path, evaluated inside `invoke_tool` immediately before the upstream call.
+
+### Set L7 Policy
 
 ```
-POST /agent/policy
+POST /mcp_servers/{mcp_server_id}/l7_policy
+PUT  /mcp_servers/{mcp_server_id}/l7_policy
 ```
 
-Applies a batch of tool access policies (allow/deny/require-approval/audit) per MCP server. Use `mcp_server_id: "*"` for a global policy.
+Attaches or replaces the compiled L7 policy on an MCP server. `POST` and `PUT`
+behave identically. Requires `mcp_servers:write`.
 
-**Request body:**
+**Request body:** the compiled policy the operator derives from an
+`MCPEgressPolicy`:
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `tool_policies` | list[dict] | `[]` | Policy entries (`mcp_server_id`, `action`, `tool_name`, `approval_timeout_seconds`) |
-| `version` | int | `0` | Policy version |
+| Field | Type | Description |
+|-------|------|-------------|
+| `tools` | dict | Tool-name globs: `allow`, `deny`, `requireApproval` |
+| `arguments` | dict | Argument-level constraints: `secretPatterns`, `maxPayloadBytes` |
+| `defaultAction` | string | Action when no rule matches |
+
+> **`requireApproval` fails closed.** A synchronous `requireApproval` match
+> **blocks** the call — it is not an interactive prompt-and-wait approval queue.
 
 **Response 200:**
 
 ```json
-{"status": "ok", "version": 3, "applied": 2}
+{"mcp_server_id": "math", "l7_policy_set": true}
+```
+
+**Response 400:** `{"error": "invalid_l7_policy", "detail": "..."}` when the body
+is not a valid compiled policy.
+
+**Response 404:** MCP Server not found.
+
+### Clear L7 Policy
+
+```
+DELETE /mcp_servers/{mcp_server_id}/l7_policy
+```
+
+Clears the L7 policy on an MCP server, disabling L7 enforcement for it. Requires
+`mcp_servers:write`.
+
+**Response 200:**
+
+```json
+{"mcp_server_id": "math", "l7_policy_set": false}
 ```
 
 ---
@@ -930,9 +964,9 @@ Removes a runtime withdrawal (config-declared withdrawals persist independently)
 
 ---
 
-## Enterprise Approvals
+## Approvals
 
-Available when the enterprise approval service is enabled.
+Available when the approval service is enabled. (The `/enterprise/approvals` path is the released 1.6.x route; it is renamed to `/approvals` on the v2 line.)
 
 ### List Approvals
 

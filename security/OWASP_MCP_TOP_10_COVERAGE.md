@@ -13,7 +13,7 @@ This page is deliberately honest about scope. Hangar is a **policy enforcement p
 | MCP05 | Command Injection & Execution | **Out of scope (by design)** | Hangar does not inspect tool-call arguments for injection. Container-mode command allow-list constrains the server *process*, not call semantics |
 | MCP06 | Intent Flow Subversion | **Out of scope (by design)** | Intent/prompt semantics are not parsed. Approval gates offer a human checkpoint, not intent detection |
 | MCP07 | Insufficient Authentication & Authorization | **Covered** | RFC 8707 / RFC 9728, JWT/OIDC + JWKS, per-tenant scoping, approval gates, end-to-end identity propagation |
-| MCP08 | Lack of Audit and Telemetry | **Covered** | Identity-attributed audit trail per tool call; SIEM export (LEEF 2.0, RFC 5424 syslog, OTLP); Prometheus metrics; K8s events |
+| MCP08 | Lack of Audit and Telemetry | **Covered** | Identity-attributed audit trail per tool call; SIEM export (CEF, LEEF 2.0, RFC 5424 syslog, JSON-lines); Prometheus metrics; K8s events |
 | MCP09 | Shadow MCP Servers | **Partial** | Registry of `MCPServer` resources, admission validation of their spec, per-server egress NetworkPolicy. Full "unregistered/unpinned → no traffic" enforcement tracked in operator#50 / #51 |
 | MCP10 | Context Injection & Over-Sharing | **Out of scope (by design)** | Prompt/context content is not inspected. Per-tenant scoping + audit limit blast radius but do not detect context injection |
 
@@ -23,7 +23,7 @@ This page is deliberately honest about scope. Hangar is a **policy enforcement p
 
 **MCP07 — Insufficient Auth.** Authentication and authorization are Hangar's core. Tokens are audience-bound (RFC 8707) so a token minted for one resource cannot be replayed against another; multi-issuer trust follows RFC 9728. JWT/OIDC with JWKS validation and per-tenant scoping gate who may call what, and approval gates add a human decision point for high-risk calls. Caller identity is propagated end-to-end.
 
-**MCP08 — Audit & Telemetry.** Every allowed tool call carries user identity into the audit record, exported to SIEM in LEEF 2.0, RFC 5424 syslog, and OTLP. Prometheus metrics and Kubernetes events cover the operational side.
+**MCP08 — Audit & Telemetry.** Every allowed tool call carries user identity into the audit record, exported to SIEM in CEF, LEEF 2.0, RFC 5424 syslog, and JSON-lines (OTLP is a separate trace/audit-span path, not a SIEM format). Prometheus metrics and Kubernetes events cover the operational side.
 
 ## Partial (enforcement tracked)
 

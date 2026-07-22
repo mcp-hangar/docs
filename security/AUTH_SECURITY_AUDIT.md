@@ -24,7 +24,7 @@ This audit covers the authentication, authorization, and request-enforcement pat
 
 ### Authorization
 
-- `/api/agent/policy` no longer trusts a magic internal header.
+- `/api/mcp_servers/{id}/l7_policy` (L7 egress policy push) no longer trusts a magic internal header.
 - Policy push now requires an authenticated principal plus `policy:write` authorization.
 - Failed policy pushes emit `PolicyPushRejected` audit events.
 - The `agent` role was retired along with the (now-discontinued) cluster agent product; `policy:write` remains a valid permission and is now granted via the `admin` role.
@@ -42,15 +42,19 @@ This audit covers the authentication, authorization, and request-enforcement pat
 - `Origin` validation happens before `websocket.accept()` to mitigate cross-site WebSocket hijacking.
 - Per-connection backpressure is enforced with bounded queues.
 
-### Enterprise Boundary
+### Module Boundary (`enterprise` internal module)
+
+There is no paid tier or license split: MCP Hangar ships as a single MIT-licensed
+package. `enterprise` here is an internal module name (it houses the approvals
+service and related optional integrations), not a commercial edition or licensed
+add-on. This section covers the import hygiene around that module boundary.
 
 - Core bootstrap/router code no longer scatters direct `enterprise.*` imports across server modules.
 - Optional integrations are resolved via `src/mcp_hangar/server/bootstrap/enterprise.py`.
 - The boundary exposes provider hooks for:
-  - license validation
   - auth CQRS registration
   - API route extension
-  - enterprise-backed event store creation
+  - event store creation
   - observability adapter creation
   - legacy bootstrap compatibility exports
 - Entry points are supported when available; the monorepo layout uses a controlled fallback loader so development remains functional without breaking the core boundary.
@@ -59,7 +63,7 @@ This audit covers the authentication, authorization, and request-enforcement pat
 
 | Finding | Status | Notes |
 |--------|--------|-------|
-| K-1 Agent policy auth bypass | Fixed | `/api/agent/policy` requires authenticated principal + `policy:write`; rejection events emitted |
+| K-1 L7 policy push auth bypass | Fixed | `/api/mcp_servers/{id}/l7_policy` requires authenticated principal + `policy:write`; rejection events emitted |
 | K-2 WebSocket auth / CSWSH gaps | Fixed | Shared auth enforcement, pre-accept Origin validation, bounded queue backpressure |
 | K-3 Unsafe unauthenticated HTTP exposure | Fixed | Non-loopback HTTP bind blocked without auth unless explicitly overridden |
 | K-4 CORS / host / CSRF hardening | Fixed | Explicit CORS config, TrustedHostMiddleware, browser-scoped CSRF defense |
@@ -88,7 +92,7 @@ This audit covers the authentication, authorization, and request-enforcement pat
 
 - `uv run pytest tests/ -x -q` -- pass
 - `uv run mypy src/` -- pass
-- Manual exploit replay of K-1..K-4 -- pass (`/agent/policy/` spoof returns 401, unauthenticated WebSocket closes 1008, non-loopback no-auth HTTP exits 1, hostile Host rejected with 400)
+- Manual exploit replay of K-1..K-4 -- pass (`/api/mcp_servers/{id}/l7_policy` spoof returns 401, unauthenticated WebSocket closes 1008, non-loopback no-auth HTTP exits 1, hostile Host rejected with 400)
 - Focused security and boundary suites cover:
   - `tests/security/test_critical.py`
   - `tests/security/test_identity_network.py`
@@ -101,4 +105,4 @@ This audit covers the authentication, authorization, and request-enforcement pat
 ## Open Items
 
 - Repo-wide Ruff debt in historical tests remains outside the scope of this hardening pass.
-- If enterprise packaging is split into a separately installed distribution later, the fallback loader can be retired in favor of entry-point-only discovery.
+- If the optional-integrations module is split into a separately installed distribution later, the fallback loader can be retired in favor of entry-point-only discovery.

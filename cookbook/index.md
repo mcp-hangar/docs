@@ -1,6 +1,6 @@
 # Cookbook
 
-From zero to production in 23 recipes. Start at 01 and go in order, or jump to
+From zero to production in 24 recipes. Start at 01 and go in order, or jump to
 what you need.
 
 ## The Path (sequential)
@@ -40,6 +40,7 @@ recipe 01.
 | 21 | [Local Dev & Staging Profiles](21-dev-staging-profiles.md) | 01, 12 |
 | 22 | [External Multi-Tenant OIDC](22-external-multitenant-oidc.md) | 16 |
 | 23 | [Harden a Public Authenticated Gateway](23-harden-public-gateway.md) | 22 |
+| 24 | [L7 Egress Policy Language](24-egress-policy-language.md) | 11 |
 
 ## How to Use This Cookbook
 

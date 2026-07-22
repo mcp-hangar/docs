@@ -1,6 +1,6 @@
 # ADR-014: Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute
 
-**Status:** Accepted
+**Status:** Accepted; **Activated 2026-07-22** (see [Activation](#activation))
 **Date:** 2026-07-20
 **Authors:** MCP Hangar Team
 **Supersedes:** ADR-008 (in part) -- lifts Decision 1's "relay-only *permanently*" absolutism and Decision 3's "do not build the relay yet"; carries ADR-008's other decisions forward unchanged.
@@ -146,6 +146,33 @@ Each is an objection ADR-008 / PR `#368` raised; the decision above answers it.
   of species with job-runner failure modes, off-thesis, and unnecessary for governing
   the call path.
 
+## Activation
+
+**Activated 2026-07-22** by maintainer decision, on SDK v2 (`mcp==2.0.0b2`), after
+the relay seam shipped dark across four phases (`mcp-hangar#580`/`#581`/`#582`/`#583`,
+consolidated onto the v2 integration branch by `#584`) and the consent gate wired in
+(`#322`). Activation is the flip of the `relay_tasks_enabled` kill-switch to its new
+default (`True`); the switch is retained for a fast, per-deployment rollback.
+
+What activation does and does not change, against the decisions above:
+
+- **Per D5 (build now, activate on first real upstream):** the flip makes the seam
+  *live*, but the relay itself still only engages the first time an upstream actually
+  emits a task. No synchronous `tools/call` flow changes on the flip; a deployment
+  whose upstreams never emit tasks observes no behavioral difference.
+- **Per D6 + "do not advertise what does not run" (ADR-009):** because the seam is now
+  live, the `tasks` capability is advertised at `INITIALIZE`. This is the honest
+  signal that governed relay is available — not a claim that a task is in flight.
+- **Per D4 (governance binds at the seam, never in a worker):** unchanged and
+  structural; activation adds no execution thread.
+- **`benchmarks#3`** flips in lockstep: its governance-surface axis moves from
+  asserting the `tasks` capability is *absent* (relay-only) to asserting it is
+  *present*, matching the activated gateway.
+
+The consent gate (`#322`) is live with the flip (D6): a relayed task entering
+`input_required` is resolved through the synchronous elicitation approval path, and a
+task whose consent is absent is failed fail-closed, never left hanging.
+
 ## References
 
 - Supersedes (in part): [ADR-008](ADR-008-tasks-relay-only.md) (relay-only).
@@ -156,5 +183,5 @@ Each is an objection ADR-008 / PR `#368` raised; the decision above answers it.
   parent epic `#302` (WS-4).
 - Trigger (b) evidence: `mcp-hangar#547` (SDK v2 spike / breaking-change catalog;
   `mcp==2.0.0b2` promotes Tasks to a first-class extension). SEP-2663 (MCP Tasks).
-- Compatibility assertion: `benchmarks#3` (the relay-only axis that flips on activation).
+- Compatibility assertion: `benchmarks#3` (the relay-only axis; flips to asserting the `tasks` capability is present on activation — 2026-07-22, see [Activation](#activation)).
 - Foundations: ADR-002 (event sourcing -- the provenance chain), ADR-004 (digest pinning).

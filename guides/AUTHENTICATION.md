@@ -1,6 +1,6 @@
 # Authentication & Authorization
 
-MCP-Hangar supports enterprise-grade authentication (AuthN) and authorization (AuthZ) for secure multi-tenant access control.
+MCP-Hangar supports production-grade authentication (AuthN) and authorization (AuthZ) for secure multi-tenant access control.
 
 ## Quick Start
 
@@ -74,7 +74,7 @@ auth:
 
 ### JWT/OIDC Authentication
 
-For enterprise SSO integration with MCP servers like Okta, Auth0, Azure AD:
+For SSO / OIDC integration with MCP servers like Okta, Auth0, Azure AD:
 
 ```yaml
 auth:

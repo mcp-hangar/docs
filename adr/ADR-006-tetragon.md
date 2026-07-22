@@ -28,7 +28,7 @@ three known gaps:
    pod-IP-port granularity.
 
 These gaps recur consistently in fresh CVE analysis (CVE-2026-44284
-FastGPT) and in the threat model presented to enterprise prospects. They
+FastGPT) and in the threat model presented to operators and teams. They
 must be closed no later than v2.0, but not at the cost of slipping the
 v1.0 launch.
 
@@ -120,7 +120,7 @@ v1.x.
 - **Dependency on Tetragon being installed in the customer cluster.**
   Mitigation: Helm sub-chart that installs it for them, plus
   bring-your-own-Tetragon mode with detect-and-warn. Not a blocker -- most
-  Kubernetes-native enterprises already run some runtime security layer.
+  Kubernetes-native teams already run some runtime security layer.
 - **Cisco / Isovalent governance risk.** Apache 2.0 protects against the
   worst case. Backend-agnostic DSL prevents lock-in. If Tetragon stalls,
   we refactor to KubeArmor in roughly six months.

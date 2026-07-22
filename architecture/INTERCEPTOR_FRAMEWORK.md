@@ -1,6 +1,6 @@
 # Interceptor Framework
 
-MCP Hangar implements the SEP-1763 interceptor framework with hook-based event delivery and priority-ordered mutator pipelines. See [ADR-005](../adr/ADR-005-sep-1763-interceptor-compliance.md) for design rationale.
+MCP Hangar implements the SEP-1763 interceptor framework with hook-based event delivery and priority-ordered mutator pipelines (experimental — disabled by default; validators/mutators register only when explicitly configured, so the pipeline is a no-op out of the box). See [ADR-005](../adr/ADR-005-sep-1763-interceptor-compliance.md) for design rationale.
 
 ## Architecture
 

@@ -67,7 +67,7 @@ P1 landed in PRs #136, #137, #138 (epic #118): hook model, IMutator contract, Mu
 - hangar-agent becomes a spec-compliant MCP interceptor — "MCP-native" positioning
 - Working group is building exactly what we already have (sidecar runtime) — we can contribute and shape the standard
 - Mutator type adds new product capabilities (PII redaction, schema enforcement) beyond pure policy enforcement
-- Shadow mutations enable "what-if" analysis for policy planning — strong enterprise feature
+- Shadow mutations enable "what-if" analysis for policy planning — strong governance feature
 
 ### Negative
 

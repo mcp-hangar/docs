@@ -23,14 +23,14 @@ handler that forwards `ToolInvocationCompleted`, `ToolInvocationFailed`, and
 independently of the OTLP audit exporter.
 
 Compliance exporters are included in the main `mcp_hangar` package since
-v1.3.0; no separate enterprise module or license key is required.
+v1.3.0; no separate module or license key is required.
 
 ## Format reference
 
 ### CEF (Common Event Format)
 
 ```
-CEF:0|MCP Hangar|MCP Hangar|0.15.0|100|ToolInvocationCompleted|5|...extensions...
+CEF:0|MCP Hangar|MCP Hangar|1.6.0|100|ToolInvocationCompleted|5|...extensions...
 ```
 
 Compatible with ArcSight, Splunk, QRadar, and any CEF-aware SIEM.
@@ -38,7 +38,7 @@ Compatible with ArcSight, Splunk, QRadar, and any CEF-aware SIEM.
 ### LEEF 2.0 (IBM QRadar)
 
 ```
-LEEF:2.0|MCP Hangar|MCP Hangar|0.15.0|101|\tproto=tool\taction=add\t...
+LEEF:2.0|MCP Hangar|MCP Hangar|1.6.0|101|\tproto=tool\taction=add\t...
 ```
 
 Tab-delimited extensions following the LEEF 2.0 specification.

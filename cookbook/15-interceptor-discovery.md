@@ -74,7 +74,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
      "interceptors": [
        {
          "name": "mcp-hangar-validator",
-         "version": "1.4.0",
+         "version": "1.6.0",
          "type": "validator",
          "supportedEvents": ["tools/call", "tools/list"],
          "modes": ["audit", "enforce"],
@@ -82,7 +82,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
        },
        {
          "name": "mcp-hangar-mutator",
-         "version": "1.4.0",
+         "version": "1.6.0",
          "type": "mutator",
          "supportedEvents": ["tools/call"],
          "modes": ["enforce"],

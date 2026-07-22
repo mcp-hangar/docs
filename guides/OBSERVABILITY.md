@@ -298,7 +298,7 @@ Alert monitoring and trends:
 MCP Hangar 1.4.0 adds a governance dashboard for tenant and policy operations:
 
 - Cost attribution by MCP server, tool, and cost model
-- Capability violations, behavioral deviations, tool schema drifts, detection rule matches, and enforcement actions
+- Capability violations, tool schema drifts, detection rule matches, and enforcement actions
 - Tool access denials, filtered tools, and active tool-access policies
 - Batch in-flight calls, concurrency queueing, P95 wait time, and circuit-breaker state
 
@@ -328,7 +328,7 @@ Alert rules are defined in `monitoring/prometheus/alerts.yaml` and organized by 
 | `MCPHangarCircuitBreakerTripped` | CB rejections > 10/5m | 2m | MCP Server isolated |
 | `MCPHangarProviderUnhealthy` | Consecutive failures > 5 | 2m | MCP Server critically unhealthy |
 | `MCPHangarAllProvidersDown` | All MCP servers down (with servers configured) | 1m | Total outage |
-| `MCPHangarCriticalDetectionMatch` | Critical detection rule match | 0m | Security: critical behavioral detection |
+| `MCPHangarCriticalDetectionMatch` | Critical detection rule match | 0m | Security: critical detection rule match |
 
 #### Warning Alerts (Investigate)
 
@@ -487,9 +487,9 @@ are automatically propagated from the event's `identity_context` when available.
 Cost attributes (`mcp.cost.cents`, `mcp.cost.model`, `gen_ai.usage.input_tokens`,
 `gen_ai.usage.output_tokens`) are included when cost attribution is configured.
 
-### Compliance Export Formats (Enterprise)
+### Compliance Export Formats
 
-Enterprise deployments can export audit events in SIEM-compatible formats alongside
+MCP Hangar can export audit events in SIEM-compatible formats alongside
 OTLP. Available exporters (in `src/mcp_hangar/compliance/`):
 
 | Format | Class | Use Case |

@@ -25,7 +25,6 @@ topology this implies). The org has separate repos per shippable artifact:
   charts.
 - `mcp-hangar/docs` -- this documentation site.
 - `mcp-hangar/mcp-hangar-website` -- the marketing site.
-- `mcp-hangar/terraform-provider` -- Terraform provider.
 
 Each has its own CONTRIBUTING guide, CI, and (per ADR-009) its own release
 lane. This document only covers `mcp-hangar/mcp-hangar`.

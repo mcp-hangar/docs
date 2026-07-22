@@ -1,7 +1,7 @@
 # 17 -- Multi-Issuer Front Door
 
 > **Prerequisite:** [16 -- Front-Door Multi-Tenant](16-front-door-multi-tenant.md)
-> **You will need:** MCP Hangar 1.4.0, two OIDC issuers that mint JWTs with a `tenant_id` claim and `aud` set to your resource URI
+> **You will need:** MCP Hangar 1.6.0, two OIDC issuers that mint JWTs with a `tenant_id` claim and `aud` set to your resource URI
 > **Time:** ~15 minutes
 > **Adds:** Multi-issuer OAuth trust, RFC 8707 resource-bound audience, RFC 9728 multi-issuer discovery
 

@@ -1,6 +1,6 @@
 # HTTP Transport for Remote MCP servers
 
-MCP Hangar supports connecting to remote MCP servers exposed via HTTP/HTTPS endpoints. This enables integration with MCP servers deployed as standalone HTTP services in enterprise environments.
+MCP Hangar supports connecting to remote MCP servers exposed via HTTP/HTTPS endpoints. This enables integration with MCP servers deployed as standalone HTTP services in production environments.
 
 ## Overview
 

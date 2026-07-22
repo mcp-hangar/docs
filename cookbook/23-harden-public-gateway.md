@@ -256,14 +256,20 @@ State what you are defending against, and what you are not.
 | Cross-tenant data access | Per-tenant projection + authoritative call-path check (recipe 22) | application |
 | Host-header / CORS abuse | `MCP_TRUSTED_HOSTS`, scoped `MCP_CORS_ORIGINS`, `MCP_TRUSTED_PROXIES` | application |
 | Volumetric / DDoS flooding | Edge WAF + DDoS + edge rate cap (Hangar's `rate_limit` is a backstop, not the defense) | external-infrastructure |
-| Compromised backend provider | Least-privilege per-provider service account; sandboxed container providers (recipe 20) | provider + application |
+| Compromised backend provider | Least-privilege per-provider service account; sandboxed container providers (recipe 20); deny-by-default L7 egress policy ([`MCPEgressPolicy`](../guides/EGRESS_POLICY.md)) constraining which upstreams/tool calls/arguments a server may make | provider + application |
 | Lost or tampered audit trail | Durable event store (`allow_memory_fallback: false`) + immutable SIEM ingest | application + external-infrastructure |
 | TLS interception | Managed/publicly trusted edge cert; verified backend TLS (`tls.verify: true`) | external-infrastructure + provider |
 
 **Out of scope / not claimed here:** Hangar is an OAuth *Resource Server*; it
 validates tokens but never issues them -- IdP hardening is the provider's job.
-Hangar does **not** provide a mandatory independent policy gate. An external
-policy engine (OPA) can be wired in as an *optional, future* layer, but the
+For *egress*, Hangar now ships a built-in, deny-by-default L7 policy engine --
+[`MCPEgressPolicy`](../guides/EGRESS_POLICY.md) -- that constrains which
+upstreams a server may reach and which tool calls and arguments it may make, so
+outbound tool invocation is no longer ungoverned (see the
+[Egress Policy guide](../guides/EGRESS_POLICY.md) for its trust boundary and the
+network backstop it depends on). What is still *not* claimed is a composed
+*inbound* authorization gate from an external general-purpose policy engine: an
+external engine (OPA) can be wired in as an *optional, future* layer, but the
 runtime does not today enforce a composed "RBAC **and** OPA must both allow"
 decision, so do not present OPA as a required second gate. Physical/host
 security and the managed database's own hardening are external-infrastructure.

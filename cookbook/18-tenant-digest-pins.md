@@ -1,7 +1,7 @@
 # 18 -- Per-Tenant Digest Pins
 
 > **Prerequisite:** [16 -- Front-Door Multi-Tenant](16-front-door-multi-tenant.md)
-> **You will need:** MCP Hangar 1.4.0, an OIDC issuer minting JWTs with a `tenant_id` claim, a backend whose tool schema you can pin
+> **You will need:** MCP Hangar 1.6.0, an OIDC issuer minting JWTs with a `tenant_id` claim, a backend whose tool schema you can pin
 > **Time:** ~20 minutes
 > **Adds:** Per-tenant digest pins on the call path, per-server enforcement modes (audit/warn/block)
 
@@ -284,7 +284,7 @@ caller identity carries the matching `tenant_id`.
 
 For the full background on digest pinning -- unknown-tool policy
 (`allow_unverified`, with `allow_degraded` still accepted as a deprecated alias
-in 1.4.0), mismatch enforcement levels, and the per-tenant pin schema -- see the
+in 1.6.0), mismatch enforcement levels, and the per-tenant pin schema -- see the
 Digest Pinning section of the
 [Configuration Reference](../reference/configuration.md).
 

@@ -1,7 +1,7 @@
 # 21 -- Local Dev & Staging Profiles
 
 > **Prerequisite:** [01 -- HTTP Gateway](01-http-gateway.md), [12 -- Auth & RBAC](12-auth-rbac.md)
-> **You will need:** Python 3.11+, `pip install mcp-hangar==1.4.0`
+> **You will need:** Python 3.11+, `pip install mcp-hangar==1.6.0`
 > **Time:** 20 minutes
 > **Adds:** Two ready-to-run `config.yaml` profiles -- a loopback dev profile and an auth-on staging profile
 
@@ -15,7 +15,7 @@ one shared config every time you switch. You also need a clear line for where
 
 This recipe gives you two complete, copy-pasteable profiles and the exact
 command to run each. Every config field, env var, command, and endpoint below
-is verified against MCP Hangar core **1.4.0** (`pip install mcp-hangar==1.4.0`).
+is verified against MCP Hangar core **1.6.0** (`pip install mcp-hangar==1.6.0`).
 
 > **Neither profile is production-ready.** The dev profile has no auth. The
 > staging profile turns auth on but stops short of the production trust

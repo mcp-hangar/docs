@@ -148,7 +148,10 @@ The L7 half runs in the core, on the connections Hangar already proxies. It is *
 **Tool-call matching** resolves a tool name by glob, in precedence order:
 
 1. `deny` — reject.
-2. `requireApproval` — route into the human-in-the-loop approval gates.
+2. `requireApproval` — **fail closed**: the call is blocked pending out-of-band
+   approval. This is a hard gate, not an interactive approval queue — routing a
+   gated call into the interactive approval workflow is a follow-up (see
+   [Limitations](#limitations-and-notes)).
 3. `allow` — permit.
 4. otherwise — the policy's `defaultAction`.
 

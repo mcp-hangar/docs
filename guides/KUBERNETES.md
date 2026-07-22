@@ -13,6 +13,11 @@ The MCP-Hangar Operator provides:
 - **MCPServer** - Declarative MCP server management
 - **MCPServerGroup** - Load balancing and high availability
 - **MCPDiscoverySource** - Automatic MCP server discovery
+- **MCPEgressPolicy** - Declarative, deny-by-default egress control (which
+  upstreams a server may reach, which tool calls it may make, and what happens
+  on a violation). See the [Egress Policy guide](EGRESS_POLICY.md).
+
+> **CRD API version.** These examples use `apiVersion: mcp-hangar.io/v1alpha2`.
 
 ## Installation
 
@@ -81,7 +86,7 @@ resources:
 ### Basic MCP Server
 
 ```yaml
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
   name: sqlite-tools
@@ -115,7 +120,7 @@ spec:
 ### MCP Server with Secrets
 
 ```yaml
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
   name: github-tools
@@ -142,7 +147,7 @@ spec:
 ### Remote MCP Server
 
 ```yaml
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
   name: external-api
@@ -165,7 +170,7 @@ spec:
 ### Cold Start (Scale to Zero)
 
 ```yaml
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
   name: expensive-tool
@@ -185,7 +190,7 @@ spec:
 ### High Availability Group
 
 ```yaml
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServerGroup
 metadata:
   name: database-tools-ha
@@ -214,7 +219,7 @@ spec:
 ### Label MCP servers for Grouping
 
 ```yaml
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
   name: sqlite-primary
@@ -225,7 +230,7 @@ spec:
   mode: container
   image: ghcr.io/modelcontextprotocol/mcp-sqlite:latest
 ---
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
   name: sqlite-replica
@@ -242,7 +247,7 @@ spec:
 ### Namespace Discovery
 
 ```yaml
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPDiscoverySource
 metadata:
   name: team-mcp-servers
@@ -268,7 +273,7 @@ spec:
 ### ConfigMap Discovery
 
 ```yaml
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPDiscoverySource
 metadata:
   name: config-mcp-servers
@@ -301,7 +306,7 @@ securityContext:
 Override if needed:
 
 ```yaml
-apiVersion: mcp-hangar.io/v1alpha1
+apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
   name: my-mcp-server

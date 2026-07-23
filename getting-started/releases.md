@@ -5,9 +5,10 @@ repository. This page is the single index of where each one lives and how to
 install it.
 
 > **Note**
-> Publishing for the operator image and the Helm charts is being rolled out per
-> the release-topology decision ([mcp-hangar/mcp-hangar#410]). Until the first
-> release of each lands, install the Python core from PyPI.
+> Each artifact is released independently per the release-topology decision
+> ([mcp-hangar/mcp-hangar#410]): the Python core on PyPI, the operator image and
+> `install.yaml` on GHCR / GitHub Releases (operator `v0.14.0`), and the Helm
+> charts as OCI packages. Each advances on its own cadence.
 
 ## At a glance
 

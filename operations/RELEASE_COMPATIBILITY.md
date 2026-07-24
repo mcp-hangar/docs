@@ -59,7 +59,7 @@ table is **not** a supported combination — it may work, but it is not covered.
 Rules for reading and extending the matrix:
 
 - **Core** is the reference axis: every supported combination pins a concrete
-  core minor (`v1.6.0` is the current published core).
+  core minor (`v1.6.1` is the current published core).
 - **Operator / Helm** columns carry the released version; the verified
   digests are in *Released artifacts* below. Both lanes have landed
   (`mcp-hangar-operator#26`, `helm-charts#7`) and the

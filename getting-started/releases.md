@@ -85,7 +85,7 @@ Per-release, user-visible migration steps live in the [Upgrade Guide](../upgrade
 
 ### 1.6.0 — breaking for trace/metrics consumers
 
-The current stable Python core is **1.6.0**, an observability-hardening release.
+The current stable Python core is **1.6.1**; it adds the MCPEgressPolicy Audit/Enforce mode on top of the 1.6.0 observability-hardening release.
 It contains a **silent breaking change for telemetry consumers**: tool-invocation
 spans were renamed to the OpenTelemetry GenAI/MCP semantic conventions, so any
 dashboard, saved query, or alert keyed on the **old** span/attribute names keeps
@@ -109,9 +109,9 @@ released.
 
 ## v2 preview (prerelease)
 
-The stable Python core is **1.6.0** and stays that way — a plain `pip install
+The stable Python core is **1.6.1** and stays that way — a plain `pip install
 mcp-hangar` lands on 1.6.0, and nothing below changes that. The **v2 line is a
-prerelease**: `mcp-hangar==2.0.0a1`, built on the SDK v2 beta (`mcp==2.0.0b2`).
+prerelease**: `mcp-hangar==2.0.0a2`, built on the SDK v2 beta (`mcp==2.0.0b2`).
 It is opt-in only. You will not get it by accident.
 
 1.6 added visibility through the front door — OTel-semconv traces and the L7
@@ -148,7 +148,7 @@ Get the preview:
 
 ```bash
 pip install --pre mcp-hangar          # newest prerelease on the v2 line
-pip install "mcp-hangar==2.0.0a1"     # pin the exact prerelease
+pip install "mcp-hangar==2.0.0a2"     # pin the exact prerelease
 ```
 
 Watch the [Releases page](https://github.com/mcp-hangar/mcp-hangar/releases) for

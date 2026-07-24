@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.1.0](https://github.com/mcp-hangar/docs/compare/v1.0.4...v1.1.0) (2026-07-24)
+
+
+### Added
+
+* **guides:** renovation phase 1 — truth-now docs for 1.6.0 ([#87](https://github.com/mcp-hangar/docs/issues/87)) ([2543475](https://github.com/mcp-hangar/docs/commit/25434754adb82b7b382eea0ee0747e0bd86fc1b0))
+* **guides:** renovation phase 2 — governed tasks guide + v2 preview notes ([#88](https://github.com/mcp-hangar/docs/issues/88)) ([ef58f40](https://github.com/mcp-hangar/docs/commit/ef58f400ba6dfca11bda494023aab3333338e595))
+
+
+### Fixed
+
+* **release:** drop stale pre-v0.14.0 release caveats ([#89](https://github.com/mcp-hangar/docs/issues/89)) ([d0adc57](https://github.com/mcp-hangar/docs/commit/d0adc57fe59fb7d493c443e4badd848bf00fb1ac))
+
+
+### Changed
+
+* accuracy/currency review — align content to the current project state ([cb72bd6](https://github.com/mcp-hangar/docs/commit/cb72bd6b39a15689daf9ad6974a4e121b917884a))
+* **adr-014:** record task-relay activation (2026-07-22) ([#86](https://github.com/mcp-hangar/docs/issues/86)) ([743a820](https://github.com/mcp-hangar/docs/commit/743a8203f6a406b21103f641c311652238fe20ee))
+* **adr:** ADR-013 egress policy enforcement model (MCPEgressPolicy) ([#72](https://github.com/mcp-hangar/docs/issues/72)) ([8e2480d](https://github.com/mcp-hangar/docs/commit/8e2480d60ad9b7b1a279e01cb24cac13a59e9b7a))
+* **adr:** amend ADR-009 with the prerelease / pre-GA branch lane ([#77](https://github.com/mcp-hangar/docs/issues/77)) ([ba4749e](https://github.com/mcp-hangar/docs/commit/ba4749e664d747cf106550ff1cc615ee258e91d4))
+* **architecture:** add ADR-012 (interceptor SEP-pin tracking policy) ([#70](https://github.com/mcp-hangar/docs/issues/70)) ([6ac3f1d](https://github.com/mcp-hangar/docs/commit/6ac3f1d438f30b391d559f5ce2ca00cdcafd2094))
+* **architecture:** add ADR-014 (tasks relayed with governance, partially supersedes ADR-008) ([#78](https://github.com/mcp-hangar/docs/issues/78)) ([1aaa1a6](https://github.com/mcp-hangar/docs/commit/1aaa1a6353f1d6a58c0a17bbea19db84fe3924a8))
+* **architecture:** correct ADR-009 amendment — prereleases publish to prod PyPI ([#85](https://github.com/mcp-hangar/docs/issues/85)) ([37f4288](https://github.com/mcp-hangar/docs/commit/37f428839611dadb44dcb0b55c4a39479b4d72c9))
+* **architecture:** ratify ADR-014 (Proposed -&gt; Accepted) ([#79](https://github.com/mcp-hangar/docs/issues/79)) ([469e5ac](https://github.com/mcp-hangar/docs/commit/469e5ac72b94cd5a4a432c13fcbb6d24d2b7e460))
+* bump version surfaces to core 1.6.1 + v2 preview 2.0.0a2 ([#90](https://github.com/mcp-hangar/docs/issues/90)) ([347a21c](https://github.com/mcp-hangar/docs/commit/347a21cb96be44956fa200daa46fc3500e641c8e))
+* currency pass — v0.14.0 L7 delivery, release matrix, rebuilt architecture overview ([8ca8381](https://github.com/mcp-hangar/docs/commit/8ca838159acee61030b4524c316d685789a141c2))
+* **guides:** add the MCPEgressPolicy egress policy guide ([#73](https://github.com/mcp-hangar/docs/issues/73)) ([fda8656](https://github.com/mcp-hangar/docs/commit/fda86566d082206806bbea3a7667420e1dd368d5))
+* **guides:** reflect the 1.6.0 observability/semconv changes ([#76](https://github.com/mcp-hangar/docs/issues/76)) ([5dfd3fb](https://github.com/mcp-hangar/docs/commit/5dfd3fb41adda4db13c613cbe7185eba0ec7a628))
+* **guides:** refresh MCPEgressPolicy guide for the completed feature ([#74](https://github.com/mcp-hangar/docs/issues/74)) ([2df3798](https://github.com/mcp-hangar/docs/commit/2df37988310c09db04ca43d8344c66a5574e9421))
+* **reference:** add operational runbooks for the shipped alerts ([#75](https://github.com/mcp-hangar/docs/issues/75)) ([a06dd93](https://github.com/mcp-hangar/docs/commit/a06dd9300a764385ade91768ab1bb93d51259d28))
+* strip 'enterprise' tier/marketing framing (no paid tier) ([e046c8c](https://github.com/mcp-hangar/docs/commit/e046c8c131729de53c92087c162ee5afad07535b))
+
 ## [1.0.4](https://github.com/mcp-hangar/docs/compare/v1.0.3...v1.0.4) (2026-07-18)
 
 

@@ -12,5 +12,13 @@
   "MD012": false, // no-multiple-blanks: release-please emits double blank lines
   "MD034": false, // no-bare-urls
   "MD033": false, // no-inline-html: diagrams/tables use occasional inline HTML
-  "MD036": false  // no-emphasis-as-heading
+  "MD036": false, // no-emphasis-as-heading
+  // table-column-style: new in markdownlint 0.41 (arrived with cli2-action v24).
+  // Disabled, not deferred silently: measured against this tree, no setting makes
+  // the corpus pass -- "any" (default) 1788 violations, "compact" 1958, "aligned"
+  // 4733, "tight" 11939 -- and `--fix` rewrites 56 files while still leaving 358.
+  // Table pipe padding is cosmetic and invisible in the rendered site, so the gate
+  // would cost a corpus-wide whitespace churn for no reader-visible gain. Revisit
+  // with a dedicated formatting pass (docs#91), not inside a dependency bump.
+  "MD060": false
 }

@@ -2,7 +2,7 @@
 
 Governance for asynchronous MCP tasks: Hangar relays an upstream-created task and interposes ownership, digest re-verification, a `task_id`-keyed audit chain, and a fail-closed mid-flight consent gate on its lifecycle -- without ever executing the task.
 
-> **Landing in 2.0 / on the v2 preview.** Everything on this page ships on the v2 preview (prerelease `2.0.0a1`, `mcp==2.0.0b2`) and is **not** in released `1.6.0`. Tasks were promoted out of `mcp.server.experimental` into a first-class negotiated extension only in the SDK v2 beta, which is what makes governed relay buildable at all (see [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md)). On `1.6.0` the observed behavior is still a clean `TaskRelayNotSupported` rejection of any upstream task handle.
+> **Landing in 2.0 / on the v2 preview.** Everything on this page ships on the v2 preview (prerelease `2.0.0a2`, `mcp==2.0.0b2`) and is **not** in released `1.6.0`. Tasks were promoted out of `mcp.server.experimental` into a first-class negotiated extension only in the SDK v2 beta, which is what makes governed relay buildable at all (see [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md)). On `1.6.0` the observed behavior is still a clean `TaskRelayNotSupported` rejection of any upstream task handle.
 
 ## Overview
 

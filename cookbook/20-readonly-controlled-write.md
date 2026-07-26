@@ -87,7 +87,7 @@ event_store:
      -v /srv/hangar/events:/app/data:rw \
      -v "$PWD/config.yaml:/app/config.yaml:ro" \
      -p 8000:8080 \
-     mcp-hangar:1.6.0 serve --http --port 8080
+     mcp-hangar:1.6.1 serve --http --port 8080
    ```
 
 3. Confirm the event store is durable. `/health/ready` includes the
@@ -108,7 +108,7 @@ event_store:
    docker run --rm --read-only \
      --tmpfs /tmp:rw,noexec,nosuid,size=64m \
      -e MCP_JSON_LOGS=true \
-     mcp-hangar:1.6.0 serve --http
+     mcp-hangar:1.6.1 serve --http
    ```
 
    Startup aborts instead of silently degrading:

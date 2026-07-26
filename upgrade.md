@@ -10,8 +10,8 @@ MCP Hangar 1.6.0 is an observability-hardening release: tool-invocation
 telemetry now follows the OpenTelemetry GenAI/MCP semantic conventions, the
 transport message metrics are wired, and it ships the L7 egress-policy
 ([`MCPEgressPolicy`](guides/EGRESS_POLICY.md)) enforcement plane end to end.
-Upgrade is drop-in (`pip install -U mcp-hangar==1.6.0`, or pull
-`ghcr.io/mcp-hangar/mcp-hangar:1.6.0`); the notes below cover what changed for
+Upgrade is drop-in (`pip install -U mcp-hangar==1.6.1`, or pull
+`ghcr.io/mcp-hangar/mcp-hangar:1.6.1`); the notes below cover what changed for
 telemetry consumers.
 
 ### Span attributes moved to OTel semantic conventions (breaking for trace consumers)

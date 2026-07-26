@@ -17,7 +17,7 @@ The trust boundary is explicit: **a policy without the network backstop is a sug
 
 ## Prerequisites
 
-- The operator, with the `MCPEgressPolicy` CRD installed (v0.13.0 shipped the enforcement roadmap; the `MCPEgressPolicy` reconciler ships in the release after it).
+- The operator, with the `MCPEgressPolicy` CRD installed. The `MCPEgressPolicy` reconciler shipped in operator **v0.14.0**; v0.13.0 shipped the rest of the enforcement roadmap.
 - The target namespace should be opted into egress enforcement with the label `mcp-hangar.io/enforce-egress=true`, so the namespace default-deny is in place and the backstop has something to build on.
 - **For FQDN upstreams:** a cluster running **Cilium**. A vanilla `NetworkPolicy` cannot match on DNS names, so hostname upstreams are only enforceable under the Cilium flavor (see [Backstop flavors](#backstop-flavors)).
 - **For L7 enforcement** (tool-call / argument rules): the operator must be run with `--hangar-url` pointing at the core, so it can deliver the compiled policy to the data plane. Without it, only the L3/L4 backstop is applied.

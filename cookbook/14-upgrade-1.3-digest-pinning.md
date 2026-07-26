@@ -11,7 +11,7 @@ MCP Hangar v1.2.1 changed how tool digests are computed. Releases up to v1.2.0
 used Python `json.dumps` canonicalization. Starting in v1.2.1, Hangar uses
 RFC 8785 JSON Canonicalization Scheme (JCS), normalizes empty optional values,
 and rejects malformed tool entries before hashing. That digest behavior carries
-forward unchanged through the current release (v1.6.0), so this migration
+forward unchanged through the current release (v1.6.1), so this migration
 applies whether you land on v1.2.1 or any later version.
 
 If you upgrade across the v1.2.1 boundary with strict digest enforcement, valid
@@ -64,7 +64,7 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
 
 1. Verify the package in Docker
 
-   This recipe installs v1.3.0 or newer (the current release is v1.6.0), which
+   This recipe installs v1.3.0 or newer (the current release is v1.6.1), which
    includes the v1.2.1 JCS digest behavior. Any version `>=1.2.1` works.
 
    ```bash

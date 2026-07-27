@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1](https://github.com/mcp-hangar/docs/compare/v1.1.0...v1.1.1) (2026-07-27)
+
+
+### Changed
+
+* **reference:** move the version surfaces to core 1.6.2 and the 2.0.0rc1 candidate ([#92](https://github.com/mcp-hangar/docs/issues/92)) ([9e7262f](https://github.com/mcp-hangar/docs/commit/9e7262fbb8b2b11c7438a92bd55e0d940d221471))
+* **reference:** resync the artifact matrix after both charts published ([#94](https://github.com/mcp-hangar/docs/issues/94)) ([e36926b](https://github.com/mcp-hangar/docs/commit/e36926b59c54cfb88d9667c77984f12b771dbea1))
+
 ## [1.1.0](https://github.com/mcp-hangar/docs/compare/v1.0.4...v1.1.0) (2026-07-26)
 
 

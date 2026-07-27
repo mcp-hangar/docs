@@ -113,17 +113,19 @@ version is `v1alpha2`. See [ADR-013](../adr/ADR-013-egress-policy-enforcement-mo
   chokepoint (control #10 above).
 
 **End-to-end L7 egress enforcement is available today** with core engine v1.6.0 +
-operator **v0.14.0** (released 2026-07-19, the latest operator release), which
-ships the MCPEgressPolicy controller. The core L7 engine and REST intake are armed
+operator **v0.14.0**, which shipped the MCPEgressPolicy controller. The latest
+operator release is **v0.15.0** (2026-07-27), which forwards the policy `mode`
+to the compiled L7 payload. The core L7 engine and REST intake are armed
 in v1.6.0; the operator now delivers policies to it end-to-end.
 
 Current chart versions: `mcp-hangar` 0.13.5 (appVersion 1.6.1),
-`mcp-hangar-operator` 0.12.3 (appVersion 0.14.0).
+`mcp-hangar-operator` 0.12.4 (appVersion 0.14.0). Read live from GHCR — see the
+[released-artifacts matrix](../operations/RELEASE_COMPATIBILITY.md) for digests.
 
 ## v2 preview: governed async task relay + consent (landing in 2.0)
 
 A governed async-task capability is **landing in 2.0** and ships today only as a
-prerelease (`pip install --pre mcp-hangar`); stable installs still land on 1.6.1.
+prerelease (`pip install --pre mcp-hangar`); stable installs still land on 1.6.2.
 See [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md) and
 [Governed Tasks](../guides/GOVERNED_TASKS.md).
 
@@ -141,7 +143,7 @@ See [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md) and
 - Gated by the `relay_tasks_enabled` kill-switch. The 2026-07-28 SEP-2663 Tasks
   reshape is forward-compat-guarded, not live behavior.
 
-Public version surfaces remain 1.6.1; everything in this section is labeled
+Public version surfaces remain 1.6.2; everything in this section is labeled
 "landing in 2.0" and is not implied as shipped in the stable release.
 
 ## Layer Structure (DDD + CQRS)

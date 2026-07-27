@@ -85,7 +85,11 @@ Per-release, user-visible migration steps live in the [Upgrade Guide](../upgrade
 
 ### 1.6.0 — breaking for trace/metrics consumers
 
-The current stable Python core is **1.6.1**; it adds the MCPEgressPolicy Audit/Enforce mode on top of the 1.6.0 observability-hardening release.
+The current stable Python core is **1.6.2**: 1.6.1 added the MCPEgressPolicy
+Audit/Enforce mode on top of the 1.6.0 observability-hardening release, and
+1.6.2 caps the `mcp` SDK dependency below 2.x — without that cap a fresh
+install follows the SDK into a major whose server surface this line does not
+use, and the gateway dies at import.
 It contains a **silent breaking change for telemetry consumers**: tool-invocation
 spans were renamed to the OpenTelemetry GenAI/MCP semantic conventions, so any
 dashboard, saved query, or alert keyed on the **old** span/attribute names keeps
@@ -107,12 +111,12 @@ operator's `MCPEgressPolicy` controller, which ships in operator **v0.14.0**.
 Run **core 1.6.0+** and **operator v0.14.0+** for end-to-end L7 — both are
 released.
 
-## v2 preview (prerelease)
+## v2 preview (release candidate)
 
-The stable Python core is **1.6.1** and stays that way — a plain `pip install
-mcp-hangar` lands on 1.6.0, and nothing below changes that. The **v2 line is a
-prerelease**: `mcp-hangar==2.0.0a2`, built on the SDK v2 beta (`mcp==2.0.0b2`).
-It is opt-in only. You will not get it by accident.
+The stable Python core is **1.6.2** and stays that way — a plain `pip install
+mcp-hangar` lands on 1.6.2, and nothing below changes that. The **v2 line is at
+its first release candidate**: `mcp-hangar==2.0.0rc1`, built on the SDK v2 beta
+(`mcp==2.0.0b2`). It is opt-in only. You will not get it by accident.
 
 1.6 added visibility through the front door — OTel-semconv traces and the L7
 `MCPEgressPolicy` plane. The v2 preview adds governance over task lifecycle
@@ -121,7 +125,7 @@ which lifts ADR-008's "relay-only, permanently" absolutism now that Tasks have
 graduated out of `mcp.server.experimental` into a negotiated protocol extension
 in `mcp==2.0.0b2`.
 
-**Landing in 2.0 — on the v2 preview, not in 1.6.0:**
+**Landing in 2.0 — on the v2 preview, not in 1.6.2:**
 
 - **Relay-with-governance, not execution.** Hangar relays upstream-created tasks
   and interposes governance on their lifecycle, engaging per-upstream on that
@@ -141,18 +145,24 @@ in `mcp==2.0.0b2`.
   blocking a gated call pending an out-of-band decision — it is **not** an
   interactive approval queue.
 
-Still **coming, not shipped:** the 2026-07-28 protocol handshake and the
-SEP-2663 Tasks reshape are forward-compat only. Do not build against them yet.
+**Where the 2026-07-28 protocol stands on the rc.** The stateless surface is
+live: `server/discover` (SEP-2575) and the `Mcp-Method`/`Mcp-Name` header
+routing (SEP-2243) are served on `serve --http`, and discover reports the
+server's real capabilities and the caller's actual tool surface. The **SEP-2663
+Tasks reshape** is the part that is still forward-compat only: it is
+version-guarded, byte-identical on `mcp==2.0.0b2`, and self-activates when the
+SDK ships the reshaped surface. Do not build against the reshaped Tasks calls
+yet.
 
 Get the preview:
 
 ```bash
 pip install --pre mcp-hangar          # newest prerelease on the v2 line
-pip install "mcp-hangar==2.0.0a2"     # pin the exact prerelease
+pip install "mcp-hangar==2.0.0rc1"    # pin the exact release candidate
 ```
 
 Watch the [Releases page](https://github.com/mcp-hangar/mcp-hangar/releases) for
-the a-line to move. Until 2.0 is cut, `pip install mcp-hangar` remains 1.6.0.
+the rc line to move. Until 2.0 is cut, `pip install mcp-hangar` remains 1.6.2.
 
 ## Where to watch
 

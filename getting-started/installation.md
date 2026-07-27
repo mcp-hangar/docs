@@ -23,22 +23,22 @@ This will install the latest version of MCP Hangar and set up your environment.
 pip install mcp-hangar
 ```
 
-## Installing the v2 preview (prerelease)
+## Installing the v2 preview (release candidate)
 
-The v2 line is a prerelease (`2.0.0a2`, built on `mcp==2.0.0b2`) and is opt-in.
-A normal `pip install mcp-hangar` still lands on stable **1.6.1** — pip does not
-resolve to a prerelease unless you ask for one.
+The v2 line is a release candidate (`2.0.0rc1`, built on `mcp==2.0.0b2`) and is
+opt-in. A normal `pip install mcp-hangar` still lands on stable **1.6.2** — pip
+does not resolve to a prerelease unless you ask for one.
 
 ```bash
 pip install --pre mcp-hangar          # newest prerelease (the v2 line)
-pip install "mcp-hangar==2.0.0a2"     # pin the exact prerelease
+pip install "mcp-hangar==2.0.0rc1"    # pin the exact release candidate
 ```
 
-`--pre` opts the whole resolve into prereleases; the pinned `==2.0.0a2` form
-takes exactly that build. Both leave a plain `pip install mcp-hangar` on 1.6.0.
+`--pre` opts the whole resolve into prereleases; the pinned `==2.0.0rc1` form
+takes exactly that build. Both leave a plain `pip install mcp-hangar` on 1.6.2.
 
 > What the v2 preview adds — governed task relay-with-governance (ADR-014),
-> landing in 2.0, not in 1.6.0 — is summarized under
+> landing in 2.0, not in 1.6.2 — is summarized under
 > [v2 preview (prerelease)](releases.md#v2-preview-prerelease) in Releases &
 > Artifacts.
 
@@ -75,11 +75,11 @@ make setup
 ## Docker
 
 ```bash
-docker pull ghcr.io/mcp-hangar/mcp-hangar:1.6.1
+docker pull ghcr.io/mcp-hangar/mcp-hangar:1.6.2
 
 # Run with config
 docker run -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  ghcr.io/mcp-hangar/mcp-hangar:1.6.1
+  ghcr.io/mcp-hangar/mcp-hangar:1.6.2
 ```
 
 > The tag above pins the current stable release. See

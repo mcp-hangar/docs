@@ -118,8 +118,8 @@ operator release is **v0.15.0** (2026-07-27), which forwards the policy `mode`
 to the compiled L7 payload. The core L7 engine and REST intake are armed
 in v1.6.0; the operator now delivers policies to it end-to-end.
 
-Current chart versions: `mcp-hangar` 0.13.5 (appVersion 1.6.1),
-`mcp-hangar-operator` 0.12.4 (appVersion 0.14.0). Read live from GHCR — see the
+Current chart versions: `mcp-hangar` 0.13.6 (appVersion 1.6.2),
+`mcp-hangar-operator` 0.12.5 (appVersion 0.15.0). Read live from GHCR — see the
 [released-artifacts matrix](../operations/RELEASE_COMPATIBILITY.md) for digests.
 
 ## v2 preview: governed async task relay + consent (landing in 2.0)

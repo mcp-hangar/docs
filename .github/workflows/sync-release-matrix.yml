@@ -33,6 +33,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          # Do NOT leave the token in the local git config. `create-pull-request`
+          # authenticates its own push, and checkout's persisted
+          # `http.extraheader` adds a second one -- GitHub answers the push with
+          # `remote: Duplicate header: "Authorization"` and a bare 400, which is
+          # what kept this workflow from ever delivering its output.
+          persist-credentials: false
 
       - uses: azure/setup-helm@v5
       - uses: imjasonh/setup-crane@v0.7

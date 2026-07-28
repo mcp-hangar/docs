@@ -11,11 +11,11 @@ governs how the images and charts are published and verified.
 > **Status: released, signed, and pinned — the published charts carry their
 > fixes and chart tags are now immutable (`mcp-hangar/helm-charts#36`, closed;
 > fixed by the fail-safe publish guard #37).**
-> As of 2026-07-27 every lane has a published, public, **cosign-signed**,
+> As of 2026-07-28 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
 > image `1.6.2`, operator `0.15.0`, and both Helm charts. (The core `2.x` line is
-> at `2.0.0-rc.1` and is deliberately absent from the matrix below, which tracks
-> stable lanes.)
+> at `2.0.0-rc.3`, built on the stable `mcp==2.0.0`, and is deliberately absent
+> from the matrix below, which tracks stable lanes.)
 > Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done.
 >
 > Live cluster testing found defects that made a default `helm install` fail

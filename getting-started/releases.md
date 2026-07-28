@@ -125,6 +125,12 @@ which lifts ADR-008's "relay-only, permanently" absolutism now that Tasks have
 graduated out of `mcp.server.experimental` into a negotiated protocol extension
 in `mcp==2.0.0b2`.
 
+> **`rc2` predates the SEP-2663 realignment.** The list below describes the
+> `mcp2` line. The published `2.0.0rc2` still registers `tasks/result` /
+> `tasks/list` and defaults `relay_tasks_enabled` to false, so the task items
+> here are not in it. Everything else on this page is. The next candidate closes
+> the gap.
+
 **Landing in 2.0 — on the v2 preview, not in 1.6.2:**
 
 - **Relay-with-governance, not execution.** Hangar relays upstream-created tasks

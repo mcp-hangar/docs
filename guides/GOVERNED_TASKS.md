@@ -2,7 +2,9 @@
 
 Governance for asynchronous MCP tasks: Hangar relays an upstream-created task and interposes ownership, digest re-verification, a `task_id`-keyed audit chain, and a fail-closed mid-flight consent gate on its lifecycle -- without ever executing the task.
 
-> **v2 preview, and OFF by default.** Everything here ships on the v2 preview (`2.0.0rc2`, `mcp==2.0.0b2`) and is **not** in released `1.6.2`, where any upstream task handle is still rejected `TaskRelayNotSupported`.
+> **v2 preview.** Everything here ships on the v2 preview and is **not** in released `1.6.2`, where any upstream task handle is still rejected `TaskRelayNotSupported`.
+>
+> **Ahead of the published candidate.** This page describes the `mcp2` line. The newest published prerelease, `2.0.0rc2`, predates the SEP-2663 realignment: it still registers `tasks/result` / `tasks/list` and ships `relay_tasks_enabled` defaulting to **false**. `pip install --pre mcp-hangar` gets you that, not this. Build from `mcp2` until the next candidate is cut.
 >
 > The `relay_tasks_enabled` kill-switch defaults to **true**. It has been on, off and on again inside a week: activated 2026-07-22, turned off when the surface was found advertising a wire it did not serve, and turned back on once the SEP-2663 wire was actually served and verified end to end -- which is the condition [ADR-015](../adr/ADR-015-vendored-task-wire.md) Decision 5 set for reactivating it. Set it to `false` to restore the relay-only stance.
 

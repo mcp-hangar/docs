@@ -115,7 +115,7 @@ released.
 
 The stable Python core is **1.6.2** and stays that way — a plain `pip install
 mcp-hangar` lands on 1.6.2, and nothing below changes that. The **v2 line is at
-its first release candidate**: `mcp-hangar==2.0.0rc1`, built on the SDK v2 beta
+its second release candidate**: `mcp-hangar==2.0.0rc2`, built on the SDK v2 beta
 (`mcp==2.0.0b2`). It is opt-in only. You will not get it by accident.
 
 1.6 added visibility through the front door — OTel-semconv traces and the L7
@@ -136,14 +136,20 @@ in `mcp==2.0.0b2`.
   `TaskCreated` before the handle reaches the client. The dead-handle failure
   mode is structurally excluded — rejection is replaced by a tracked record, not
   by pass-through.
-- **Four serving handlers:** `tasks/get`, `tasks/result` (pinned-digest
-  verify), `tasks/cancel`, and owner-only `tasks/list`.
-- **One genuinely interactive consent gate.** The mid-flight `input_required`
-  path (`#322`) routes to real human-in-the-loop elicitation and is recorded as
-  `TaskConsentDecided`. It is the only interactive consent flow in the stack. The
-  L7 `requireApproval` gate is a different shape entirely: it **fails closed**,
-  blocking a gated call pending an out-of-band decision — it is **not** an
-  interactive approval queue.
+- **Three serving handlers**, the SEP-2663 set: `tasks/get` (outcome inlined,
+  pinned-digest verify before any payload is handed over), `tasks/update`,
+  `tasks/cancel`. `tasks/result` and `tasks/list` are removed by the SEP and
+  answer `-32601`.
+- **Off by default.** `relay_tasks_enabled` defaults to false and must be set
+  explicitly ([ADR-015](../adr/ADR-015-vendored-task-wire.md)).
+- **A governed mid-flight consent gate.** An upstream `input_required` surfaces
+  its `inputRequests`; the client answers by driving `tasks/update`, and that
+  update **is** the consent — gated before the answer reaches the upstream,
+  consumed only on a confirmed relay, recorded as `TaskConsentDecided` (`#322`).
+  Neither gate prompts a human: the L7 `requireApproval` gate **fails closed**,
+  blocking a call pending an out-of-band decision, and this one fails closed on a
+  decision the client volunteers. Hangar used to elicit the client itself; that
+  belonged to the 2025-11-25 wire and is gone.
 
 **Where the 2026-07-28 protocol stands on the rc.** The stateless surface is
 live: `server/discover` (SEP-2575) and the `Mcp-Method`/`Mcp-Name` header
@@ -158,7 +164,7 @@ Get the preview:
 
 ```bash
 pip install --pre mcp-hangar          # newest prerelease on the v2 line
-pip install "mcp-hangar==2.0.0rc1"    # pin the exact release candidate
+pip install "mcp-hangar==2.0.0rc2"    # pin the exact release candidate
 ```
 
 Watch the [Releases page](https://github.com/mcp-hangar/mcp-hangar/releases) for

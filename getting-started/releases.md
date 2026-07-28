@@ -85,11 +85,12 @@ Per-release, user-visible migration steps live in the [Upgrade Guide](../upgrade
 
 ### 1.6.0 — breaking for trace/metrics consumers
 
-The current stable Python core is **1.6.2**: 1.6.1 added the MCPEgressPolicy
-Audit/Enforce mode on top of the 1.6.0 observability-hardening release, and
-1.6.2 caps the `mcp` SDK dependency below 2.x — without that cap a fresh
-install follows the SDK into a major whose server surface this line does not
-use, and the gateway dies at import.
+The current stable Python core is **1.6.3**: 1.6.1 added the MCPEgressPolicy
+Audit/Enforce mode on top of the 1.6.0 observability-hardening release, 1.6.2
+caps the `mcp` SDK dependency below 2.x — without that cap a fresh install
+follows the SDK into a major whose server surface this line does not use, and
+the gateway dies at import — and 1.6.3 caps `httpx` below 1.0 for the same
+reason on the same line.
 It contains a **silent breaking change for telemetry consumers**: tool-invocation
 spans were renamed to the OpenTelemetry GenAI/MCP semantic conventions, so any
 dashboard, saved query, or alert keyed on the **old** span/attribute names keeps
@@ -113,8 +114,8 @@ released.
 
 ## v2 preview (release candidate)
 
-The stable Python core is **1.6.2** and stays that way — a plain `pip install
-mcp-hangar` lands on 1.6.2, and nothing below changes that. The **v2 line is at
+The stable Python core is **1.6.3** and stays that way — a plain `pip install
+mcp-hangar` lands on 1.6.3, and nothing below changes that. The **v2 line is at
 its third release candidate**: `mcp-hangar==2.0.0rc3`, built on the stable SDK
 (`mcp==2.0.0`, released 2026-07-28). It is opt-in only. You will not get it by
 accident.
@@ -126,7 +127,7 @@ which lifts ADR-008's "relay-only, permanently" absolutism now that Tasks have
 graduated out of `mcp.server.experimental` into a negotiated protocol extension
 in the SDK v2 line.
 
-**Landing in 2.0 — on the v2 preview, not in 1.6.2:**
+**Landing in 2.0 — on the v2 preview, not on the 1.6.x line:**
 
 - **Relay-with-governance, not execution.** Hangar relays upstream-created tasks
   and interposes governance on their lifecycle, engaging per-upstream on that

@@ -1,6 +1,6 @@
 # ADR-015: The Tasks Wire is Vendored -- `mcp_types.Task*` is a Fossil, Not a Moving Target
 
-**Status:** Accepted
+**Status:** Accepted; **Decision 5's condition met 2026-07-28** -- the SEP-2663 wire is served and verified end to end, so `relay_tasks_enabled` is back to default-true (core#645). The decision is unchanged: advertisement stays gated on the served wire, never on SDK symbol presence.
 **Date:** 2026-07-28
 **Authors:** MCP Hangar Team
 **Supersedes:** [ADR-014](ADR-014-tasks-relay-with-governance.md) in part -- corrects the factual premise of its Context ("trigger (b) is met"). Every decision ADR-014 makes about *governance* stands unchanged; only the claim about which wire the SDK provides is wrong.

@@ -148,9 +148,10 @@ See [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md) and
   `-32021` (with `requiredCapabilities`) for a modern client that did not declare
   the extension, `-32020` for a missing or contradictory `Mcp-Name`, `-32602` for
   an unknown or unowned task.
-- Gated by the `relay_tasks_enabled` kill-switch, which defaults to **false**
-  ([ADR-015](../adr/ADR-015-vendored-task-wire.md)). The 2026-07-28 SEP-2663 wire
-  is **served**, from vendored models rather than the SDK's frozen SEP-1686
+- Gated by the `relay_tasks_enabled` kill-switch, which defaults to **true**
+  again: [ADR-015](../adr/ADR-015-vendored-task-wire.md) Decision 5 set the
+  condition for reactivating it as the SEP-2663 shapes actually being served,
+  and they are -- from vendored models rather than the SDK's frozen SEP-1686
   types.
 
 Public version surfaces remain 1.6.2; everything in this section is labeled

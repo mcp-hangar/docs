@@ -87,8 +87,9 @@ Notes and honest caveats:
   interceptors as a live enforcement control. See
   [Interceptor Framework](INTERCEPTOR_FRAMEWORK.md).
 - **The sync L7 `requireApproval` outcome fails closed** — it blocks the call. It
-  is not an interactive approval queue or a human prompt-and-wait. The only
-  genuinely interactive consent flow is the v2 relay consent gate (below).
+  is not an interactive approval queue or a human prompt-and-wait. Nor is the v2
+  relay consent gate (below): it fails closed on a decision the client volunteers
+  by driving `tasks/update`. Nothing in the stack prompts a human and waits.
 - Deeper detail: [Front-Door Mode & Per-Tenant Tool Governance](../guides/FRONT_DOOR.md),
   [Egress Policy](../guides/EGRESS_POLICY.md), [Authentication & RBAC](../guides/AUTHENTICATION.md).
 
@@ -134,14 +135,23 @@ See [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md) and
   scheduler, job runner, or result store. Every relayed task is governed at relay
   time (`GovernedTaskStore` + a `TaskCreated` audit event). This supersedes the
   earlier relay-only stance ([ADR-008](../adr/ADR-008-tasks-relay-only.md)) in part.
-- **Serving handlers**: `tasks/get`, `tasks/result` (with pinned-digest
-  re-verification), `tasks/cancel`, and owner-only `tasks/list`.
-- **Mid-flight consent gate** — on an upstream `input_required`, the call is
-  routed to genuinely interactive HITL elicitation and **fails closed** absent
-  consent. This is the *only* interactive consent flow in the system (contrast the
-  sync L7 `requireApproval`, which merely blocks).
-- Gated by the `relay_tasks_enabled` kill-switch. The 2026-07-28 SEP-2663 Tasks
-  reshape is forward-compat-guarded, not live behavior.
+- **Serving handlers**: the SEP-2663 set — `tasks/get` (outcome inlined, with
+  pinned-digest re-verification before any payload is handed over),
+  `tasks/update`, `tasks/cancel`. `tasks/result` and `tasks/list` are removed by
+  the SEP and answer `-32601`.
+- **Mid-flight consent gate** — an upstream `input_required` surfaces its
+  `inputRequests` to the client, which answers by driving `tasks/update`. That
+  update **is** the consent: gated before the answer reaches the upstream,
+  consumed only on a confirmed relay, recorded as `TaskConsentDecided`. Hangar no
+  longer elicits the client itself; that flow belonged to the 2025-11-25 wire.
+- **Refused with the code the SEP specifies**: `-32601` on a legacy connection,
+  `-32021` (with `requiredCapabilities`) for a modern client that did not declare
+  the extension, `-32020` for a missing or contradictory `Mcp-Name`, `-32602` for
+  an unknown or unowned task.
+- Gated by the `relay_tasks_enabled` kill-switch, which defaults to **false**
+  ([ADR-015](../adr/ADR-015-vendored-task-wire.md)). The 2026-07-28 SEP-2663 wire
+  is **served**, from vendored models rather than the SDK's frozen SEP-1686
+  types.
 
 Public version surfaces remain 1.6.2; everything in this section is labeled
 "landing in 2.0" and is not implied as shipped in the stable release.

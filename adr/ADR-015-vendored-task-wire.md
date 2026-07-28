@@ -25,13 +25,13 @@ The replacement, SEP-2663, is wire-incompatible with them on nearly every field:
 | `tasks/result` | present | **removed** (`-32601`) |
 | `tasks/list` | present | **removed** |
 | `tasks/update` | absent | **required** |
-| `resultType` | absent entirely | required on every result |
+| `resultType` | declared on 12 result classes, **none of them `Task*`** | required on every result |
 
 ### How the wrong premise survived review
 
 It was hedged, not assumed. `_sdk_compat` carried capability probes -- `HAS_LIST_TASKS`, `HAS_TASKS_UPDATE` -- so that "the `tasks/list` advertise + serving drop themselves when the SDK removes the type, and the `tasks/update` handler + answer path light up when the SDK adds it." A version-independent feature probe is normally the *right* instinct, and it is why nobody re-checked.
 
-It cannot work here. The probes watch a module that is finished. Measured across two releases thirteen days apart -- `mcp==2.0.0b2` (14 Jul) and `2.0.0rc1` (27 Jul) -- the surface is byte-identical: `ListTasksResult` still present, `UpdateTaskRequest` still absent. python-sdk#3005 states the reason in its own design: the extension defines its **own** SEP-2663 models *because* they are wire-incompatible with what stayed in `mcp_types`. Nothing will ever be added to or removed from the fossil, so the probes were latches that could never trip.
+It cannot work here, and the reason is sharper than "the module is finished". Measured across two releases thirteen days apart -- `mcp==2.0.0b2` (14 Jul) and `2.0.0rc1` (27 Jul) -- the Tasks surface is **unchanged**: all 29 `Task*` classes are field-for-field identical, `ListTasksResult` still present, `UpdateTaskRequest` still absent. The module itself was edited in that window, just not there: `mcp_types/__init__.py`, `_types.py` and `v2026_07_28/__init__.py` all changed hash, `SERVER_INFO_META_KEY` arrived and `DiscoverResult` lost `server_info`. So this is not a forgotten file that nobody touches -- it is a **deliberately frozen region of a live one**, which is a much stronger reason to expect it never to move. python-sdk#3005 states the reason in its own design: the extension defines its **own** SEP-2663 models *because* they are wire-incompatible with what stayed in `mcp_types`. Nothing will ever be added to or removed from the fossil, so the probes were latches that could never trip.
 
 ### What it cost
 
@@ -41,7 +41,7 @@ Exposure was small but not accidental: `pip` will not select a pre-release unaid
 
 ## Decision
 
-1. **The Tasks wire is vendored in `mcp_hangar/tasks_wire.py`.** Request params, results and the served method set are defined by Hangar, not imported from the SDK.
+1. **The Tasks wire is vendored in `mcp_hangar/tasks_wire.py`.** Request params, results and the served method set are defined by Hangar, not imported from the SDK. Landed on `mcp2` in core#634; the present tense below describes that branch, not a released artifact -- `2.0.0rc2` was tagged before it merged and does not contain the module.
 
 2. **`mcp_types.Task*` must never appear in a serving path.** Not as a base class, not as a constructor, not as a validation target. Enforced by a test that parses `tasks_wire.py`'s AST and fails on any `mcp_types` import -- source text is not enough, since the module's own docstring names `mcp_types` throughout to explain the prohibition.
 
@@ -63,11 +63,11 @@ Exposure was small but not accidental: `pip` will not select a pre-release unaid
 
 ## Alternatives Considered
 
-**Wait for python-sdk#3005 to merge, keep the relay dark.** Rejected. The PR is open with conflicts and a week of no movement; its merge is not ours to schedule. It would also leave `2.0.0rc1`'s bad advertisement live in the meantime, which is the acute problem.
+**Wait for python-sdk#3005 to merge, keep the relay dark.** Rejected. Its merge is not ours to schedule. It would also leave `2.0.0rc1`'s bad advertisement live in the meantime, which is the acute problem.
 
 **Serve the SEP-1686 wire and advertise 2025-11-25 only.** Rejected. It is coherent, and it forfeits the reason the v2 line exists: Hangar's whole position is being current with the modern surface. It would also strand the mid-flight consent work against a generation whose Tasks feature is removed.
 
-**Keep using `mcp_types` and translate at the edge.** Rejected as the worst of both. Translation still requires knowing the target shapes -- the vendored models -- while adding a lossy hop through types that cannot express `resultType`, `tasks/update` or a nullable `ttlMs`. Fields with no fossil equivalent would have to be smuggled through `_meta`.
+**Keep using `mcp_types` and translate at the edge.** Rejected as the worst of both. Translation still requires knowing the target shapes -- the vendored models -- while adding a lossy hop through types that cannot express `tasks/update` or a `ttlMs` field at all. Fields with no fossil equivalent would have to be smuggled through `_meta`.
 
 **Fix the probes to watch the extension package instead.** Deferred, not rejected. Once #3005 merges its models become the thing to track, and a probe against *them* is sound because they are the live surface. That is Decision 3's retirement path.
 

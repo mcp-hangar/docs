@@ -115,21 +115,16 @@ released.
 
 The stable Python core is **1.6.2** and stays that way — a plain `pip install
 mcp-hangar` lands on 1.6.2, and nothing below changes that. The **v2 line is at
-its second release candidate**: `mcp-hangar==2.0.0rc2`, built on the SDK v2 beta
-(`mcp==2.0.0b2`). It is opt-in only. You will not get it by accident.
+its third release candidate**: `mcp-hangar==2.0.0rc3`, built on the stable SDK
+(`mcp==2.0.0`, released 2026-07-28). It is opt-in only. You will not get it by
+accident.
 
 1.6 added visibility through the front door — OTel-semconv traces and the L7
 `MCPEgressPolicy` plane. The v2 preview adds governance over task lifecycle
 without executing it. It carries [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md),
 which lifts ADR-008's "relay-only, permanently" absolutism now that Tasks have
 graduated out of `mcp.server.experimental` into a negotiated protocol extension
-in `mcp==2.0.0b2`.
-
-> **`rc2` predates the SEP-2663 realignment.** The list below describes the
-> `mcp2` line. The published `2.0.0rc2` still registers `tasks/result` /
-> `tasks/list` and defaults `relay_tasks_enabled` to false, so the task items
-> here are not in it. Everything else on this page is. The next candidate closes
-> the gap.
+in the SDK v2 line.
 
 **Landing in 2.0 — on the v2 preview, not in 1.6.2:**
 
@@ -159,20 +154,25 @@ in `mcp==2.0.0b2`.
   decision the client volunteers. Hangar used to elicit the client itself; that
   belonged to the 2025-11-25 wire and is gone.
 
-**Where the 2026-07-28 protocol stands on the rc.** The stateless surface is
-live: `server/discover` (SEP-2575) and the `Mcp-Method`/`Mcp-Name` header
-routing (SEP-2243) are served on `serve --http`, and discover reports the
-server's real capabilities and the caller's actual tool surface. The **SEP-2663
-Tasks reshape** is the part that is still forward-compat only: it is
-version-guarded, byte-identical on `mcp==2.0.0b2`, and self-activates when the
-SDK ships the reshaped surface. Do not build against the reshaped Tasks calls
-yet.
+**Where the 2026-07-28 protocol stands on the rc.** All of it is served. The
+stateless surface — `server/discover` (SEP-2575) and the `Mcp-Method` /
+`Mcp-Name` header routing (SEP-2243) — is live on `serve --http`, and discover
+reports the server's real capabilities and the caller's actual tool surface. The
+**SEP-2663 Tasks reshape** is served too, from models vendored in Hangar rather
+than taken from the SDK.
+
+That last part was previously described here as forward-compat plumbing that
+would self-activate when the SDK shipped the reshaped surface. It will not: the
+SDK's `Task*` types are the SEP-1686 generation and shipped **unchanged in
+`mcp==2.0.0`**, with the SEP-2663 extension still an open upstream PR. See
+[ADR-015](../adr/ADR-015-vendored-task-wire.md). You can build against the
+reshaped Tasks calls now.
 
 Get the preview:
 
 ```bash
 pip install --pre mcp-hangar          # newest prerelease on the v2 line
-pip install "mcp-hangar==2.0.0rc2"    # pin the exact release candidate
+pip install "mcp-hangar==2.0.0rc3"    # pin the exact release candidate
 ```
 
 Watch the [Releases page](https://github.com/mcp-hangar/mcp-hangar/releases) for

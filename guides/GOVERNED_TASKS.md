@@ -4,8 +4,6 @@ Governance for asynchronous MCP tasks: Hangar relays an upstream-created task an
 
 > **v2 preview.** Everything here ships on the v2 preview and is **not** in released `1.6.2`, where any upstream task handle is still rejected `TaskRelayNotSupported`.
 >
-> **Ahead of the published candidate.** This page describes the `mcp2` line. The newest published prerelease, `2.0.0rc2`, predates the SEP-2663 realignment: it still registers `tasks/result` / `tasks/list` and ships `relay_tasks_enabled` defaulting to **false**. `pip install --pre mcp-hangar` gets you that, not this. Build from `mcp2` until the next candidate is cut.
->
 > The `relay_tasks_enabled` kill-switch defaults to **true**. It has been on, off and on again inside a week: activated 2026-07-22, turned off when the surface was found advertising a wire it did not serve, and turned back on once the SEP-2663 wire was actually served and verified end to end -- which is the condition [ADR-015](../adr/ADR-015-vendored-task-wire.md) Decision 5 set for reactivating it. Set it to `false` to restore the relay-only stance.
 
 ## Overview
@@ -125,7 +123,7 @@ Two distinctions the code enforces and the positioning depends on. Keep them exa
 
 The `2026-07-28` generation and the SEP-2663 reshape are **served**, not pending. That is a correction: this page previously described them as forward-compatible plumbing that would light up on its own.
 
-The mechanism it described does not work. The serving surface was meant to track the SDK by registering each handler only while the SDK defined its type -- `tasks/list` while `ListTasksResult` existed, `tasks/update` once `UpdateTaskRequest` arrived. Those probes watch `mcp_types`, which carries the **SEP-1686** generation that 2026-07-28 removed from the core spec. Measured across `mcp==2.0.0b2` and `2.0.0rc1`, thirteen days apart: all 29 `Task*` classes are field-for-field identical, while the module around them was edited. It is a deliberately frozen region of a live file, so the probes were latches that could never trip -- `tasks/list` was always served and `tasks/update` never was.
+The mechanism it described does not work. The serving surface was meant to track the SDK by registering each handler only while the SDK defined its type -- `tasks/list` while `ListTasksResult` existed, `tasks/update` once `UpdateTaskRequest` arrived. Those probes watch `mcp_types`, which carries the **SEP-1686** generation that 2026-07-28 removed from the core spec. Measured across `mcp==2.0.0b2`, `2.0.0rc1` and the stable `2.0.0`: all 29 `Task*` classes are field-for-field identical, while the module around them was edited throughout. A frozen region inside a moving beta could have been a snapshot mid-migration; one that ships unchanged in a **major** is a decision -- so the probes were latches that could never trip -- `tasks/list` was always served and `tasks/update` never was.
 
 The wire is therefore **vendored** in `mcp_hangar/tasks_wire.py`, tracking SEP-2663 and [python-sdk#3005](https://github.com/modelcontextprotocol/python-sdk/pull/3005) rather than the SDK's frozen types. Flat `CreateTaskResult` with `resultType`, `ttlMs` / `pollIntervalMs`, the outcome inlined on `tasks/get`. See [ADR-015](../adr/ADR-015-vendored-task-wire.md), which records the rule that generalises past Tasks: *a capability probe is a hedge only when the probed module can still change.*
 

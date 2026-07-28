@@ -1,6 +1,6 @@
 # ADR-014: Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute
 
-**Status:** Accepted; **Activated 2026-07-22** (see [Activation](#activation))
+**Status:** Accepted (partial) -- Context premise corrected by [ADR-015](ADR-015-vendored-task-wire.md); **Activated 2026-07-22**, **deactivated 2026-07-28** pending the SEP-2663 wire (see [Activation](#activation))
 **Date:** 2026-07-20
 **Authors:** MCP Hangar Team
 **Supersedes:** ADR-008 (in part) -- lifts Decision 1's "relay-only *permanently*" absolutism and Decision 3's "do not build the relay yet"; carries ADR-008's other decisions forward unchanged.

@@ -24,7 +24,8 @@ taxonomy, and formatting conventions.
 | [011](ADR-011-single-source-of-truth-cross-repo-facts.md) | Single Source of Truth for Cross-Repo Facts | Accepted | 2026-07-18 |
 | [012](ADR-012-interceptor-sep-pin-tracking-policy.md) | Interceptor SEP-Pin Tracking Policy | Accepted | 2026-07-18 |
 | [013](ADR-013-egress-policy-enforcement-model.md) | Egress Policy Enforcement Model (MCPEgressPolicy) | Accepted | 2026-07-18 |
-| [014](ADR-014-tasks-relay-with-governance.md) | Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute | Accepted | 2026-07-20 |
+| [014](ADR-014-tasks-relay-with-governance.md) | Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute | Accepted (partial → [015](ADR-015-vendored-task-wire.md)) | 2026-07-20 |
+| [015](ADR-015-vendored-task-wire.md) | The Tasks Wire is Vendored -- `mcp_types.Task*` is a Fossil, Not a Moving Target | Accepted | 2026-07-28 |
 
 ## Summaries
 
@@ -162,6 +163,24 @@ scheduler, no worker→main-loop bridge. Lifts only ADR-008's "relay-only *perma
 and "do not build yet"; carries the rest forward. Build the seam now (trigger (b) met),
 activate per-upstream on first real task; behavior is unchanged until then. Unblocks the
 p1-high consent gate #322. Answers PR #368's objections point by point.
+
+### [ADR-015](ADR-015-vendored-task-wire.md): The Tasks Wire is Vendored -- `mcp_types.Task*` is a Fossil, Not a Moving Target
+
+**Accepted.** Partially supersedes ADR-014 — corrects the factual premise of its
+Context, not any of its governance decisions. SDK v2 does promote Tasks to a
+negotiated extension, but what `mcp_types` actually exposes is the **SEP-1686**
+generation that 2026-07-28 removed from the core spec (nested `CreateTaskResult`,
+`ttl`, `pollInterval`, `tasks/result`, no `resultType`). The `HAS_LIST_TASKS` /
+`HAS_TASKS_UPDATE` capability probes meant to track the SDK's maturation could
+never trip: b2 and rc1, thirteen days apart, are byte-identical there, and
+python-sdk#3005 defines its own models precisely *because* they are
+wire-incompatible. `2.0.0rc1` therefore advertised a `tasks` capability it could
+not serve — an ADR-009 violation that reached PyPI. Decision: vendor the SEP-2663
+models in `mcp_hangar/tasks_wire.py`, forbid `mcp_types.Task*` in any serving path
+(AST-enforced), track python-sdk#3005 rather than invent a dialect, document every
+divergence, and gate capability advertisement on the **served wire** rather than on
+SDK symbol presence. Generalises: a capability probe is a hedge only when the
+probed module can still change.
 
 ## Conventions
 

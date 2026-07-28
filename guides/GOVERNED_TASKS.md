@@ -4,7 +4,7 @@ Governance for asynchronous MCP tasks: Hangar relays an upstream-created task an
 
 > **v2 preview, and OFF by default.** Everything here ships on the v2 preview (`2.0.0rc2`, `mcp==2.0.0b2`) and is **not** in released `1.6.2`, where any upstream task handle is still rejected `TaskRelayNotSupported`.
 >
-> The `relay_tasks_enabled` kill-switch defaults to **false**. It was activated on 2026-07-22 and turned back off on 2026-07-28: the surface advertised a wire it did not serve. See [ADR-015](../adr/ADR-015-vendored-task-wire.md). Set it explicitly to opt in.
+> The `relay_tasks_enabled` kill-switch defaults to **true**. It has been on, off and on again inside a week: activated 2026-07-22, turned off when the surface was found advertising a wire it did not serve, and turned back on once the SEP-2663 wire was actually served and verified end to end -- which is the condition [ADR-015](../adr/ADR-015-vendored-task-wire.md) Decision 5 set for reactivating it. Set it to `false` to restore the relay-only stance.
 
 ## Overview
 
@@ -129,7 +129,7 @@ The wire is therefore **vendored** in `mcp_hangar/tasks_wire.py`, tracking SEP-2
 
 ## Limitations and notes
 
-- **v2 preview, opt-in.** Not in released `1.6.2`. `relay_tasks_enabled` defaults to **false** and must be set explicitly; it is not merely a rollback switch.
+- **v2 preview only.** Not in released `1.6.2`. `relay_tasks_enabled` defaults to **true** on the preview and is retained as a per-deployment rollback. What to check before changing it is not whether the surface is wanted, but whether the served wire matches what is advertised -- that mismatch is what took it out once already.
 - **Behavior is unchanged until an upstream emits a task.** Activation is per-upstream, on the first real task an upstream emits (ADR-014 Decision 5). A deployment whose upstreams never emit tasks observes no difference; the extension is advertised on `server/discover` only once the seam is live -- "do not advertise what does not run."
 - **The ledger is in-memory.** An in-memory `task_id` mapping suffices for a relay; a durable/distributed task store remains the executor's problem and stays out of scope. The ownership registry and digest guard are TTL/LRU bounded, and an evicted still-live binding is failed closed (`TaskFailed('evicted')`) rather than silently vanishing.
 - **Cancellation is best-effort relay.** Hangar forwards `tasks/cancel` and retires the entry only on confirmation; it takes on no cancellation-race ownership beyond the relay.

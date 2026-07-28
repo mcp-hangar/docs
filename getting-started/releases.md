@@ -140,8 +140,10 @@ in `mcp==2.0.0b2`.
   pinned-digest verify before any payload is handed over), `tasks/update`,
   `tasks/cancel`. `tasks/result` and `tasks/list` are removed by the SEP and
   answer `-32601`.
-- **Off by default.** `relay_tasks_enabled` defaults to false and must be set
-  explicitly ([ADR-015](../adr/ADR-015-vendored-task-wire.md)).
+- **On by default on the preview**, with `relay_tasks_enabled` retained as a
+  per-deployment rollback. It was briefly off after the surface was found
+  advertising a wire it did not serve; it went back on once that wire was served
+  and verified ([ADR-015](../adr/ADR-015-vendored-task-wire.md)).
 - **A governed mid-flight consent gate.** An upstream `input_required` surfaces
   its `inputRequests`; the client answers by driving `tasks/update`, and that
   update **is** the consent — gated before the answer reaches the upstream,

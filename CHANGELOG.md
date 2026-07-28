@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.2](https://github.com/mcp-hangar/docs/compare/v1.1.1...v1.1.2) (2026-07-28)
+
+
+### Changed
+
+* **architecture:** record that the Tasks wire is vendored, not taken from the SDK ([#99](https://github.com/mcp-hangar/docs/issues/99)) ([80b13bc](https://github.com/mcp-hangar/docs/commit/80b13bcf8d407a185e71cc472cfe926c3cbc6adc))
+* **guides:** bring the governed-tasks pages back to what actually ships ([#101](https://github.com/mcp-hangar/docs/issues/101)) ([15121d4](https://github.com/mcp-hangar/docs/commit/15121d4164e25806e9fa19c42eae212cc273ebd1))
+* **guides:** move to 2.0.0rc3 and retire the gap warnings ([#104](https://github.com/mcp-hangar/docs/issues/104)) ([3fcceb3](https://github.com/mcp-hangar/docs/commit/3fcceb33fb154c6b120052e36adc99880a023508))
+* **guides:** record that the task relay is on by default again ([#102](https://github.com/mcp-hangar/docs/issues/102)) ([50025f0](https://github.com/mcp-hangar/docs/commit/50025f06498e158fd7b281e219ad23560c7d0d5f))
+* **guides:** stop the tasks pages contradicting themselves and the artifact ([#103](https://github.com/mcp-hangar/docs/issues/103)) ([bb2b245](https://github.com/mcp-hangar/docs/commit/bb2b24594a9720280b42854547044b58acfc3a1b))
+* **reference:** move the version surfaces to 1.6.3 and fix a dead anchor ([#106](https://github.com/mcp-hangar/docs/issues/106)) ([5d3d2a8](https://github.com/mcp-hangar/docs/commit/5d3d2a80ab7998108ad6cd96996efe25e6668bb3))
+* **reference:** the compatibility matrix still named the rc.1 candidate ([#105](https://github.com/mcp-hangar/docs/issues/105)) ([781f8d4](https://github.com/mcp-hangar/docs/commit/781f8d475ac3aeba6b5664f0e5a09ca86308b18e))
+
 ## [1.1.1](https://github.com/mcp-hangar/docs/compare/v1.1.0...v1.1.1) (2026-07-27)
 
 

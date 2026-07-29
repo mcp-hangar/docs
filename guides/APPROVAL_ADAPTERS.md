@@ -208,7 +208,7 @@ def verify_slack_signature(signing_secret: str, headers, body: str) -> bool:
 
 async def handle_slack_callback(
     signing_secret: str,
-    hangar_base_url: str,   # your deployment's Hangar URL -- not a Hangar-provided variable
+    base_url: str,          # your deployment's Hangar URL -- you supply this
     headers,
     raw_body: str,
 ) -> None:
@@ -226,7 +226,7 @@ async def handle_slack_callback(
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.post(
-            f"{hangar_base_url}/api/approvals/{approval_id}/resolve",
+            f"{base_url}/api/approvals/{approval_id}/resolve",
             json={"decision": decision, "reason": f"via Slack by {slack_user}"},
             headers={"Authorization": f"Bearer {token}"},
         )

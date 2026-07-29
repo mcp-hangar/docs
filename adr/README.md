@@ -27,6 +27,7 @@ taxonomy, and formatting conventions.
 | [014](ADR-014-tasks-relay-with-governance.md) | Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute | Accepted (partial → [015](ADR-015-vendored-task-wire.md)) | 2026-07-20 |
 | [015](ADR-015-vendored-task-wire.md) | The Tasks Wire is Vendored -- `mcp_types.Task*` is a Fossil, Not a Moving Target | Accepted | 2026-07-28 |
 | [016](ADR-016-approval-resolution-chokepoint.md) | Approval Resolution Has One Authorized Chokepoint, and Core Knows No Vendors | Accepted | 2026-07-29 |
+| [017](ADR-017-approval-input-request-namespace.md) | Pending Approvals Use `io.mcp-hangar/approval`, and Carry No Requested Schema | Accepted | 2026-07-29 |
 
 ## Summaries
 

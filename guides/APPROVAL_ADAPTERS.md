@@ -206,7 +206,12 @@ def verify_slack_signature(signing_secret: str, headers, body: str) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
-async def handle_slack_callback(signing_secret: str, headers, raw_body: str) -> None:
+async def handle_slack_callback(
+    signing_secret: str,
+    hangar_base_url: str,   # your deployment's Hangar URL -- not a Hangar-provided variable
+    headers,
+    raw_body: str,
+) -> None:
     if not verify_slack_signature(signing_secret, headers, raw_body):
         raise PermissionError("bad Slack signature")
 
@@ -221,7 +226,7 @@ async def handle_slack_callback(signing_secret: str, headers, raw_body: str) -> 
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.post(
-            f"{HANGAR_URL}/api/approvals/{approval_id}/resolve",
+            f"{hangar_base_url}/api/approvals/{approval_id}/resolve",
             json={"decision": decision, "reason": f"via Slack by {slack_user}"},
             headers={"Authorization": f"Bearer {token}"},
         )

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3](https://github.com/mcp-hangar/docs/compare/v1.1.2...v1.1.3) (2026-07-29)
+
+
+### Changed
+
+* **architecture:** add ADR-016 and the approval adapter guide ([#109](https://github.com/mcp-hangar/docs/issues/109)) ([c8308f3](https://github.com/mcp-hangar/docs/commit/c8308f30b9d96e9bc2fac830bea30ef116678e0b))
+* **architecture:** add ADR-017 on the approval input-request namespace ([#111](https://github.com/mcp-hangar/docs/issues/111)) ([f72dad8](https://github.com/mcp-hangar/docs/commit/f72dad878dca8ffddebc5f79a34f47127824c296))
+
 ## [1.1.2](https://github.com/mcp-hangar/docs/compare/v1.1.1...v1.1.2) (2026-07-28)
 
 

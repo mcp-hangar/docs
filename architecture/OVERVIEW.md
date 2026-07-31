@@ -19,7 +19,7 @@ Enforcement is delivered across **two distinct planes**:
   *different plane and a different temporal moment* from the per-request path.
 
 A third capability — a **governed async task relay with a mid-flight consent
-gate** — is landing in 2.0 (v2 preview; see below).
+gate** — shipped in 2.0 (see below).
 
 Beyond enforcement, MCP Hangar also manages MCP servers with explicit lifecycle,
 health monitoring, and automatic cleanup — the machinery the enforcement path
@@ -123,10 +123,10 @@ Current chart versions: `mcp-hangar` 0.13.6 (appVersion 1.6.2),
 `mcp-hangar-operator` 0.12.5 (appVersion 0.15.0). Read live from GHCR — see the
 [released-artifacts matrix](../operations/RELEASE_COMPATIBILITY.md) for digests.
 
-## v2 preview: governed async task relay + consent (landing in 2.0)
+## Governed async task relay + consent (shipped in 2.0)
 
-A governed async-task capability is **landing in 2.0** and ships today only as a
-prerelease (`pip install --pre mcp-hangar`); stable installs still land on 1.6.2.
+A governed async-task capability **shipped in 2.0.0**; a plain
+`pip install mcp-hangar` gets it. It is not in the closed 1.6.x line.
 See [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md) and
 [Governed Tasks](../guides/GOVERNED_TASKS.md).
 
@@ -154,8 +154,9 @@ See [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md) and
   and they are -- from vendored models rather than the SDK's frozen SEP-1686
   types.
 
-Public version surfaces remain 1.6.2; everything in this section is labeled
-"landing in 2.0" and is not implied as shipped in the stable release.
+Everything in this section is in the stable 2.0.0 release. It is absent from
+the 1.6.x line, which rejects an upstream task handle with
+`TaskRelayNotSupported`.
 
 ## Layer Structure (DDD + CQRS)
 

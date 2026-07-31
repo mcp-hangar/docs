@@ -29,7 +29,7 @@ pip install mcp-hangar
 is a major version: it moves onto the MCP 2026-07-28 protocol generation and the
 stable `mcp==2.0.0` SDK, and it removes the last vendor integration from core.
 
-If you are coming from 1.6.x, read [Upgrade to 2.0.0](../upgrade.md#upgrade-to-200)
+If you are coming from 1.6.x, read [Upgrade to 2.0.0](../upgrade.md)
 first — there are two changes that need a decision before you upgrade, not
 after: Slack approval delivery now needs an adapter you run yourself, and
 approval resolution is authorized.
@@ -76,14 +76,15 @@ make setup
 ## Docker
 
 ```bash
-docker pull ghcr.io/mcp-hangar/mcp-hangar:1.6.3
+docker pull ghcr.io/mcp-hangar/mcp-hangar:2.0.0
 
 # Run with config
 docker run -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  ghcr.io/mcp-hangar/mcp-hangar:1.6.3
+  ghcr.io/mcp-hangar/mcp-hangar:2.0.0
 ```
 
-> The tag above pins the current stable release. See
+> The tag above pins the current stable release, matching what
+> `pip install mcp-hangar` gives you. See
 > [Releases & Artifacts](releases.md) for the authoritative version index.
 
 ## Verify Installation

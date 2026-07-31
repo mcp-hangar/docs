@@ -7,8 +7,11 @@ install it.
 > **Note**
 > Each artifact is released independently per the release-topology decision
 > ([mcp-hangar/mcp-hangar#410]): the Python core on PyPI, the operator image and
-> `install.yaml` on GHCR / GitHub Releases (operator `v0.14.0`), and the Helm
-> charts as OCI packages. Each advances on its own cadence.
+> `install.yaml` on GHCR / GitHub Releases, and the Helm charts as OCI
+> packages. Each advances on its own cadence, so there is no single
+> "MCP Hangar version" — the current pairing lives in the
+> [compatibility matrix](../operations/RELEASE_COMPATIBILITY.md), which is
+> regenerated from the registry rather than maintained by hand.
 
 ## At a glance
 

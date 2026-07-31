@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/mcp-hangar/docs/compare/v1.1.4...v1.1.5) (2026-07-31)
+
+
+### Changed
+
+* **release:** move the version surfaces to core 2.0.1 ([#120](https://github.com/mcp-hangar/docs/issues/120)) ([ea185a4](https://github.com/mcp-hangar/docs/commit/ea185a4fd0bee694fe0a84838a05e412c9c32862))
+
 ## [1.1.4](https://github.com/mcp-hangar/docs/compare/v1.1.3...v1.1.4) (2026-07-31)
 
 

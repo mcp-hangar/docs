@@ -4,6 +4,69 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.0.0
+
+MCP Hangar 2.0.0 moves the gateway onto the MCP **2026-07-28** protocol
+generation and the stable `mcp==2.0.0` SDK, and it removes the last vendor
+integration from core. Four things need a decision before you upgrade; the rest
+is drop-in (`pip install -U mcp-hangar`, or pull
+`ghcr.io/mcp-hangar/mcp-hangar:2.0.0`).
+
+### Slack approvals need an adapter (breaking, act before upgrading)
+
+Core no longer knows any approval vendor. The `resolve` route dropped its
+`X-Slack-Signature` branch, and `delivery/slack.py` left the tree. **If your
+config sets `approvals.channel: slack`, the channel silently degrades to `noop`
+on 2.0.0** — approvals still queue and stay resolvable over REST, but nobody is
+notified. That degradation is deliberate: refusing to boot over a notification
+channel turns a degraded path into an outage.
+
+The replacement is an adapter you run yourself. It terminates the Slack webhook,
+verifies the signature, maps the Slack identity onto a Hangar principal, and
+calls `POST /approvals/{id}/resolve` with an ordinary token. A reference adapter
+ships in [Approval delivery adapters](guides/APPROVAL_ADAPTERS.md), which walks
+the Slack case end to end — outbound notification and inbound resolution.
+
+Why the change: both authentication branches on the old route were individually
+sound, but an **unauthenticated caller chose which one ran**. One chokepoint,
+one mechanism (ADR-016).
+
+Provenance changes with it. `decided_by` was `slack:<user-id>`; it now names a
+Hangar principal. Anything parsing that field — audit queries, dashboards,
+exports — needs updating.
+
+### Approval resolution is authorized now (breaking for API callers)
+
+`approval:resolve` was defined, granted to a role, and checked nowhere: any
+principal with a valid token could decide any approval given its id. It is
+enforced from 2.0.0, so a caller without the permission gets `403` where it
+previously got `200`.
+
+The `x-principal-id` request header no longer sets identity. It used to be the
+*only* path that set `decided_by`, including on authenticated requests, and a
+client-supplied header landing in a provenance chain is not attribution.
+Identity now comes from the authenticated principal; with auth disabled the
+decision is attributed to the system principal.
+
+### `tasks/result` and `tasks/list` are gone (breaking for task clients)
+
+The task relay serves the SEP-2663 wire. `tasks/get` now **inlines** the
+outcome — the round trip through `tasks/result` is what SEP-2663 removed — and
+both `tasks/result` and `tasks/list` answer `-32601`. `tasks/get|update|cancel`
+require the mandatory `Mcp-Name: <taskId>` header over HTTP.
+
+The synchronous 2025-11-25 mid-flight consent flow is removed with it: Hangar no
+longer issues an `elicitation/create` prompt inside `tasks/get`. On the
+2026-07-28 wire the client resolves its own input by driving `tasks/update`,
+which is governed and still fail-closed.
+
+### The SDK pin moves to `mcp==2.0.0`
+
+If your environment installs `mcp` alongside Hangar, it moves to the v2 line.
+**Your upstream MCP servers do not have to.** A connection that negotiates
+2025-11-25 keeps working: the handshake records the negotiated era and withholds
+the modern `_meta` envelope on legacy connections.
+
 ## Upgrade to 1.6.0
 
 MCP Hangar 1.6.0 is an observability-hardening release: tool-invocation

@@ -28,7 +28,7 @@ The following table tracks the evolution of git and workflow standards.
 | 4 | Stale bot | 90-day stale, 30-day close (applied via stale.yml) | Tightened from 180/90 post-1.0 per PR #113. |
 | 5 | CC scope list | 13 approved, 3 rejected, 1 deferred | Auth, events, and cqrs were collapsed into core or security to reduce noise. Proto deferred pending higher change frequency. |
 | 6 | Release cadence | ad-hoc, release-please planned | - |
-| 7 | Deprecation policy | post-1.0 SemVer: deprecate in minor, remove in next major | Project is at v1.6.0. Breaking changes require a major version bump. |
+| 7 | Deprecation policy | post-1.0 SemVer: deprecate in minor, remove in next major | Project is at v2.0.0. Breaking changes require a major version bump. |
 | 8 | Dependabot auto-merge | auto-merge dev, actions, and runtime CVE patches | Runtime CVE patches are included in auto-merge to maintain security posture with minimal manual intervention. |
 | 9 | ADR authorship | agents may draft, maintainer authors PR | - |
 | 10 | Pre-release flow location | documented in this file (see Pre-release flow) | - |
@@ -198,7 +198,7 @@ Agents may draft ADRs in issue comments but never author the PR.
 
 ## Deprecation policy
 
-The project is at v1.6.0 and follows standard SemVer deprecation rules:
+The project is at v2.0.0 and follows standard SemVer deprecation rules:
 
 - Deprecations must be marked in at least one minor release.
 - Removal occurs earliest in the next major release.
@@ -209,7 +209,11 @@ The project is at v1.6.0 and follows standard SemVer deprecation rules:
 Pre-releases allow for testing artifacts in a controlled environment.
 This is an operational workflow driven by tags.
 
-Tagging `vX.Y.Z-rc.N` triggers .github/workflows/release.yml to publish to TestPyPI.
+Tagging `vX.Y.Z-rc.N` triggers .github/workflows/release.yml to publish to
+production PyPI — not TestPyPI, which was dropped because its trusted publisher
+was never configured. `pip` ignores a pre-release unless asked with `--pre` or
+an exact pin, so this is safe; the build carries no `latest` Docker tag and is
+marked as a prerelease on GitHub (ADR-009).
 The project uses alpha, beta, and rc suffixes for lifecycle management.
 Promoting a release to production is done by tagging `vX.Y.Z` (no -rc suffix).
 This triggers the same workflow to publish the final artifact to PyPI.
@@ -273,7 +277,7 @@ PR gates:
 
 Release:
 
-- release.yml (TestPyPI and PyPI publishing)
+- release.yml (PyPI publishing, releases and pre-releases alike)
 - release-please.yml (automated version bump and Release PR)
 
 Housekeeping:

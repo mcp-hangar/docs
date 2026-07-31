@@ -23,24 +23,25 @@ This will install the latest version of MCP Hangar and set up your environment.
 pip install mcp-hangar
 ```
 
-## Installing the v2 preview (release candidate)
+## Which line you get
 
-The v2 line is a release candidate (`2.0.0rc3`, built on the stable `mcp==2.0.0`)
-and is opt-in. A normal `pip install mcp-hangar` still lands on stable **1.6.3** —
-pip does not resolve to a prerelease unless you ask for one.
+`pip install mcp-hangar` resolves to **2.0.0**, the current stable release. It
+is a major version: it moves onto the MCP 2026-07-28 protocol generation and the
+stable `mcp==2.0.0` SDK, and it removes the last vendor integration from core.
+
+If you are coming from 1.6.x, read [Upgrade to 2.0.0](../upgrade.md#upgrade-to-200)
+first — there are two changes that need a decision before you upgrade, not
+after: Slack approval delivery now needs an adapter you run yourself, and
+approval resolution is authorized.
+
+To stay on the older line while you plan that work, pin it:
 
 ```bash
-pip install --pre mcp-hangar          # newest prerelease (the v2 line)
-pip install "mcp-hangar==2.0.0rc3"    # pin the exact release candidate
+pip install "mcp-hangar>=1.6,<2"      # the 1.6.x line
 ```
 
-`--pre` opts the whole resolve into prereleases; the pinned `==2.0.0rc3` form
-takes exactly that build. Both leave a plain `pip install mcp-hangar` on 1.6.3.
-
-> What the v2 preview adds — governed task relay-with-governance (ADR-014),
-> landing in 2.0, not on the 1.6.x line — is summarized under
-> [v2 preview (release candidate)](releases.md#v2-preview-release-candidate) in Releases &
-> Artifacts.
+The 1.6.x line receives no new features. `--pre` is no longer needed for the v2
+line — it is the default resolve.
 
 ## Install from Source (Monorepo)
 

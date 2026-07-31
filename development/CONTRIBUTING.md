@@ -238,19 +238,26 @@ See [RELEASE.md](../runbooks/RELEASE.md) for the full operational runbook.
 
 ### Pre-release Versions
 
-Pre-releases are automatically published to **TestPyPI**:
+Pre-releases are published to **production PyPI**, not TestPyPI — TestPyPI was
+dropped because its trusted publisher was never configured. They are cut by a
+hand-pushed semver tag:
 
 ```bash
 # Tag patterns for pre-releases
-v1.0.0-alpha.1  # Alpha release
-v1.0.0-beta.1   # Beta release
-v1.0.0-rc.1     # Release candidate
+v2.0.0-alpha.1  # Alpha release
+v2.0.0-beta.1   # Beta release
+v2.0.0-rc.1     # Release candidate
 ```
 
-Install pre-release:
+Publishing to prod is safe because `pip` will not select a pre-release unless
+asked. A pre-release carries no `latest` Docker tag and is marked as a
+prerelease on GitHub (ADR-009).
+
+Install a pre-release:
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ mcp-hangar==1.0.0rc1
+pip install --pre mcp-hangar            # newest pre-release
+pip install "mcp-hangar==2.1.0rc1"      # an exact candidate
 ```
 
 ### Release Checklist

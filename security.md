@@ -51,9 +51,14 @@ This project implements multiple security layers:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-| 0.12.x  | :white_check_mark: |
-| < 0.12  | :x:                |
+| 2.0.x   | :white_check_mark: |
+| 1.6.x   | :x:                |
+| < 1.6   | :x:                |
+
+Security fixes land on 2.0.x only. The 1.6.x line is closed — notably, the
+approval-resolution authorization fix released in 2.0.0 is **not** backported.
+If you run approvals on 1.6.x, any principal holding a valid token can decide
+any approval given its id; see [Upgrade to 2.0.0](upgrade.md#upgrade-to-200).
 
 ## Security Best Practices
 

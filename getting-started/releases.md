@@ -134,7 +134,7 @@ which lifts ADR-008's "relay-only, permanently" absolutism now that Tasks have
 graduated out of `mcp.server.experimental` into a negotiated protocol extension
 in the SDK v2 line.
 
-**Landing in 2.0 — on the v2 preview, not on the 1.6.x line:**
+**What the governed task relay gives you, from 2.0.0:**
 
 - **Relay-with-governance, not execution.** Hangar relays upstream-created tasks
   and interposes governance on their lifecycle, engaging per-upstream on that

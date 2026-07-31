@@ -163,9 +163,9 @@ All endpoints return JSON. Error responses follow the envelope format:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/enterprise/approvals` | List approval requests |
-| `GET` | `/api/enterprise/approvals/{id}` | Get an approval request |
-| `POST` | `/api/enterprise/approvals/{id}/resolve` | Resolve an approval request |
+| `GET` | `/api/approvals` | List approval requests |
+| `GET` | `/api/approvals/{id}` | Get an approval request |
+| `POST` | `/api/approvals/{id}/resolve` | Resolve an approval request (requires `approval:resolve`) |
 
 ### Health Probes and Metrics
 

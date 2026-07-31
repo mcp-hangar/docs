@@ -11,11 +11,12 @@ governs how the images and charts are published and verified.
 > **Status: released, signed, and pinned — the published charts carry their
 > fixes and chart tags are now immutable (`mcp-hangar/helm-charts#36`, closed;
 > fixed by the fail-safe publish guard #37).**
-> As of 2026-07-28 every lane has a published, public, **cosign-signed**,
+> As of 2026-07-31 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
-> image `1.6.2`, operator `0.15.0`, and both Helm charts. (The core `2.x` line is
-> at `2.0.0-rc.3`, built on the stable `mcp==2.0.0`, and is deliberately absent
-> from the matrix below, which tracks stable lanes.)
+> image `2.0.0`, operator `0.15.0`, and both Helm charts. The `2.x` line went
+> stable on 2026-07-31 and is now the reference row below; it was previously
+> excluded here as a release candidate, which this page kept asserting after it
+> stopped being true.
 > Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done.
 >
 > Live cluster testing found defects that made a default `helm install` fail
@@ -56,12 +57,21 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Helm charts (core / operator) | Kubernetes |
 | --- | --- | --- | --- |
-| `1.6.x` | `0.14.0` | `0.13.4` / `0.12.3` | `1.25` -- `1.36` |
+| `2.0.x` | `0.15.0` | `0.13.6` [^chart-2] / `0.12.5` | `1.25` -- `1.36` |
+| `1.6.x` | `0.15.0` | `0.13.6` / `0.12.5` | `1.25` -- `1.36` |
+
+[^chart-2]: **The published core chart does not install 2.0.0 by default yet.**
+    `charts/mcp-hangar 0.13.6` carries `appVersion: 1.6.2`, and `image.tag`
+    defaults to `appVersion` — so a plain `helm install` of it still pulls the
+    1.6.2 image. Set `image.tag: 2.0.0` explicitly until the next chart release
+    ships the bump (merged to `helm-charts` `main`, not yet cut). Read from the
+    registry, not from `Chart.yaml` in the repo, which is already ahead.
 
 Rules for reading and extending the matrix:
 
 - **Core** is the reference axis: every supported combination pins a concrete
-  core minor (`v1.6.2` is the current published core).
+  core minor (`v2.0.0` is the current published core; `1.6.x` is closed and
+  receives no fixes, including the approval-authorization fix released in 2.0.0).
 - **Operator / Helm** columns carry the released version; the verified
   digests are in *Released artifacts* below. Both lanes have landed
   (`mcp-hangar-operator#26`, `helm-charts#7`) and the

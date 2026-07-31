@@ -117,11 +117,18 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.0.0**, released 2026-07-31 — a plain `pip install
+The stable Python core is **2.0.1**, released 2026-07-31 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
 the MCP 2026-07-28 protocol generation.
 
-It is a major version. Read [Upgrade to 2.0.0](../upgrade.md) before you take
+2.0.1 is a security patch on top of 2.0.0 and is drop-in: the approval gate now
+re-establishes an approval's validity at dispatch rather than only at decision,
+so a call whose world moved while its approval was held is refused where it
+previously executed ([#674](https://github.com/mcp-hangar/mcp-hangar/issues/674)).
+See [Upgrade to 2.0.1](../upgrade.md#upgrade-to-201).
+
+The 2.0.0 notes below still apply — it is a major version. Read
+[Upgrade to 2.0.0](../upgrade.md) before you take
 it: Slack approval delivery now needs an adapter you run yourself, and approval
 resolution is authorized. Your upstream MCP servers do **not** have to move — a
 connection that negotiates 2025-11-25 keeps working.
@@ -182,8 +189,8 @@ reshaped Tasks calls now.
 Install it:
 
 ```bash
-pip install mcp-hangar                # 2.0.0, the current stable release
-pip install "mcp-hangar==2.0.0"       # pin it explicitly
+pip install mcp-hangar                # 2.0.1, the current stable release
+pip install "mcp-hangar==2.0.1"       # pin it explicitly
 ```
 
 Watch the [Releases page](https://github.com/mcp-hangar/mcp-hangar/releases) for

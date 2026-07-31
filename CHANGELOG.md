@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.4](https://github.com/mcp-hangar/docs/compare/v1.1.3...v1.1.4) (2026-07-31)
+
+
+### Changed
+
+* **guides:** correct the RBAC role table against roles.py ([#119](https://github.com/mcp-hangar/docs/issues/119)) ([43809ef](https://github.com/mcp-hangar/docs/commit/43809ef8413d00f91086353fdc9b504094075d07))
+* **guides:** fix the API paths and framing that reach AI consumers verbatim ([#118](https://github.com/mcp-hangar/docs/issues/118)) ([dec9824](https://github.com/mcp-hangar/docs/commit/dec982462555a8f870148f22dbc4b494b8bf7c75))
+* **reference:** fix what the first 2.0.0 pass missed ([#116](https://github.com/mcp-hangar/docs/issues/116)) ([62b75d9](https://github.com/mcp-hangar/docs/commit/62b75d9a3f1be1f8424ab373fa3d68e74a89c231))
+* **reference:** move the compatibility matrix onto the 2.0.0 line ([#115](https://github.com/mcp-hangar/docs/issues/115)) ([7915ceb](https://github.com/mcp-hangar/docs/commit/7915ceb44cd9bd03c3e564cc77051d140fe25c57))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#114](https://github.com/mcp-hangar/docs/issues/114)) ([57f6956](https://github.com/mcp-hangar/docs/commit/57f6956db774f4ea83f2906855093278c7332a17))
+* **reference:** the chart that installs 2.0.0 exists now ([#117](https://github.com/mcp-hangar/docs/issues/117)) ([daf8f1c](https://github.com/mcp-hangar/docs/commit/daf8f1c659d617ebe181f7af623143ea4b951a7f))
+* **release:** move the documentation to 2.0.0 ([#112](https://github.com/mcp-hangar/docs/issues/112)) ([5de8fea](https://github.com/mcp-hangar/docs/commit/5de8fea95aeb0bd45c7cf6d3b3934c10498e9700))
+
 ## [1.1.3](https://github.com/mcp-hangar/docs/compare/v1.1.2...v1.1.3) (2026-07-29)
 
 

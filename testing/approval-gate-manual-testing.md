@@ -164,30 +164,39 @@ A tool on `deny_list` is always blocked -- even if also on `approval_list`.
 ### 4.1 List Pending Approvals
 
 ```bash
-curl -s http://localhost:8080/enterprise/approvals?state=pending | jq
+curl -s http://localhost:8080/api/approvals?state=pending | jq
 ```
 
 ### 4.2 Get Single Approval
 
 ```bash
-curl -s http://localhost:8080/enterprise/approvals/{approval_id} | jq
+curl -s http://localhost:8080/api/approvals/{approval_id} | jq
 ```
 
 ### 4.3 Approve via API
 
+> From 2.0.0 resolution is authorized: the caller must present a token whose
+> principal holds `approval:resolve`. The `x-principal-id` header these steps
+> used to send no longer sets identity — it was never authentication, and a
+> client-supplied value landing in the provenance chain is what 2.0.0 removed.
+> Export `TOKEN` before running the calls below. On a gateway started with
+> `--unsafe-no-auth` the header is unnecessary and the decision is attributed
+> to the system principal.
+
+
 ```bash
-curl -X POST http://localhost:8080/enterprise/approvals/{approval_id}/resolve \
+curl -X POST http://localhost:8080/api/approvals/{approval_id}/resolve \
   -H "Content-Type: application/json" \
-  -H "x-principal-id: manual-tester" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"decision": "approve"}'
 ```
 
 ### 4.4 Deny via API
 
 ```bash
-curl -X POST http://localhost:8080/enterprise/approvals/{approval_id}/resolve \
+curl -X POST http://localhost:8080/api/approvals/{approval_id}/resolve \
   -H "Content-Type: application/json" \
-  -H "x-principal-id: manual-tester" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"decision": "deny", "reason": "Not authorized for production"}'
 ```
 
@@ -198,7 +207,7 @@ After resolving once, send the same request again:
 ```bash
 # Should return 409 Conflict
 curl -s -o /dev/null -w "%{http_code}" -X POST \
-  http://localhost:8080/enterprise/approvals/{approval_id}/resolve \
+  http://localhost:8080/api/approvals/{approval_id}/resolve \
   -H "Content-Type: application/json" \
   -d '{"decision": "approve"}'
 ```
@@ -209,17 +218,30 @@ curl -s -o /dev/null -w "%{http_code}" -X POST \
 
 ## 5. Slack Integration Testing
 
+> **This section changed in 2.0.0.** Core no longer terminates a Slack webhook.
+> Pointing Slack's Request URL at the resolve endpoint, as earlier revisions of
+> this page instructed, sends an unverified request to an endpoint that no
+> longer checks Slack signatures. Delivery now runs as an adapter you deploy;
+> see [Approval delivery adapters](../guides/APPROVAL_ADAPTERS.md).
+
 ### 5.1 Prerequisite Setup
 
-1. Create a Slack App with Interactivity enabled
-2. Set the Request URL to: `https://your-domain/enterprise/approvals/{approval_id}/resolve`
-3. Copy the Signing Secret to config
-4. Set up an Incoming Webhook
+1. Install a delivery adapter that registers under the
+   `mcp_hangar.approvals.delivery` entry-point group, and configure
+   `approvals.channel` to the name it registers.
+2. Create a Slack App with Interactivity enabled.
+3. Set the Request URL to **the adapter's** callback endpoint, not Hangar's.
+4. Give the adapter the Signing Secret and a Hangar token whose principal holds
+   `approval:resolve`.
+
+With no adapter installed, an unknown channel degrades to `noop` and logs a
+warning: approvals queue undelivered but stay resolvable over REST. That is the
+intended behaviour, not a failure to debug.
 
 ### 5.2 Notification Test
 
-1. Configure `channel: slack` in config
-2. Invoke a tool matching `approval_list`
+1. Configure the adapter's channel in config.
+2. Invoke a tool matching `approval_list`.
 
 **Expected:** Slack message appears with:
 
@@ -231,9 +253,13 @@ curl -s -o /dev/null -w "%{http_code}" -X POST \
 
 ### 5.3 Slack Approve/Deny
 
-1. Click **Approve** or **Deny** in Slack
-2. Verify the tool execution completes (or fails with denied)
-3. Verify the `decided_by` shows `slack:{user_id}`
+1. Click **Approve** or **Deny** in Slack.
+2. Verify the adapter verified the Slack signature and called
+   `POST /api/approvals/{approval_id}/resolve` with its token.
+3. Verify the tool execution completes (or fails with denied).
+4. Verify `decided_by` names the **Hangar principal** the adapter mapped the
+   Slack user onto. The old `slack:{user_id}` form is retired: provenance names
+   a principal Hangar authenticated, not a vendor handle.
 
 ---
 

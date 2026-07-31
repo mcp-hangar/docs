@@ -57,15 +57,14 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Helm charts (core / operator) | Kubernetes |
 | --- | --- | --- | --- |
-| `2.0.x` | `0.15.0` | `0.13.6` [^chart-2] / `0.12.5` | `1.25` -- `1.36` |
+| `2.0.x` | `0.15.0` | `0.13.7` / `0.12.5` | `1.25` -- `1.36` |
 | `1.6.x` | `0.15.0` | `0.13.6` / `0.12.5` | `1.25` -- `1.36` |
 
-[^chart-2]: **The published core chart does not install 2.0.0 by default yet.**
-    `charts/mcp-hangar 0.13.6` carries `appVersion: 1.6.2`, and `image.tag`
-    defaults to `appVersion` — so a plain `helm install` of it still pulls the
-    1.6.2 image. Set `image.tag: 2.0.0` explicitly until the next chart release
-    ships the bump (merged to `helm-charts` `main`, not yet cut). Read from the
-    registry, not from `Chart.yaml` in the repo, which is already ahead.
+`charts/mcp-hangar 0.13.7` carries `appVersion: 2.0.0`, and `image.tag` defaults
+to `appVersion`, so a plain `helm install` of it pulls the 2.0.0 image — verified
+with `helm show chart` against the registry. `0.13.6` and earlier carry
+`appVersion: 1.6.2`; pin the chart version, not just the image tag, if you are
+staying on the closed line.
 
 Rules for reading and extending the matrix:
 

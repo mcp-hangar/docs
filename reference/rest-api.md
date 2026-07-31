@@ -966,12 +966,12 @@ Removes a runtime withdrawal (config-declared withdrawals persist independently)
 
 ## Approvals
 
-Available when the approval service is enabled. (The `/enterprise/approvals` path is the released 1.6.x route; it is renamed to `/approvals` on the v2 line.)
+Available when the approval service is enabled. Paths below are the 2.x routes, served under the `/api` mount — verified against core's published route inventory (`api-routes.json`). On the closed 1.6.x line these lived under `/enterprise/approvals`.
 
 ### List Approvals
 
 ```
-GET /enterprise/approvals?state={state}&provider_id={id}
+GET /api/approvals?state={state}&provider_id={id}
 ```
 
 | Parameter | In | Type | Default | Description |
@@ -984,7 +984,7 @@ GET /enterprise/approvals?state={state}&provider_id={id}
 ### Get Approval
 
 ```
-GET /enterprise/approvals/{approval_id}
+GET /api/approvals/{approval_id}
 ```
 
 **Response 200:** Approval request object.
@@ -994,10 +994,14 @@ GET /enterprise/approvals/{approval_id}
 ### Resolve Approval
 
 ```
-POST /enterprise/approvals/{approval_id}/resolve
+POST /api/approvals/{approval_id}/resolve
 ```
 
-Approves or denies a pending approval. Accepts JWT auth (with `approval:resolve` permission) or a Slack HMAC callback.
+Approves or denies a pending approval. Requires an authenticated principal holding `approval:resolve`; the decision is attributed to that principal.
+
+From 2.0.0 this is the **only** way in. The Slack HMAC callback branch was removed, and the client-supplied `x-principal-id` header no longer sets identity. A Slack integration now runs as a delivery adapter that verifies the vendor signature itself and calls this endpoint with an ordinary token — see [Approval delivery adapters](../guides/APPROVAL_ADAPTERS.md).
+
+On a gateway with auth disabled the decision is attributed to the system principal rather than refused: refusing there would decide nothing.
 
 **Request body:**
 

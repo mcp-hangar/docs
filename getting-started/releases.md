@@ -85,7 +85,7 @@ Per-release, user-visible migration steps live in the [Upgrade Guide](../upgrade
 
 ### 1.6.0 — breaking for trace/metrics consumers
 
-The current stable Python core is **1.6.3**: 1.6.1 added the MCPEgressPolicy
+On the 1.6.x line, now closed: 1.6.1 added the MCPEgressPolicy
 Audit/Enforce mode on top of the 1.6.0 observability-hardening release, 1.6.2
 caps the `mcp` SDK dependency below 2.x — without that cap a fresh install
 follows the SDK into a major whose server surface this line does not use, and
@@ -112,16 +112,23 @@ operator's `MCPEgressPolicy` controller, which ships in operator **v0.14.0**.
 Run **core 1.6.0+** and **operator v0.14.0+** for end-to-end L7 — both are
 released.
 
-## v2 preview (release candidate)
+## The 2.x line
 
-The stable Python core is **1.6.3** and stays that way — a plain `pip install
-mcp-hangar` lands on 1.6.3, and nothing below changes that. The **v2 line is at
-its third release candidate**: `mcp-hangar==2.0.0rc3`, built on the stable SDK
-(`mcp==2.0.0`, released 2026-07-28). It is opt-in only. You will not get it by
-accident.
+The stable Python core is **2.0.0**, released 2026-07-31 — a plain `pip install
+mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
+the MCP 2026-07-28 protocol generation.
+
+It is a major version. Read [Upgrade to 2.0.0](../upgrade.md) before you take
+it: Slack approval delivery now needs an adapter you run yourself, and approval
+resolution is authorized. Your upstream MCP servers do **not** have to move — a
+connection that negotiates 2025-11-25 keeps working.
+
+The **1.6.x line is closed**: no new features, and the approval-resolution
+authorization fix is not backported. Pin `"mcp-hangar>=1.6,<2"` if you need to
+stay there while you plan the upgrade.
 
 1.6 added visibility through the front door — OTel-semconv traces and the L7
-`MCPEgressPolicy` plane. The v2 preview adds governance over task lifecycle
+`MCPEgressPolicy` plane. 2.0 adds governance over task lifecycle
 without executing it. It carries [ADR-014](../adr/ADR-014-tasks-relay-with-governance.md),
 which lifts ADR-008's "relay-only, permanently" absolutism now that Tasks have
 graduated out of `mcp.server.experimental` into a negotiated protocol extension
@@ -169,15 +176,15 @@ SDK's `Task*` types are the SEP-1686 generation and shipped **unchanged in
 [ADR-015](../adr/ADR-015-vendored-task-wire.md). You can build against the
 reshaped Tasks calls now.
 
-Get the preview:
+Install it:
 
 ```bash
-pip install --pre mcp-hangar          # newest prerelease on the v2 line
-pip install "mcp-hangar==2.0.0rc3"    # pin the exact release candidate
+pip install mcp-hangar                # 2.0.0, the current stable release
+pip install "mcp-hangar==2.0.0"       # pin it explicitly
 ```
 
 Watch the [Releases page](https://github.com/mcp-hangar/mcp-hangar/releases) for
-the rc line to move. Until 2.0 is cut, `pip install mcp-hangar` remains 1.6.2.
+what lands next.
 
 ## Where to watch
 

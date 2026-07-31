@@ -4,6 +4,23 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.0.1
+
+Drop-in from 2.0.0 — nothing to decide, no config key moved, no API shape
+changed. A single security fix: the approval gate now re-establishes an
+approval's validity **at dispatch** rather than only at decision, re-checking
+state, expiry and the argument hash, re-resolving the effective policy, and
+re-running the digest pin after the hold. Behaviour changes in one direction
+only — a call whose world moved while its approval was pending (tool withdrawn,
+policy tightened, arguments rewritten, approval expired) is now refused where it
+previously executed. An expired approval resolves `409` instead of minting a
+false `APPROVED` record ([#674](https://github.com/mcp-hangar/mcp-hangar/issues/674)).
+
+Scope it honestly: the approval gate is **not reachable on a stock
+`serve --http`** ([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678)),
+so this is the guard that must be in place before that wiring lands, not a patch
+to a live exposure.
+
 ## Upgrade to 2.0.0
 
 MCP Hangar 2.0.0 moves the gateway onto the MCP **2026-07-28** protocol

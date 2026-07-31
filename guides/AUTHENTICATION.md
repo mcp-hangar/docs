@@ -125,10 +125,20 @@ Tokens with a missing, empty, non-string, or untrusted `iss` claim fail closed.
 | Role | Description | Permissions |
 |------|-------------|-------------|
 | `admin` | Full access | Everything |
-| `mcp_server_admin` | Manage MCP servers | MCP server:*, tool:invoke, tool:list |
-| `developer` | Use tools | MCP server:read/list, tool:invoke/list, MCP server:start |
-| `viewer` | Read-only | MCP server:read/list, tool:list, metrics:read |
-| `auditor` | Audit logs | audit:read, metrics:read |
+| `provider-admin` | Manage MCP servers and invoke tools | `provider:*`, `group:*`, `discovery:read/trigger/approve`, `tool:invoke`, `tool:list`, `metrics:read`, **`approval:read`**, **`approval:resolve`** |
+| `developer` | Use tools, start servers on demand | `provider:read/list/start/load/load_verified/unload`, `providers:read/write/lifecycle`, `tool:invoke/list`, `group:read/list`, `discovery:read` |
+| `viewer` | Read-only | `providers:read`, `provider:read/list`, `tool:list`, `metrics:read`, `group:read/list`, `discovery:read` |
+| `auditor` | Audit logs and read-only oversight | `audit:read`, `metrics:read`, `provider:list`, `group:list`, `discovery:read`, **`approval:read`** |
+| `service-account` | Default for service accounts — invoke tools | `provider:read/list`, `tool:invoke/list` |
+
+Role names are exactly as shown. The name `mcp_server_admin` appeared in an
+earlier revision of this table and does not exist — the role is
+`provider-admin`, which kept its original name through the provider→MCP-server
+rename.
+
+`approval:resolve` is the permission that decides an approval. From 2.0.0 it is
+enforced, so a caller without it receives `403` where it previously received
+`200`; `approval:read` alone lists and reads approvals but cannot decide one.
 
 ### Assigning Roles
 

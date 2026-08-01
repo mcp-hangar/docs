@@ -4,6 +4,20 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.1.1
+
+A drop-in security patch on 2.1.0 — no new configuration keys, no API changes.
+It closes two issues found by red-teaming 2.1.0, both fail-closed:
+
+- The L7 egress `jwt` secret pattern now catches short-header JWTs that slipped
+  past the previous matcher
+  ([#687](https://github.com/mcp-hangar/mcp-hangar/issues/687)).
+- The approval surface is now scoped by tenant, so an approver in one tenant can
+  no longer see or resolve another tenant's approvals
+  ([#688](https://github.com/mcp-hangar/mcp-hangar/issues/688)).
+
+Nothing to change in your configuration — upgrade in place.
+
 ## Upgrade to 2.1.0
 
 Drop-in from 2.0.x for almost everyone: the new configuration keys are opt-in,

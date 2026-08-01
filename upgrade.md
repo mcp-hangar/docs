@@ -4,6 +4,60 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.1.0
+
+Drop-in from 2.0.x for almost everyone: the new configuration keys are opt-in,
+no key moved, and no API shape changed. What 2.1.0 adds is that the
+human-in-the-loop approval gate is **reachable for the first time**. It was
+documented, unit-tested in isolation and wired nowhere on any shipped path — no
+config key could put a tool behind it, the gate service was never constructed,
+and `GET /api/approvals` answered `500` while a call the policy said to hold
+executed immediately ([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678),
+fixed in [#684](https://github.com/mcp-hangar/mcp-hangar/pull/684)).
+
+**The one thing that can bite: a config that already carries `approval_list`.**
+The key existed on the internal policy object, so a `tools:` block naming it
+parsed as a block with no access policy and the pattern was silently dropped —
+those tools ran ungated. From 2.1.0 the same file is honoured: matching calls are
+**held** for a human decision, for `approval_timeout_seconds` (default `300`),
+and a call nobody decides is refused rather than executed. Grep your
+configuration before you upgrade:
+
+```bash
+grep -rn "approval_list" /etc/mcp-hangar/
+```
+
+If a hit is not something you want gated, remove it. If it is, make sure someone
+is watching `GET /api/approvals` — or a delivery adapter is installed — before
+you roll it out, because otherwise every matching call now stalls for five
+minutes and then fails.
+
+Approvals are on by default and inert until a policy gates a tool. Set
+`approvals: {enabled: false}` to opt out entirely.
+
+### The server may now refuse to boot
+
+2.1.0 adds a startup reachability check. At the end of `bootstrap()` — the funnel
+`serve`, `serve --http` and the facade all pass through — it asks, for each
+subsystem a configuration can demand, whether the runtime object that serves it
+is actually present. A demand met by absence is no longer silent.
+
+A tool on `approval_list` with no gate service **refuses the boot**: a gateway
+that cannot hold a call is a gateway executing it unapproved, and starting anyway
+is failing open. Everything else logs at `ERROR` naming the subsystem and what
+asked for it. The refusal is a `ConfigurationError` reading
+`Configured subsystem is not reachable on this server: ...`.
+
+```yaml
+startup_checks:
+  enforce: false      # downgrade the refusals to error logs
+```
+
+There is deliberately no switch that makes an unreachable subsystem silent.
+
+The full key reference is in
+[Configuration → `tools` dual format](reference/configuration.md#tools-dual-format).
+
 ## Upgrade to 2.0.1
 
 Drop-in from 2.0.0 — nothing to decide, no config key moved, no API shape
@@ -16,10 +70,12 @@ policy tightened, arguments rewritten, approval expired) is now refused where it
 previously executed. An expired approval resolves `409` instead of minting a
 false `APPROVED` record ([#674](https://github.com/mcp-hangar/mcp-hangar/issues/674)).
 
-Scope it honestly: the approval gate is **not reachable on a stock
+Scope it honestly: at 2.0.1 the approval gate was **not reachable on a stock
 `serve --http`** ([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678)),
-so this is the guard that must be in place before that wiring lands, not a patch
-to a live exposure.
+so this was the guard that had to be in place before that wiring landed, not a
+patch to a live exposure. The wiring landed in
+[2.1.0](#upgrade-to-210), and this fix now guards a path a deployment can
+actually enter.
 
 ## Upgrade to 2.0.0
 

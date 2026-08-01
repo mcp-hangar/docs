@@ -4,6 +4,26 @@ Hangar's approval gate holds a `tools/call` until a human decides. **Where that 
 
 Core ships two channels — `dashboard` and `noop` — and resolves everything else from the `mcp_hangar.approvals.delivery` entry-point group. A vendor integration is a package you install, not a branch in the gateway. The reasoning is in [ADR-016](../adr/ADR-016-approval-resolution-chokepoint.md).
 
+> **The gate only started holding calls in 2.1.0.** Everything on this page describes delivery, which is downstream of a gate that until then was not reachable on any shipped build: no config key put a tool behind it, the service was never constructed, and the REST routes answered `500` ([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678)). If you wrote an adapter against an earlier release and never saw it fire, that is why — there was nothing to deliver. Put a tool behind the gate with [`approval_list`](../reference/configuration.md#holding-a-tool-for-a-human-approval_list) first.
+
+## Putting a tool behind the gate
+
+Delivery is only reached once a policy gates a tool. That is a `tools:` block:
+
+```yaml
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: https://payments.example.com/mcp
+    tools:
+      approval_list:
+        - "refund_*"
+      approval_timeout_seconds: 600
+      approval_channel: slack       # the entry-point name of your adapter
+```
+
+`approval_channel` names the channel this policy's approvals are delivered on, so different servers can route to different adapters. An unknown channel degrades to `noop` with a warning: approvals still queue and stay resolvable over REST, but nobody is notified. Full key reference: [Configuration → `tools` dual format](../reference/configuration.md#tools-dual-format).
+
 > **Migrating from `approvals.channel: slack`?** Core carried a built-in Slack channel through 1.x. It was removed in 2.0. Nothing breaks silently: the channel now logs `approval_delivery_channel_unknown` and degrades to `noop`, so approvals queue undelivered but stay resolvable over the REST API. Restore delivery by installing an adapter — the full reference implementation is below.
 
 ## The two halves
@@ -246,3 +266,4 @@ Hangar's own test for the registry ([`test_delivery_registry.py`](https://github
 - [ADR-016](../adr/ADR-016-approval-resolution-chokepoint.md) — why core has one authorization chokepoint and no vendors
 - [Authentication & Authorization](AUTHENTICATION.md) — minting tokens and the `approval:resolve` permission
 - [REST API](REST_API.md) — the `/approvals` endpoints
+- [Configuration](../reference/configuration.md#holding-a-tool-for-a-human-approval_list) — `approval_list`, `approval_timeout_seconds`, `approval_channel`

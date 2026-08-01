@@ -1,11 +1,20 @@
 # Manual Testing Guide: Approval Gate
 
+> **Requires core 2.1.0 or newer.** On earlier releases none of this can pass:
+> `approval_list` was read by no config parser, the gate service was never
+> constructed, and `GET /api/approvals` answered `500`
+> ([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678)). The scenarios
+> below were written against the intended behaviour and only became runnable in
+> 2.1.0.
+
 ## Prerequisites
 
+- Core **2.1.0+**
 - Python 3.11+ with `uv` installed
 - Node.js 18+ (for dashboard)
 - mcp-hangar checked out on `main`
-- Optional: Slack workspace with webhook configured
+- Optional: a delivery adapter, if you are testing a channel other than
+  `dashboard`/`noop`
 
 ---
 
@@ -16,28 +25,31 @@
 Add to your `config.yaml`:
 
 ```yaml
-enterprise:
-  approvals:
-    channel: dashboard
+approvals:
+  enabled: true          # the default; set false to switch the gate off entirely
+  channel: dashboard
 ```
 
 ### 1.2 Slack Channel
 
 ```yaml
-enterprise:
-  approvals:
-    channel: slack
-    slack:
-      webhook_url: "https://hooks.slack.com/services/T.../B.../xxx"
-      signing_secret: "your-slack-signing-secret"
+approvals:
+  channel: slack
+  slack:
+    webhook_url: "https://hooks.slack.com/services/T.../B.../xxx"
+    signing_secret: "your-slack-signing-secret"
 ```
+
+Core ships only `dashboard` and `noop`. From 2.0.0 `slack` resolves from the
+`mcp_hangar.approvals.delivery` entry-point group and needs an adapter you
+install; without one it degrades to `noop` with a warning. See
+[Approval delivery adapters](../guides/APPROVAL_ADAPTERS.md).
 
 ### 1.3 NoOp Channel (for testing without notifications)
 
 ```yaml
-enterprise:
-  approvals:
-    channel: noop
+approvals:
+  channel: noop
 ```
 
 ---
@@ -49,7 +61,7 @@ Add `approval_list` to a MCP server's tool access policy:
 ```yaml
 mcp_servers:
   grafana:
-    tool_access_policy:
+    tools:
       deny_list:
         - "admin_*"
       approval_list:

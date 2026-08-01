@@ -65,7 +65,7 @@ tool invocation, just before any bytes leave for the upstream:
 | 4 | **Tool-schema digest-pin verify** | SHA-256 pin over the tool's canonical schema; audit/warn/block, fails closed under block | v1.6.0 (opt-in) |
 | 5 | **Circuit-breaker / health** | Rejects calls to unhealthy servers/groups | v1.6.0 |
 | 6 | **Interceptor validators** | Empty/no-op unless explicitly configured | v1.6.0 (experimental, **off by default**) |
-| 7 | **Approval gate (HITL)** | If approval is required, the call **fails closed** (it is blocked, not queued for an interactive prompt) | v1.6.0 |
+| 7 | **Approval gate (HITL)** | A tool matched by `tools.approval_list` is **held** for a human decision (`approval_timeout_seconds`, default 300); denial or expiry refuses the call. Fails closed | 2.1.0 (reachable) |
 | 8 | **Concurrency / backpressure** | Global + per-server semaphores | v1.6.0 |
 | 9 | **Interceptor mutators (request)** | Argument rewriting; no-op unless configured | v1.6.0 (experimental, off) |
 | 10 | **Egress L7 policy** | **The last gate before the wire.** Tool-name globs + secret-pattern + payload-size scan; DENY or REQUIRE_APPROVAL. Evaluated inside tool invocation, before cold-start and before any upstream I/O | v1.6.0 |
@@ -86,10 +86,18 @@ Notes and honest caveats:
   `interceptors/list` endpoints are conformance-shaped no-ops. Do not treat
   interceptors as a live enforcement control. See
   [Interceptor Framework](INTERCEPTOR_FRAMEWORK.md).
-- **The sync L7 `requireApproval` outcome fails closed** — it blocks the call. It
-  is not an interactive approval queue or a human prompt-and-wait. Nor is the v2
-  relay consent gate (below): it fails closed on a decision the client volunteers
-  by driving `tasks/update`. Nothing in the stack prompts a human and waits.
+- **The HITL gate (step 7) prompts a human and waits — from 2.1.0 only.** The
+  control existed and was unit-tested from v1.6.0, but on every shipped build no
+  config key could put a tool behind it, the gate service was never constructed,
+  and `GET /api/approvals` answered `500` while the gated call executed
+  immediately ([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678)). It is
+  wired on all construction paths from 2.1.0, and a config that demands it
+  without a gate service now refuses the boot rather than starting ungated. See
+  [`approval_list`](../reference/configuration.md#holding-a-tool-for-a-human-approval_list).
+- **The sync L7 `requireApproval` outcome is a different control and still fails
+  closed** — it blocks the call outright. It is not an approval queue and does not
+  enqueue one. Nor is the v2 relay consent gate (below) a human prompt: it fails
+  closed on a decision the client volunteers by driving `tasks/update`.
 - Deeper detail: [Front-Door Mode & Per-Tenant Tool Governance](../guides/FRONT_DOOR.md),
   [Egress Policy](../guides/EGRESS_POLICY.md), [Authentication & RBAC](../guides/AUTHENTICATION.md).
 

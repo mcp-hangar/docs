@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.6](https://github.com/mcp-hangar/docs/compare/v1.1.5...v1.1.6) (2026-08-01)
+
+
+### Changed
+
+* **reference:** document the approval gate and move version surfaces to 2.1.0 ([#122](https://github.com/mcp-hangar/docs/issues/122)) ([f94c218](https://github.com/mcp-hangar/docs/commit/f94c218ef0a4582547d0a70d40939a723734ad71))
+
 ## [1.1.5](https://github.com/mcp-hangar/docs/compare/v1.1.4...v1.1.5) (2026-07-31)
 
 

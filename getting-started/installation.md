@@ -25,11 +25,14 @@ pip install mcp-hangar
 
 ## Which line you get
 
-`pip install mcp-hangar` resolves to **2.0.1**, the current stable release. It
+`pip install mcp-hangar` resolves to **2.1.0**, the current stable release. It
 is on a major line: 2.0.0 moved onto the MCP 2026-07-28 protocol generation and
 the stable `mcp==2.0.0` SDK, and removed the last vendor integration from core.
-2.0.1 adds a drop-in security fix on top of it — see
-[Upgrade to 2.0.1](../upgrade.md#upgrade-to-201).
+2.1.0 makes the human-in-the-loop approval gate reachable — `approval_list` in a
+`tools:` block now actually holds a call for a human — and adds a startup check
+that refuses to boot when the configuration demands a subsystem the runtime
+cannot reach. It is drop-in unless your config already carries `approval_list`;
+see [Upgrade to 2.1.0](../upgrade.md#upgrade-to-210).
 
 If you are coming from 1.6.x, read [Upgrade to 2.0.0](../upgrade.md)
 first — there are two changes that need a decision before you upgrade, not
@@ -78,11 +81,11 @@ make setup
 ## Docker
 
 ```bash
-docker pull ghcr.io/mcp-hangar/mcp-hangar:2.0.1
+docker pull ghcr.io/mcp-hangar/mcp-hangar:2.1.0
 
 # Run with config
 docker run -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  ghcr.io/mcp-hangar/mcp-hangar:2.0.1
+  ghcr.io/mcp-hangar/mcp-hangar:2.1.0
 ```
 
 > The tag above pins the current stable release, matching what

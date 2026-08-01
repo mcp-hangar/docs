@@ -92,6 +92,110 @@ mcp_servers:
 
 When `allow_list` is set, only matching tools are exposed. When only `deny_list` is set, all tools except matches are exposed.
 
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `allow_list` | `list[str]` | `[]` | Glob patterns; when set, **only** matching tools are exposed and `deny_list` is ignored |
+| `deny_list` | `list[str]` | `[]` | Glob patterns; matching tools are hidden. Wins over `approval_list` |
+| `approval_list` | `list[str]` | `[]` | Glob patterns; matching tools stay visible but each call is **held for a human decision** before it runs |
+| `approval_timeout_seconds` | `int` | `300` | How long a held call waits for a decision. Must be a positive integer |
+| `approval_channel` | `str` | `dashboard` | Which delivery adapter is notified. Core ships `dashboard` and `noop` |
+
+The same block is accepted at every scope that takes an access policy — an
+`mcp_servers` entry, a `groups` entry, a group member, and the per-tenant
+`tool_access.member` block — and all four go through one parser, so a key cannot
+be honoured at one scope and dropped at another.
+
+### Holding a tool for a human (`approval_list`)
+
+`approval_list` marks tools as visible but gated: the caller's `tools/call` is
+held, an approval record is created and delivered on `approval_channel`, and the
+call runs only if a human approves it inside `approval_timeout_seconds`. A denial
+or an expiry refuses the call — the gate fails closed.
+
+```yaml
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: https://payments.example.com/mcp
+    tools:
+      deny_list:
+        - "internal_*"
+      approval_list:
+        - "refund_*"
+        - "issue_credit"
+      approval_timeout_seconds: 600
+      approval_channel: dashboard
+```
+
+With that config, `list_transactions` runs straight through, `internal_reconcile`
+is not exposed at all, and `refund_payment` is held for up to ten minutes while
+someone decides. `deny_list` wins over `approval_list`: a tool matched by both is
+hidden, not gated.
+
+Pending approvals are listed and resolved over the REST API
+(`GET /api/approvals`, `POST /api/approvals/{id}/resolve`) — see
+[REST API](rest-api.md). Resolution requires the `approval:resolve` permission.
+Notification is a separate concern from resolution: `dashboard` and `noop` ship
+in core, and any other channel resolves from the `mcp_hangar.approvals.delivery`
+entry-point group. See
+[Approval delivery adapters](../guides/APPROVAL_ADAPTERS.md).
+
+> **Before 2.1.0 this key did nothing.** `approval_list` existed on the internal
+> policy object but no config parser read it, so a `tools:` block naming it
+> parsed as *no access policy at all* and the matching tools ran ungated
+> ([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678)). If you have such
+> a block, it becomes live on upgrade — see
+> [Upgrade to 2.1.0](../upgrade.md#upgrade-to-210).
+
+The gate itself is on by default and inert until a policy gates a tool. To turn
+it off:
+
+```yaml
+approvals:
+  enabled: false
+```
+
+Note the interaction with [`startup_checks`](#startup_checks): disabling the gate
+while a policy still names `approval_list` makes the server **refuse to boot**,
+rather than start and execute those calls ungated.
+
+## `startup_checks`
+
+At the end of bootstrap — the funnel `serve`, `serve --http` and the facade all
+pass through — Hangar checks that every subsystem the configuration *demands* is
+actually reachable on the path this process took. The question asked per
+subsystem is: the config demands it, and is the runtime object that serves it
+present?
+
+```yaml
+startup_checks:
+  enforce: true
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enforce` | `bool` | `true` | When `false`, a fail-closed subsystem that is unreachable logs at `ERROR` instead of refusing the boot |
+
+Two outcomes:
+
+- **Refuses the boot** — a security subsystem the config demands is absent. The
+  only one today is the approval gate: a tool on `approval_list` with no gate
+  service raises a configuration error reading `Configured subsystem is not
+  reachable on this server: approval_gate required by tools.approval_list on
+  <scope>`. A gateway that cannot hold a call is a gateway executing it
+  unapproved, so starting anyway would be failing open.
+- **Logs at `ERROR`** — everything else, e.g. the governed task relay enabled by
+  `relay_tasks_enabled` with no governed task store. The event is
+  `subsystem_configured_but_unreachable`, carrying `subsystem`, `required_by` and
+  `fail_closed`.
+
+Setting `enforce: false` downgrades the refusals to error logs. There is
+deliberately no switch that makes an unreachable subsystem silent.
+
+The approval-gate policies are read off the tool-access resolver rather than the
+raw YAML, so a policy introduced by hot reload or over REST is measured the same
+way as one from the config file.
+
 ## Digest Pinning
 
 Digest pinning validates tool schemas against precomputed SHA-256 digests. Since
@@ -492,7 +596,7 @@ mcp_servers:
 | `health.healthy_threshold` | `int` | `1` | >= 1 | Consecutive successes before re-adding member to rotation |
 | `circuit_breaker.failure_threshold` | `int` | `10` | >= 1 | Total group failures before the circuit opens |
 | `circuit_breaker.reset_timeout_s` | `float` | `60.0` | >= 1.0 | Seconds before the circuit auto-resets |
-| `tools` | `dict` | -- | -- | Group-level tool access policy (`allow_list`, `deny_list`) |
+| `tools` | `dict` | -- | -- | Group-level tool access policy (`allow_list`, `deny_list`, `approval_list`, `approval_timeout_seconds`, `approval_channel`) -- see [`tools` dual format](#tools-dual-format) |
 | `canary.member` | `str` | -- | -- | Member that receives canary split traffic |
 | `canary.split_pct` | `int` | `0` | 0--100 | Deterministic percentage of tenants routed to `canary.member` |
 | `canary.pinned_tenants` | `dict[str, str]` | `{}` | -- | Tenant ID to member ID pins; explicit pins win over split routing |
@@ -507,6 +611,7 @@ Each member entry supports all standard MCP server keys (`mode`, `command`, `ima
 | `id` | `str` | -- | -- | Unique member ID (required) |
 | `weight` | `int` | -- | 1--100 | Weight for weighted_round_robin and random strategies |
 | `priority` | `int` | -- | 1--100 | Priority for priority strategy (lower number = higher priority) |
+| `tools` | `dict` | -- | -- | Member-level tool access policy, same keys as the group-level block |
 
 ## Environment Variables
 

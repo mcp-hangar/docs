@@ -458,6 +458,17 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 - Check network connectivity to MCP server
 - Verify MCP-Hangar core is running
 
+**Hangar pod in CrashLoopBackOff right after a 2.1.0 upgrade:**
+
+- Check the logs for `Configured subsystem is not reachable on this server`. The
+  2.1.0 startup check refuses the boot when the config gates a tool behind
+  `tools.approval_list` and no approval gate service exists.
+- Either remove the `approval_list` entry, or stop disabling the gate
+  (`approvals.enabled: false`).
+- `startup_checks: {enforce: false}` downgrades the refusal to an error log if
+  you need the pod up while you fix the config. See
+  [Configuration → `startup_checks`](../reference/configuration.md#startup_checks).
+
 **Discovery not finding MCP servers:**
 
 - Verify namespace labels match selector

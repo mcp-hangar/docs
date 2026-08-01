@@ -889,6 +889,10 @@ behave identically. Requires `mcp_servers:write`.
 
 > **`requireApproval` fails closed.** A synchronous `requireApproval` match
 > **blocks** the call — it is not an interactive prompt-and-wait approval queue.
+> That queue is a different control: the tool-access
+> [`approval_list`](configuration.md#holding-a-tool-for-a-human-approval_list),
+> which holds the call for a human decision. The two are configured separately
+> and an egress `requireApproval` match does not enqueue an approval.
 
 **Response 200:**
 
@@ -967,6 +971,10 @@ Removes a runtime withdrawal (config-declared withdrawals persist independently)
 ## Approvals
 
 Available when the approval service is enabled. Paths below are the 2.x routes, served under the `/api` mount — verified against core's published route inventory (`api-routes.json`). On the closed 1.6.x line these lived under `/enterprise/approvals`.
+
+These routes became usable in **2.1.0**. Before that they read an application-state field that nothing ever populated, so `GET /api/approvals` answered `500` with an `AttributeError` on every deployment ([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678)). The service is now published onto application state from a single place shared by the HTTP-serve path, the server factory and any test client, and the routes fall back to the application context — the same object the enforcement path reads — so the API and enforcement cannot hold different services. When there is genuinely no gate service, these routes answer **503**, not a stack trace.
+
+Something has to put a tool behind the gate before anything appears here: see [`approval_list`](configuration.md#holding-a-tool-for-a-human-approval_list).
 
 ### List Approvals
 

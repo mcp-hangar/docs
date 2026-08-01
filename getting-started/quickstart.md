@@ -131,6 +131,35 @@ Check the MCP server status for errors:
 mcp-hangar status mcp-server-name
 ```
 
+### Gateway refuses to start: "Configured subsystem is not reachable"
+
+From 2.1.0 Hangar checks at startup that every subsystem the configuration
+*demands* is actually reachable on the path this process took, and refuses to
+boot when a security subsystem is missing:
+
+```
+Configured subsystem is not reachable on this server:
+approval_gate required by tools.approval_list on mcp_server:payments.
+The configuration asks for enforcement this process cannot perform.
+```
+
+It means a tool is on an `approval_list` but no approval gate service exists —
+usually because `approvals.enabled: false` is also set. Starting anyway would run
+those calls ungated, which is why it is a refusal rather than a warning. Fix it
+by removing the `approval_list` entry or re-enabling the gate. To downgrade every
+such refusal to an error log:
+
+```yaml
+startup_checks:
+  enforce: false
+```
+
+There is deliberately no setting that makes an unreachable subsystem silent. Any
+non-security subsystem in the same state already logs
+`subsystem_configured_but_unreachable` at `ERROR` without blocking the boot — grep
+your logs for it. See
+[Configuration → `startup_checks`](../reference/configuration.md#startup_checks).
+
 ### Permission denied
 
 Make sure you have write access to the config directories:

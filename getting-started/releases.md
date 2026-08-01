@@ -117,11 +117,32 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.0.1**, released 2026-07-31 — a plain `pip install
+The stable Python core is **2.1.0**, released 2026-08-01 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
 the MCP 2026-07-28 protocol generation.
 
-2.0.1 is a security patch on top of 2.0.0 and is drop-in: the approval gate now
+**2.1.0 makes the human-in-the-loop approval gate reachable — for the first
+time.** The control was documented, unit-tested and wired nowhere: no
+configuration key could put a tool behind it, the gate service was never
+constructed on a shipped path, and `GET /api/approvals` answered `500` while a
+call the policy said to hold executed immediately
+([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678)). A `tools:` block
+now accepts `approval_list`, `approval_timeout_seconds` and `approval_channel`
+everywhere it already accepted `allow_list`/`deny_list`, the gate service is
+built independently of auth, and the REST surface reads the same service the
+enforcement path does. Nothing that worked before behaves differently — hence a
+minor rather than a patch. See
+[Tool access control](../reference/configuration.md#tools-dual-format) for the
+keys and [Upgrade to 2.1.0](../upgrade.md#upgrade-to-210) for the one thing that
+can bite.
+
+It also adds a **startup reachability check**: if the configuration demands a
+subsystem this process cannot reach — a tool on `approval_list` with no gate
+service, say — the server refuses to boot instead of starting clean and doing
+less than its configuration said. `startup_checks: {enforce: false}` downgrades
+the refusals to error logs; there is deliberately no switch that silences them.
+
+2.0.1 was a security patch on top of 2.0.0 and is drop-in: the approval gate
 re-establishes an approval's validity at dispatch rather than only at decision,
 so a call whose world moved while its approval was held is refused where it
 previously executed ([#674](https://github.com/mcp-hangar/mcp-hangar/issues/674)).
@@ -167,10 +188,13 @@ in the SDK v2 line.
   its `inputRequests`; the client answers by driving `tasks/update`, and that
   update **is** the consent — gated before the answer reaches the upstream,
   consumed only on a confirmed relay, recorded as `TaskConsentDecided` (`#322`).
-  Neither gate prompts a human: the L7 `requireApproval` gate **fails closed**,
-  blocking a call pending an out-of-band decision, and this one fails closed on a
-  decision the client volunteers. Hangar used to elicit the client itself; that
-  belonged to the 2025-11-25 wire and is gone.
+  Neither of these gates prompts a human: the L7 `requireApproval` gate **fails
+  closed**, blocking a call pending an out-of-band decision, and this one fails
+  closed on a decision the client volunteers. Hangar used to elicit the client
+  itself; that belonged to the 2025-11-25 wire and is gone. The gate that *does*
+  hold a call for a human is the separate tool-access
+  [`approval_list`](../reference/configuration.md#holding-a-tool-for-a-human-approval_list),
+  reachable from 2.1.0.
 
 **Where the 2026-07-28 protocol stands on the rc.** All of it is served. The
 stateless surface — `server/discover` (SEP-2575) and the `Mcp-Method` /
@@ -189,8 +213,8 @@ reshaped Tasks calls now.
 Install it:
 
 ```bash
-pip install mcp-hangar                # 2.0.1, the current stable release
-pip install "mcp-hangar==2.0.1"       # pin it explicitly
+pip install mcp-hangar                # 2.1.0, the current stable release
+pip install "mcp-hangar==2.1.0"       # pin it explicitly
 ```
 
 Watch the [Releases page](https://github.com/mcp-hangar/mcp-hangar/releases) for

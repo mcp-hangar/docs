@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.8](https://github.com/mcp-hangar/docs/compare/v1.1.7...v1.1.8) (2026-08-01)
+
+
+### Changed
+
+* **guides:** state what argument secret-pattern scanning does not catch ([#126](https://github.com/mcp-hangar/docs/issues/126)) ([2e7e30e](https://github.com/mcp-hangar/docs/commit/2e7e30e812daeba55d6f5f0f43e7c46b1c648217))
+
 ## [1.1.7](https://github.com/mcp-hangar/docs/compare/v1.1.6...v1.1.7) (2026-08-01)
 
 

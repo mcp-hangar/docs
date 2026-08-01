@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.7](https://github.com/mcp-hangar/docs/compare/v1.1.6...v1.1.7) (2026-08-01)
+
+
+### Changed
+
+* **release:** bump current core to 2.1.1 ([#124](https://github.com/mcp-hangar/docs/issues/124)) ([56d4142](https://github.com/mcp-hangar/docs/commit/56d4142e17411e871fb0ca165a7b1bb398089aef))
+
 ## [1.1.6](https://github.com/mcp-hangar/docs/compare/v1.1.5...v1.1.6) (2026-08-01)
 
 

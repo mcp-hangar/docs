@@ -125,7 +125,7 @@ Tokens with a missing, empty, non-string, or untrusted `iss` claim fail closed.
 | Role | Description | Permissions |
 |------|-------------|-------------|
 | `admin` | Full access | Everything |
-| `provider-admin` | Manage MCP servers and invoke tools | `provider:*`, `group:*`, `discovery:read/trigger/approve`, `tool:invoke`, `tool:list`, `metrics:read`, **`approval:read`**, **`approval:resolve`** |
+| `provider-admin` | Manage servers, deliver egress policy, invoke tools | **`providers:read`**, **`policy:write`**, `provider:*`, `group:*`, `discovery:read/trigger/approve`, `tool:invoke`, `tool:list`, `metrics:read`, **`approval:read`**, **`approval:resolve`** |
 | `developer` | Use tools, start servers on demand | `provider:read/list/start/load/load_verified/unload`, `providers:read/write/lifecycle`, `tool:invoke/list`, `group:read/list`, `discovery:read` |
 | `viewer` | Read-only | `providers:read`, `provider:read/list`, `tool:list`, `metrics:read`, `group:read/list`, `discovery:read` |
 | `auditor` | Audit logs and read-only oversight | `audit:read`, `metrics:read`, `provider:list`, `group:list`, `discovery:read`, **`approval:read`** |
@@ -135,6 +135,15 @@ Role names are exactly as shown. The name `mcp_server_admin` appeared in an
 earlier revision of this table and does not exist — the role is
 `provider-admin`, which kept its original name through the provider→MCP-server
 rename.
+
+The `provider:*` family is the pre-rename vocabulary and the REST API authorizes
+against `mcp_servers:*` instead, so those entries currently grant nothing over
+the API. That is why `provider-admin` gained `providers:read` and `policy:write`
+in 2.1.2: without them it could not make a single call the Kubernetes operator
+makes, and an operator key had to be `developer` or `admin`. **`provider-admin`
+is now the least-privilege role for an operator API key** — it can read servers
+and deliver compiled egress policy, and cannot create, delete or restart a
+server through the API.
 
 `approval:resolve` is the permission that decides an approval. From 2.0.0 it is
 enforced, so a caller without it receives `403` where it previously received

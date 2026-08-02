@@ -4,6 +4,90 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.1.2
+
+**Read this one before upgrading.** Unlike 2.1.0 and 2.1.1, this is not a
+drop-in patch. It is a security release, and closing the holes changes behaviour
+that working deployments may be relying on. Three items need action before you
+roll it out.
+
+### Action required
+
+**1. Check the role on your operator's API key.**
+
+The compiled-egress-policy channel, `POST`/`DELETE
+/api/mcp_servers/{id}/l7_policy`, now requires `policy:write` instead of
+`mcp_servers:write`. `mcp_servers:write` is held by the `developer` role, so
+any developer token could clear a compiled `MCPEgressPolicy` — ADR-013 makes
+that channel privileged.
+
+`provider-admin` has been given `mcp_servers:read` and `policy:write` so it is
+the least-privilege home for an operator key. It previously held only the
+pre-rename `provider:*` permissions, which the REST API checks against nothing,
+so it could not make **any** of the operator's calls.
+
+| Operator key role | Before 2.1.2 | From 2.1.2 |
+|---|---|---|
+| `admin` | works | works |
+| `provider-admin` | broken (could not read servers) | **works** |
+| `developer` | works | **stops delivering policy** |
+
+If your operator key is a `developer` token, move it to `provider-admin` before
+upgrading. The failure is silent otherwise: the CRD still reconciles, the status
+still reports `Compiled`, and the policy never reaches the enforcement point.
+
+**2. Check that your OPA policy returns a boolean.**
+
+`OPAAuthorizer` compared the verdict for truthiness. A Rego rule returning an
+object (`{"result": {"allow": true, ...}}`), a string (`{"result": "deny"}`) or
+an array was therefore treated as **allow** — including the one that says deny.
+A non-boolean verdict is now a denial (`opa_error:non_boolean_result`), and a
+missing `result` key — what OPA returns for an undefined rule, e.g. a wrong
+`policy_path` — is reported separately as `opa_error:undefined_result`.
+
+If your policy returns anything other than a bare boolean, it flips from
+allowing everything to denying everything. Query the rule directly and confirm
+the response body is `{"result": true}` or `{"result": false}`.
+
+**3. Check `tool_access.mode` for typos.**
+
+An unrecognised value used to resolve to `egress` with a warning, which handed
+a deployment that had written `front_door` — but misspelled it — the permissive
+topology. The server now refuses to start on an invalid value. An **absent**
+key still means `egress`; only a present-but-invalid one is fatal.
+
+### Other behaviour changes
+
+- **REST authorization is enforced on every route.** `/config`, `/discovery`,
+  `/groups`, `/sessions`, `/tools`, the `/approvals` reads and the whole
+  `/auth` subtree previously authenticated callers but made no authorization
+  decision — any valid credential could `POST /api/auth/roles/assign` and grant
+  itself `admin`. Authorization is now resolved from the route, and a route not
+  in the permission table is denied. Clients that relied on the gap will start
+  receiving `403`.
+- **`POST /api/config/reload` no longer accepts `config_path`.** It reloads the
+  server's own configuration file. A request still sending the field gets `422`
+  rather than being silently ignored. Reload loads whatever path it is given and
+  an `mcp_servers` entry carries `command`/`args`, so the old behaviour was a
+  remote "load an arbitrary file and start what it describes" primitive.
+- **Approvals pending across the upgrade will be refused.** The
+  dispatch-time integrity hash moved from the redacted copy of the arguments to
+  the raw ones, so records written by the old version no longer revalidate.
+  Re-request them; this is the fail-closed direction.
+- **An unknown `secretPatterns` group is now rejected.** A misspelled group name
+  (`github-token` for `github-tokens`) used to be skipped silently, leaving the
+  policy reporting as enforcing with that detector off. The policy is now
+  refused at parse time, on both the operator and REST channels.
+- **Approval arguments are redacted by value, not only by key name.** A secret
+  under an innocuous key (`{"body": "Authorization: Bearer ..."}`) no longer
+  reaches the SQLite record or the REST DTO.
+
+### New audit events
+
+`EgressPolicySet` and `EgressPolicyCleared` are emitted when an L7 egress policy
+is attached, replaced or removed. Consumers of the event stream that enumerate
+event types exhaustively should add them.
+
 ## Upgrade to 2.1.1
 
 A drop-in security patch on 2.1.0 — no new configuration keys, no API changes.

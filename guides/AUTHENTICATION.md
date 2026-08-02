@@ -139,7 +139,7 @@ rename.
 The `provider:*` family is the pre-rename vocabulary and the REST API authorizes
 against `mcp_servers:*` instead, so those entries currently grant nothing over
 the API. That is why `provider-admin` gained `providers:read` and `policy:write`
-in 2.1.2: without them it could not make a single call the Kubernetes operator
+in 2.2.0: without them it could not make a single call the Kubernetes operator
 makes, and an operator key had to be `developer` or `admin`. **`provider-admin`
 is now the least-privilege role for an operator API key** — it can read servers
 and deliver compiled egress policy, and cannot create, delete or restart a

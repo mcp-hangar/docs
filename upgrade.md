@@ -4,12 +4,13 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
-## Upgrade to 2.1.2
+## Upgrade to 2.2.0
 
 **Read this one before upgrading.** Unlike 2.1.0 and 2.1.1, this is not a
-drop-in patch. It is a security release, and closing the holes changes behaviour
-that working deployments may be relying on. Three items need action before you
-roll it out.
+drop-in release. It is a security release cut as a **minor** rather than a
+patch, deliberately: three of the changes break a working deployment, two of
+them silently, and `~=2.1.1`-style constraints would have pulled a patch in
+unattended. Three items need action before you roll it out.
 
 ### Action required
 
@@ -26,7 +27,7 @@ the least-privilege home for an operator key. It previously held only the
 pre-rename `provider:*` permissions, which the REST API checks against nothing,
 so it could not make **any** of the operator's calls.
 
-| Operator key role | Before 2.1.2 | From 2.1.2 |
+| Operator key role | Before 2.2.0 | From 2.2.0 |
 |---|---|---|
 | `admin` | works | works |
 | `provider-admin` | broken (could not read servers) | **works** |

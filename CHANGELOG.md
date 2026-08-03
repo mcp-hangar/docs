@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.9](https://github.com/mcp-hangar/docs/compare/v1.1.8...v1.1.9) (2026-08-03)
+
+
+### Changed
+
+* **reference:** document the 2.2.0 upgrade and correct the role table ([#128](https://github.com/mcp-hangar/docs/issues/128)) ([dbe14b6](https://github.com/mcp-hangar/docs/commit/dbe14b6b5200a118edb3baf77dea921508eed579))
+
 ## [1.1.8](https://github.com/mcp-hangar/docs/compare/v1.1.7...v1.1.8) (2026-08-01)
 
 

@@ -4,6 +4,82 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.2.2
+
+A patch release, and drop-in for almost everyone. It needs planning in exactly
+one case: **you set `auth.storage.driver: event_sourcing`.**
+
+### If you run `auth.storage.driver: event_sourcing`, read this before you upgrade
+
+On that driver, API keys and role assignments were written to the event store
+correctly and could not be read back. The store's writer accepts any domain
+event -- it serialises whatever it is handed -- while the reader looked the
+class up in a table maintained by hand, which listed 30 of the 116 event types
+in the codebase. All five that the API-key and role aggregates emit were
+missing from it, so the first read after a restart raised
+`EventSerializationError`. In practice:
+
+- every API key stopped authenticating across a restart, and
+- role assignments were invisible after a restart.
+
+Affected from **1.2.2**, when the driver landed, through **2.2.1**. The default
+driver is `memory`, and the `sqlite` and `postgresql` drivers were never
+affected -- this only ever reached deployments that set `event_sourcing`
+explicitly.
+
+**No data was lost.** The events were written correctly the whole time; only the
+read path failed. That is good news with a consequence worth planning for:
+
+> Credentials and role assignments you believed were gone will start working
+> again the moment you upgrade.
+
+If you worked around the failure by re-issuing keys after each restart, the
+older keys are still live and will come back. So will every role assignment ever
+made on that store that was not explicitly revoked -- including `admin`.
+
+### Check what comes back, before you upgrade
+
+Run these against your configured `event_store.path` (default `data/events.db`):
+
+```bash
+# How much is dormant, by event type.
+sqlite3 data/events.db "
+  SELECT event_type, COUNT(*) FROM events
+  WHERE stream_id LIKE 'api_key:%' OR stream_id LIKE 'role_assignment:%'
+  GROUP BY event_type ORDER BY event_type;"
+
+# Exactly which principals get which roles back, oldest first.
+sqlite3 data/events.db "
+  SELECT json_extract(data, '\$.principal_id') AS principal,
+         json_extract(data, '\$.role_name')    AS role,
+         event_type, created_at
+  FROM events WHERE stream_id LIKE 'role_assignment:%'
+  ORDER BY created_at;"
+```
+
+Revocations are events too and they replay in order, so a key or role you
+revoked before the upgrade stays revoked. What returns is what was never
+revoked. Revoke anything you do not want live, then upgrade.
+
+If the counts are larger than you expect, that is the measure of how long the
+store had been unreadable -- every restart since 1.2.2 left its writes behind.
+
+### Also in this release
+
+**Events written before the `provider` -> `mcp_server` rename replay again.**
+The rename landed after 1.0.1, so an event store from 1.0.1 or earlier holds
+rows typed `ProviderStarted`, `ProviderDiscovered` and so on. Replaying one was
+a silent no-op: it reconstructed into the deprecated alias class, and handlers
+are registered against the modern class, so it reached nothing. No error, no
+warning. If you have carried an event store across that rename, expect replay to
+start producing events it previously swallowed.
+
+**A `datetime` field on a persisted event comes back as a `datetime`.** JSON has
+no datetime, so it was written as an ISO string and nothing parsed it back --
+consumers received a `str`. Only `PolicyPushRejected.timestamp` was affected.
+
+Neither of these needs any configuration change.
+
 ## Upgrade to 2.2.0
 
 **Read this one before upgrading.** Unlike 2.1.0 and 2.1.1, this is not a

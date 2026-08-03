@@ -152,6 +152,19 @@ what a policy refuses on the way in:
 | `bearer-tokens` | `Bearer …` credentials |
 | `npm-tokens`, `pypi-tokens` | npm / PyPI tokens |
 
+> **What argument scanning does and does not catch.** `secretPatterns` matches
+> the **literal** shape of a secret in the serialized arguments. It is a
+> deterministic tripwire against a secret being passed in the clear -- an agent
+> pasting an AWS key or a bearer token into a tool call -- not a defense against
+> a motivated exfiltrator. Any encoding defeats it: URL-encoding the separators,
+> base64-wrapping the value, or splitting a token across two arguments all pass
+> a value that no longer matches the pattern, and the receiving upstream decodes
+> it on the far side. Treat it as leak *detection* for well-formed secrets, and
+> put the real boundary on **which upstreams a tool may reach at all**
+> (`tools.allow`/`deny` and the L3/L4 backstop) -- an argument a policy cannot
+> inspect cannot be trusted, but an upstream a policy never allows cannot be
+> reached regardless of how the argument is dressed up.
+
 ## Try It
 
 1. Apply the policy to a governed namespace and confirm it compiled:

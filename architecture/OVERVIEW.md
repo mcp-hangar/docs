@@ -291,7 +291,7 @@ are persisted to the Event Store for auditing and can be replayed. See
 
 ### Lock Hierarchy
 
-Acquire in order to avoid deadlocks (see `infrastructure/lock_hierarchy.py`):
+Acquire in order to avoid deadlocks (see `lock_hierarchy.py`, in the shared kernel):
 
 ```
 PROVIDER(10) < PROVIDER_GROUP(11) < EVENT_BUS(20) < EVENT_STORE(30) < SAGA_MANAGER(40) < STDIO_CLIENT(50)

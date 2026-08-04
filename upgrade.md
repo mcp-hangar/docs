@@ -4,10 +4,49 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
-## Upgrade to 2.2.2
+## Upgrade to 2.3.0
 
-A patch release, and drop-in for almost everyone. It needs planning in exactly
-one case: **you set `auth.storage.driver: event_sourcing`.**
+Drop-in for a default deployment. Two things need checking, and each affects a
+narrow case: code that imports the concrete launchers from the domain layer,
+and deployments running `auth.storage.driver: event_sourcing`.
+
+> Written first against a planned 2.2.2. That release was never cut -- it became
+> 2.3.0 when the launcher removal landed, so everything below ships in 2.3.0.
+
+### The deprecated launcher import paths are gone
+
+Only affects code importing the concrete launcher classes from the domain
+layer. If you import them from `mcp_hangar.infrastructure.launchers`, which is
+where they live and what the deprecation warning has said since **v1.0.2**,
+nothing changes.
+
+```python
+# Both of these now raise.
+from mcp_hangar.domain.services.mcp_server_launcher import DockerLauncher
+from mcp_hangar.domain.services import DockerLauncher
+
+# This is the one to use, and always was:
+from mcp_hangar.infrastructure.launchers import DockerLauncher
+```
+
+The same applies to `SubprocessLauncher`, `ContainerLauncher`, `HttpLauncher`,
+`ContainerConfig`, `McpServerLauncher` and `get_launcher`.
+
+`mcp_hangar.domain.services` still exports the launcher **port**,
+`IMcpServerLauncher`, along with `LaunchResult` and `TransportClient`. It is the
+concrete implementations that moved out -- a domain package re-exporting
+infrastructure classes is what the deprecation was about.
+
+The shim emitted a `DeprecationWarning` on import from v1.0.2 onward, so one run
+of your test suite with warnings fatal lists every call site:
+
+```bash
+python -W error::DeprecationWarning -m pytest
+```
+
+Removing it also broke a real import cycle: the domain reaching for the concrete
+launchers is what forced two sagas to import their saga manager inside a
+function body rather than at module level.
 
 ### If you run `auth.storage.driver: event_sourcing`, read this before you upgrade
 

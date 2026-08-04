@@ -29,8 +29,23 @@ Full suite is optional locally; CI runs it on the PR.
 
 ## 5. Update CHANGELOG
 
-Add a new section `## [vX.Y.Z] - YYYY-MM-DD` above the existing `[Unreleased]` entry.
-Use `### Security` for CVEs and security fixes. Use `### Fixed` for regressions.
+A hotfix is cut by hand from a tag, so it does not go through the release PR
+that normally assembles the changelog. Write the fragment and assemble it in the
+same branch:
+
+```bash
+printf '**core:** <entry text>\n' > changelog.d/<id>-<slug>.security.md
+python scripts/build_changelog.py assemble --version X.Y.Z
+```
+
+Use `.security.md` for CVEs and security fixes, `.fixed.md` for regressions.
+Assembly consumes the fragment, so the commit shows only the `CHANGELOG.md`
+section -- that is expected. Never write that section by hand; see the
+changelog-fragments section of [GIT_FLOW.md](GIT_FLOW.md).
+
+The cherry-pick back to `main` carries the section with it. If `main` has
+released a higher version in the meantime, move the hotfix section below it so
+the headings stay in descending order.
 
 ## 6. Bump pyproject.toml
 

@@ -220,6 +220,40 @@ This triggers the same workflow to publish the final artifact to PyPI.
 
 Reference .github/workflows/release.yml for the specific logic of tag-driven publishing.
 
+## Changelog fragments
+
+Changelog entries are written **one file per PR**, not as a line in a shared
+block. Every non-trivial PR in the core repo adds exactly one file:
+
+```text
+changelog.d/<id>-<slug>.<kind>.md
+```
+
+`<kind>` is one of the six Keep a Changelog sections: `added`, `changed`,
+`deprecated`, `removed`, `fixed`, `security`. The file holds the entry text
+only -- no bullet, no heading, no PR link; `scripts/build_changelog.py` adds
+all three at release time and deletes the fragment. `<id>` is a sort key and a
+fallback: the PR link is normally read from the squash commit that added the
+file, so a fragment written before the PR number exists still links correctly.
+
+**Nobody edits `CHANGELOG.md` directly.** An entry written there is overwritten
+by the next assembly.
+
+This replaced a shared `## [Unreleased]` block, for two reasons that were both
+mechanical rather than editorial. Every open PR wrote to the same anchor in the
+same file, so two PRs open at once conflicted by construction and the second to
+merge got a hand-resolve. And release-please generated its own section from the
+commit subjects and inserted it *above* that block, so the hand-written prose
+was orphaned under the wrong heading -- v2.3.0 shipped after consolidating three
+separate `## [Unreleased]` blocks by hand. release-please now runs with
+`skip-changelog: true` and owns the version, the tag and the release PR; the
+fragments own the prose.
+
+Enforced by `changelog-check.yml`, which requires an added fragment on any PR
+touching `src/`, `pyproject.toml` or `packages/`, renders it to catch a
+malformed one at PR time, and is bypassed by the `skip-changelog` label.
+See `changelog.d/README.md` in the core repo.
+
 ## Release cadence and process
 
 Releases are currently ad-hoc based on feature readiness and security needs.
@@ -230,6 +264,14 @@ Release PR (`release-please--branches--main`) summarizing the next release.
 Merging that PR creates the version tag, which `release.yml` consumes to
 publish to PyPI and GHCR. There is no scheduled release cron -- the Release PR
 sits open until a maintainer decides "enough has accumulated."
+
+The changelog is assembled onto that Release PR, not on `main`: the last step of
+`release-please.yml` checks out the release branch, folds `changelog.d/` into a
+`## [X.Y.Z]` section and commits it there. Merging the Release PR therefore
+lands the version bump and the notes in one squash commit, as it always did.
+The step is idempotent -- release-please force-pushes its branch whenever a new
+commit reaches `main`, which drops that commit and restores the fragments, and
+the next run redoes the assembly.
 
 ### Release topology (ADR-009)
 
@@ -268,7 +310,7 @@ PR gates:
 - pr-title.yml (Conventional Commits title, scope required)
 - pr-body.yml (required PR template sections)
 - branch-name.yml (branch prefix validation)
-- changelog-check.yml (changelog entry present)
+- changelog-check.yml (changelog fragment present in changelog.d/)
 - pr-validation.yml (change detection and the required-check aggregate)
 - ci-core.yml (lint, domain and application tests, integration, build)
 - ci-docs.yml (markdown linting via markdownlint-cli2)

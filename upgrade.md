@@ -4,6 +4,64 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.4.0
+
+Drop-in for a default deployment. Everything below affects deployments that run
+**discovery**, which is off unless you enabled it.
+
+### A third-party discovery source must report the addresses it found
+
+Discovery now registers through the same command a REST caller uses, so a
+discovered endpoint goes through the SSRF check. A container or pod address is
+private by definition, so that check is scoped by provenance: a discovered
+endpoint may resolve to a private address **only** where the container runtime
+reported it for that container or pod.
+
+The built-in sources report those addresses. A third-party source written
+against the entry-point group must put them in the discovered server's metadata:
+
+```python
+metadata = {
+    # ... your own metadata ...
+    "runtime_addresses": ["10.88.0.7"],   # what the runtime says, never a label
+}
+```
+
+Without them the source is treated as untrusted input and its servers stop
+registering, with `SSRF blocked: endpoint resolves to private address` in the
+log. That is the safe direction to fail, and it is a change in behaviour for a
+source that used to bypass the check entirely.
+
+Link-local, loopback and cloud metadata hostnames stay refused whatever the
+runtime claims.
+
+### Kubernetes discovery needs its client installed
+
+```bash
+pip install mcp-hangar[kubernetes]
+```
+
+The published image ships it. Before 2.4.0 the extra did not exist and the
+source could not be constructed at all, so this enables a feature rather than
+breaking one -- but a deployment that expected it to work silently was getting
+`discovery_source_unavailable` and no servers.
+
+### The event store now records more, and starts earlier
+
+`EventBus.publish` persists an event that names an aggregate, where it
+previously delivered without storing. Two consequences worth knowing before
+you upgrade a long-running gateway:
+
+- `data/events.db` grows where it did not before -- registrations, discoveries,
+  quarantines and lifecycle transitions all land in it now.
+- A server's stream begins with `McpServerRegistered` rather than with its first
+  edit. Streams written before 2.4.0 keep the shape they had; nothing is
+  backfilled, and replay before a stream's first row is not claimed.
+
+Handlers must be idempotent on `event_id`. They always should have been -- the
+startup sweep re-delivers anything the previous process did not finish -- but
+until 2.4.0 far fewer events reached that path.
+
 ## Upgrade to 2.3.0
 
 Drop-in for a default deployment. Two things need checking, and each affects a

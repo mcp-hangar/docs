@@ -119,10 +119,10 @@ Every control is classified by **who is responsible** for it:
 | OIDC signing-key rotation | provider + application | IdP rotates its JWKS; Hangar's JWKS client re-fetches signing keys on an unknown `kid`, so rotation needs no Hangar restart. Hangar warns (`jwks_uri_not_https`) if the JWKS URI is not HTTPS |
 | Token lifetime ceiling | application | `MCP_JWT_MAX_TOKEN_LIFETIME` caps accepted `exp - iat` (default 3600s) independent of what the IdP mints |
 | Rate-limiting scope | application + external-infrastructure | `rate_limit.rps` / `rate_limit.burst` (or `MCP_RATE_LIMIT_RPS` / `MCP_RATE_LIMIT_BURST`) inside Hangar, *plus* an edge/WAF rate cap and DDoS protection you own |
-| Durable auth storage | application + external-infrastructure | `auth.storage.driver: postgresql` (or `sqlite` on a durable volume) on a managed, backed-up database |
+| Durable auth storage | application + external-infrastructure | `auth.storage.driver: sqlite` on a durable, backed-up volume. `postgresql` exists and stores API keys and roles, but does **not** yet carry tool-access policies -- selecting it silently disables their runtime management and their replay at startup ([#779](https://github.com/mcp-hangar/mcp-hangar/issues/779)). It also needs `psycopg2-binary` installed explicitly on 2.4.0 and earlier |
 | Durable audit / event storage | application + external-infrastructure | `event_store.driver: sqlite` with `allow_memory_fallback: false` on a writable, backed-up volume; readiness turns `503` if durability is lost |
 | Central immutable log / SIEM ingest | application + external-infrastructure | Structured JSON logs (`MCP_JSON_LOGS=true`, `MCP_LOG_LEVEL=INFO`) shipped to an append-only, access-controlled SIEM your platform owns |
-| High availability | external-infrastructure + application | Multiple Hangar replicas behind the LB, all pointing at the *same* durable auth/event stores; orchestrator gates on `/health/ready` |
+| High availability | **not supported yet** | Run a **single** Hangar instance and make its restart fast and its storage durable. Multiple replicas are not safe today: an approval held on one instance is not released by a decision that lands on another (it times out and fails closed, while the record says approved), rate limits are per process so N replicas serve N× the configured rate, and each replica runs its own discovery and health loops. Tracked in [#778](https://github.com/mcp-hangar/mcp-hangar/issues/778) / [#779](https://github.com/mcp-hangar/mcp-hangar/issues/779) |
 | Per-provider service accounts | application + provider | Each `remote` provider carries its own least-privilege credential (`mcp_servers.<id>.auth`), scoped at the backend; no shared super-credential |
 
 ## Illustrative Config (placeholders -- review before use)
@@ -146,13 +146,14 @@ auth:
     resource_uri: https://gateway.example            # advertised AND enforced as aud
     tenant_claim: tenant_id
 
-  # Durable, backed-up auth storage. `postgresql` for HA (all replicas share it);
-  # `sqlite` on a durable volume is acceptable for a single node.
+  # Durable, backed-up auth storage on a single node. `postgresql` is not the
+  # HA answer yet -- see the High availability row above and #779; it also does
+  # not carry tool-access policies, so selecting it turns those off silently.
   storage:
-    driver: postgresql             # memory | sqlite | postgresql
-    host: db.internal.example      # managed, private, backed up
-    port: 5432
-    database: mcp_hangar
+    driver: sqlite                 # memory | sqlite | postgresql
+    path: /app/data/auth.db        # writable, backed-up volume
+    # postgresql takes host/port/database/user/password instead of `path`.
+    # Not recommended yet -- see the note above.
 
 # Durable audit trail -- fail fast rather than silently lose history.
 event_store:

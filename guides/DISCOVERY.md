@@ -50,6 +50,10 @@ services:
 
 ### Kubernetes
 
+Needs the Kubernetes Python client, which is an extra — `pip install
+mcp-hangar[kubernetes]`. The published image ships it. Without it Hangar starts
+and logs `discovery_source_unavailable`, and this source discovers nothing.
+
 ```yaml
 sources:
   - type: kubernetes
@@ -241,8 +245,19 @@ about — belong to that source; see
 [Kubernetes](#kubernetes) and [Refusing what it discovers](#refusing-what-it-discovers).
 
 A discovered server is registered through the same command as one created over
-the REST API, so it passes the same duplicate and SSRF checks and appears in the
-event history with `source: discovery:<type>`.
+the REST API, so it passes the same duplicate and SSRF checks, and the
+`McpServerRegistered` event carries `source: discovery:<type>`.
+
+> **The SSRF check applies to discovered endpoints too**, and a container or pod
+> address is private by definition. A source that reports an HTTP endpoint on a
+> private address is refused registration — see
+> [#771](https://github.com/mcp-hangar/mcp-hangar/issues/771).
+>
+> **`McpServerRegistered` is not written to the event store.** It is published to
+> in-process subscribers only, so a server's registration does not appear in its
+> stream — updates, lifecycle transitions and tool invocations do. Do not rely on
+> the event history to answer "when was this server added, and by which source"
+> — see [#772](https://github.com/mcp-hangar/mcp-hangar/issues/772).
 
 ## Tools
 

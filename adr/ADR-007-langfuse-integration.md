@@ -52,7 +52,7 @@ We will integrate MCP Hangar with [Langfuse](https://langfuse.com), an open-sour
 
 2. **Decorator Pattern**: `TracedMcpServerService` wraps `McpServerService` rather than modifying it, preserving the original service and allowing optional tracing.
 
-3. **Optional Dependency**: Langfuse SDK is an optional dependency (`pip install mcp-hangar[observability]`). When not installed, the system gracefully falls back to `NullObservabilityAdapter`.
+3. **Optional Dependency**: Langfuse SDK is an optional dependency (`pip install mcp-hangar[langfuse]` — this ADR proposed the name `observability`, and the extra shipped as `langfuse`). When not installed, the system gracefully falls back to `NullObservabilityAdapter`.
 
 4. **Thread-Safe Design**: All Langfuse operations are protected with `threading.Lock` to match MCP Hangar's thread-based (not async) architecture.
 

@@ -57,6 +57,12 @@ ENV_RE = re.compile(r"\b(?:MCP|HANGAR)_[A-Z][A-Z0-9_]+")
 # `${VAR}` in a config example is a user-chosen interpolation placeholder, not
 # one of Hangar's own env vars -- strip those spans before extracting env vars.
 INTERP_RE = re.compile(r"\$\{[^}]*\}")
+# A doc filename is SCREAMING_SNAKE too, so a plain link to `MCP_SERVER_GROUPS.md`
+# reads as an env var that does not exist and fails the build. Strip link
+# destinations and `*.md` references before extracting env vars. A trailing
+# negative lookahead on the pattern cannot do this: the match backtracks a
+# character and reports `MCP_SERVER_GROUP` instead, which is a phantom too.
+DOC_REF_RE = re.compile(r"\]\([^)]*\)|[\w./-]+\.md(?:#[\w.-]*)?")
 
 # Metric suffixes that Prometheus client libs append at exposition time, so the
 # base name (without the suffix) is what appears in the source definition.
@@ -132,7 +138,7 @@ def main() -> int:
         scanned += 1
         rel = doc.relative_to(docs)
         for lineno, line in enumerate(doc.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
-            env_line = INTERP_RE.sub("", line)
+            env_line = DOC_REF_RE.sub("", INTERP_RE.sub("", line))
             for category, regex, exists in checks:
                 target = env_line if category == "env" else line
                 for match in regex.findall(target):

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.12](https://github.com/mcp-hangar/docs/compare/v1.1.11...v1.1.12) (2026-08-05)
+
+
+### Changed
+
+* **guides:** document the changelog-fragment convention ([#138](https://github.com/mcp-hangar/docs/issues/138)) ([80e8be4](https://github.com/mcp-hangar/docs/commit/80e8be488ceed7008bb4701b892745c4ecd25c64))
+
 ## [1.1.11](https://github.com/mcp-hangar/docs/compare/v1.1.10...v1.1.11) (2026-08-04)
 
 

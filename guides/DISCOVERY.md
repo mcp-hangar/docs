@@ -57,7 +57,18 @@ sources:
     namespaces: [mcp-servers]
     label_selector: "app.kubernetes.io/component=mcp-server"
     in_cluster: true
+    allowed_namespaces: [mcp-servers]          # optional allowlist
+    denied_namespaces: [kube-system, default]  # default
 ```
+
+A pod in a denied namespace is refused registration even when it carries the
+annotations. `denied_namespaces` wins over `allowed_namespaces`; with no
+allowlist, everything not denied is accepted.
+
+> **These two keys moved.** They used to live under `discovery.security`, where
+> the core applied them behind a check on the source's name. The old location
+> still works and logs `discovery_namespace_policy_deprecated_location` on every
+> startup that uses it; the new one wins when both are set.
 
 Pod annotations:
 
@@ -119,6 +130,93 @@ def create_server():
     }
 ```
 
+## Adding a source of your own
+
+Consul, Nomad, an internal registry — a source Hangar does not ship is a package
+of yours. Core is not modified and never learns your option names.
+
+Implement the port — three members:
+
+```python
+# my_package/consul_source.py
+from mcp_hangar.domain.discovery.discovered_mcp_server import DiscoveredMcpServer
+from mcp_hangar.domain.discovery.discovery_source import DiscoveryMode, DiscoverySource
+
+
+class ConsulSource(DiscoverySource):
+    def __init__(self, mode: DiscoveryMode, *, datacenter: str, token: str | None = None) -> None:
+        super().__init__(mode=mode)
+        self._datacenter = datacenter
+        self._token = token
+
+    @property
+    def source_type(self) -> str:
+        return "consul"
+
+    async def discover(self) -> list[DiscoveredMcpServer]:
+        ...  # return what is there now; the orchestrator diffs it for you
+
+    async def health_check(self) -> bool:
+        ...  # can this source be reached at all
+```
+
+Advertise a factory under the `mcp_hangar.discovery_sources` entry point group:
+
+```python
+def create_source(mode: DiscoveryMode, config: dict) -> ConsulSource:
+    return ConsulSource(mode, datacenter=config["datacenter"], token=config.get("token"))
+```
+
+```toml
+# pyproject.toml
+[project.entry-points."mcp_hangar.discovery_sources"]
+consul = "my_package.consul_source:create_source"
+```
+
+Install the package next to Hangar and configure it like any built-in:
+
+```yaml
+sources:
+  - type: consul
+    mode: additive
+    datacenter: dc1
+    token: ${CONSUL_TOKEN}
+```
+
+Hangar reads `type` and `mode`. Everything else in that entry is handed to your
+factory untouched, so `datacenter` and `token` are yours to name and yours to
+validate.
+
+| Situation | What happens |
+|-----------|--------------|
+| `type` has no factory | Startup **fails** — a configured source that silently watches nothing is worse than a crash |
+| Your package fails to import | Logged as `discovery_source_plugin_failed` and skipped; the gateway still starts |
+| Your entry point names a built-in | Logged as `discovery_source_plugin_ignored`; a plugin cannot quietly shadow `kubernetes` |
+
+### Refusing what it discovers
+
+A source can veto its own findings in its own vocabulary. This runs before
+Hangar's checks (rate, count, health, schema), and Hangar never interprets it —
+the reason and details reach the operator and the quarantine report as written:
+
+```python
+from mcp_hangar.domain.discovery.discovery_source import SourcePolicyViolation
+
+
+def policy_violation(self, mcp_server: DiscoveredMcpServer) -> SourcePolicyViolation | None:
+    datacenter = mcp_server.metadata.get("datacenter", "")
+    if datacenter not in self._allowed:
+        return SourcePolicyViolation(
+            reason=f"Datacenter {datacenter!r} is not allowed",
+            details={"datacenter": datacenter, "allowed": sorted(self._allowed)},
+        )
+    return None
+```
+
+The hook is optional. A source with no rules of its own overrides nothing —
+which is also why the Kubernetes namespace policy is the same mechanism rather
+than a special case in core.
+
 ## Discovery Modes
 
 | Mode | Behavior |
@@ -135,9 +233,16 @@ discovery:
     max_registration_rate: 10  # per minute
     require_health_check: true
     quarantine_on_failure: true
-    allowed_namespaces: [mcp-servers]
-    denied_namespaces: [kube-system, default]
 ```
+
+These apply to every source. Rules that only one kind of infrastructure
+understands — Kubernetes namespaces, and whatever a third-party source cares
+about — belong to that source; see
+[Kubernetes](#kubernetes) and [Refusing what it discovers](#refusing-what-it-discovers).
+
+A discovered server is registered through the same command as one created over
+the REST API, so it passes the same duplicate and SSRF checks and appears in the
+event history with `source: discovery:<type>`.
 
 ## Tools
 
@@ -151,7 +256,7 @@ discovery:
 ## Conflict Resolution
 
 1. **Static config wins** — Manual config always takes precedence
-2. **Higher priority source wins** — K8s (1) > Docker (2) > Filesystem (3) > Entrypoints (4)
+2. **Higher priority source wins** — K8s (1) > Docker (2) > Filesystem (3) > Entrypoints (4) > any other source (99)
 3. **TTL expiration** — Authoritative sources deregister after TTL
 
 ## Prometheus Metrics

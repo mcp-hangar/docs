@@ -293,23 +293,32 @@ discovery:
 
 ### `sources[]` entry
 
+Only `type` and `mode` are read by Hangar itself. Every other key is passed to
+that source's factory untouched — which is what lets a third-party source be
+configured here without core knowing its option names.
+
 | Key | Type | Description |
 |-----|------|-------------|
-| `type` | `str` | Source type: `kubernetes`, `docker`, `filesystem`, `entrypoint` |
+| `type` | `str` | Source type: `kubernetes`, `docker`, `filesystem`, `entrypoint`, or any type registered under the `mcp_hangar.discovery_sources` entry point group. An unregistered type **fails startup** |
 | `mode` | `str` | `additive` (only adds) or `authoritative` (adds and removes) |
 | `path` / `pattern` | `str` | File path or glob pattern (filesystem source) |
 | `watch` | `bool` | Enable file watching (filesystem source) |
+| `socket_path` | `str` | Docker/Podman socket (docker source) |
 | `namespaces` | `list[str]` | Kubernetes namespaces to scan |
 | `label_selector` | `str` | Kubernetes label selector |
 | `in_cluster` | `bool` | Use in-cluster Kubernetes config |
+| `allowed_namespaces` | `list[str]` | Kubernetes namespace allowlist; empty means "everything not denied" |
+| `denied_namespaces` | `list[str]` | Kubernetes namespace denylist, default `[kube-system, default]`. Wins over the allowlist |
 | `group` | `str` | Target group for discovered MCP servers |
 
 ### `security` sub-section
 
+Constraints applied to every source, whatever it discovers.
+
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `allowed_namespaces` | `list[str]` | -- | Kubernetes namespace allowlist |
-| `denied_namespaces` | `list[str]` | -- | Kubernetes namespace denylist |
+| `allowed_namespaces` | `list[str]` | -- | **Deprecated** — moved to the kubernetes source entry above. Still honoured, and logs `discovery_namespace_policy_deprecated_location`; the source's own setting wins when both are present |
+| `denied_namespaces` | `list[str]` | -- | **Deprecated** — see `allowed_namespaces` |
 | `require_health_check` | `bool` | -- | Require health check before registration |
 | `require_mcp_schema` | `bool` | -- | Require valid MCP schema |
 | `max_mcp_servers_per_source` | `int` | -- | Maximum MCP servers per source |

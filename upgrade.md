@@ -4,6 +4,206 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.3.0
+
+Drop-in for a default deployment. Two things need checking, and each affects a
+narrow case: code that imports the concrete launchers from the domain layer,
+and deployments running `auth.storage.driver: event_sourcing`.
+
+> Written first against a planned 2.2.2. That release was never cut -- it became
+> 2.3.0 when the launcher removal landed, so everything below ships in 2.3.0.
+
+### The deprecated launcher import paths are gone
+
+Only affects code importing the concrete launcher classes from the domain
+layer. If you import them from `mcp_hangar.infrastructure.launchers`, which is
+where they live and what the deprecation warning has said since **v1.0.2**,
+nothing changes.
+
+```python
+# Both of these now raise.
+from mcp_hangar.domain.services.mcp_server_launcher import DockerLauncher
+from mcp_hangar.domain.services import DockerLauncher
+
+# This is the one to use, and always was:
+from mcp_hangar.infrastructure.launchers import DockerLauncher
+```
+
+The same applies to `SubprocessLauncher`, `ContainerLauncher`, `HttpLauncher`,
+`ContainerConfig`, `McpServerLauncher` and `get_launcher`.
+
+`mcp_hangar.domain.services` still exports the launcher **port**,
+`IMcpServerLauncher`, along with `LaunchResult` and `TransportClient`. It is the
+concrete implementations that moved out -- a domain package re-exporting
+infrastructure classes is what the deprecation was about.
+
+The shim emitted a `DeprecationWarning` on import from v1.0.2 onward, so one run
+of your test suite with warnings fatal lists every call site:
+
+```bash
+python -W error::DeprecationWarning -m pytest
+```
+
+Removing it also broke a real import cycle: the domain reaching for the concrete
+launchers is what forced two sagas to import their saga manager inside a
+function body rather than at module level.
+
+### If you run `auth.storage.driver: event_sourcing`, read this before you upgrade
+
+On that driver, API keys and role assignments were written to the event store
+correctly and could not be read back. The store's writer accepts any domain
+event -- it serialises whatever it is handed -- while the reader looked the
+class up in a table maintained by hand, which listed 30 of the 116 event types
+in the codebase. All five that the API-key and role aggregates emit were
+missing from it, so the first read after a restart raised
+`EventSerializationError`. In practice:
+
+- every API key stopped authenticating across a restart, and
+- role assignments were invisible after a restart.
+
+Affected from **1.2.2**, when the driver landed, through **2.2.1**. The default
+driver is `memory`, and the `sqlite` and `postgresql` drivers were never
+affected -- this only ever reached deployments that set `event_sourcing`
+explicitly.
+
+**No data was lost.** The events were written correctly the whole time; only the
+read path failed. That is good news with a consequence worth planning for:
+
+> Credentials and role assignments you believed were gone will start working
+> again the moment you upgrade.
+
+If you worked around the failure by re-issuing keys after each restart, the
+older keys are still live and will come back. So will every role assignment ever
+made on that store that was not explicitly revoked -- including `admin`.
+
+### Check what comes back, before you upgrade
+
+Run these against your configured `event_store.path` (default `data/events.db`):
+
+```bash
+# How much is dormant, by event type.
+sqlite3 data/events.db "
+  SELECT event_type, COUNT(*) FROM events
+  WHERE stream_id LIKE 'api_key:%' OR stream_id LIKE 'role_assignment:%'
+  GROUP BY event_type ORDER BY event_type;"
+
+# Exactly which principals get which roles back, oldest first.
+sqlite3 data/events.db "
+  SELECT json_extract(data, '\$.principal_id') AS principal,
+         json_extract(data, '\$.role_name')    AS role,
+         event_type, created_at
+  FROM events WHERE stream_id LIKE 'role_assignment:%'
+  ORDER BY created_at;"
+```
+
+Revocations are events too and they replay in order, so a key or role you
+revoked before the upgrade stays revoked. What returns is what was never
+revoked. Revoke anything you do not want live, then upgrade.
+
+If the counts are larger than you expect, that is the measure of how long the
+store had been unreadable -- every restart since 1.2.2 left its writes behind.
+
+### Also in this release
+
+**Events written before the `provider` -> `mcp_server` rename replay again.**
+The rename landed after 1.0.1, so an event store from 1.0.1 or earlier holds
+rows typed `ProviderStarted`, `ProviderDiscovered` and so on. Replaying one was
+a silent no-op: it reconstructed into the deprecated alias class, and handlers
+are registered against the modern class, so it reached nothing. No error, no
+warning. If you have carried an event store across that rename, expect replay to
+start producing events it previously swallowed.
+
+**A `datetime` field on a persisted event comes back as a `datetime`.** JSON has
+no datetime, so it was written as an ISO string and nothing parsed it back --
+consumers received a `str`. Only `PolicyPushRejected.timestamp` was affected.
+
+Neither of these needs any configuration change.
+
+## Upgrade to 2.2.0
+
+**Read this one before upgrading.** Unlike 2.1.0 and 2.1.1, this is not a
+drop-in release. It is a security release cut as a **minor** rather than a
+patch, deliberately: three of the changes break a working deployment, two of
+them silently, and `~=2.1.1`-style constraints would have pulled a patch in
+unattended. Three items need action before you roll it out.
+
+### Action required
+
+**1. Check the role on your operator's API key.**
+
+The compiled-egress-policy channel, `POST`/`DELETE
+/api/mcp_servers/{id}/l7_policy`, now requires `policy:write` instead of
+`mcp_servers:write`. `mcp_servers:write` is held by the `developer` role, so
+any developer token could clear a compiled `MCPEgressPolicy` — ADR-013 makes
+that channel privileged.
+
+`provider-admin` has been given `mcp_servers:read` and `policy:write` so it is
+the least-privilege home for an operator key. It previously held only the
+pre-rename `provider:*` permissions, which the REST API checks against nothing,
+so it could not make **any** of the operator's calls.
+
+| Operator key role | Before 2.2.0 | From 2.2.0 |
+|---|---|---|
+| `admin` | works | works |
+| `provider-admin` | broken (could not read servers) | **works** |
+| `developer` | works | **stops delivering policy** |
+
+If your operator key is a `developer` token, move it to `provider-admin` before
+upgrading. The failure is silent otherwise: the CRD still reconciles, the status
+still reports `Compiled`, and the policy never reaches the enforcement point.
+
+**2. Check that your OPA policy returns a boolean.**
+
+`OPAAuthorizer` compared the verdict for truthiness. A Rego rule returning an
+object (`{"result": {"allow": true, ...}}`), a string (`{"result": "deny"}`) or
+an array was therefore treated as **allow** — including the one that says deny.
+A non-boolean verdict is now a denial (`opa_error:non_boolean_result`), and a
+missing `result` key — what OPA returns for an undefined rule, e.g. a wrong
+`policy_path` — is reported separately as `opa_error:undefined_result`.
+
+If your policy returns anything other than a bare boolean, it flips from
+allowing everything to denying everything. Query the rule directly and confirm
+the response body is `{"result": true}` or `{"result": false}`.
+
+**3. Check `tool_access.mode` for typos.**
+
+An unrecognised value used to resolve to `egress` with a warning, which handed
+a deployment that had written `front_door` — but misspelled it — the permissive
+topology. The server now refuses to start on an invalid value. An **absent**
+key still means `egress`; only a present-but-invalid one is fatal.
+
+### Other behaviour changes
+
+- **REST authorization is enforced on every route.** `/config`, `/discovery`,
+  `/groups`, `/sessions`, `/tools`, the `/approvals` reads and the whole
+  `/auth` subtree previously authenticated callers but made no authorization
+  decision — any valid credential could `POST /api/auth/roles/assign` and grant
+  itself `admin`. Authorization is now resolved from the route, and a route not
+  in the permission table is denied. Clients that relied on the gap will start
+  receiving `403`.
+- **`POST /api/config/reload` no longer accepts `config_path`.** It reloads the
+  server's own configuration file. A request still sending the field gets `422`
+  rather than being silently ignored. Reload loads whatever path it is given and
+  an `mcp_servers` entry carries `command`/`args`, so the old behaviour was a
+  remote "load an arbitrary file and start what it describes" primitive.
+- **Approvals pending across the upgrade will be refused.** The
+  dispatch-time integrity hash moved from the redacted copy of the arguments to
+  the raw ones, so records written by the old version no longer revalidate.
+  Re-request them; this is the fail-closed direction.
+- **An unknown `secretPatterns` group is now rejected.** A misspelled group name
+  (`github-token` for `github-tokens`) used to be skipped silently, leaving the
+  policy reporting as enforcing with that detector off. The policy is now
+  refused at parse time, on both the operator and REST channels.
+- **Approval arguments are redacted by value, not only by key name.** A secret
+  under an innocuous key (`{"body": "Authorization: Bearer ..."}`) no longer
+  reaches the SQLite record or the REST DTO.
+
+### New audit events
+
+`EgressPolicySet` and `EgressPolicyCleared` are emitted when an L7 egress policy
+is attached, replaced or removed. Consumers of the event stream that enumerate
+event types exhaustively should add them.
+
 ## Upgrade to 2.1.1
 
 A drop-in security patch on 2.1.0 — no new configuration keys, no API changes.

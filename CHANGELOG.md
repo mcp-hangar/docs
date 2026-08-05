@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.1.11](https://github.com/mcp-hangar/docs/compare/v1.1.10...v1.1.11) (2026-08-04)
+
+
+### Changed
+
+* **guides:** renumber the upgrade note to 2.3.0 and add the launcher removal ([#136](https://github.com/mcp-hangar/docs/issues/136)) ([922687a](https://github.com/mcp-hangar/docs/commit/922687a90078514453b70753d07cc9a827083586))
+
+## [1.1.10](https://github.com/mcp-hangar/docs/compare/v1.1.9...v1.1.10) (2026-08-04)
+
+
+### Changed
+
+* **architecture:** lock_hierarchy moved to the shared kernel ([#135](https://github.com/mcp-hangar/docs/issues/135)) ([004a48a](https://github.com/mcp-hangar/docs/commit/004a48a63e0e7e531fb2e61f9f1910edefcfa829))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#130](https://github.com/mcp-hangar/docs/issues/130)) ([63f4b60](https://github.com/mcp-hangar/docs/commit/63f4b60c8af9115514c7de4fce491bb6f064a837))
+* **release:** move the version surfaces to core 2.2.1 ([#131](https://github.com/mcp-hangar/docs/issues/131)) ([53fbbaa](https://github.com/mcp-hangar/docs/commit/53fbbaac6dfe5bcffd35f52582250310b5a7ba2c))
+* **upgrade:** add the 2.2.2 note for the event-sourcing auth store ([#134](https://github.com/mcp-hangar/docs/issues/134)) ([faeae19](https://github.com/mcp-hangar/docs/commit/faeae19b9838a9ffa4fd5e51bf35407cf7fb7095))
+
+## [1.1.9](https://github.com/mcp-hangar/docs/compare/v1.1.8...v1.1.9) (2026-08-03)
+
+
+### Changed
+
+* **reference:** document the 2.2.0 upgrade and correct the role table ([#128](https://github.com/mcp-hangar/docs/issues/128)) ([dbe14b6](https://github.com/mcp-hangar/docs/commit/dbe14b6b5200a118edb3baf77dea921508eed579))
+
+## [1.1.8](https://github.com/mcp-hangar/docs/compare/v1.1.7...v1.1.8) (2026-08-01)
+
+
+### Changed
+
+* **guides:** state what argument secret-pattern scanning does not catch ([#126](https://github.com/mcp-hangar/docs/issues/126)) ([2e7e30e](https://github.com/mcp-hangar/docs/commit/2e7e30e812daeba55d6f5f0f43e7c46b1c648217))
+
 ## [1.1.7](https://github.com/mcp-hangar/docs/compare/v1.1.6...v1.1.7) (2026-08-01)
 
 

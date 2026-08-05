@@ -97,8 +97,8 @@ Built-in roles:
 | Role | Can do |
 |------|--------|
 | `admin` | Everything |
-| `provider-admin` | Manage MCP servers and providers (start, stop, reload, manage groups) |
-| `developer` | Invoke tools, read status |
+| `provider-admin` | Manage servers and groups, deliver compiled egress policy (`policy:write`). The least-privilege role for a Kubernetes operator API key. |
+| `developer` | Invoke tools, read and manage server state. Cannot touch egress policy. |
 | `viewer` | Read-only access |
 
 Tool access policies add fine-grained control per (principal, MCP server, tool) tuple.

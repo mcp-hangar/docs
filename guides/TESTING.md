@@ -43,7 +43,7 @@ MCP Hangar uses [Testcontainers](https://testcontainers.com/) for integration te
 ### Installation
 
 ```bash
-pip install mcp-hangar[testcontainers]
+pip install mcp-hangar[containers]
 # or
 pip install "testcontainers[postgres]>=4.0.0" httpx
 ```

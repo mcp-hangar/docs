@@ -7,6 +7,16 @@
 
 ## Prerequisites
 
+The kubernetes discovery source needs the Kubernetes Python client, which is an
+extra rather than a base dependency:
+
+```bash
+pip install mcp-hangar[kubernetes]
+```
+
+The published container image already includes it. Without it, Hangar starts,
+logs `discovery_source_unavailable`, and this source discovers nothing.
+
 This recipe requires the **MCP-Hangar Operator** running in your cluster.
 The operator ships from a separate repository:
 <https://github.com/mcp-hangar/hangar-operator>.
@@ -126,8 +136,16 @@ reason, listed by the `hangar_quarantine` tool and counted by
 `mcp_hangar_discovery_quarantine_total`.
 
 A discovered pod is registered through the same command as a server you create
-over the REST API, so it faces the same duplicate and SSRF checks, and it lands
-in the event history with `source: discovery:kubernetes`.
+over the REST API, so it faces the same duplicate and SSRF checks, and the
+`McpServerRegistered` event carries `source: discovery:kubernetes`.
+
+> **Two limits to know before you follow this recipe.** The SSRF check applies to
+> discovered endpoints, and a pod IP is private by definition, so registration of
+> an HTTP-mode pod is currently refused
+> ([#771](https://github.com/mcp-hangar/mcp-hangar/issues/771)). And
+> `McpServerRegistered` is published in-process but never written to the event
+> store, so the registration will not appear in the server's stream
+> ([#772](https://github.com/mcp-hangar/mcp-hangar/issues/772)).
 
 For declarative management, use the MCP-Hangar Operator CRDs instead. See the [Kubernetes guide](../guides/KUBERNETES.md).
 

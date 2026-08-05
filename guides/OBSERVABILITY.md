@@ -25,8 +25,8 @@ This guide covers MCP Hangar's observability features: metrics, tracing, logging
 # Core package
 pip install mcp-hangar
 
-# For full observability support
-pip install mcp-hangar[observability]
+# For full observability support -- these are two separate extras
+pip install mcp-hangar[opentelemetry,langfuse]
 ```
 
 ### Start Monitoring Stack

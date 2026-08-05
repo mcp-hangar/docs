@@ -70,6 +70,18 @@ METRIC_SUFFIXES = ("_total", "_seconds", "_bucket", "_count", "_sum", "_info")
 
 SOURCE_GLOBS = ("*.py", "*.yaml", "*.yml", "*.toml")
 
+# `pip install mcp-hangar[foo]`. A name that is not an extra is not an error pip
+# reports usefully -- it warns and installs the base package -- so the reader
+# follows the instruction, gets none of the feature, and believes they did.
+EXTRA_RE = re.compile(r"mcp-hangar\[([a-zA-Z0-9,._-]+)\]")
+
+
+def declared_extras(source: Path) -> set[str]:
+    """Extra names from the source repo's `[project.optional-dependencies]`."""
+    text = (source / "pyproject.toml").read_text(encoding="utf-8", errors="ignore")
+    section = re.search(r"^\[project\.optional-dependencies\](.*?)(?=^\[)", text, re.S | re.M)
+    return set(re.findall(r"^([A-Za-z0-9._-]+)\s*=\s*\[", section.group(1), re.M)) if section else set()
+
 
 def resolve_source(arg: str | None) -> Path:
     candidate = arg or os.environ.get("MCP_HANGAR_SRC") or "../mcp-hangar"
@@ -125,7 +137,8 @@ def main() -> int:
     blob = load_source_blob(source)
 
     # category -> identifier -> sorted list of "file:line" doc locations
-    findings: dict[str, dict[str, list[str]]] = {"tool": {}, "metric": {}, "env": {}}
+    findings: dict[str, dict[str, list[str]]] = {"tool": {}, "metric": {}, "env": {}, "extra": {}}
+    extras = declared_extras(source)
 
     checks = (
         ("tool", TOOL_RE, lambda n: n in blob),
@@ -145,9 +158,13 @@ def main() -> int:
                     if match in ALLOWLIST or exists(match):
                         continue
                     findings[category].setdefault(match, []).append(f"{rel}:{lineno}")
+            for group in EXTRA_RE.findall(line):
+                for name in (n.strip() for n in group.split(",")):
+                    if name and name not in extras:
+                        findings["extra"].setdefault(name, []).append(f"{rel}:{lineno}")
 
     total = sum(len(v) for v in findings.values())
-    labels = {"tool": "MCP tools", "metric": "Prometheus metrics", "env": "env vars"}
+    labels = {"tool": "MCP tools", "metric": "Prometheus metrics", "env": "env vars", "extra": "pip extras"}
 
     if not args.quiet:
         print(f"docs:   {docs}")
@@ -159,7 +176,7 @@ def main() -> int:
         return 0
 
     print(f"FAIL: {total} phantom reference(s) not found in source:\n")
-    for category in ("tool", "metric", "env"):
+    for category in ("tool", "metric", "env", "extra"):
         items = findings[category]
         if not items:
             continue

@@ -1,6 +1,6 @@
 # ADR-002: Event Sourcing
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-018](ADR-018-event-sourcing-actually-wired.md) (the decision was never wired; ADR-018 records the shape that was actually built)
 **Date:** 2026-04-17
 **Authors:** MCP Hangar Team
 

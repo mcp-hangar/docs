@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.14](https://github.com/mcp-hangar/docs/compare/v1.1.13...v1.1.14) (2026-08-05)
+
+
+### Changed
+
+* **architecture:** ADR-018, event sourcing as actually wired ([#144](https://github.com/mcp-hangar/docs/issues/144)) ([21326d9](https://github.com/mcp-hangar/docs/commit/21326d9b4e1320ee5b1c7a5822bab7d04fa08ff7))
+
 ## [1.1.13](https://github.com/mcp-hangar/docs/compare/v1.1.12...v1.1.13) (2026-08-05)
 
 

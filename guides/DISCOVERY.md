@@ -265,5 +265,6 @@ event history with `source: discovery:<type>`.
 |--------|-------------|
 | `mcp_hangar_discovery_mcp_servers` | MCP servers per source (Gauge) |
 | `mcp_hangar_discovery_registrations_total` | New registrations |
+| `mcp_hangar_discovery_quarantine_total` | Refused registrations, by `reason` — including a source's own policy |
 | `mcp_hangar_discovery_errors_total` | Errors by source |
 | `mcp_hangar_discovery_cycle_duration_seconds` | Cycle duration (Histogram) |

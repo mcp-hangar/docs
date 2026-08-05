@@ -116,6 +116,19 @@ discovery:
 
 The Kubernetes discovery source watches pods in the configured namespace matching the label selector. Pods with `mcp-hangar.io/enabled: "true"` annotations are registered as remote MCP servers. In `authoritative` mode, when a pod is deleted, the corresponding MCP server is deregistered.
 
+Two defaults are worth knowing before you take `namespaces` out of the config.
+Omitting it watches **every** namespace, not one — and whatever is watched, the
+source refuses to register anything from `kube-system` or `default`, which is
+the `denied_namespaces` default. So a pod annotated correctly but sitting in
+`default` is discovered and then declined. It does not vanish quietly: with
+`quarantine_on_failure` (on by default) it lands in quarantine carrying the
+reason, listed by the `hangar_quarantine` tool and counted by
+`mcp_hangar_discovery_quarantine_total`.
+
+A discovered pod is registered through the same command as a server you create
+over the REST API, so it faces the same duplicate and SSRF checks, and it lands
+in the event history with `source: discovery:kubernetes`.
+
 For declarative management, use the MCP-Hangar Operator CRDs instead. See the [Kubernetes guide](../guides/KUBERNETES.md).
 
 ## Key Config Reference
@@ -124,8 +137,10 @@ For declarative management, use the MCP-Hangar Operator CRDs instead. See the [K
 |-----|------|---------|-------------|
 | `discovery.sources[].type` | string | -- | Set to `kubernetes` |
 | `discovery.sources[].mode` | string | -- | `additive` or `authoritative` |
-| `discovery.sources[].namespaces` | list | `default` | Kubernetes namespaces to watch |
+| `discovery.sources[].namespaces` | list | all namespaces | Kubernetes namespaces to watch |
 | `discovery.sources[].label_selector` | string | -- | Pod label selector |
+| `discovery.sources[].allowed_namespaces` | list | -- | Namespaces a pod may be registered from; empty means "everything not denied" |
+| `discovery.sources[].denied_namespaces` | list | `[kube-system, default]` | Namespaces never registered from. Wins over the allowlist |
 
 ### Kubernetes Annotations
 

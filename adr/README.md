@@ -12,7 +12,7 @@ taxonomy, and formatting conventions.
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
 | [001](ADR-001-cqrs.md) | Command Query Responsibility Segregation (CQRS) | Accepted | 2026-04-17 |
-| [002](ADR-002-event-sourcing.md) | Event Sourcing | Accepted | 2026-04-17 |
+| [002](ADR-002-event-sourcing.md) | Event Sourcing | Superseded by [018](ADR-018-event-sourcing-actually-wired.md) | 2026-04-17 |
 | [003](ADR-003-sagas.md) | Saga Pattern | Accepted | 2026-04-17 |
 | [004](ADR-004-sep-1766-digest-pinning.md) | Preemptive Implementation of SEP-1766 (Digest Pinning) and SEP-1763 (Interceptor Framework) | Accepted (partial → [010](ADR-010-retire-agent-cloud-tier.md)) | 2026-05-01 |
 | [005](ADR-005-sep-1763-interceptor-compliance.md) | SEP-1763 Interceptor Framework Compliance | Superseded by [010](ADR-010-retire-agent-cloud-tier.md) | 2026-05-01 |
@@ -28,6 +28,7 @@ taxonomy, and formatting conventions.
 | [015](ADR-015-vendored-task-wire.md) | The Tasks Wire is Vendored -- `mcp_types.Task*` is a Fossil, Not a Moving Target | Accepted | 2026-07-28 |
 | [016](ADR-016-approval-resolution-chokepoint.md) | Approval Resolution Has One Authorized Chokepoint, and Core Knows No Vendors | Accepted | 2026-07-29 |
 | [017](ADR-017-approval-input-request-namespace.md) | Pending Approvals Use `io.mcp-hangar/approval`, and Carry No Requested Schema | Accepted | 2026-07-29 |
+| [018](ADR-018-event-sourcing-actually-wired.md) | Event Sourcing, Actually Wired -- and What Is Not Event-Sourced | Accepted | 2026-08-05 |
 
 ## Summaries
 
@@ -44,6 +45,11 @@ Persists domain aggregates as append-only event streams instead of mutable
 snapshots, providing a complete audit trail, time-travel debugging, and
 simplified persistence at the cost of event schema management and
 indefinite storage growth (mitigated by snapshots every 50 events).
+
+Superseded by [ADR-018](ADR-018-event-sourcing-actually-wired.md): the mechanism
+was built but never connected to a writer, so the audit trail it promised was
+empty. ADR-018 records what was wired instead, and what is deliberately not
+event-sourced.
 
 ### [ADR-003](ADR-003-sagas.md): Saga Pattern
 

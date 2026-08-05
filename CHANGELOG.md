@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.13](https://github.com/mcp-hangar/docs/compare/v1.1.12...v1.1.13) (2026-08-05)
+
+
+### Changed
+
+* **guides:** document extending discovery and the namespace policy move ([#140](https://github.com/mcp-hangar/docs/issues/140)) ([0cd084f](https://github.com/mcp-hangar/docs/commit/0cd084fdbec42d3b4844f836099fe201fac8b1a2))
+* **guides:** install instructions that work, and two claims that did not ([#143](https://github.com/mcp-hangar/docs/issues/143)) ([c2822b2](https://github.com/mcp-hangar/docs/commit/c2822b25f0866189f495f11b03d76e1acb3ce428))
+
 ## [1.1.12](https://github.com/mcp-hangar/docs/compare/v1.1.11...v1.1.12) (2026-08-05)
 
 

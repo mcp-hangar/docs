@@ -120,7 +120,7 @@ Every control is classified by **who is responsible** for it:
 | Token lifetime ceiling | application | `MCP_JWT_MAX_TOKEN_LIFETIME` caps accepted `exp - iat` (default 3600s) independent of what the IdP mints |
 | Rate-limiting scope | application + external-infrastructure | `rate_limit.rps` / `rate_limit.burst` (or `MCP_RATE_LIMIT_RPS` / `MCP_RATE_LIMIT_BURST`) inside Hangar, *plus* an edge/WAF rate cap and DDoS protection you own |
 | Durable storage | application + external-infrastructure | *Since 2.5.0:* one decision -- `persistence.backend: sqlite` on a durable, backed-up volume, or `postgresql`. A backend now serves **every** persisted concern or is refused, so the 2.4.0 trap of selecting PostgreSQL and silently losing tool-access policy management is unrepresentable. On 2.4.0 and earlier, use `auth.storage.driver: sqlite`: the PostgreSQL driver there does not carry tool-access policies, and needs `psycopg2-binary` installed explicitly |
-| Durable audit / event storage | application + external-infrastructure | `event_store.driver: sqlite` with `allow_memory_fallback: false` on a writable, backed-up volume; readiness turns `503` if durability is lost |
+| Durable audit / event storage | application + external-infrastructure | *Since 2.5.0:* covered by the `persistence.backend` above -- the log and its delivery mark come from the selected backend, which is durable as a whole, so there is no fallback to opt out of. On 2.4.0 and earlier: `event_store.driver: sqlite` with `allow_memory_fallback: false` on a writable, backed-up volume; readiness turns `503` if durability is lost |
 | Central immutable log / SIEM ingest | application + external-infrastructure | Structured JSON logs (`MCP_JSON_LOGS=true`, `MCP_LOG_LEVEL=INFO`) shipped to an append-only, access-controlled SIEM your platform owns |
 | High availability | application + external-infrastructure | *Since 2.5.0:* supported, with conditions. Requires `persistence.backend: postgresql` shared by every replica, a `coordination:` block, and `remote`-mode servers -- `subprocess` and `docker` run a child process of one gateway and are refused in a coordinated deployment. Exactly one replica manages the fleet at a time; all of them serve. Known costs: rate limits are counted **per instance** (three replicas admit three times the configured rate -- put a fleet-wide cap at the ingress), anything travelling by the shared log lags by a poll interval, and a leader that dies without releasing its lease leaves the fleet unmanaged -- though still served -- until the tenure expires. See [Running more than one replica](25-multiple-replicas.md) and [ADR-020](../adr/ADR-020-high-availability.md). **On 2.4.0 and earlier, run a single instance**: replicas there are not safe, and the failure is silent |
 | Per-provider service accounts | application + provider | Each `remote` provider carries its own least-privilege credential (`mcp_servers.<id>.auth`), scoped at the backend; no shared super-credential |
@@ -146,21 +146,35 @@ auth:
     resource_uri: https://gateway.example            # advertised AND enforced as aud
     tenant_claim: tenant_id
 
-  # Durable, backed-up auth storage on a single node. `postgresql` is not the
-  # HA answer yet -- see the High availability row above and #779; it also does
-  # not carry tool-access policies, so selecting it turns those off silently.
-  storage:
-    driver: sqlite                 # memory | sqlite | postgresql
-    path: /app/data/auth.db        # writable, backed-up volume
-    # postgresql takes host/port/database/user/password instead of `path`.
-    # Not recommended yet -- see the note above.
+  # Storage is chosen once, below, for every persisted concern. On 2.4.0 and
+  # earlier it was picked here instead -- `storage: {driver: sqlite, path: ...}`
+  # -- independently of the event store, which is how a deployment could end up
+  # half on PostgreSQL.
 
-# Durable audit trail -- fail fast rather than silently lose history.
-event_store:
-  enabled: true
-  driver: sqlite
-  path: /app/data/events.db        # writable, backed-up volume
-  allow_memory_fallback: false
+# Durable storage -- one decision (since 2.5.0). A backend serves every
+# persisted concern or it is refused, so the half-configured deployment is
+# unrepresentable. `sqlite` is the single-node answer; `postgresql` is the only
+# one several replicas can share.
+persistence:
+  backend: sqlite                  # sqlite | postgresql
+  sqlite:
+    data_dir: /app/data            # writable, backed-up volume
+  # postgresql:
+  #   host: db.internal.example    # managed, private, backed up
+  #   database: mcp_hangar
+  #   user: hangar
+  #   password: ${HANGAR_DB_PASSWORD}
+
+# No `event_store:` block: with a backend selected, the log and its delivery
+# mark come from it, and a durability negotiation would have nothing to decide
+# -- a backend is durable as a whole. On 2.4.0 and earlier this is where the
+# audit trail was configured, and `allow_memory_fallback: false` mattered:
+#
+#   event_store:
+#     enabled: true
+#     driver: sqlite
+#     path: /app/data/events.db
+#     allow_memory_fallback: false
 
 # In-process rate limit. This is NOT your DDoS defense -- the edge WAF is.
 rate_limit:
@@ -258,7 +272,7 @@ State what you are defending against, and what you are not.
 | Host-header / CORS abuse | `MCP_TRUSTED_HOSTS`, scoped `MCP_CORS_ORIGINS`, `MCP_TRUSTED_PROXIES` | application |
 | Volumetric / DDoS flooding | Edge WAF + DDoS + edge rate cap (Hangar's `rate_limit` is a backstop, not the defense) | external-infrastructure |
 | Compromised backend provider | Least-privilege per-provider service account; sandboxed container providers (recipe 20); deny-by-default L7 egress policy ([`MCPEgressPolicy`](../guides/EGRESS_POLICY.md)) constraining which upstreams/tool calls/arguments a server may make | provider + application |
-| Lost or tampered audit trail | Durable event store (`allow_memory_fallback: false`) + immutable SIEM ingest | application + external-infrastructure |
+| Lost or tampered audit trail | Durable event log -- a selected `persistence.backend`, or `allow_memory_fallback: false` on 2.4.0 and earlier -- plus immutable SIEM ingest | application + external-infrastructure |
 | TLS interception | Managed/publicly trusted edge cert; verified backend TLS (`tls.verify: true`) | external-infrastructure + provider |
 
 **Out of scope / not claimed here:** Hangar is an OAuth *Resource Server*; it
@@ -293,12 +307,19 @@ adds the public-edge items.
 - [ ] **Host / CORS:** `MCP_TRUSTED_HOSTS` and `MCP_CORS_ORIGINS` replaced with
       reviewed production values (never the dev defaults); `MCP_TRUSTED_PROXIES`
       set to your proxy chain.
-- [ ] **Storage:** `auth.storage` on a managed, backed-up database; `event_store`
-      durable with `allow_memory_fallback: false`; backups verified restorable.
+- [ ] **Storage:** *since 2.5.0* -- one `persistence.backend`: `sqlite` on a
+      durable volume, or `postgresql` on a managed, backed-up database; backups
+      verified restorable. On 2.4.0 and earlier: `auth.storage.driver: sqlite`
+      plus a durable `event_store` with `allow_memory_fallback: false`.
 - [ ] **Logging / SIEM:** `MCP_JSON_LOGS=true`, `MCP_LOG_LEVEL=INFO`; logs shipped
       to an append-only, access-controlled SIEM.
-- [ ] **HA:** multiple replicas behind the LB sharing the same durable stores;
-      orchestrator gates on `/health/live` and `/health/ready`.
+- [ ] **HA:** *since 2.5.0* -- replicas require one shared
+      `persistence.backend: postgresql`, a `coordination:` block, and
+      `remote`-mode servers; **exactly one** pod reports `manages_fleet: true`
+      at `GET /api/system`, asked pod by pod rather than through the Service;
+      the fleet-wide request cap is at the ingress, because Hangar's own limit
+      counts per instance. On 2.4.0 and earlier, run a **single** instance.
+      Orchestrator gates on `/health/live` and `/health/ready`.
 - [ ] **Per-provider service accounts:** each provider has its own least-privilege
       credential; no shared super-credential; tenant surfaces are least-privilege.
 - [ ] **Incident readiness:** global tool-withdrawal rehearsed; rollback rehearsed;
@@ -363,8 +384,9 @@ Everything a responder or auditor needs is observable at the boundary:
   (provider and gateway health). Alert on denials and rate-limit spikes as
   early indicators of probing.
 - **The durable event store** is the tamper-evident trail of state changes
-  (tool withdrawals/restores, key events); with `allow_memory_fallback: false`
-  it either persists or the node is pulled from readiness.
+  (tool withdrawals/restores, key events). A selected `persistence.backend` is
+  durable as a whole; under the pre-2.5.0 keys, `allow_memory_fallback: false`
+  is what makes it either persist or pull the node from readiness.
 
 ## Key Config Reference
 
@@ -373,8 +395,10 @@ Everything a responder or auditor needs is observable at the boundary:
 | `tool_access.mode` | config | `front_door` for an untrusted public edge (fail-closed) |
 | `auth.allow_anonymous` | config | Keep `false` at a public edge |
 | `auth.oidc.resource_uri` | config | Public URI advertised as `resource` and enforced as `aud` |
-| `auth.storage.driver` | config | `memory`, `sqlite`, or `postgresql` (durable auth store) |
-| `event_store.allow_memory_fallback` | config | Keep `false` so a non-durable audit store fails fast |
+| `persistence.backend` | config | *Since 2.5.0.* `sqlite` or `postgresql`, for every persisted concern at once; `postgresql` is required for more than one replica |
+| `coordination` | config | *Since 2.5.0.* Declares that these replicas are one gateway. Refused on a backend they cannot share |
+| `auth.storage.driver` | config | Pre-2.5.0 auth store: `memory`, `sqlite`, or `postgresql`. Contradicting a selected `persistence.backend` is refused at startup |
+| `event_store.allow_memory_fallback` | config | Pre-2.5.0. Keep `false` so a non-durable audit store fails fast |
 | `mcp_servers.<id>.tls.verify` | config | Verify backend TLS; never disable in production |
 | `mcp_servers.<id>.auth` | config | Per-provider service-account credential (least privilege) |
 | `rate_limit.rps` / `rate_limit.burst` | config | In-process rate backstop (not DDoS defense) |

@@ -29,6 +29,7 @@ taxonomy, and formatting conventions.
 | [016](ADR-016-approval-resolution-chokepoint.md) | Approval Resolution Has One Authorized Chokepoint, and Core Knows No Vendors | Accepted | 2026-07-29 |
 | [017](ADR-017-approval-input-request-namespace.md) | Pending Approvals Use `io.mcp-hangar/approval`, and Carry No Requested Schema | Accepted | 2026-07-29 |
 | [018](ADR-018-event-sourcing-actually-wired.md) | Event Sourcing, Actually Wired -- and What Is Not Event-Sourced | Accepted | 2026-08-05 |
+| [019](ADR-019-one-storage-decision-two-backends.md) | One Storage Decision, and Two Backends That Are Never Mixed | Accepted | 2026-08-06 |
 
 ## Summaries
 

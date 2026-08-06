@@ -74,11 +74,20 @@ They are refused at registration in a coordinated deployment, and refused again 
 
 Routing a follower's call to the holder was considered and rejected for now: it needs a peer-to-peer channel that does not exist, plus presence discovery, authentication between replicas and budgets across two hops. Sharding local servers across replicas is explicitly out of scope (core#788, core#789).
 
-### 7. With a shared database, two versions coexist during every rollout
+### 7. A cluster requires PostgreSQL, and is refused without it
+
+Several replicas on a file-backed backend do not collide. Each gets its own file, grants itself its own lease -- the SQLite adapter always grants, correctly, because a file admits one writer -- runs its own management loops and holds its own fleet. They never disagree, because they cannot see each other, so every health check stays green while the deployment has as many fleets as it has pods. Measured: three replicas, all three reporting `manages_fleet: true`.
+
+A `coordination:` block is the statement that these replicas are meant to be **one** gateway, and it is refused on storage they cannot share. The question is asked on the axis the operator controls rather than by inspecting the environment: a thousand pods each with their own storage are a thousand gateways, which is a legitimate thing to run. What is not legitimate is calling them one.
+
+A backend that cannot be shared gets no lease keeper at all -- it would grant itself the lease every time, which is not coordination -- and `GET /api/system` reports `storage_is_shareable` next to a `coordinates_with_peers` that is true only when it is.
+
+### 8. With a shared database, two versions coexist during every rollout
 
 This is the standing rule, and it outlives every decision above. A rolling update runs the old and new images against one database, for as long as the rollout takes. **A schema change must therefore be compatible with the previous release**, in both directions, for at least one version:
 
-- New columns are added nullable, or with a non-volatile default. The `xid8` column added in this work is nullable precisely so that adding it does not rewrite the events table under an exclusive lock.
+- New columns are added nullable, or with a non-volatile default. The `xid8` column added in this work is nullable precisely so that adding it does not rewrite the events table under an exclusive lock. Verified with both versions running against one database: the older gateway, which does not know the column exists, appended a row and the column's default filled it in.
+- **A new replica may see events whose records the old one did not write.** The two halves of a change do not arrive together during a rollout: an older gateway that registers a server emits the event but not the configuration row a newer one reads to rebuild it. The newer replica must decline rather than invent -- observed as `fleet_projection_no_record` in exactly this arrangement, which is a defensive branch that a rollout turns into an ordinary one.
 - An event gains fields; it does not lose them or change their meaning. Events are persisted, so an old row must still deserialize -- the upcaster chain from ADR-018 is the mechanism, and absence is a signal in its own right.
 - A row written by the new version must be readable by the old one, for the length of one release cycle.
 
@@ -100,6 +109,23 @@ This is the standing rule, and it outlives every decision above. A rolling updat
 | Two replicas answer `manages_fleet: false` and none `true` | nothing is converging the fleet | serving; and `GET /api/system` says so |
 
 **Rate limits multiply by the replica count.** The limiter counts per process, so a configured 10 rps admits 30 across three replicas. Dividing by the count drifts exactly when it matters -- a rollout runs N+1 replicas, a failure runs N-1 -- and a shared bucket puts a database round trip on the path of every call. The scope is stated in configuration and reported by `GET /api/system`; a fleet-wide limit belongs at the ingress, where the fleet has one entrance.
+
+**What fencing covers, and what rests on local belief.** At the database there is never more than one holder: acquisition is a single conditional statement, and sixteen threads racing produce one winner. In *belief* there can be two, briefly -- an instance that stalls past its expiry believes it holds the lease until its keeper's next tick. Measured with `SIGSTOP`: the belief ended in the same second as the thaw, because the keeper's wait had already elapsed, but that is a scheduling accident and not a guarantee. What bounds the damage is fencing, and it does not cover everything:
+
+| a stalled leader's action | what stops it |
+|---|---|
+| deregistering a server | the generation, in the `WHERE` clause -- zero rows |
+| writing the shared circuit-breaker row | the lease gate |
+| registering from discovery | local belief only |
+| taking a metric snapshot | local belief only |
+| starting a local-mode server | local belief only |
+| health decisions | local belief only |
+
+Deregistration is fenced first because it is the irreversible one: a re-registration is an upsert, a duplicate snapshot is one row too many, and a repeated discovery cycle is a wasted second.
+
+**One logical PostgreSQL is assumed.** Everything above rests on the lease row being a single authority. A database that fails over to a stale replica could take the row back in time, and two instances would then both see a free lease. Nothing here detects that, and nothing here can.
+
+**Two databases are indistinguishable from one, from inside.** Pointing two groups of replicas at different databases produces two fleets, each internally consistent, each reporting health. That is a configuration error nothing catches.
 
 **Accepted limits, stated rather than discovered.**
 

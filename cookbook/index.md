@@ -41,6 +41,7 @@ recipe 01.
 | 22 | [External Multi-Tenant OIDC](22-external-multitenant-oidc.md) | 16 |
 | 23 | [Harden a Public Authenticated Gateway](23-harden-public-gateway.md) | 22 |
 | 24 | [L7 Egress Policy Language](24-egress-policy-language.md) | 11 |
+| 25 | [Running More Than One Replica](25-multiple-replicas.md) | 23 |
 
 ## How to Use This Cookbook
 

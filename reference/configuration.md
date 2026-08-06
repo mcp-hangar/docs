@@ -389,6 +389,86 @@ If the store degrades to in-memory while a durable driver was configured,
 so an orchestrator does not route traffic to an instance that is silently
 dropping its audit trail.
 
+## `persistence`
+
+*Since 2.5.0.* One storage decision for everything the gateway keeps: the event
+log and its delivery mark, server configuration, the audit trail, saga state,
+approvals, API keys, roles, tool-access policies, metric history and the
+management lease.
+
+```yaml
+persistence:
+  backend: postgresql
+  postgresql:
+    host: db.internal.example
+    port: 5432
+    user: hangar
+    password: ${HANGAR_DB_PASSWORD}
+    database: mcp_hangar
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `backend` | `str` | -- | `sqlite` or `postgresql`. Omit the block entirely and each subsystem configures its own storage as before |
+| `<backend name>` | `map` | -- | Passed to that backend untouched. `data_dir` means nothing to PostgreSQL and `host` means nothing to SQLite |
+
+The block under the backend's own name is handed to its factory as-is, so the
+two never have to know each other's vocabulary.
+
+**A backend serves every concern or it is refused.** Selection checks all of
+them and names every missing one at once. A backend cannot be half-configured:
+that is what made it possible to select PostgreSQL and silently lose
+tool-access policy management before 2.5.0.
+
+**A contradiction is refused rather than resolved.** Selecting a backend while
+a legacy per-subsystem key names a different one fails at startup. Every
+precedence rule silently ignores half of what you wrote, and the half that
+loses is the one you wrote most recently. `memory` is exempt -- it is a testing
+choice rather than a storage backend.
+
+**Which one to choose.** `sqlite` is the standalone answer: files under one
+directory, nothing to install, nothing to run, and not shareable between
+processes. `postgresql` is the only one several gateways can share, and is
+therefore required for more than one replica -- see `coordination` below and
+[Running more than one replica](../cookbook/25-multiple-replicas.md).
+
+No migration is provided between backends. Selecting PostgreSQL on a gateway
+that has been running on SQLite starts an empty database.
+
+## `coordination`
+
+*Since 2.5.0.* Declares that these replicas are meant to be **one** gateway
+rather than several independent ones. Present only for multi-replica
+deployments.
+
+```yaml
+coordination:
+  lease_ttl_s: 15
+  renew_interval_s: 5
+  renew_deadline_s: 10
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `lease_ttl_s` | `float` | `15.0` | How long a management tenure lasts without renewal |
+| `renew_interval_s` | `float` | `5.0` | How often the holder renews, and how often a follower retries |
+| `renew_deadline_s` | `float` | `10.0` | How long this instance will go without a *successful* renewal before it gives the lease up on its own. Must be under `lease_ttl_s` |
+
+The defaults mirror Kubernetes leader election. Shorter values replace a dead
+leader sooner and make a garbage-collection pause likelier to cost a live one
+its lease; a fleet whose manager keeps changing converges worse than one whose
+manager is occasionally slow.
+
+`renew_deadline_s` is deliberately under the TTL. An unreachable database is
+not an answer: the tenure expires on its clock whether or not this instance can
+read it, so the instance gives up slightly early rather than slightly late.
+
+**This block requires a shareable backend.** Configuring it with `sqlite`
+refuses to start, because replicas that cannot share storage are not a cluster
+-- each would hold its own fleet and its own lease and they would never notice
+each other. Either use `postgresql`, or remove the block to run this as a
+single gateway.
+
 ## `logging`
 
 Log output configuration.
@@ -653,6 +733,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 | `MCP_DATABASE_PATH` | `"data/mcp_hangar.db"` | SQLite database file path |
 | `MCP_DATABASE_WAL` | `"true"` | Enable WAL mode for SQLite |
 | `MCP_AUTO_RECOVER` | `"true"` | Auto-recover persisted state on startup |
+| `HANGAR_INSTANCE_LABEL` | hostname | *Since 2.5.0.* Prefix for this instance's identity, which appears on every event it produces. Under Kubernetes, set it from the downward API (`metadata.name`); the hostname is that same pod name, which is why it is the fallback. It is a **label**, not the identity: a per-process suffix is always appended, so replicas rolled from one ConfigMap cannot end up sharing an id |
 
 ### Observability / Tracing
 

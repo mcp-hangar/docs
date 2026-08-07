@@ -49,7 +49,7 @@ mcp_servers:
 | `description` | `str` | -- | -- | Human-readable MCP server description |
 | `tools` | `list` or `dict` | -- | -- | Predefined tool schemas (list) or access policy (dict). See below. |
 | `auth` | `dict` | -- | -- | HTTP auth configuration (remote mode only) |
-| `tls` | `dict` | -- | -- | TLS configuration (remote mode only) |
+| `tls` | `dict` | -- | -- | TLS for a `remote` upstream: `verify_ssl` (bool, default `true`) and `ca_cert_path` (a bundle to trust, for an upstream signed by your own CA). Both are honoured from 2.5.0; earlier releases accepted and discarded them |
 | `http` | `dict` | -- | -- | HTTP transport configuration (remote mode only) |
 | `max_concurrency` | `int` | -- | -- | Per-MCP server concurrency limit |
 | `capabilities` | `dict` | -- | -- | Declared capability contract (network, filesystem, environment, tools, resources, `enforcement_mode`). Hangar enforces these at runtime and flags deviations. |
@@ -98,7 +98,7 @@ When `allow_list` is set, only matching tools are exposed. When only `deny_list`
 | `deny_list` | `list[str]` | `[]` | Glob patterns; matching tools are hidden. Wins over `approval_list` |
 | `approval_list` | `list[str]` | `[]` | Glob patterns; matching tools stay visible but each call is **held for a human decision** before it runs |
 | `approval_timeout_seconds` | `int` | `300` | How long a held call waits for a decision. Must be a positive integer |
-| `approval_channel` | `str` | `dashboard` | Which delivery adapter is notified. Core ships `dashboard` and `noop` |
+| `approval_channel` | `str` | `dashboard` | A label recorded on each approval this policy holds. It does **not** choose the adapter -- one delivery is built at startup from the global `approvals.channel` and handles every approval |
 
 The same block is accepted at every scope that takes an access policy — an
 `mcp_servers` entry, a `groups` entry, a group member, and the per-tenant
@@ -108,7 +108,7 @@ be honoured at one scope and dropped at another.
 ### Holding a tool for a human (`approval_list`)
 
 `approval_list` marks tools as visible but gated: the caller's `tools/call` is
-held, an approval record is created and delivered on `approval_channel`, and the
+held, an approval record is created carrying `approval_channel` as a label, and the
 call runs only if a human approves it inside `approval_timeout_seconds`. A denial
 or an expiry refuses the call — the gate fails closed.
 
@@ -485,21 +485,6 @@ logging:
 | `level` | `str` | `"INFO"` | Log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `json_format` | `bool` | `false` | Enable structured JSON logging |
 | `file` | `str` | -- | Log file path |
-
-## `health`
-
-Global health check settings.
-
-```yaml
-health:
-  enabled: true
-  interval_s: 30
-```
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `enabled` | `bool` | -- | Enable health checks |
-| `interval_s` | `int` | -- | Global health check interval in seconds |
 
 ## `observability`
 

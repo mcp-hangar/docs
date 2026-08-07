@@ -112,7 +112,7 @@ Every control is classified by **who is responsible** for it:
 | Control | Responsibility | How it is delivered |
 | --- | --- | --- |
 | Trusted TLS at the edge | external-infrastructure | Managed/publicly trusted cert on the LB/WAF; Hangar expects TLS terminated upstream and speaks plain HTTP on the private net |
-| Backend (provider) TLS verification | application + provider | `mcp_servers.<id>.tls.verify: true` for `remote` providers; never disable in production |
+| Backend (provider) TLS verification | application + provider | `mcp_servers.<id>.tls.verify_ssl: true` for `remote` providers -- the field is `verify_ssl`, and it is on by default; never disable it in production. `tls.ca_cert_path` points at your own CA. Both were accepted and silently discarded before 2.5.0, which failed closed for the first and made an upstream behind a private CA unreachable for the second |
 | Host boundary | application + external-infrastructure | `MCP_TRUSTED_HOSTS` (Hangar rejects off-allow-list `Host` headers; dev default `localhost,127.0.0.1,::1,testserver` MUST be replaced) + host-based routing at the edge |
 | Real client IP behind the proxy | application | `MCP_TRUSTED_PROXIES` so source IP is resolved from the proxy chain, not spoofable headers |
 | CORS scope | application | `MCP_CORS_ORIGINS` (dev default `http://localhost:5173` MUST be replaced with your reviewed origins); `MCP_CORS_CREDENTIALS` only if you truly need credentialed cross-origin calls |
@@ -186,7 +186,8 @@ mcp_servers:
     mode: remote
     endpoint: https://reports.internal.example/mcp
     tls:
-      verify: true                 # never disable backend TLS verification
+      verify_ssl: true             # never disable backend TLS verification
+      # ca_cert_path: /etc/ssl/internal-ca.pem   # for an upstream behind your own CA
     auth:
       type: bearer
       token: ${REPORTS_PROVIDER_TOKEN}   # per-provider service account, least privilege
@@ -273,7 +274,7 @@ State what you are defending against, and what you are not.
 | Volumetric / DDoS flooding | Edge WAF + DDoS + edge rate cap (Hangar's `rate_limit` is a backstop, not the defense) | external-infrastructure |
 | Compromised backend provider | Least-privilege per-provider service account; sandboxed container providers (recipe 20); deny-by-default L7 egress policy ([`MCPEgressPolicy`](../guides/EGRESS_POLICY.md)) constraining which upstreams/tool calls/arguments a server may make | provider + application |
 | Lost or tampered audit trail | Durable event log -- a selected `persistence.backend`, or `allow_memory_fallback: false` on 2.4.0 and earlier -- plus immutable SIEM ingest | application + external-infrastructure |
-| TLS interception | Managed/publicly trusted edge cert; verified backend TLS (`tls.verify: true`) | external-infrastructure + provider |
+| TLS interception | Managed/publicly trusted edge cert; verified backend TLS (`tls.verify_ssl: true`, the default) | external-infrastructure + provider |
 
 **Out of scope / not claimed here:** Hangar is an OAuth *Resource Server*; it
 validates tokens but never issues them -- IdP hardening is the provider's job.
@@ -296,7 +297,7 @@ lives in [Cookbook 13 -- Production Checklist](13-production-checklist.md); this
 adds the public-edge items.
 
 - [ ] **TLS:** managed/publicly trusted certificate at the edge; no self-signed
-      cert exposed; backend `mcp_servers.<id>.tls.verify: true`.
+      cert exposed; backend `mcp_servers.<id>.tls.verify_ssl: true`.
 - [ ] **Network boundary:** no public ingress to Hangar's service port; only the
       edge is reachable; the `nc`/`curl` boundary checks above pass.
 - [ ] **WAF / DDoS:** edge WAF and DDoS protection enabled with an edge rate cap;
@@ -399,7 +400,8 @@ Everything a responder or auditor needs is observable at the boundary:
 | `coordination` | config | *Since 2.5.0.* Declares that these replicas are one gateway. Refused on a backend they cannot share |
 | `auth.storage.driver` | config | Pre-2.5.0 auth store: `memory`, `sqlite`, or `postgresql`. Contradicting a selected `persistence.backend` is refused at startup |
 | `event_store.allow_memory_fallback` | config | Pre-2.5.0. Keep `false` so a non-durable audit store fails fast |
-| `mcp_servers.<id>.tls.verify` | config | Verify backend TLS; never disable in production |
+| `mcp_servers.<id>.tls.verify_ssl` | config | Verify backend TLS. On by default; never disable in production |
+| `mcp_servers.<id>.tls.ca_cert_path` | config | Trust an upstream signed by your own CA |
 | `mcp_servers.<id>.auth` | config | Per-provider service-account credential (least privilege) |
 | `rate_limit.rps` / `rate_limit.burst` | config | In-process rate backstop (not DDoS defense) |
 | `MCP_TRUSTED_HOSTS` | env | Allowed `Host` values (replace the dev default) |

@@ -21,24 +21,37 @@ auth:
 
 ### 2. Create an API Key
 
+The field names matter: the handler subscripts the body directly, so a wrong
+name is a `500`, not a validation error.
+
 ```bash
-# Via the REST API (there is no auth CLI subcommand)
 curl -X POST http://localhost:8000/api/auth/keys \
   -H "X-API-Key: <admin-key>" \
   -H "Content-Type: application/json" \
   -d '{
-    "principal": "service:my-app",
-    "name": "My App Key",
-    "role": "developer"
+    "principal_id": "service:my-app",
+    "name": "My App Key"
   }'
 
 # Response:
 # {
-#   "key": "mcp_aBcDeFgHiJkLmNoPqRsTuVwXyZ...",
-#   "principal": "service:my-app"
+#   "key_id": "N3xQ...",
+#   "raw_key": "mcp_aBcDeFgHiJkLmNoPqRsTuVwXyZ...",
+#   "principal_id": "service:my-app",
+#   "name": "My App Key",
+#   "expires_at": null,
+#   "warning": "Save this key now - it cannot be retrieved later!"
 # }
-# Save this key now - it cannot be retrieved later!
 ```
+
+There is no `role` field on this route -- a key carries a principal, and roles
+are assigned to the principal separately (see below).
+
+Getting the **first** admin key is a different problem: `/api/auth/**` requires
+an admin principal with no carve-out, and `mcp-hangar auth bootstrap-admin`
+grants the admin role to a principal that can already authenticate without
+printing a key secret. See
+[recipe 12](../cookbook/12-auth-rbac.md) for what that means in practice.
 
 ### 3. Use the API Key
 
@@ -177,8 +190,8 @@ curl -X POST http://localhost:8000/api/auth/roles/assign \
   -H "X-API-Key: <admin-key>" \
   -H "Content-Type: application/json" \
   -d '{
-    "principal": "user:john@company.com",
-    "role": "developer",
+    "principal_id": "user:john@company.com",
+    "role_name": "developer",
     "scope": "global"
   }'
 ```
@@ -211,9 +224,9 @@ curl -X POST http://localhost:8000/api/auth/keys \
   -H "X-API-Key: <admin-key>" \
   -H "Content-Type: application/json" \
   -d '{
-    "principal": "service:ci",
+    "principal_id": "service:ci",
     "name": "CI Pipeline Key",
-    "expires_in_days": 30
+    "expires_at": "2027-01-01T00:00:00+00:00"
   }'
 ```
 

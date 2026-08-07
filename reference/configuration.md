@@ -520,8 +520,8 @@ observability:
     secret_key: ${LANGFUSE_SECRET_KEY}
     host: https://cloud.langfuse.com
     sample_rate: 1.0
-    scrub_inputs: false
-    scrub_outputs: false
+    scrub_inputs: true
+    scrub_outputs: true
 ```
 
 | Key | Type | Default | Description |
@@ -531,8 +531,8 @@ observability:
 | `secret_key` | `str` | -- | Langfuse secret key. Supports env var interpolation: `${LANGFUSE_SECRET_KEY}` |
 | `host` | `str` | `"https://cloud.langfuse.com"` | Langfuse API host |
 | `sample_rate` | `float` | `1.0` | Trace sampling rate (0.0--1.0) |
-| `scrub_inputs` | `bool` | `false` | Redact sensitive data from tool inputs |
-| `scrub_outputs` | `bool` | `false` | Redact sensitive data from tool outputs |
+| `scrub_inputs` | `bool` | **`true`** | Redact sensitive data from tool inputs. On by default -- set it to `false` to send raw arguments to Langfuse |
+| `scrub_outputs` | `bool` | **`true`** | Redact sensitive data from tool outputs. On by default |
 
 ## `auth`
 

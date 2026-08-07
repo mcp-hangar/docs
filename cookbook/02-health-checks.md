@@ -65,7 +65,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ```
 
    ```
-   INFO     mcp_server_state mcp_server_id=my-mcp state=cold
+   INFO     domain_event event_type=McpServerRegistered mcp_server_id=my-mcp
    INFO     mcp_registry_ready mcp_servers=['my-mcp']
    ```
 
@@ -84,8 +84,11 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ```
 
    ```
-   INFO     mcp_server_state_transition mcp_server_id=my-mcp from=cold to=ready
+   INFO     domain_event event_type=McpServerStateChanged mcp_server_id=my-mcp from_state=cold to_state=ready
    ```
+
+   State changes are logged as domain events, not under a name of their own:
+   the event handler emits `domain_event` with the class in `event_type`.
 
    MCP Server transitioned to READY. Health checks now active.
 
@@ -127,7 +130,8 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ```
 
    ```
-   INFO     mcp_server_state mcp_server_id=my-mcp state=degraded consecutive_failures=3
+   WARNING  health_check_unhealthy mcp_server_id=my-mcp
+   INFO     domain_event event_type=McpServerStateChanged mcp_server_id=my-mcp to_state=degraded
    ```
 
 7. MCP Server will auto-recover if restarted
@@ -157,7 +161,7 @@ State machine transitions:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `health_check_interval_s` | int | `60` | Per-MCP server health check interval (seconds) |
+| `health_check_interval_s` | int | `60` | Recorded on the server and reported by the API. It does **not** set the probe cadence: the background worker checks on its own interval, adjusted per state by the health tracker (skipped while cold or initializing, backed off once degraded). Treat it as documentation of intent until the scheduler reads it |
 | `max_consecutive_failures` | int | `3` | Failures before state transition to DEGRADED |
 
 ## What's Next

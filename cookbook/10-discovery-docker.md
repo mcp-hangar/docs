@@ -39,19 +39,20 @@ discovery:                               # NEW: discovery configuration
 2. Start Hangar:
 
    ```bash
-   mcp-hangar serve --http --port 8000
+   mcp-hangar serve --http --host 127.0.0.1 --port 8000
    ```
 
-3. Trigger a discovery scan:
+3. Wait for the first scan. It runs on its own every
+   `discovery.refresh_interval_s`, on the instance holding the management lease
+   (see [25](25-multiple-replicas.md)); the log line to watch for is
+   `discovery_cycle_complete`.
 
-   ```bash
-   curl -X POST http://localhost:8000/api/discovery/sources/{source_id}/scan
-   ```
-
-   `{source_id}` is the UUID of the registered source, which you can read from
-   `GET /api/discovery/sources` (the source defined in `config.yaml` is
-   registered at bootstrap and addressed by its UUID, not by the literal type
-   `docker`).
+   > There is no way to trigger a scan by hand for a source declared in
+   > `config.yaml`. `POST /api/discovery/sources/{id}/scan` addresses a
+   > separate registry that config-declared sources are never added to, so it
+   > answers `404` for every id you could obtain -- and
+   > `GET /api/discovery/sources` does not return an `id` field to try. Tracked;
+   > the scan endpoint is usable only for sources registered through the API.
 
 4. Check pending MCP servers:
 
@@ -60,8 +61,13 @@ discovery:                               # NEW: discovery configuration
    ```
 
    ```json
-   {"pending": [{"name": "docker-math", "source": "docker", "mode": "remote"}]}
+   {"pending": [{"name": "docker-math", "source_type": "docker", "mode": "remote",
+                 "connection_info": {"endpoint": "http://172.17.0.3:8080/mcp"},
+                 "metadata": {}, "fingerprint": "...", "discovered_at": "...",
+                 "last_seen_at": "...", "ttl_seconds": 300, "is_expired": false}]}
    ```
+
+   The key is `source_type`, not `source`.
 
 5. Approve the MCP server:
 
@@ -76,12 +82,12 @@ discovery:                               # NEW: discovery configuration
    ```
 
    ```
-   docker-math    remote    cold    source=docker:auto-discovery
+   docker-math    COLD
    ```
 
 ## What Just Happened
 
-The Docker discovery source connects to the Docker socket and lists containers with `mcp.hangar.enabled=true` labels. In `additive` mode, it only adds new MCP servers -- never removes existing ones. With `auto_register: false`, discovered MCP servers go to a pending queue for manual approval.
+The Docker discovery source connects to the Docker socket and lists containers with `mcp.hangar.enabled=true` labels. In `additive` mode, it only adds new MCP servers -- never removes existing ones. With `auto_register: false`, discovered MCP servers go to a pending queue for manual approval. Omit the key and they are registered on discovery: the default is `true`.
 
 Set `auto_register: true` if you trust all labeled containers and want zero-touch registration.
 
@@ -101,7 +107,7 @@ for the same rule stated in full, and
 |-----|------|---------|-------------|
 | `discovery.enabled` | bool | `false` | Enable auto-discovery |
 | `discovery.refresh_interval_s` | int | `30` | Seconds between scans |
-| `discovery.auto_register` | bool | `false` | Register without approval |
+| `discovery.auto_register` | bool | **`true`** | Register a discovered server without approval. The default registers -- set it to `false`, as this recipe does, if you want the pending queue |
 | `discovery.sources[].type` | string | -- | `docker`, `filesystem`, `kubernetes`, `entrypoint` |
 | `discovery.sources[].mode` | string | -- | `additive` (add only) or `authoritative` (add and remove) |
 

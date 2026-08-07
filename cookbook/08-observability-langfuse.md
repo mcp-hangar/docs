@@ -16,7 +16,7 @@ You know a tool call was slow. You don't know whether the delay was in Hangar (r
 mcp_servers:
   my-mcp:
     mode: remote
-    endpoint: "http://localhost:8080"
+    endpoint: "http://localhost:8080/mcp"
     health_check_interval_s: 10
     max_consecutive_failures: 3
 
@@ -40,7 +40,7 @@ observability:                           # NEW: Langfuse tracing
 2. Start Hangar:
 
    ```bash
-   mcp-hangar serve --http --port 8000
+   mcp-hangar serve --http --host 127.0.0.1 --port 8000
    ```
 
 3. Make a tool call:
@@ -50,9 +50,12 @@ observability:                           # NEW: Langfuse tracing
    ```
 
 4. Open Langfuse dashboard and find the trace. You see spans for:
-   - `hangar.tool_invocation` -- overall call
-   - `hangar.cold_start` -- MCP server initialization (if cold)
-   - `hangar.mcp_server_call` -- actual MCP server communication
+   - `batch.execute` -- the batch the call arrived in
+   - `batch.call.<tool>` -- the call itself, carrying `mcp.server.id`
+   - `policy.check_access`, `concurrency.acquire` -- the gates it passed
+
+   The spans are named after the pipeline that produces them; there is no
+   `hangar.` prefix.
 
 ## What Just Happened
 

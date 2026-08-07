@@ -70,12 +70,6 @@ discovery:
    metadata:
      name: math-mcp-server
      namespace: mcp-servers
-     labels:
-       app.kubernetes.io/part-of: mcp
-     annotations:
-       mcp-hangar.io/enabled: "true"
-       mcp-hangar.io/name: "k8s-math"
-       mcp-hangar.io/port: "8080"
    spec:
      replicas: 2
      selector:
@@ -83,8 +77,17 @@ discovery:
          app: math-mcp-server
      template:
        metadata:
+         # On the POD template, not on the Deployment. Discovery lists pods and
+         # reads pod annotations; Kubernetes does not copy a Deployment's own
+         # labels or annotations down to the pods it creates, so anything put
+         # above matches nothing.
          labels:
            app: math-mcp-server
+           app.kubernetes.io/part-of: mcp
+         annotations:
+           mcp-hangar.io/enabled: "true"
+           mcp-hangar.io/name: "k8s-math"
+           mcp-hangar.io/port: "8080"
        spec:
          containers:
            - name: math
@@ -139,12 +142,14 @@ A discovered pod is registered through the same command as a server you create
 over the REST API, so it faces the same duplicate and SSRF checks, and the
 `McpServerRegistered` event carries `source: discovery:kubernetes`.
 
-> **Two limits to know before you follow this recipe.** The SSRF check applies to
-> discovered endpoints, and a pod IP is private by definition, so registration of
-> an HTTP-mode pod is currently refused
+> **Both of these are fixed as of 2.5.0**, and the paragraph is kept because the
+> shape of the fix is worth knowing. The SSRF check still refuses a private
+> address supplied by a human, but a discovered pod IP now arrives with its
+> provenance attached (`runtime_addresses`) and is accepted -- the rule is about
+> who supplied the endpoint, not what it looks like
 > ([#771](https://github.com/mcp-hangar/mcp-hangar/issues/771)). And
-> `McpServerRegistered` is published in-process but never written to the event
-> store, so the registration will not appear in the server's stream
+> `McpServerRegistered` is written to the event store, so a discovered
+> registration survives a restart
 > ([#772](https://github.com/mcp-hangar/mcp-hangar/issues/772)).
 
 For declarative management, use the MCP-Hangar Operator CRDs instead. See the [Kubernetes guide](../guides/KUBERNETES.md).

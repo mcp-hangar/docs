@@ -16,7 +16,7 @@ You have MCP servers running. You don't know how many tool calls they handle, ho
 mcp_servers:
   my-mcp:
     mode: remote
-    endpoint: "http://localhost:8080"
+    endpoint: "http://localhost:8080/mcp"
     health_check_interval_s: 10
     max_consecutive_failures: 3
 ```
@@ -28,7 +28,7 @@ No config changes needed -- metrics are always available at `/metrics` on the HT
 1. Start Hangar in HTTP mode:
 
    ```bash
-   mcp-hangar serve --http --port 8000
+   mcp-hangar serve --http --host 127.0.0.1 --port 8000
    ```
 
 2. Check Prometheus metrics are exposed:
@@ -48,8 +48,10 @@ No config changes needed -- metrics are always available at `/metrics` on the HT
 3. Start the monitoring stack:
 
    ```bash
-   cd monitoring
-   docker compose up -d
+   # From the repository root: the compose file is `docker-compose.monitoring.yml`
+   # there, and its mounts are root-relative. `monitoring/` holds only the
+   # Prometheus, Grafana and Alertmanager configuration it mounts.
+   docker compose -f docker-compose.monitoring.yml up -d
    ```
 
 4. Open Grafana at `http://localhost:3000` (admin/admin) and check the MCP Hangar dashboard.

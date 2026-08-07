@@ -58,18 +58,22 @@ mcp_servers:
 
    ```
    ╭──────────────────────────────────────────────────────────────────────────────╮
-   │ Server not running | McpServers: 1                                           │
+   │ Server not running | McpServers: 4                                           │
    ╰──────────────────────────────────────────────────────────────────────────────╯
                 MCP Hangar Status
-   ╭─────┬───────────┬───────┬────────┬───────╮
-   │     │ McpServer │ State │ Health │ Tools │
-   ├─────┼───────────┼───────┼────────┼───────┤
-   │ --  │ my-mcp-group │ COLD │      - │     - │
-   ╰─────┴───────────┴───────┴────────┴───────╯
+   ╭─────┬──────────────┬───────┬────────┬───────╮
+   │     │ McpServer    │ State │ Health │ Tools │
+   ├─────┼──────────────┼───────┼────────┼───────┤
+   │ --  │ my-mcp       │ COLD  │      - │     - │
+   │ --  │ my-mcp-backup│ COLD  │      - │     - │
+   │ --  │ my-mcp-3     │ COLD  │      - │     - │
+   │ --  │ my-mcp-group │ COLD  │      - │     - │
+   ╰─────┴──────────────┴───────┴────────┴───────╯
    ```
 
-   `status` shows the group as a single COLD row -- it does not report the
-   strategy or per-member health. To observe load distribution, watch which
+   The count is four, not one: the members are servers in their own right and
+   `status` lists them alongside the group. It does not report the strategy or
+   per-member health. To observe load distribution, watch which
    member serves successive calls in the logs (next step).
 
 3. Make several tool calls through the group and observe distribution in

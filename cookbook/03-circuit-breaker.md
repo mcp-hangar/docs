@@ -51,7 +51,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ```
 
    ```
-   INFO     group_created group_id=my-mcp-group strategy=round_robin
+   INFO     group_loaded group_id=my-mcp-group member_count=2 strategy=round_robin
    INFO     background_worker_started task=health_check interval_s=60
    ```
 
@@ -138,7 +138,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    tail -5 /tmp/hangar-circuit.log
    ```
 
-   After `reset_timeout_s` elapses, the circuit automatically transitions from OPEN back to CLOSED.
+   After `reset_timeout_s` elapses, the circuit moves from OPEN to **HALF_OPEN** and lets a probe through. That call decides it: a success closes the circuit, a failure re-opens it for another `reset_timeout_s`. It never goes straight from OPEN to CLOSED -- something has to prove the upstream is back.
 
 7. Restart MCP server and verify recovery
 
@@ -170,7 +170,7 @@ Hangar introduced **MCP server groups** — a logical grouping of one or more MC
 
 **CLOSED** (normal operation): All calls pass through to group members. The circuit breaker counts consecutive failures. When `failure_count` reaches `failure_threshold` (3), the circuit opens.
 
-**OPEN** (protecting): All calls are rejected immediately with a circuit-open error. No traffic reaches the MCP server — this is the protection. Instead of waiting 10+ seconds for connection timeout, Hangar fails in milliseconds. After `reset_timeout_s` (30 seconds), the circuit automatically closes and allows traffic again.
+**OPEN** (protecting): All calls are rejected immediately with a circuit-open error. No traffic reaches the MCP server — this is the protection. Instead of waiting 10+ seconds for connection timeout, Hangar fails in milliseconds. After `reset_timeout_s` (30 seconds) the circuit becomes HALF_OPEN and admits one probe: it closes if that call succeeds and re-opens if it fails.
 
 **How this differs from health checks:**
 

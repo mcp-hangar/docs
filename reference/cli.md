@@ -220,12 +220,13 @@ mcp-hangar add [OPTIONS] NAME
 | `brave-search` | Brave Search API | Yes (API key) |
 | `puppeteer` | Browser automation | No |
 | `slack` | Slack integration | Yes (token) |
-| `google-drive` | Google Drive access | Yes (credentials) |
 | `google-maps` | Google Maps API | Yes (API key) |
-| `sentry` | Sentry error tracking | Yes (token) |
-| `raygun` | Raygun monitoring | Yes (API key) |
-| `everart` | Everart API | Yes (API key) |
-| `sequential-thinking` | Reasoning chains | No |
+
+The registry is a fixed list of these eleven. `google-drive`, `sentry`,
+`raygun`, `everart` and `sequential-thinking` were listed here and are not in
+it -- `mcp-hangar add sentry` answers `Did you mean: sqlite, slack?` and
+installs nothing. For anything outside the list, add the server to
+`config.yaml` yourself.
 
 ### Examples
 

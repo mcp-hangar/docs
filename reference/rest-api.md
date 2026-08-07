@@ -6,10 +6,26 @@ Complete reference for all REST API endpoints exposed by MCP Hangar in HTTP mode
 
 All endpoint paths shown below are relative to this base URL. Every route resolves only under the `/api` prefix (e.g. `GET /mcp_servers` is served at `GET /api/mcp_servers`).
 
-All responses are JSON. Error responses return:
+**Collection endpoints carry a trailing slash.** `GET /api/mcp_servers` answers
+`307` and redirects to `/api/mcp_servers/`; `curl` does not follow a redirect
+unless you pass `-L`, and a `POST` that follows one without `--post301` loses
+its body. The same applies to `/api/groups/`, `/api/tools/`, `/api/config/` and
+`/api/system/`.
+
+All responses are JSON. Errors are **nested**:
 
 ```json
-{"error": "<ExceptionType>", "message": "<description>", "status_code": <code>}
+{"error": {"code": "<ExceptionType>", "message": "<description>", "details": {"field": "..."} }}
+```
+
+`details` is `null` unless the error carries structured context. The HTTP
+status is in the status line, not the body.
+
+Authentication failures are the one exception -- they are produced by the
+middleware before the handler chain and use a flat shape:
+
+```json
+{"error": "authentication_failed", "message": "No valid credentials provided", "details": {}}
 ```
 
 ---
@@ -64,9 +80,17 @@ POST /mcp_servers
 | `idle_ttl_s` | int | No | `300` | Idle timeout in seconds |
 | `health_check_interval_s` | int | No | `60` | Health check interval |
 | `description` | string | No | -- | Human-readable description |
-| `volumes` | list[string] | No | `[]` | Docker volume mounts |
-| `network` | string | No | `"none"` | Docker network mode |
-| `read_only` | bool | No | `true` | Read-only filesystem (docker) |
+| `source` | string | No | `"api"` | Provenance recorded on the registration |
+
+`volumes`, `network` and `read_only` are **not** read by this route. They are
+accepted by the request parser and dropped: the command it builds carries only
+the fields above, so a container registered here gets the container defaults
+rather than the ones you sent. Declare those in `config.yaml`, where they are
+honoured.
+
+A private or link-local `endpoint` is refused with `400 {"error":
+"ssrf_blocked"}`. That check applies to human-supplied endpoints only --
+discovery supplies a pod IP with its provenance attached and is accepted.
 
 **Response 201:**
 
@@ -519,8 +543,12 @@ POST /config/reload
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `config_path` | string | server default | Path to config file |
 | `graceful` | bool | `true` | Graceful reload |
+
+Sending `config_path` is **refused** with `422` and
+`config_path is not accepted; reload always targets the server's own
+configuration file`. Reload re-reads the file the process was started with;
+there is no way to point it at another one over HTTP.
 
 **Response 200:**
 
@@ -553,7 +581,17 @@ Creates a rotating backup of the current configuration.
 **Response 200:**
 
 ```json
-{"backup_path": "/path/to/backup.yaml", "created": true}
+{"path": "/path/to/config.yaml.bak1"}
+```
+
+The backup is written **next to the configuration file** as `<config>.bak1`,
+rotating older ones to `.bak2` and beyond. That directory has to be writable by
+the process. In the published container image it is not -- `/app` is owned by
+root and the gateway runs as `hangar` -- so this route answers `500` there,
+with `PermissionError` in the log. Mount a writable directory and point
+`--config` at it if you need this endpoint.
+
+```json
 ```
 
 ### Config Diff
@@ -567,7 +605,7 @@ Compares on-disk configuration with current in-memory state.
 **Response 200:**
 
 ```json
-{"diff": "--- on-disk\n+++ in-memory\n@@ ...", "has_changes": true}
+{"has_diff": true, "diff": "--- on-disk\n+++ in-memory\n@@ ...", "on_disk": {...}, "in_memory": {...}}
 ```
 
 ---
@@ -588,11 +626,24 @@ GET /system
     "total_mcp_servers": 5,
     "mcp_servers_by_state": {"ready": 3, "cold": 2},
     "total_tools": 15,
-    "total_tool_calls": 42,
+    "total_invocations": 42,
+    "total_failures": 1,
+    "overall_success_rate": 0.976,
     "uptime_seconds": 3600.5,
-    "version": "1.6.0"
+    "version": "2.5.0",
+    "instance": {
+      "instance_id": "hangar-7f9c4d2b1a-a3f19c",
+      "coordinates_with_peers": false,
+      "manages_fleet": true,
+      "storage_is_shareable": false,
+      "rate_limits_are_per_instance": true
+    }
   }
 }
+
+The counter is `total_invocations`, not `total_tool_calls`. `instance` is
+present from 2.5.0 and describes the replica that answered -- see
+[Running more than one replica](../cookbook/25-multiple-replicas.md).
 ```
 
 ### Get Current User

@@ -7,17 +7,22 @@ MCP Hangar exposes a full REST API alongside the MCP protocol layer. The API is 
 Start Hangar in HTTP mode:
 
 ```bash
-mcp-hangar serve --http --port 8000
+mcp-hangar serve --http --host 127.0.0.1 --port 8000
 ```
 
 The REST API is available at `http://localhost:8000/api/`.
 
+**Collection endpoints carry a trailing slash.** `/api/mcp_servers` answers a
+`307` to `/api/mcp_servers/`; `curl` does not follow it without `-L`, and a
+`POST` that follows a 307 without `--post301` arrives with no body. The same
+holds for `/api/groups/`, `/api/tools/`, `/api/config/` and `/api/system/`.
+
 ```bash
 # List all mcp_servers
-curl http://localhost:8000/api/mcp_servers
+curl http://localhost:8000/api/mcp_servers/
 
 # Get system info
-curl http://localhost:8000/api/system
+curl http://localhost:8000/api/system/
 
 # Start a mcp_server
 curl -X POST http://localhost:8000/api/mcp_servers/math/start
@@ -28,7 +33,7 @@ curl -X POST http://localhost:8000/api/mcp_servers/math/start
 When authentication is enabled, pass your API key in the `X-API-Key` header:
 
 ```bash
-curl -H "X-API-Key: mcp_your_key_here" http://localhost:8000/api/mcp_servers
+curl -H "X-API-Key: mcp_your_key_here" http://localhost:8000/api/mcp_servers/
 ```
 
 See the [Authentication guide](AUTHENTICATION.md) for setup instructions.
@@ -191,7 +196,7 @@ See the [WebSockets guide](WEBSOCKETS.md) for connection details.
 ### Create a MCP Server
 
 ```bash
-curl -X POST http://localhost:8000/api/mcp_servers \
+curl -X POST http://localhost:8000/api/mcp_servers/ \
   -H "Content-Type: application/json" \
   -d '{
     "mcp_server_id": "my-llm",
@@ -210,7 +215,7 @@ curl -X POST http://localhost:8000/api/mcp_servers \
 
 ```bash
 # Create group
-curl -X POST http://localhost:8000/api/groups \
+curl -X POST http://localhost:8000/api/groups/ \
   -H "Content-Type: application/json" \
   -d '{
     "group_id": "llm-pool",

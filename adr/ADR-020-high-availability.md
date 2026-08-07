@@ -47,8 +47,10 @@ The gate is asked **per cycle**, not once at startup, and the keeper gives the l
 
 Required at subscription, with no default: an unclassified effect exports the same tool call from three replicas, an unclassified projection leaves two of them stale, and both wrong answers are silent.
 
-- A **projection** keeps a local view -- the tool catalogue, fleet membership, risk scores, the websocket feed. It runs on every replica for every event, whoever produced it, and publishes nothing.
+- A **projection** keeps a local view -- fleet membership, risk scores, session suspensions, the websocket feed. It runs on every replica for every event, whoever produced it, and publishes nothing.
 - An **effect** acts outward -- SIEM export, cost accounting, alerts, enforcement. It runs **only on the instance that produced the event**.
+
+**The tool catalogue is not among them, and this decision does not make it one.** A server's tools are learned by connecting to it: the replica that starts a server lists its tools and holds them; a peer that has never started it answers with an empty list until it does. Measured on two replicas sharing one database, fifteen seconds after the leader had listed five tools, `GET /api/mcp_servers/<id>/tools` on the follower returned `[]`. The MCP surface is unaffected -- it advertises the gateway's own tools and reaches upstream ones through them, so both replicas answer `tools/list` identically -- and the tool-projection registry the digest pin resolves against is fed from configuration, so it is the same everywhere. What differs is the REST inspection endpoint, and what it reports is honestly per-instance: the tools *this* replica has seen. Making the catalogue a projection means putting a learned schema into the log, which is a change to what the log carries and is not attempted here.
 
 That last rule is what makes exactly-once free: a tool call happens on exactly one replica, so the replica that did the work is the one that exports it. No cursor, no coordination, no leader bottleneck.
 
@@ -95,7 +97,7 @@ This is the standing rule, and it outlives every decision above. A rolling updat
 
 **Good.** Three replicas serve one fleet, share one view of it, export one copy of each audit record, and converge it from exactly one place. A replica can be killed without the fleet forgetting anything, and the one that replaces it inherits the record rather than an empty dictionary.
 
-**The window with no leader.** When the holder dies without releasing the lease, nothing manages the fleet until the TTL expires and a peer acquires it -- fifteen seconds by default. **Serving continues throughout**; what pauses is discovery, garbage collection, TTL deregistration and metric snapshots. A graceful shutdown releases the lease and reduces this to the time of one acquisition round.
+**The window with no leader.** When the holder dies without releasing the lease, nothing manages the fleet until the TTL expires and a peer acquires it -- fifteen seconds by default, **written by the holder from its own configuration**. Config drift therefore sets a cluster-wide safety property from whichever replica happens to hold the lease: measured at 52 seconds on a pair configured 60 and 10, with the ten-second replica doing the waiting. `GET /api/system` reports the tenure in force beside this instance's own, and a materially longer one is logged, because the drift has no other symptom. **Serving continues throughout**; what pauses is discovery, garbage collection, TTL deregistration and metric snapshots. A graceful shutdown releases the lease and reduces this to the time of one acquisition round.
 
 **Failure modes, and what each one costs.**
 
@@ -107,6 +109,7 @@ This is the standing rule, and it outlives every decision above. A rolling updat
 | A replica joins mid-life | it reads the fleet snapshot and tails from the head | it does not replay the cluster's history |
 | A replica dies between appending an event and exporting it | that one outbound export | the event, which is in the log |
 | Two replicas answer `manages_fleet: false` and none `true` | nothing is converging the fleet | serving; and `GET /api/system` says so |
+| Discovery is configured only on replicas that do not hold the lease | nothing discovers, and the fleet does not converge | serving; the idle replicas log `discovery_idle_not_the_lease_holder` |
 
 **Rate limits multiply by the replica count.** The limiter counts per process, so a configured 10 rps admits 30 across three replicas. Dividing by the count drifts exactly when it matters -- a rollout runs N+1 replicas, a failure runs N-1 -- and a shared bucket puts a database round trip on the path of every call. The scope is stated in configuration and reported by `GET /api/system`; a fleet-wide limit belongs at the ingress, where the fleet has one entrance.
 

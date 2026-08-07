@@ -65,10 +65,17 @@ Exactly one replica **manages**: discovery, garbage collection, TTL
 deregistration, and the metric-snapshot worker. It holds a lease -- a row in the
 shared database with a expiry and a generation -- and the others wait.
 
-Everything else is a *projection*: fleet membership, the tool catalogue, risk
-scores, session suspensions and the websocket event feed are rebuilt on every
-replica from the shared event log, so what you get back does not depend on which
-pod answered.
+Everything else is a *projection*: fleet membership, risk scores, session
+suspensions and the websocket event feed are rebuilt on every replica from the
+shared event log, so what you get back does not depend on which pod answered.
+
+**One thing is not.** A server's tools are learned by connecting to it, so
+`GET /api/mcp_servers/<id>/tools` reports what *that* replica has seen -- a pod
+that has never started the server answers `[]`, and it can stay that way while
+another pod lists five tools. This is the REST inspection endpoint only: the MCP
+surface advertises the gateway's own tools on every replica alike, so a client's
+`tools/list` does not depend on which pod answered. Ask the pod that reports
+`manages_fleet: true` when you want the fleet's view.
 
 ## Checking it
 
@@ -84,11 +91,24 @@ GET /api/system
       "coordinates_with_peers": true,
       "manages_fleet": true,
       "storage_is_shareable": true,
-      "rate_limits_are_per_instance": true
+      "rate_limits_are_per_instance": true,
+      "management_lease": {
+        "holder": "hangar-7f9c4d2b1a-a3f19c",
+        "generation": 4,
+        "expires_in_s": 12.3,
+        "my_lease_ttl_s": 15.0
+      }
     }
   }
 }
 ```
+
+`management_lease` is the tenure **actually in force**, which is not
+necessarily this pod's idea of one: `expires_at` is written by whoever holds the
+lease, from *its* `lease_ttl_s`. A pod whose `expires_in_s` keeps exceeding its
+own `my_lease_ttl_s` is telling you the holder is configured differently -- and
+that the failover window is the holder's number, not this one's. `holder` names
+the pod to ask when this one is not the manager.
 
 Ask each pod directly rather than through the Service -- the point of the field
 is that replicas can differ. Exactly one should answer `manages_fleet: true`.
@@ -113,9 +133,14 @@ seconds. A replica that joins *after* a suspension does not inherit it.
 
 **There is a window with no manager.** When the holder dies without releasing
 the lease, nothing manages the fleet until the tenure expires -- fifteen seconds
-by default. Serving continues throughout. A graceful shutdown releases the
-lease, so a rolling update hands over in seconds rather than waiting out the
-TTL.
+by default, **and the default that applies is the dead holder's**. The tenure is
+written by whoever holds the lease, from its own `lease_ttl_s`, so one replica
+carrying a stale ConfigMap sets the failover window for the whole set: a replica
+configured for ten seconds beside a holder configured for sixty waits sixty.
+Keep the value the same everywhere, and check `management_lease` in
+`GET /api/system` if a failover took longer than you expected. Serving continues
+throughout. A graceful shutdown releases the lease, so a rolling update hands
+over in seconds rather than waiting out the TTL.
 
 **Circuit breakers and lifecycle state stay local.** Each replica decides for
 itself whether it can reach an upstream, because a single replica with a network
@@ -141,7 +166,10 @@ rather than inventing a configuration. It resolves when the rollout completes.
 | No pod answers `true` | the database is unreachable, or the lease is held by a pod that has stopped -- it clears within the TTL |
 | `fleet_writer_absent` in the logs | no durable config repository was in use; registrations are not being written down |
 | A server exists on one pod only | the tail is stalled -- look for `event_tailer_read_failed` |
-| `LocalModeNotOwnedError` | a `subprocess` or `docker` server in a coordinated deployment; use `remote` |
+| `/tools` is empty on one pod and not another | expected: tools are learned per replica when it connects. The MCP surface is unaffected |
+| Discovery finds nothing, and no `discovery_cycle_complete` anywhere | the replica configured for discovery is not the holder -- look for `discovery_idle_not_the_lease_holder` |
+| Failover took far longer than `lease_ttl_s` | the *holder* wrote the tenure from its own config. Compare `expires_in_s` with `my_lease_ttl_s` under `management_lease` in `GET /api/system` |
+| `409 LocalModeNotOwnedError` | a `subprocess` or `docker` server started on a follower; ask the pod reporting `manages_fleet: true`, or use `remote` |
 
 ## See also
 

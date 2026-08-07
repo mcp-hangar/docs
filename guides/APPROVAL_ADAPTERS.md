@@ -19,10 +19,21 @@ mcp_servers:
       approval_list:
         - "refund_*"
       approval_timeout_seconds: 600
-      approval_channel: slack       # the entry-point name of your adapter
+      approval_channel: slack       # a label on the request, NOT a router
 ```
 
-`approval_channel` names the channel this policy's approvals are delivered on, so different servers can route to different adapters. An unknown channel degrades to `noop` with a warning: approvals still queue and stay resolvable over REST, but nobody is notified. Full key reference: [Configuration → `tools` dual format](../reference/configuration.md#tools-dual-format).
+`approval_channel` is recorded on each approval this policy holds and travels
+with the request, so a dashboard or an adapter can read it. **It does not select
+an adapter.** The gateway builds exactly one delivery at startup, from the
+global `approvals.channel`, and every approval goes through it whichever policy
+raised it -- so per-server routing to different adapters is not available.
+
+An unknown value in the *global* `approvals.channel` degrades to `noop` with a
+warning: approvals still queue and stay resolvable over REST, but nobody is
+notified. An unknown value in a per-policy `approval_channel` does nothing at
+all, warning included, because nothing dispatches on it.
+
+Full key reference: [Configuration → `tools` dual format](../reference/configuration.md#tools-dual-format).
 
 > **Migrating from `approvals.channel: slack`?** Core carried a built-in Slack channel through 1.x. It was removed in 2.0. Nothing breaks silently: the channel now logs `approval_delivery_channel_unknown` and degrades to `noop`, so approvals queue undelivered but stay resolvable over the REST API. Restore delivery by installing an adapter — the full reference implementation is below.
 

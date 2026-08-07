@@ -259,8 +259,12 @@ Example:
 
 Large responses are truncated to prevent memory issues:
 
-- Max response per call: 10MB
-- Max total batch response: 50MB
+- Max response per call: 10MB -- enforced, and the result carries
+  `truncated: true`
+
+A 50MB total-batch ceiling is defined as a constant and **not enforced**:
+nothing compares against it. A batch of many large responses is bounded only by
+the per-call limit multiplied by the call count.
 
 Truncated responses have `truncated: true` flag:
 
@@ -302,17 +306,22 @@ mcp_hangar_batch_cancellations_total{reason="timeout|fail_fast"}
 
 ## Configuration
 
-Optional configuration in `config.yaml`:
+**There is none.** A `batch:` block in `config.yaml` was documented here and is
+not read anywhere -- all six values are module constants in
+`server/tools/batch/`. Writing the block changes nothing, which is worse than
+having no knob at all: the operator believes a limit was raised and it was not.
 
-```yaml
-batch:
-  max_calls: 100
-  max_concurrency: 50
-  default_timeout: 60.0
-  max_timeout: 300.0
-  max_response_size_bytes: 10485760      # 10MB per call
-  max_total_response_size_bytes: 52428800  # 50MB total
-```
+The values in force:
+
+| | |
+|---|---|
+| Calls per batch | 100 |
+| Concurrency | 50 global, 10 per server |
+| Timeout | 60s default, 300s maximum |
+| Response per call | 10MB |
+
+Per-call concurrency is tunable, through `execution:` -- see
+[Configuration](../reference/configuration.md#execution).
 
 ## Migration from Previous API
 

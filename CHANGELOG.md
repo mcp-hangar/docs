@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.15](https://github.com/mcp-hangar/docs/compare/v1.1.14...v1.1.15) (2026-08-07)
+
+
+### Changed
+
+* **architecture:** ADR-019, one storage decision and two backends ([#149](https://github.com/mcp-hangar/docs/issues/149)) ([d028c7d](https://github.com/mcp-hangar/docs/commit/d028c7d03574c31491b41f58a3ed437b03793a42))
+* **architecture:** the tool catalogue is not a projection, and the tenure is the holder's ([#152](https://github.com/mcp-hangar/docs/issues/152)) ([91e0099](https://github.com/mcp-hangar/docs/commit/91e009907cbacf30e3ce62e10dcd7cba6125c832))
+* **architecture:** what it takes to run more than one gateway (ADR-020) ([#150](https://github.com/mcp-hangar/docs/issues/150)) ([f40558a](https://github.com/mcp-hangar/docs/commit/f40558a9ef4176e699f141d9a52fb3e9e15b0cba))
+* **guides:** running more than one replica, and the config that decides it ([#151](https://github.com/mcp-hangar/docs/issues/151)) ([ef1bd42](https://github.com/mcp-hangar/docs/commit/ef1bd42a946a747e373529e17d2da0fa84a34dd7))
+* **guides:** stop recommending a multi-replica deployment that breaks approvals ([#148](https://github.com/mcp-hangar/docs/issues/148)) ([6f0ba55](https://github.com/mcp-hangar/docs/commit/6f0ba55b690da60f2fec2c73265c9040ea9f2218))
+* **guides:** the recipes a second replica changes ([#153](https://github.com/mcp-hangar/docs/issues/153)) ([c0ed65a](https://github.com/mcp-hangar/docs/commit/c0ed65a9b4b4b18a7ea5e26f0b6eba842f55626a))
+* **release:** move the version surfaces to 2.4.0, and write the upgrade note ([#146](https://github.com/mcp-hangar/docs/issues/146)) ([d6129f8](https://github.com/mcp-hangar/docs/commit/d6129f80e0befd8e5c6861bc9df5b816b3202ae3))
+
 ## [1.1.14](https://github.com/mcp-hangar/docs/compare/v1.1.13...v1.1.14) (2026-08-05)
 
 

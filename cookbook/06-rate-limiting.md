@@ -16,19 +16,19 @@ A runaway client sends hundreds of requests per second. Your MCP servers can han
 mcp_servers:
   my-mcp:
     mode: remote
-    endpoint: "http://localhost:8080"
+    endpoint: "http://localhost:8080/mcp"
     health_check_interval_s: 10
     max_consecutive_failures: 3
 
   my-mcp-backup:
     mode: remote
-    endpoint: "http://localhost:8081"
+    endpoint: "http://localhost:8081/mcp"
     health_check_interval_s: 10
     max_consecutive_failures: 3
 
   my-mcp-3:
     mode: remote
-    endpoint: "http://localhost:8082"
+    endpoint: "http://localhost:8082/mcp"
     health_check_interval_s: 10
     max_consecutive_failures: 3
 

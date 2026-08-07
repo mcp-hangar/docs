@@ -87,18 +87,18 @@ event_store:
      -v /srv/hangar/events:/app/data:rw \
      -v "$PWD/config.yaml:/app/config.yaml:ro" \
      -p 8000:8080 \
-     mcp-hangar:1.6.2 serve --http --port 8080
+     ghcr.io/mcp-hangar/mcp-hangar:2.5.0 serve --http --port 8080
    ```
 
 3. Confirm the event store is durable. `/health/ready` includes the
-   `event_store_durability` check; a durable store returns `200`:
+   event-store durability check; a durable store returns `200` and the body reports readiness counts (an unhealthy store adds an `event_store` block and turns the code into `503`):
 
    ```bash
    curl -s http://localhost:8000/health/ready
    ```
 
    ```json
-   {"status": "ready", "checks": {"event_store_durability": "healthy"}}
+   {"status": "healthy", "ready_mcp_servers": 1, "total_mcp_servers": 1}
    ```
 
 4. Now prove the fail-closed behaviour. Point the event store at a path under
@@ -108,7 +108,7 @@ event_store:
    docker run --rm --read-only \
      --tmpfs /tmp:rw,noexec,nosuid,size=64m \
      -e MCP_JSON_LOGS=true \
-     mcp-hangar:1.6.2 serve --http
+     ghcr.io/mcp-hangar/mcp-hangar:2.5.0 serve --http
    ```
 
    Startup aborts instead of silently degrading:

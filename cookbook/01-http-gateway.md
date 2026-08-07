@@ -20,6 +20,9 @@ docker build -t mcp-math:latest examples/provider_math/
 
 # Start it on port 8080
 docker run -d --name mcp-math -p 8080:8080 mcp-math:latest
+# The image serves streamable-http on 8080. If you built it before 2.5.0, add
+# `-e MCP_TRANSPORT=streamable-http` -- older builds defaulted to stdio and the
+# container exited without binding the port.
 ```
 
 Verify it is running:
@@ -57,7 +60,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
    ```
 
    ```json
-   {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{...},"serverInfo":{"name":"mcp-registry","version":"1.25.0"}}}
+   {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{...},"serverInfo":{"name":"mcp-hangar","version":"2.5.0"}}}
    ```
 
    Hangar responds to MCP initialize. Press Ctrl+C to stop.
@@ -105,7 +108,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
    ```
 
    ```json
-   {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"...\"mcp_server\": \"my-mcp\", \"state\": \"ready\", \"mode\": \"remote\", \"tools_count\": 2..."}]}}
+   {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"...\"mcp_server\": \"my-mcp\", \"state\": \"ready\", \"mode\": \"remote\", \"tools_count\": 5..."}]}}
    ```
 
    MCP Server transitioned to READY and discovered tools.

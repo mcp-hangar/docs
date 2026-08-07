@@ -67,7 +67,7 @@ mcp_servers:
    ```
 
    ```
-   math    subprocess    ready    tools=5    idle_ttl=300s
+   │ ok  │ math      │ READY │ healthy │     5 │
    ```
 
 5. Wait 5 minutes (or set `idle_ttl_s: 10` for testing) and watch it stop:
@@ -77,7 +77,7 @@ mcp_servers:
    ```
 
    ```
-   math    subprocess    cold    tools=5    idle
+   │ --  │ math      │ COLD  │       - │     5 │
    ```
 
 ## What Just Happened

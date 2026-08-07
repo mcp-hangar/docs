@@ -21,6 +21,10 @@ ports:
 docker build -t mcp-math:latest examples/provider_math/
 
 # Terminal 1: Primary server on port 8080
+# Both upstreams serve streamable-http on 8080. On an image built before
+# 2.5.0, add `-e MCP_TRANSPORT=streamable-http` to each -- the older default
+# was stdio, so neither container bound its port and there was nothing to fail
+# over between.
 docker run -d --name mcp-primary -p 8080:8080 mcp-math:latest
 
 # Terminal 2: Backup server on port 8081
@@ -82,9 +86,9 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ```
 
    ```
-   INFO     group_created group_id=my-mcp-group strategy=priority
-   INFO     Added member my-mcp to group my-mcp-group (priority=1)
-   INFO     Added member my-mcp-backup to group my-mcp-group (priority=2)
+   INFO     group_loaded group_id=my-mcp-group member_count=2 strategy=priority
+   INFO     Added member my-mcp to group my-mcp-group (weight=1, priority=1)
+   INFO     Added member my-mcp-backup to group my-mcp-group (weight=1, priority=2)
    ```
 
 2. Check group status - both members healthy
@@ -135,9 +139,9 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ```
 
    ```
-   WARNING  health_check_failed mcp_server=my-mcp consecutive_failures=1
-   WARNING  health_check_failed mcp_server=my-mcp consecutive_failures=2
-   WARNING  health_check_failed mcp_server=my-mcp consecutive_failures=3
+   WARNING  health_check_failed: my-mcp, error=Connection refused
+   WARNING  health_check_failed: my-mcp, error=Connection refused
+   WARNING  health_check_failed: my-mcp, error=Connection refused
    (primary removed from rotation after max consecutive failures)
    ```
 

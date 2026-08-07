@@ -37,6 +37,11 @@ mcp_servers:
   # `add` returns a fixed result, so verification is reproducible.
   math:
     mode: subprocess
+    # `examples/` ships in the git repository, not in the wheel: a `pip install`
+    # gives you `mcp_hangar` only, so `python -m examples.provider_math.server`
+    # exits with "No module named examples". Clone the repository and run from
+    # its root, or point `command` at a server of your own. The staging profile
+    # below uses the same module and the same applies there.
     command: [python, -m, examples.provider_math.server]
     idle_ttl_s: 180
 
@@ -57,7 +62,7 @@ logging:
 Run it in HTTP mode, bound to loopback, with verbose output:
 
 ```bash
-mcp-hangar --config config.dev.yaml serve --http --host 127.0.0.1 --port 8000 --verbose
+mcp-hangar --config config.dev.yaml --verbose serve --http --host 127.0.0.1 --port 8000
 ```
 
 For a stdio session (e.g. Claude Desktop) drop the HTTP flags:
@@ -72,15 +77,17 @@ Verify MCP reachability and one deterministic tool call:
 # Liveness -- no auth needed on loopback
 curl -s http://127.0.0.1:8000/health/live
 
-# Start the provider, then invoke the deterministic `add` tool
+# Start the provider and confirm it came up with its tools
 curl -s -X POST http://127.0.0.1:8000/api/mcp_servers/math/start
-curl -s -X POST http://127.0.0.1:8000/api/mcp_servers/math/tools/add \
-  -H "Content-Type: application/json" \
-  -d '{"arguments": {"a": 2, "b": 3}}'
+curl -s http://127.0.0.1:8000/api/mcp_servers/math/tools
 ```
 
-`add` always returns `5` for `{a: 2, b: 3}`, so this call is a reproducible
-smoke test. Confirm local event persistence survived the call:
+The REST API starts, stops and inspects servers; it does not invoke tools.
+There is no `POST /api/mcp_servers/<id>/tools/<name>` route -- tool calls go
+through the MCP surface at `/mcp`, which needs the `initialize` handshake and
+the `Mcp-Session-Id` it returns, so drive those with an MCP client rather than
+a bare `curl`. The `/start` response lists the tools it found, which is the
+reproducible check at this stage. Confirm local event persistence survived the call:
 
 ```bash
 ls -l data/dev-events.db          # SQLite file exists and grows
@@ -115,6 +122,9 @@ auth:
   api_key:
     enabled: true
     header_name: X-API-Key
+  storage:
+    driver: sqlite          # the default is `memory`, and the CLI that mints
+    path: data/auth.db      # the first key refuses a non-durable store
 
 # Topology posture. `egress` (the default) treats callers as trusted back-end
 # clients. `front_door` is for the multi-tenant OIDC edge -- out of scope here.
@@ -163,10 +173,13 @@ production credential:
 # 1. Unauthenticated request is rejected
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/mcp_servers   # -> 401
 
-# 2. Mint a scoped API key (raw key is shown once -- capture it)
-curl -s -X POST http://localhost:8000/api/auth/keys \
-  -H "Content-Type: application/json" \
-  -d '{"principal_id": "service:staging-smoke", "name": "Staging Smoke"}'
+# 2. Obtain a credential. `/api/auth/**` is admin-only with no carve-out for
+#    the first key, so an unauthenticated POST here answers 401 --
+#    `auth bootstrap-admin` grants the admin ROLE to a principal that can
+#    already authenticate, and does not print a key secret. On an API-key-only
+#    staging profile there is no supported way to mint the first key; give the
+#    admin an OIDC identity (recipe 22) or carry a key over from a durable
+#    store you provisioned. See recipe 12 for the full explanation.
 
 # 3. Authenticated request succeeds
 curl -s -H "X-API-Key: <raw_key>" http://localhost:8000/api/mcp_servers   # -> 200

@@ -16,7 +16,7 @@ Your Hangar instance is accessible to everyone on the network. You need to contr
 mcp_servers:
   my-mcp:
     mode: remote
-    endpoint: "http://localhost:8080"
+    endpoint: "http://localhost:8080/mcp"
     health_check_interval_s: 10
 
 auth:                                    # NEW: authentication config
@@ -26,14 +26,24 @@ auth:                                    # NEW: authentication config
   api_key:                               # NEW: API key config
     enabled: true                        # NEW: enable API key auth
     header_name: X-API-Key               # NEW: header to read key from
+
+  storage:                               # NEW: durable, and required below
+    driver: sqlite                       # the default is `memory`
+    path: data/auth.db
 ```
+
+The `storage` block is not optional here. Every `/api/auth/**` route requires an
+admin principal, so there is no unauthenticated call that mints the first key --
+`POST /api/auth/keys` on a fresh gateway answers `401`. The way out is the CLI,
+and it refuses the default `memory` driver, because a key minted into memory is
+gone the moment the process it was minted in exits.
 
 ## Try It
 
 1. Start Hangar:
 
    ```bash
-   mcp-hangar serve --http --port 8000
+   mcp-hangar serve --http --host 127.0.0.1 --port 8000
    ```
 
 2. Try an unauthenticated request -- it fails:
@@ -46,10 +56,33 @@ auth:                                    # NEW: authentication config
    401
    ```
 
-3. Create an API key:
+3. Grant the first administrator. Not over HTTP: `/api/auth/**` requires an
+   admin principal with no carve-out for the first call, so an unauthenticated
+   `POST /api/auth/keys` answers `401`. Stop the gateway and run:
+
+   ```bash
+   mcp-hangar auth bootstrap-admin --config config.yaml --principal user:admin
+   ```
+
+   > **Read this before you plan around it.** The command assigns the global
+   > `admin` role to a principal that **already has a way to authenticate** --
+   > an OIDC subject, for instance. It creates an API key row as part of the
+   > same atomic claim but **deliberately does not print the secret**, so it
+   > cannot hand you a usable key for an API-key-only deployment. It is
+   > also one-shot: a second run exits 1 with "the initial administrator has
+   > already been bootstrapped".
+   >
+   > So on this recipe's configuration -- API keys and nothing else -- there is
+   > no supported way to obtain the first usable credential. To administer a
+   > gateway over HTTP today, give the admin an identity provider
+   > ([recipe 22](22-external-multitenant-oidc.md)) and bootstrap that
+   > principal; API keys are then minted by that admin for everything else.
+
+   With an admin credential in hand, later keys are ordinary API calls:
 
    ```bash
    curl -X POST http://localhost:8000/api/auth/keys \
+     -H "Authorization: Bearer <admin_token>" \
      -H "Content-Type: application/json" \
      -d '{"principal_id": "service:my-app", "name": "My App Key"}'
    ```

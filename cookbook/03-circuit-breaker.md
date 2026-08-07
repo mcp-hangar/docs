@@ -190,6 +190,16 @@ They complement each other. Health checks catch dead MCP servers. Circuit breake
 | `mcp_servers.<name>.circuit_breaker.reset_timeout_s` | float | `60.0` | Seconds before circuit auto-closes |
 | `mcp_servers.<name>.members` | list | — | List of MCP server IDs or inline definitions |
 
+## Running More Than One Hangar
+
+The breaker lives in the process that opened it. Each replica decides for itself
+whether it can reach an upstream, so a breaker opened on one pod does not open
+on its peers -- deliberately, because a single replica with a network problem
+must not cut a healthy server off from the rest of the fleet. The cost is that
+each replica discovers an outage independently, and that `GET /api/system` on
+one pod can report a server the others are still using. See
+[25 -- Running More Than One Replica](25-multiple-replicas.md).
+
 ## What's Next
 
 Your single MCP server is protected — but it's still a single point of failure. When the circuit opens, agents get errors instead of results. What if there was a backup MCP server ready to take over automatically?

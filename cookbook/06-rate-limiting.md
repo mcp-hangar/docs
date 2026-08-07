@@ -111,6 +111,16 @@ Rate limiting is enforced by a token-bucket limiter wired into the command bus a
 
 Scope: the limiter covers the MCP tool-call (command-bus) path only. The REST `/api/*` routes are **not** rate-limited by these settings -- protecting those endpoints is out of scope for this recipe and handled by separate infrastructure (for example a reverse proxy or gateway in front of Hangar).
 
+**The bucket is per process, so the number multiplies by your replica count.**
+Three replicas configured for 10 rps admit 30 across the fleet, because each
+holds its own bucket. That is deliberate -- a shared bucket puts a database
+round trip on the path of every call -- and it means the figure you set here is
+per pod, not per gateway. Dividing by the replica count drifts exactly when it
+matters, since a rolling update runs N+1 and a failure runs N-1; a fleet-wide
+cap belongs at the ingress, where the fleet has one entrance. `GET /api/system`
+reports `rate_limits_are_per_instance` so the scope is readable from outside.
+See [25 -- Running More Than One Replica](25-multiple-replicas.md).
+
 ## Key Config Reference
 
 | Environment Variable | Type | Default | Description |

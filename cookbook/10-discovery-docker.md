@@ -85,6 +85,16 @@ The Docker discovery source connects to the Docker socket and lists containers w
 
 Set `auto_register: true` if you trust all labeled containers and want zero-touch registration.
 
+## With More Than One Hangar
+
+*Since 2.5.0*, discovery runs only on the replica holding the management lease,
+and each replica reads its own Docker socket -- so the containers it can see are
+the ones on its node. Give every replica the discovery configuration, not just
+one: the holder can be any of them. See
+[11 -- Kubernetes discovery](11-discovery-kubernetes.md#with-more-than-one-hangar)
+for the same rule stated in full, and
+[25 -- Running More Than One Replica](25-multiple-replicas.md).
+
 ## Key Config Reference
 
 | Key | Type | Default | Description |

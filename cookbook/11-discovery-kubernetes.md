@@ -149,6 +149,23 @@ over the REST API, so it faces the same duplicate and SSRF checks, and the
 
 For declarative management, use the MCP-Hangar Operator CRDs instead. See the [Kubernetes guide](../guides/KUBERNETES.md).
 
+## With More Than One Hangar
+
+*Since 2.5.0*, discovery runs on **exactly one replica** -- the one holding the
+management lease -- because three discovery loops against one estate is three
+sources of truth arguing, and a follower converging the fleet off a view it does
+not own would deregister what a peer had just registered.
+
+Two consequences for a replica set:
+
+- Every replica needs the discovery configuration, not just one. The holder can
+  be any of them, and a holder without the source configured discovers nothing.
+- A replica that is configured for discovery and is not the holder logs
+  `discovery_idle_not_the_lease_holder` and runs no cycles. That line is the one
+  to look for when nothing is being discovered anywhere.
+
+See [25 -- Running More Than One Replica](25-multiple-replicas.md).
+
 ## Key Config Reference
 
 | Key | Type | Default | Description |

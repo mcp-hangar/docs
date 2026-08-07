@@ -86,6 +86,24 @@ Subprocess MCP servers communicate via JSON-RPC over stdin/stdout. Hangar starts
 
 Stderr output is captured into a ring buffer and available via the [Log Streaming](../guides/LOG_STREAMING.md) API.
 
+## One Gateway Only
+
+`subprocess` does not describe a server the gateway talks to; it describes one
+the gateway **runs**, as a child process with its stdio attached. There is no
+address a peer could use, so a second Hangar replica cannot reach this server --
+it would start its own copy, with its own working directory and its own
+environment.
+
+*Since 2.5.0*, that is refused rather than allowed to happen quietly:
+registering a `subprocess` or `docker` server through the API in a deployment
+whose replicas share storage returns **409**, and starting one on a replica that
+does not hold the management lease returns 409 as well. Servers declared in
+`config.yaml` still start on the holder.
+
+If you need several replicas to serve the same server, run it as a service and
+use `mode: remote`. See
+[25 -- Running More Than One Replica](25-multiple-replicas.md).
+
 ## Key Config Reference
 
 | Key | Type | Default | Description |

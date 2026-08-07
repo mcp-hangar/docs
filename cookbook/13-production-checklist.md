@@ -20,7 +20,10 @@
 - [ ] `min_healthy` set to match your SLA requirements
 - [ ] Idle TTL set appropriately (300s for subprocess, 600s for containers)
 - [ ] Rate limiting enabled to prevent overload
-- [ ] Event store configured (`event_store.driver: sqlite`)
+- [ ] Storage decided once: `persistence.backend` set to `sqlite` (durable
+      volume) or `postgresql` -- *since 2.5.0*, a backend serves every persisted
+      concern or startup is refused. On 2.4.0 and earlier: `event_store.driver:
+      sqlite` plus `auth.storage.driver`, chosen separately
 
 ## Observability
 
@@ -60,7 +63,28 @@
 - [ ] RBAC (Kubernetes) configured for operator service account
 - [ ] Network policies restricting MCP server-to-MCP server communication
 - [ ] Resource requests and limits in Helm values
-- [ ] PodDisruptionBudget for Hangar deployment
+- [ ] PodDisruptionBudget for Hangar deployment -- meaningful only with more
+      than one replica, which needs the row below
+
+## More Than One Replica (if applicable)
+
+*Since 2.5.0.* On 2.4.0 and earlier, run a **single** instance: replicas there
+disagree with each other and the failure is silent.
+
+- [ ] One PostgreSQL every replica shares (`persistence.backend: postgresql`)
+- [ ] A `coordination:` block, with the **same** `lease_ttl_s` on every replica
+      -- the tenure in force is written by whoever holds the lease, so one
+      stale ConfigMap sets the failover window for the whole set
+- [ ] Every server in `remote` mode; `subprocess`/`docker` are single-instance
+- [ ] Discovery configured on **every** replica, not one -- it runs on the
+      lease holder, and the holder can be any of them
+- [ ] Verified pod by pod, not through the Service: exactly one answers
+      `manages_fleet: true` at `GET /api/system`
+- [ ] Fleet-wide request cap at the ingress -- Hangar's own limit is per pod
+- [ ] Rolling update rehearsed: two versions run against one database for its
+      duration
+
+See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 
 ## Testing
 

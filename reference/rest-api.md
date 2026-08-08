@@ -395,8 +395,31 @@ GET /discovery/sources
 **Response 200:**
 
 ```json
-{"sources": [{"source_id": "...", "type": "docker", "mode": "additive", "enabled": true, "last_scan": "..."}]}
+{
+  "sources": [
+    {
+      "id": "28018ad1-4d9d-54dc-9e4e-c5d856af4612",
+      "source_type": "docker",
+      "mode": "additive",
+      "is_healthy": true,
+      "is_enabled": true,
+      "last_discovery": "2026-08-08T09:22:56Z",
+      "mcp_servers_count": 3,
+      "error_message": null
+    }
+  ]
+}
 ```
+
+`id` is the value every other route on this resource takes -- `/scan`,
+`/enable`, `PUT` and `DELETE`. For a source declared in `config.yaml` it is
+derived from the source type rather than generated, so it is the same id after a
+restart and a script can keep using it. *Since 2.5.0:* before that, configured
+sources were listed without an `id` and the scan answered `404` for anything an
+operator could obtain.
+
+`last_discovery` is `null` until the first cycle completes, and `error_message`
+carries the last failure or `null`.
 
 ### Register Source
 

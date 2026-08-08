@@ -468,10 +468,14 @@ Authentication management. Currently exposes a one-time administrator bootstrap.
 
 ### auth bootstrap-admin
 
-Grant the one-time global `admin` role to an existing external (OIDC) principal,
-using the server's own durable auth backend. Solves the chicken-and-egg problem
-where a fresh durable auth store with anonymous access disabled cannot create
-its first administrator through the protected API. Added in 1.5.0.
+Grant the one-time global `admin` role to an existing principal, using the
+server's own durable auth backend. Solves the chicken-and-egg problem where a
+fresh durable auth store with anonymous access disabled cannot create its first
+administrator through the protected API. Added in 1.5.0.
+
+The claim also mints an API key for that principal. Whether its secret is
+printed is `--show-key`'s decision, and the claim succeeds exactly once, so it
+is a decision to make before running the command rather than after.
 
 #### Synopsis
 
@@ -486,6 +490,7 @@ mcp-hangar auth bootstrap-admin --config PATH --principal PRINCIPAL [OPTIONS]
 | `--config PATH` | Path to the server `config.yaml` whose durable auth backend to bootstrap. |
 | `--principal PRINCIPAL` | Existing external principal to grant global admin (e.g. `user:admin`). |
 | `--key-name NAME` | Human-readable label recorded for the bootstrap claim. |
+| `--show-key` | Print the minted API key's secret. Required when API keys are the only authenticator. Off by default. *Since 2.5.0.* |
 
 #### Behavior
 
@@ -495,13 +500,32 @@ mcp-hangar auth bootstrap-admin --config PATH --principal PRINCIPAL [OPTIONS]
   storage driver is non-durable (`memory` / `event_sourcing`).
 - A second run is refused without mutating storage — exactly one bootstrap
   succeeds.
-- Grants a global `admin` role to an existing external principal; it does **not**
-  create or print an API key or any raw secret. The grant is auditable.
+- Grants a global `admin` role to the principal, and mints an API key for it as
+  part of the same claim. The key is stored hashed; its secret is printed only
+  with `--show-key`, and is not recoverable afterwards. The grant is auditable.
+- *Since 2.5.0:* **omitting `--show-key` is refused when no OIDC issuer is
+  configured**, before the claim is spent. API keys are then the only way in, so
+  a run that withheld the secret would leave an admin nobody could present and a
+  claim that cannot be made again. The refusal names the flag while re-running
+  still works.
+- *Since 2.5.0:* a configuration with no authenticator at all — API keys
+  disabled and no trusted issuer — is refused on the same grounds.
 
 #### Example
 
+An OIDC deployment: the principal authenticates on its own identity, so no
+secret is needed.
+
 ```bash
 mcp-hangar auth bootstrap-admin --config /etc/mcp-hangar/config.yaml --principal user:alice@example.com
+```
+
+A deployment authenticated by API keys. Capture the secret from this run — there
+is no second one:
+
+```bash
+mcp-hangar auth bootstrap-admin --config /etc/mcp-hangar/config.yaml \
+  --principal service:my-app --show-key
 ```
 
 ---

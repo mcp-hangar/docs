@@ -586,10 +586,13 @@ Creates a rotating backup of the current configuration.
 
 The backup is written **next to the configuration file** as `<config>.bak1`,
 rotating older ones to `.bak2` and beyond. That directory has to be writable by
-the process. In the published container image it is not -- `/app` is owned by
-root and the gateway runs as `hangar` -- so this route answers `500` there,
-with `PermissionError` in the log. Mount a writable directory and point
-`--config` at it if you need this endpoint.
+the process, and in the published container image it is not: `/app` is owned by
+root and the gateway runs as `hangar`.
+
+*Since 2.5.0* that answers **503** with the reason --
+`could not write the backup beside 'config.yaml': Permission denied` -- rather
+than a bare `500` and `An internal server error occurred.`. Mount a writable
+directory and point `--config` at it if you need this endpoint.
 
 ```json
 ```

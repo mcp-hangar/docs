@@ -56,33 +56,41 @@ gone the moment the process it was minted in exits.
    401
    ```
 
-3. Grant the first administrator. Not over HTTP: `/api/auth/**` requires an
-   admin principal with no carve-out for the first call, so an unauthenticated
+3. Mint the first key. Not over HTTP: `/api/auth/**` requires an admin
+   principal with no carve-out for the first call, so an unauthenticated
    `POST /api/auth/keys` answers `401`. Stop the gateway and run:
 
    ```bash
-   mcp-hangar auth bootstrap-admin --config config.yaml --principal user:admin
+   mcp-hangar auth bootstrap-admin --config config.yaml \
+     --principal service:my-app --show-key
    ```
 
-   > **Read this before you plan around it.** The command assigns the global
-   > `admin` role to a principal that **already has a way to authenticate** --
-   > an OIDC subject, for instance. It creates an API key row as part of the
-   > same atomic claim but **deliberately does not print the secret**, so it
-   > cannot hand you a usable key for an API-key-only deployment. It is
-   > also one-shot: a second run exits 1 with "the initial administrator has
-   > already been bootstrapped".
-   >
-   > So on this recipe's configuration -- API keys and nothing else -- there is
-   > no supported way to obtain the first usable credential. To administer a
-   > gateway over HTTP today, give the admin an identity provider
-   > ([recipe 22](22-external-multitenant-oidc.md)) and bootstrap that
-   > principal; API keys are then minted by that admin for everything else.
+   ```
+   Initial global admin bootstrapped.
+     principal : service:my-app
+     key id    : N3xQ...
+     api key   : mcp_QWBXSRQ4OW...
 
-   With an admin credential in hand, later keys are ordinary API calls:
+   This secret is shown once and is not recoverable. It is stored hashed.
+   Anyone holding it is a global administrator of this deployment.
+   ```
+
+   > **`--show-key` matters and the claim is one-shot.** Without the flag the
+   > command grants the admin *role* and prints no secret -- right when the
+   > principal is an OIDC subject that authenticates on its own identity, and
+   > useless when API keys are all you have. A second run exits 1 with "the
+   > initial administrator has already been bootstrapped", so decide before you
+   > run it, not after.
+   >
+   > *Before 2.5.0 the secret was discarded unconditionally and this recipe's
+   > configuration had no way to reach its own gateway.*
+
+   Start the gateway again. With that key in hand, later keys are ordinary API
+   calls:
 
    ```bash
    curl -X POST http://localhost:8000/api/auth/keys \
-     -H "Authorization: Bearer <admin_token>" \
+     -H "X-API-Key: <the key from bootstrap>" \
      -H "Content-Type: application/json" \
      -d '{"principal_id": "service:my-app", "name": "My App Key"}'
    ```

@@ -173,13 +173,12 @@ production credential:
 # 1. Unauthenticated request is rejected
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/mcp_servers   # -> 401
 
-# 2. Obtain a credential. `/api/auth/**` is admin-only with no carve-out for
-#    the first key, so an unauthenticated POST here answers 401 --
-#    `auth bootstrap-admin` grants the admin ROLE to a principal that can
-#    already authenticate, and does not print a key secret. On an API-key-only
-#    staging profile there is no supported way to mint the first key; give the
-#    admin an OIDC identity (recipe 22) or carry a key over from a durable
-#    store you provisioned. See recipe 12 for the full explanation.
+# 2. Mint the first key with the gateway stopped. `/api/auth/**` is admin-only
+#    with no carve-out, so an unauthenticated POST here answers 401.
+#    `--show-key` prints the secret once; the claim is one-shot, so pass it now
+#    rather than discovering later that you needed it. See recipe 12.
+mcp-hangar auth bootstrap-admin --config config.staging.yaml \
+  --principal service:staging-smoke --key-name "Staging Smoke" --show-key
 
 # 3. Authenticated request succeeds
 curl -s -H "X-API-Key: <raw_key>" http://localhost:8000/api/mcp_servers   # -> 200

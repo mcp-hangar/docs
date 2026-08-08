@@ -42,17 +42,20 @@ discovery:                               # NEW: discovery configuration
    mcp-hangar serve --http --host 127.0.0.1 --port 8000
    ```
 
-3. Wait for the first scan. It runs on its own every
-   `discovery.refresh_interval_s`, on the instance holding the management lease
-   (see [25](25-multiple-replicas.md)); the log line to watch for is
-   `discovery_cycle_complete`.
+3. Scan. A source scans on its own every `discovery.refresh_interval_s`, on
+   the instance holding the management lease (see
+   [25](25-multiple-replicas.md)) -- the log line is `discovery_cycle_complete`.
+   To do it now, read the source's id and ask:
 
-   > There is no way to trigger a scan by hand for a source declared in
-   > `config.yaml`. `POST /api/discovery/sources/{id}/scan` addresses a
-   > separate registry that config-declared sources are never added to, so it
-   > answers `404` for every id you could obtain -- and
-   > `GET /api/discovery/sources` does not return an `id` field to try. Tracked;
-   > the scan endpoint is usable only for sources registered through the API.
+   ```bash
+   curl -s http://localhost:8000/api/discovery/sources    # each source carries an `id`
+   curl -X POST http://localhost:8000/api/discovery/sources/<id>/scan
+   ```
+
+   *Since 2.5.0.* The id of a source declared in `config.yaml` is derived from
+   its type, so it is the same after a restart and safe to keep in a script.
+   Earlier releases listed configured sources without an `id` and answered
+   `404` on this route for every id you could obtain.
 
 4. Check pending MCP servers:
 

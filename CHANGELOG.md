@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.16](https://github.com/mcp-hangar/docs/compare/v1.1.15...v1.1.16) (2026-08-08)
+
+
+### Changed
+
+* **guides:** the recipes can be run again ([#154](https://github.com/mcp-hangar/docs/issues/154)) ([ec5a913](https://github.com/mcp-hangar/docs/commit/ec5a913f216a448f527e479e4a46b0b567aa156a))
+* **guides:** three dead ends that are no longer dead ([#158](https://github.com/mcp-hangar/docs/issues/158)) ([2124ff4](https://github.com/mcp-hangar/docs/commit/2124ff44712d8ffa895fc6d0844b276b42e3dc0a))
+* **reference:** remove two knobs nothing reads, and correct a third ([#157](https://github.com/mcp-hangar/docs/issues/157)) ([38cc999](https://github.com/mcp-hangar/docs/commit/38cc999bc8072cbef3aaa616b6303698971e5147))
+* **reference:** the REST reference matches the API ([#156](https://github.com/mcp-hangar/docs/issues/156)) ([b07e563](https://github.com/mcp-hangar/docs/commit/b07e563319ea7a02b6407162d9da417fe06f135a))
+
 ## [1.1.15](https://github.com/mcp-hangar/docs/compare/v1.1.14...v1.1.15) (2026-08-07)
 
 

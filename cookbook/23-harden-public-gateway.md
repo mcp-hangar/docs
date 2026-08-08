@@ -203,6 +203,61 @@ rate caps, DDoS rules, and the SIEM pipeline -- are intentionally **absent**
 here. They are external-infrastructure, and their concrete configuration is
 exactly what security review must approve before publication.
 
+## PostgreSQL Connection Pooling
+
+*Applies when `persistence.backend: postgresql`.* Ownership:
+**external-infrastructure** (the pooler and the database), with an application
+note.
+
+Hangar talks to PostgreSQL through an in-process connection pool. That pool
+returns a connection to the pool only after rolling back whatever transaction
+was on it, and the auth store's read paths (`get_role`,
+`get_roles_for_principal`, `list_keys`, `count_keys`, and the key-lookup miss)
+commit the transaction their `SELECT` opened before yielding the connection
+back. So a single Hangar process does not hand back a connection that is *idle
+in transaction*.
+
+That guarantee is about the *in-process* pool. If you additionally place an
+external connection pooler -- **pgbouncer** is the common one -- between Hangar
+and PostgreSQL, its **pooling mode** matters:
+
+- **Session pooling** (recommended) assigns a server connection to a client for
+  the life of the client connection. This matches how Hangar's own pool holds
+  connections, and a transaction that is briefly left open blocks nothing but
+  that one already-dedicated server connection.
+- **Transaction pooling** returns the server connection to pgbouncer's pool
+  only at the *end of each transaction* (`COMMIT`/`ROLLBACK`). A connection that
+  is handed back to Hangar's in-process pool mid-transaction -- or any future
+  read path added without closing its transaction -- would be seen by pgbouncer
+  as still in a transaction, so pgbouncer cannot reclaim that server connection.
+
+Under transaction pooling, a stray open read transaction is not merely untidy:
+
+1. **pgbouncer server-connection pinning and exhaustion.** Each un-closed
+   transaction pins one of pgbouncer's finite server connections. Enough of them
+   and the pool has nothing left to lend, and *new authentication requests
+   cannot obtain a backend connection* -- an auth-path outage at exactly the
+   layer this guide is hardening.
+2. **VACUUM bloat.** An open transaction -- even a read-only one -- holds a
+   snapshot, which holds back the `xmin` horizon that `VACUUM` may reclaim below.
+   Dead tuples in the auth tables accumulate and the tables bloat until the
+   transaction ends.
+
+So, if you deploy behind pgbouncer in transaction-pooling mode, add a
+database-side backstop that force-closes any transaction left idle:
+
+```sql
+-- On the database or the Hangar role: cap how long a session may sit
+-- "idle in transaction" before the server aborts it and frees the connection.
+ALTER ROLE hangar SET idle_in_transaction_session_timeout = '30s';
+```
+
+Prefer **session pooling** if you have the connection budget for it -- it sizes
+against Hangar's own pool (`persistence.postgresql` `min_connections` /
+`max_connections`) and removes the failure mode rather than bounding it.
+`idle_in_transaction_session_timeout` is the belt-and-suspenders backstop when
+transaction pooling is a hard requirement.
+
 ## Try It: Tenant-Scoped Read-Only Provider + Global Withdrawal
 
 You can rehearse the two guarantees that matter most at the edge against your
@@ -275,6 +330,19 @@ State what you are defending against, and what you are not.
 | Compromised backend provider | Least-privilege per-provider service account; sandboxed container providers (recipe 20); deny-by-default L7 egress policy ([`MCPEgressPolicy`](../guides/EGRESS_POLICY.md)) constraining which upstreams/tool calls/arguments a server may make | provider + application |
 | Lost or tampered audit trail | Durable event log -- a selected `persistence.backend`, or `allow_memory_fallback: false` on 2.4.0 and earlier -- plus immutable SIEM ingest | application + external-infrastructure |
 | TLS interception | Managed/publicly trusted edge cert; verified backend TLS (`tls.verify_ssl: true`, the default) | external-infrastructure + provider |
+| SSRF / DNS rebinding to internal endpoints | A human-registered endpoint is refused if it resolves to any private range or the cloud metadata address; the check is re-applied **at connect time** against the IP actually dialed, and the connection is pinned to that validated IP (the original hostname is kept for the `Host` header and TLS verification), so a name that passed registration cannot be re-pointed at `169.254.169.254` / `10.x` / `127.0.0.1` on a later call. A discovery-sourced endpoint may be private, but only at an address the container runtime reported for it. | application |
+
+**Backend SSRF / DNS rebinding.** The endpoint an operator registers for a
+remote (HTTP) MCP server is validated for SSRF when it is registered *and* again
+on every outbound connection: the guard re-resolves the hostname, refuses it if
+it now resolves to a private range or the cloud metadata endpoint (for a
+human-supplied endpoint), and connects to the exact IP it validated while
+sending the original hostname as the `Host` header and TLS SNI. This closes DNS
+rebinding, where a name that resolved to a public address at registration is
+re-pointed at an internal one before the next tool call. A discovery-sourced
+endpoint is allowed to be private, but only at the specific address the
+container runtime reported for it -- provenance grants a *named address*, not a
+whole private range.
 
 **Out of scope / not claimed here:** Hangar is an OAuth *Resource Server*; it
 validates tokens but never issues them -- IdP hardening is the provider's job.
@@ -312,6 +380,10 @@ adds the public-edge items.
       durable volume, or `postgresql` on a managed, backed-up database; backups
       verified restorable. On 2.4.0 and earlier: `auth.storage.driver: sqlite`
       plus a durable `event_store` with `allow_memory_fallback: false`.
+- [ ] **Connection pooling:** if PostgreSQL is fronted by pgbouncer, use
+      **session pooling**, or set `idle_in_transaction_session_timeout` on the
+      Hangar role when transaction pooling is required (see
+      [PostgreSQL Connection Pooling](#postgresql-connection-pooling)).
 - [ ] **Logging / SIEM:** `MCP_JSON_LOGS=true`, `MCP_LOG_LEVEL=INFO`; logs shipped
       to an append-only, access-controlled SIEM.
 - [ ] **HA:** *since 2.5.0* -- replicas require one shared

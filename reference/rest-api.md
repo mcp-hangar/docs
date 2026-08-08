@@ -386,6 +386,13 @@ DELETE /groups/{group_id}/members/{member_id}
 
 ## Discovery
 
+> **Preview — source management.** Registering, updating, deleting, scanning, and
+> enabling/disabling a discovery source (every endpoint below except *List Sources*)
+> ships in 2.5.0 as **Preview**, not GA: the behaviour may still change. Each of
+> those responses carries the header `X-Hangar-Preview: discovery-source-management`
+> so a client can detect the preview status programmatically. *List Sources* and the
+> approval workflow are stable.
+
 ### List Sources
 
 ```

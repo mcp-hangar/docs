@@ -57,6 +57,12 @@ discovery:                               # NEW: discovery configuration
    Earlier releases listed configured sources without an `id` and answered
    `404` on this route for every id you could obtain.
 
+   > **Preview.** Triggering a scan and the other source-management routes
+   > (register/update/delete/enable/disable) ship in 2.5.0 as **Preview**, not
+   > GA — the behaviour may still change. Those responses carry the header
+   > `X-Hangar-Preview: discovery-source-management`. Listing sources and the
+   > approval workflow are stable.
+
 4. Check pending MCP servers:
 
    ```bash

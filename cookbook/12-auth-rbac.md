@@ -76,11 +76,20 @@ gone the moment the process it was minted in exits.
    ```
 
    > **`--show-key` matters and the claim is one-shot.** Without the flag the
-   > command grants the admin *role* and prints no secret -- right when the
-   > principal is an OIDC subject that authenticates on its own identity, and
-   > useless when API keys are all you have. A second run exits 1 with "the
-   > initial administrator has already been bootstrapped", so decide before you
-   > run it, not after.
+   > command prints no secret -- right when the principal is an OIDC subject
+   > that authenticates on its own identity, and useless when API keys are all
+   > you have. On this recipe's configuration, which has no `auth.oidc` block,
+   > omitting it is therefore **refused before the claim is spent**:
+   >
+   > ```
+   > Error: Nothing could use this administrator: API keys are the only
+   > authenticator, and the key's secret would not be printed.
+   > ```
+   >
+   > So a forgotten flag costs you one command. What it used to cost is the
+   > deployment: the claim was spent, and a second run exits 1 with "the initial
+   > administrator has already been bootstrapped" while the secret sits in the
+   > database as a hash.
    >
    > *Before 2.5.0 the secret was discarded unconditionally and this recipe's
    > configuration had no way to reach its own gateway.*

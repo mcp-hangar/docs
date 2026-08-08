@@ -48,9 +48,12 @@ There is no `role` field on this route -- a key carries a principal, and roles
 are assigned to the principal separately (see below).
 
 Getting the **first** admin key is a different problem: `/api/auth/**` requires
-an admin principal with no carve-out, and `mcp-hangar auth bootstrap-admin`
-grants the admin role to a principal that can already authenticate without
-printing a key secret. See
+an admin principal with no carve-out, so nothing can mint it over HTTP.
+`mcp-hangar auth bootstrap-admin` is the way in. It grants the admin role and
+mints a key in one one-shot claim, and `--show-key` decides whether that key's
+secret is printed -- unnecessary for an OIDC principal that authenticates on its
+own identity, and required when API keys are all you have, where *since 2.5.0*
+omitting it is refused rather than silently spending the claim. See
 [recipe 12](../cookbook/12-auth-rbac.md) for what that means in practice.
 
 ### 3. Use the API Key

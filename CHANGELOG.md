@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.17](https://github.com/mcp-hangar/docs/compare/v1.1.16...v1.1.17) (2026-08-08)
+
+
+### Changed
+
+* **reference:** the CLI and the source listing say what they do ([#159](https://github.com/mcp-hangar/docs/issues/159)) ([54a92fb](https://github.com/mcp-hangar/docs/commit/54a92fb1f0943855e0756d6aa76ea75deaf7fe85))
+* **release:** the upgrade note for 2.5.0 ([#160](https://github.com/mcp-hangar/docs/issues/160)) ([b5ff3e7](https://github.com/mcp-hangar/docs/commit/b5ff3e7192187c260c9bcdc3255f63820655df53))
+
 ## [1.1.16](https://github.com/mcp-hangar/docs/compare/v1.1.15...v1.1.16) (2026-08-08)
 
 

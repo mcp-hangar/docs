@@ -121,6 +121,22 @@ Configuration values support environment variable interpolation using the `${VAR
 
 - `${VAR_NAME}` - Replace with environment variable value
 - `${VAR_NAME:-default}` - Use default value if not set
+- `${VAR_NAME:-}` - Allow an empty value, explicitly
+
+This is a property of the whole configuration document, not of the transport
+section it is documented in -- `persistence`, `auth`, `observability` and the
+rest read the same way. *Before 2.5.0 it applied only inside
+`mcp_servers.<id>.auth`, and a `${VAR}` anywhere else arrived as those literal
+characters.*
+
+A `${VAR}` that is unset and has no default is **fail-closed**: it refuses
+startup rather than substituting an empty string, naming the variable. Since
+2.5.0 that refusal covers the whole document, so a key you never had to set
+before can now stop a boot. Use `${VAR:-}` where an empty value is intended.
+
+The document is interpolated once, so a value that *contains* a literal
+`${...}` -- a generated password, say -- is passed through untouched rather than
+being read as another reference.
 
 Example:
 

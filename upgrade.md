@@ -4,6 +4,186 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.5.0
+
+**Nothing changes until you select a storage backend.** The release adds
+`persistence.backend` and multi-replica coordination, and a configuration that
+sets neither is unaffected -- omitting `persistence` keeps per-subsystem storage
+exactly as it was. That is deliberate: a storage rewiring must not change what a
+running deployment does.
+
+Four things below apply to every deployment regardless: interpolation, the
+bootstrap command, TLS, and the backup endpoint. Read those even if you are not
+opting in.
+
+### Selecting a backend takes over every persisted concern
+
+`persistence.backend: sqlite | postgresql` chooses storage for all of it at
+once: the event log and its delivery mark, server configuration, the audit
+trail, saga state, approvals, API keys, roles, tool-access policies, metric
+history and the management lease. A backend serves every one of them or the
+selection is refused -- which is what makes the half-configured deployment
+unrepresentable. Before 2.5.0 you could select the PostgreSQL auth driver and
+silently lose tool-access policy management with it.
+
+Two consequences to check before you roll out:
+
+- **A per-subsystem key naming a different backend now refuses startup.**
+  `auth.storage.driver` and `event_store.driver` are compared against your
+  selection, and a contradiction fails the boot rather than being resolved by a
+  precedence rule. Whichever way such a rule fell, half of what you wrote would
+  be ignored -- and the half that loses is the one written most recently.
+  `memory` is exempt: it is a testing choice, not a storage backend.
+- **`event_store.allow_memory_fallback` no longer has anything to decide.** With
+  a backend selected, the log and its delivery mark come from it, and a backend
+  is durable as a whole. Keep the key if you are not selecting a backend; it
+  still fails a non-durable store fast there.
+
+**There is no migration between backends.** Selecting PostgreSQL on a gateway
+that has been running on SQLite starts an empty database -- it does not move
+what is in the file.
+
+### Selecting PostgreSQL turns coordination on, at one replica
+
+This is the one that can surprise a single-node deployment. Coordination keys
+off whether the storage **can be shared**, not off how many replicas you run, so
+a single gateway on PostgreSQL takes a management lease and reports
+`coordinates_with_peers: true`. It manages the fleet, because it is the holder --
+nothing stops working.
+
+What does change: **registering a `subprocess`, `docker` or `container` server
+through the API is refused** (HTTP 422). Those modes attach a child process's
+stdio to one gateway, and any peer that learned of such a server would start its
+own copy. Servers already declared in `config.yaml` keep working -- the refusal
+is on the registration path, not the startup one.
+
+If that deployment is genuinely single-node and wants to keep registering local
+modes at runtime, stay on `persistence.backend: sqlite`, which is not shareable
+and therefore not coordinated.
+
+### A declared cluster refuses a child-process server outright
+
+The paragraph above is about *runtime registration*. Servers declared in
+`config.yaml` take a different path, and when the deployment declares a
+`coordination:` block they are refused **at startup**, naming every offender at
+once:
+
+```
+this gateway is configured as part of a cluster (`coordination:`), and
+'reports' is 'subprocess'. ... Use `remote` mode for servers several replicas
+must serve, or remove the `coordination:` block to run this as a single gateway.
+```
+
+Without the block nothing here fires, which is the point of asking on that axis:
+a single gateway that merely uses PostgreSQL keeps running its child processes
+exactly as before.
+
+### A `coordination:` block requires PostgreSQL
+
+Adding `coordination:` is the statement that these replicas are meant to be
+**one** gateway. On a file-backed backend it refuses to start, because replicas
+that cannot share storage are not a cluster -- each would hold its own fleet and
+its own lease and never notice the others. Not hypothetical: three replicas on
+SQLite each reported `manages_fleet: true`, with every health check green.
+
+Running many pods each with their own storage stays legitimate -- that is many
+gateways. What is refused is calling them one.
+
+### If you already run more than one replica
+
+Through 2.4.0 the documentation said not to, and the failure was silent rather
+than loud. To make a replica set safe on 2.5.0 you need all three of: one
+PostgreSQL every replica shares, a `coordination:` block, and `remote`-mode
+servers. Then check it pod by pod rather than through the Service -- exactly one
+should answer `manages_fleet: true` at `GET /api/system`.
+
+Two costs are worth knowing before the rollout rather than after: rate limits are
+counted **per instance** (three replicas admit three times the configured rate --
+a fleet-wide cap belongs at the ingress), and anything travelling by the shared
+log reaches peers within a poll interval rather than immediately.
+
+Full recipe: [running more than one replica](cookbook/25-multiple-replicas.md).
+The decisions and their failure modes are in
+[ADR-020](adr/ADR-020-high-availability.md).
+
+### `${VAR}` is interpolated everywhere, and an unset one now fails the boot
+
+Interpolation used to work inside `mcp_servers.<id>.auth` and nowhere else,
+while the documentation described it as a property of configuration. If you kept
+a secret out of the file the way the
+[production checklist](cookbook/13-production-checklist.md) says to, and it
+silently arrived as the literal characters `${...}`, this is why.
+
+The refusal moved with it. A `${VAR}` with no value and no `:-default` has always
+been fail-closed, and now fails the **whole boot** rather than only the `auth`
+sub-block:
+
+```
+ConfigurationError: Required environment variable '${HANGAR_DB_PASSWORD}' is not
+set and has no default. Use '${HANGAR_DB_PASSWORD:-default}' to provide a
+default value, or '${HANGAR_DB_PASSWORD:-}' to explicitly allow an empty value.
+```
+
+So check the keys you never had to set before -- `${VAR:-}` allows an empty value
+explicitly. A value that *contains* a literal `${...}`, such as a generated
+password, is safe: the document is interpolated once, so substituted text is
+never rescanned.
+
+### `auth bootstrap-admin` requires `--show-key` when API keys are the only way in
+
+On a deployment with no trusted OIDC issuer, omitting `--show-key` is refused
+before anything is written:
+
+```
+Error: Nothing could use this administrator: API keys are the only
+authenticator, and the key's secret would not be printed.
+```
+
+**Who is affected:** anything that scripts `mcp-hangar auth bootstrap-admin`
+against a config without an `auth.oidc` block. Add `--show-key` and capture the
+secret the run prints.
+
+**Why it refuses rather than warns.** The claim is one-shot and the key it mints
+is stored hashed, so a run that ends without printing the secret can be neither
+repeated nor recovered from. It used to end by advising a re-run with the flag,
+at the moment re-running had become impossible -- the second run answers *the
+initial administrator has already been bootstrapped*, and `bootstrap-admin` is
+the only subcommand in the auth CLI. The refusal costs one command; the advice
+cost the deployment.
+
+Nothing changes for a deployment that trusts an OIDC issuer: the principal
+authenticates on its own identity and needs no secret. A store whose claim was
+already spent with the secret discarded is recovered by clearing its
+`initial_admin_bootstrap` row, or starting from a fresh auth store, and
+re-running with the flag. See [recipe 12](cookbook/12-auth-rbac.md).
+
+### Per-server TLS settings now reach the connection
+
+`mcp_servers.<id>.tls.verify_ssl` and `tls.ca_cert_path` were accepted and
+silently discarded before 2.5.0 -- the HTTP client passes an explicit transport
+for retries, and the transport was built without them.
+
+- `ca_cert_path` failing was pure loss: an upstream behind your own CA was
+  unreachable with no way to fix it from configuration. It works now.
+- `verify_ssl: false` failed **closed**, so it looked like a stubborn
+  certificate. It now does exactly what it says. If you left that line in a
+  configuration expecting it to be inert, **verification really is off now** --
+  the gateway logs a warning naming the endpoint on every such upstream at
+  startup. Trusting a private CA through `ca_cert_path` is verification and
+  stays quiet.
+
+### `POST /api/config/backup` answers 503 instead of 500
+
+The backup is written beside the configuration file, so it fails wherever that
+directory is not writable -- which is every deployment on the published image,
+where `/app` is owned by root and the gateway runs as `hangar`. The caller used
+to get `500` and `An internal server error occurred.`, with the real reason in
+the log only.
+
+It now answers `503` naming the path and the reason. Anything monitoring this
+endpoint on status code should expect `503` for a filesystem refusal; mount a
+writable directory and point `--config` at it if you need it to succeed.
+
 ## Upgrade to 2.4.0
 
 Drop-in for a default deployment. Everything below affects deployments that run

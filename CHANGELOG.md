@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.18](https://github.com/mcp-hangar/docs/compare/v1.1.17...v1.1.18) (2026-08-09)
+
+
+### Changed
+
+* discovery source-management Preview + connect-time SSRF + pg pooling ([#162](https://github.com/mcp-hangar/docs/issues/162)) ([55f2448](https://github.com/mcp-hangar/docs/commit/55f24487dab758304fa703ae5c90b2927ba9e1ed))
+* **release:** advertise mcp-hangar 2.5.0 ([#164](https://github.com/mcp-hangar/docs/issues/164)) ([2c51c6d](https://github.com/mcp-hangar/docs/commit/2c51c6d6061295ea9f771bf025eeb48a4f7e7a3c))
+
 ## [1.1.17](https://github.com/mcp-hangar/docs/compare/v1.1.16...v1.1.17) (2026-08-08)
 
 

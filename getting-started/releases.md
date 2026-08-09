@@ -117,7 +117,7 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.4.0**, released 2026-08-05 — a plain `pip install
+The stable Python core is **2.5.0**, released 2026-08-08 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
 the MCP 2026-07-28 protocol generation.
 
@@ -213,8 +213,8 @@ reshaped Tasks calls now.
 Install it:
 
 ```bash
-pip install mcp-hangar                # 2.4.0, the current stable release
-pip install "mcp-hangar==2.4.0"       # pin it explicitly
+pip install mcp-hangar                # 2.5.0, the current stable release
+pip install "mcp-hangar==2.5.0"       # pin it explicitly
 ```
 
 Watch the [Releases page](https://github.com/mcp-hangar/mcp-hangar/releases) for

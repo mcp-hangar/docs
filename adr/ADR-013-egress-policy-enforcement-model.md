@@ -1,6 +1,6 @@
 # ADR-013: Egress Policy Enforcement Model (MCPEgressPolicy)
 
-**Status:** Accepted
+**Status:** Accepted -- scope corrected 2026-08-09 against the operator source: phases 1--3 did ship in `v0.13.0` as stated below, but they are narrower than the summary implies. The admission gate keys on the pod's self-declared `mcp-hangar.io/provider` label (a pod without it is admitted), and the image-digest check defaults to `warn`. See [OWASP MCP Top 10 coverage](../security/OWASP_MCP_TOP_10_COVERAGE.md).
 **Date:** 2026-07-18
 **Authors:** MCP Hangar Team
 **Related:** Builds on the enforcement roadmap (mcp-hangar-operator #50 admission, #51 default-deny egress, #52 image pinning — shipped as operator phases 1–3, v0.13.0). Decision issue: mcp-hangar-operator#53. Positioning: mcp-hangar-website#85 (enforcement-plane reposition). Depends on the interceptor/pin posture in [ADR-012](ADR-012-interceptor-sep-pin-tracking-policy.md).

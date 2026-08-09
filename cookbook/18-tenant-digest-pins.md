@@ -4,6 +4,7 @@
 > **You will need:** MCP Hangar 1.6.0, an OIDC issuer minting JWTs with a `tenant_id` claim, a backend whose tool schema you can pin
 > **Time:** ~20 minutes
 > **Adds:** Per-tenant digest pins on the call path, per-server enforcement modes (audit/warn/block)
+> **Concept:** [Digest pinning: tool schemas can't drift under you](https://mcp-hangar.io/learn/digest-pinning)
 
 ## The Problem
 

@@ -1,5 +1,7 @@
 # Progressive Deployment Playbook
 
+> **New to this?** [What Hangar costs — and where it stops](https://mcp-hangar.io/learn/costs-and-boundaries) is the concept behind this page.
+
 This is the umbrella guide for taking MCP Hangar from a laptop to an
 internet-facing, authenticated gateway. It is a **maturity model**: each stage
 adds exactly one class of guarantee on top of the previous one, so you never

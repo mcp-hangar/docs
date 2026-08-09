@@ -4,6 +4,7 @@
 > **You will need:** Docker, MCP Hangar 1.2.0 (or earlier) with pinned tool digests
 > **Time:** 20 minutes plus one audit window
 > **Adds:** Safe migration to RFC 8785 JCS digests (introduced in v1.2.1)
+> **Concept:** [Digest pinning: tool schemas can't drift under you](https://mcp-hangar.io/learn/digest-pinning)
 
 ## The Problem
 

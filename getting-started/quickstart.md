@@ -1,5 +1,7 @@
 # Quick Start
 
+> **New to this?** [From install to a governed deny in 10 minutes](https://mcp-hangar.io/learn/from-install-to-a-governed-deny) is the concept behind this page.
+
 Get MCP Hangar running with Claude Desktop in under 30 seconds.
 
 ## One-Liner Install

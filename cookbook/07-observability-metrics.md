@@ -4,6 +4,7 @@
 > **You will need:** Running Hangar in HTTP mode, Docker for monitoring stack
 > **Time:** 10 minutes
 > **Adds:** Prometheus metrics and Grafana dashboards
+> **Concept:** [Governance observability](https://mcp-hangar.io/learn/governance-observability)
 
 ## The Problem
 

@@ -1,5 +1,7 @@
 # Egress Policy (MCPEgressPolicy)
 
+> **New to this?** [The L7 MCPEgressPolicy language](https://mcp-hangar.io/learn/the-l7-mcpegresspolicy-language) is the concept behind this page.
+
 Declarative, deny-by-default egress policy for MCP servers: control which upstreams a server may reach, which tool calls it may make, and what happens when the answer is no.
 
 ## Overview

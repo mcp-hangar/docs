@@ -1,5 +1,7 @@
 # Observability Guide
 
+> **New to this?** [Governance observability](https://mcp-hangar.io/learn/governance-observability) is the concept behind this page.
+
 This guide covers MCP Hangar's observability features: metrics, tracing, logging, and health checks.
 
 ## Table of Contents

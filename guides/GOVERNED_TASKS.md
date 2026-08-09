@@ -1,5 +1,7 @@
 # Governed Tasks (Task Relay)
 
+> **New to this?** [Governed async tasks: relay-with-governance, not an executor](https://mcp-hangar.io/learn/relay-with-governance) is the concept behind this page.
+
 Governance for asynchronous MCP tasks: Hangar relays an upstream-created task and interposes ownership, digest re-verification, a `task_id`-keyed audit chain, and a fail-closed mid-flight consent gate on its lifecycle -- without ever executing the task.
 
 > **Shipped in 2.0.0.** Everything here is in the stable release. It is **not** in the closed 1.6.x line, where any upstream task handle is still rejected `TaskRelayNotSupported`.

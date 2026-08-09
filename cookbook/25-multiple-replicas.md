@@ -2,6 +2,8 @@
 
 *Since 2.5.0.*
 
+> **New to this?** [Two Hangars, one verdict](https://mcp-hangar.io/learn/more-than-one-hangar) is the concept behind this page.
+
 Until 2.5.0 the honest advice was to run one Hangar and make its restart fast.
 More than one replica did not fail loudly -- it produced a gateway that
 disagreed with itself: a server registered on one replica was invisible to the

@@ -1,6 +1,7 @@
 # 13 -- Production Checklist
 
 > Before you go live, walk through this list.
+> **Concept:** [What Hangar costs — and where it stops](https://mcp-hangar.io/learn/costs-and-boundaries)
 
 ## Security
 

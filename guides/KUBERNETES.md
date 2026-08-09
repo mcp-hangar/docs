@@ -1,5 +1,7 @@
 # Kubernetes Integration
 
+> **New to this?** [Two Hangars, one verdict](https://mcp-hangar.io/learn/more-than-one-hangar) is the concept behind this page.
+
 Deploy and manage MCP servers as native Kubernetes resources using the MCP-Hangar Operator.
 
 > **The MCP-Hangar Operator is shipped from a separate repository:

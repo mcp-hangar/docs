@@ -1,5 +1,7 @@
 # Architecture
 
+> **New to this?** [What is a policy enforcement plane?](https://mcp-hangar.io/learn/what-is-a-policy-enforcement-plane) is the concept behind this page.
+
 ## Overview
 
 MCP Hangar is the **Kubernetes-native policy enforcement plane for MCP**. Every

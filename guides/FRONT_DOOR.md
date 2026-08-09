@@ -1,5 +1,7 @@
 # Front-Door Mode & Per-Tenant Tool Governance
 
+> **New to this?** [The request path](https://mcp-hangar.io/learn/the-request-path) is the concept behind this page.
+
 Hangar 1.3 introduces a **topology mode** that controls how Hangar treats the
 callers in front of it. The default mode, `egress`, assumes Hangar sits behind
 trusted internal callers and proxies them out to back-end MCP servers. The new

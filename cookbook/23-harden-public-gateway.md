@@ -4,6 +4,7 @@
 > **You will need:** A working front-door deployment (recipe 22), plus platform ownership of your public edge (managed LB/WAF, DNS, certificates)
 > **Time:** Read first, then plan -- this is a reference architecture, not a 20-minute run
 > **Adds:** The trust boundary, control catalog, threat model, launch checklist, rollback plan, and incident-response handoff for exposing a Hangar front door to the public internet
+> **Concept:** [Enforcement plane vs API gateway for MCP](https://mcp-hangar.io/learn/enforcement-plane-vs-api-gateway)
 
 ## The Problem
 

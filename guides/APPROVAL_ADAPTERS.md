@@ -1,5 +1,7 @@
 # Approval delivery adapters
 
+> **New to this?** [Mid-flight consent for async tools](https://mcp-hangar.io/learn/mid-flight-consent) is the concept behind this page.
+
 Hangar's approval gate holds a `tools/call` until a human decides. **Where that decision is asked for, and how the answer comes back, is not core's business.**
 
 Core ships two channels — `dashboard` and `noop` — and resolves everything else from the `mcp_hangar.approvals.delivery` entry-point group. A vendor integration is a package you install, not a branch in the gateway. The reasoning is in [ADR-016](../adr/ADR-016-approval-resolution-chokepoint.md).

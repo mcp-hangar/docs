@@ -17,6 +17,7 @@
 > **Adds:** A declarative, deny-by-default `MCPEgressPolicy` that controls which
 > upstreams a server may reach, which tool calls it may make, and what happens
 > when a call carries a secret or an oversized payload
+> **Concept:** [The L7 MCPEgressPolicy language](https://mcp-hangar.io/learn/the-l7-mcpegresspolicy-language)
 
 ## The Problem
 

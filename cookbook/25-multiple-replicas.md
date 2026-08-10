@@ -77,19 +77,15 @@ Everything else is a *projection*: fleet membership, risk scores, session
 suspensions and the websocket event feed are rebuilt on every replica from the
 shared event log, so what you get back does not depend on which pod answered.
 
-**Two things are not.** The first is not an answer at all but a defence.
-*In 2.5.0*, a `remote` server registered through the REST API is re-checked
-against the SSRF policy on every outbound connection -- but only on the replica
-that handled the registration, and only until that replica restarts. The shared
-record a follower rebuilds the server from does not carry the enforcement flag,
-so on every other pod the same server connects with the connect-time guard
-**off**, leaving the validation the endpoint passed at registration as what
-holds fleet-wide. Deleting and re-registering the server re-arms it on whichever
-replica serves that call, and no other. See
-[hardening a public gateway](23-harden-public-gateway.md#threat-model) for the
-consequence and the remedy.
+**One thing is not, and one was not until 2.5.1.** The connect-time SSRF guard
+on a registered `remote` server used to be armed only on the replica that
+handled the registration: the shared record a follower rebuilt it from did not
+carry the enforcement flag, so every other pod connected with the guard off.
+From 2.5.1 the record carries it and the guard holds on every replica. On 2.5.0,
+it does not -- see
+[hardening a public gateway](23-harden-public-gateway.md#threat-model).
 
-**The second is what a pod can tell you about a server's tools.** They are
+**What a pod can tell you about a server's tools is still per-replica.** They are
 learned by connecting to it, so `GET /api/mcp_servers/<id>/tools` reports what
 *that* replica has seen -- a pod
 that has never started the server answers `[]`, and it can stay that way while

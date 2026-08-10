@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.19](https://github.com/mcp-hangar/docs/compare/v1.1.18...v1.1.19) (2026-08-10)
+
+
+### Changed
+
+* **guides:** point the deepest pages back at the concept behind them ([#168](https://github.com/mcp-hangar/docs/issues/168)) ([1849ef0](https://github.com/mcp-hangar/docs/commit/1849ef088f41493a36c963db2edc979fb9f0d411))
+* **operations:** write down the release surfaces so they stop drifting ([#169](https://github.com/mcp-hangar/docs/issues/169)) ([fd0cd9c](https://github.com/mcp-hangar/docs/commit/fd0cd9c85faef0abe99456960a01c54501e4d334))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#165](https://github.com/mcp-hangar/docs/issues/165)) ([352e16f](https://github.com/mcp-hangar/docs/commit/352e16f01006b9f87616ba1f986c586a48aa796e))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#167](https://github.com/mcp-hangar/docs/issues/167)) ([d03c9a4](https://github.com/mcp-hangar/docs/commit/d03c9a4a72876f1ce2b90f1caeb00c08f9000e7b))
+* **security:** settle MCP04 and MCP09 against the operator source ([#170](https://github.com/mcp-hangar/docs/issues/170)) ([5b7eee5](https://github.com/mcp-hangar/docs/commit/5b7eee508132ec3ab399176cff11f9929e3fef6b))
+
 ## [1.1.18](https://github.com/mcp-hangar/docs/compare/v1.1.17...v1.1.18) (2026-08-09)
 
 

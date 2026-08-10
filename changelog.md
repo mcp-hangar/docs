@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.20](https://github.com/mcp-hangar/docs/compare/v1.1.19...v1.1.20) (2026-08-10)
+
+
+### Changed
+
+* **architecture:** record which of ADR-019's limits coordination settled ([#175](https://github.com/mcp-hangar/docs/issues/175)) ([2c86d5f](https://github.com/mcp-hangar/docs/commit/2c86d5fb8df44e8359069270628f42fff12dfd01))
+* **guides:** what the SSRF guard covers, and what a replica set needs installed ([#174](https://github.com/mcp-hangar/docs/issues/174)) ([2a5a36d](https://github.com/mcp-hangar/docs/commit/2a5a36d50751cacfae74ed0814f0cb60fb5eb054))
+* **reference:** the reference surfaces 2.5.0 changed ([#172](https://github.com/mcp-hangar/docs/issues/172)) ([5e19b40](https://github.com/mcp-hangar/docs/commit/5e19b406ada2731de4b8538be21e3e61ce3a16d9))
+* **release:** the pages that name a version name 2.5.0 ([#173](https://github.com/mcp-hangar/docs/issues/173)) ([a1db213](https://github.com/mcp-hangar/docs/commit/a1db2138cbbe964686e5345d6ac8ed509cf0de61))
+* **repo:** one changelog file, and release-please writes to it ([#171](https://github.com/mcp-hangar/docs/issues/171)) ([1f41794](https://github.com/mcp-hangar/docs/commit/1f417943b335678ccc2e379dfab8de5d4829711c))
+
 ## [1.1.19](https://github.com/mcp-hangar/docs/compare/v1.1.18...v1.1.19) (2026-08-10)
 
 

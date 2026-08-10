@@ -5,6 +5,7 @@
     ".": {
       "package-name": "@mcp-hangar/docs",
       "release-type": "node",
+      "changelog-path": "changelog.md",
       "bump-minor-pre-major": false,
       "draft": false,
       "prerelease": false,

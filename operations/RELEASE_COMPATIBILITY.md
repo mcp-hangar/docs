@@ -75,7 +75,7 @@ version, not just the image tag, if you are staying on an older line.
 Rules for reading and extending the matrix:
 
 - **Core** is the reference axis: every supported combination pins a concrete
-  core minor (`v2.5.0` is the current published core; `1.6.x` is closed and
+  core minor (`v2.5.1` is the current published core; `1.6.x` is closed and
   receives no fixes, including the approval-authorization fix released in 2.0.0).
 - **Operator / Helm** columns carry the released version; the verified
   digests are in *Released artifacts* below. Both lanes have landed

@@ -4,6 +4,64 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.5.1
+
+Drop-in from 2.5.0 in the sense that nothing you wrote has to change. Two things
+are worth acting on rather than reading past.
+
+### The connect-time SSRF guard was not surviving a restart
+
+2.5.0 added a second SSRF check on every outbound connection, with the
+connection pinned to the validated address, so a hostname that passed
+registration could not be re-pointed at `169.254.169.254`, `10.x` or
+`127.0.0.1` before the next tool call. The flag that arms it was never written
+to the stored server record, so **any server rebuilt from that record came back
+without it** -- after every restart, and on every replica that learned of the
+registration from the shared log rather than performing it.
+
+**What that means for a gateway running 2.5.0.** If it has restarted since a
+`remote` server was registered through the REST API or by discovery, that
+upstream has been reached with registration-time validation only. The endpoint
+was still checked once, when it was registered; what lapsed is the re-check that
+defends against the name being re-pointed afterwards. In a replica set, only the
+replica that handled the registration ever had the guard.
+
+**What to do: upgrade and restart.** The guard is restored for servers already
+in the store -- no re-registration, no edit to the database. One deliberate
+exception: a stored endpoint that is a private literal keeps 2.5.0's behaviour,
+because such a row can only have come from discovery reporting a container
+address, and arming the strict policy over it would refuse an upstream that
+works today. Re-registering such a server writes the provenance that scopes the
+guard correctly.
+
+**One behaviour to expect once it is armed.** Guarding is also pinning: a
+guarded connection goes to one validated address rather than letting the client
+walk a multi-address DNS answer, so a dead address behind a healthy name fails
+the call instead of being skipped. That shipped in 2.5.0; what changes here is
+how much of your fleet it covers.
+
+### A `coordination:` block with no `persistence.backend` is now refused
+
+2.5.0 refused a declared cluster on a backend the replicas cannot share, and
+said nothing when no backend had been selected at all. The outcome is the same
+either way -- no lease keeper, every replica managing the fleet, every one
+reporting `manages_fleet: true` -- so it is now refused too.
+
+**Who is affected:** a configuration carrying `coordination:` while storage is
+still configured through the legacy per-subsystem keys (`event_store.driver`,
+`auth.storage.driver`). That deployment may well share one PostgreSQL, and it
+was never coordinating through it. It booted on 2.5.0 and will not boot on 2.5.1
+until it says where it persists:
+
+```text
+this gateway is configured as part of a cluster (`coordination:`), and no
+storage backend has been selected. ... Set `persistence.backend: postgresql`,
+or remove the `coordination:` block to run this as a single gateway.
+```
+
+Both ways out are in the message. A single gateway that never declared
+`coordination:` is unaffected, whatever its storage.
+
 ## Upgrade to 2.5.0
 
 **Nothing changes until you select a storage backend.** The release adds
@@ -217,21 +275,17 @@ the `Host` header and the TLS SNI/certificate check still carrying the original
 name. A refused address surfaces as a connection failure rather than a new error
 class.
 
-**What to do: know that in 2.5.0 this check does not survive a restart, and
-decide what that costs you.** The record a registered server is rebuilt from
-does not carry the enforcement flag, so after any restart -- and on every
-follower replica in a coordinated deployment, which builds its fleet from the
-same records -- those servers come back registration-time validated only, with
-the connect-time guard off. Re-registering does not restore it: a second `POST`
-of the same id is refused as a duplicate, and a `PUT`/`PATCH` update never
-revalidates the endpoint. Only `DELETE /api/mcp_servers/<id>` followed by a
-fresh registration does. So either re-register the upstreams you rely on this
-for after each restart, or plan on the registration-time check plus a resolver
-you control being the defence between restarts -- which is what a deployment on
-2.4.0 and earlier already ran on. The
-[hardening recipe](cookbook/23-harden-public-gateway.md#threat-model) has the
-full consequence. This is released behaviour, not a design intent; check the
-release notes of any version after 2.5.0 before assuming it still holds.
+**What to do: go to 2.5.1 rather than stopping here.** On 2.5.0 this check does
+not survive a restart. The record a registered server is rebuilt from does not
+carry the enforcement flag, so after any restart -- and on every follower
+replica in a coordinated deployment, which builds its fleet from the same
+records -- those servers come back registration-time validated only, with the
+connect-time guard off, and no re-registration short of
+`DELETE /api/mcp_servers/<id>` plus a fresh one restores it. [2.5.1](#upgrade-to-251)
+carries the flag on the record and derives it for servers registered while 2.5.0
+was running, so upgrading and restarting is the whole remedy. If you are staying
+on 2.5.0, the defence between restarts is the registration-time check plus a
+resolver you control -- which is what 2.4.0 and earlier already ran on.
 
 One thing does change immediately: an upstream you registered through the API
 that resolves to an address the policy refuses now fails on every call, instead

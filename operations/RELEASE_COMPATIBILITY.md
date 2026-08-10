@@ -11,21 +11,23 @@ governs how the images and charts are published and verified.
 > **Status: released, signed, and pinned — the published charts carry their
 > fixes and chart tags are now immutable (`mcp-hangar/helm-charts#36`, closed;
 > fixed by the fail-safe publish guard #37).**
-> As of 2026-07-31 every lane has a published, public, **cosign-signed**,
+> As of 2026-08-09 every lane has a published, public, **cosign-signed**,
 > digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
-> image `2.0.0`, operator `0.15.0`, and both Helm charts. The `2.x` line went
-> stable on 2026-07-31 and is now the reference row below; it was previously
-> excluded here as a release candidate, which this page kept asserting after it
-> stopped being true.
+> image `2.5.0`, operator `0.15.0`, and both Helm charts. The `2.x` line went
+> stable on 2026-07-31 and `2.5.x` is the current stable release, so it is the
+> reference row below; the line was previously excluded here as a release
+> candidate, which this page kept asserting after it stopped being true.
 > Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done.
 >
 > Live cluster testing found defects that made a default `helm install` fail
 > outright — a config key the 1.5 server rejects, flags the operator image does
 > not accept, CRDs that do not match the kinds the image watches, and a CRD the
-> API server refuses. Those are **fixed, and the fixes are present in the
-> currently-published charts**: verified by pulling `charts/mcp-hangar 0.13.4` and
-> `charts/mcp-hangar-operator 0.12.3` from GHCR and inspecting their contents, not
-> by inference. The `helm-charts` repo also had no chart lint/render/install CI at
+> API server refuses. Those are **fixed, and every chart published since carries
+> the fixes**: first verified by pulling `charts/mcp-hangar 0.13.4` and
+> `charts/mcp-hangar-operator 0.12.3` — the published charts at that time — from
+> GHCR and inspecting their contents, not by inference. The charts published today
+> (`0.14.1` / `0.12.5`, see *Released artifacts*) descend from those.
+> The `helm-charts` repo also had no chart lint/render/install CI at
 > all — that gate now exists, which is why this class of defect will not ship
 > again.
 >
@@ -57,19 +59,23 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Helm charts (core / operator) | Kubernetes |
 | --- | --- | --- | --- |
+| `2.5.x` | `0.15.0` | `0.14.1` / `0.12.5` | `1.25` -- `1.36` |
 | `2.0.x` | `0.15.0` | `0.13.7` / `0.12.5` | `1.25` -- `1.36` |
 | `1.6.x` | `0.15.0` | `0.13.6` / `0.12.5` | `1.25` -- `1.36` |
 
-`charts/mcp-hangar 0.13.7` carries `appVersion: 2.0.0`, and `image.tag` defaults
-to `appVersion`, so a plain `helm install` of it pulls the 2.0.0 image — verified
-with `helm show chart` against the registry. `0.13.6` and earlier carry
-`appVersion: 1.6.2`; pin the chart version, not just the image tag, if you are
-staying on the closed line.
+`charts/mcp-hangar 0.14.1` carries `appVersion: 2.5.0` — that is the value the
+generated *Released artifacts* table below reads back out of the registry — and
+`image.tag` defaults to `appVersion`, so a plain `helm install` of it pulls the
+2.5.0 image. Older charts stay on their own lines: `0.13.7` carries
+`appVersion: 2.0.0` and `0.13.6` carries `appVersion: 1.6.2`. Charts before
+`0.13.6` each carry whichever core they shipped against at the time (down to
+`1.4.0` on `0.13.1`), so they are not a way onto the `1.6.x` row. Pin the chart
+version, not just the image tag, if you are staying on an older line.
 
 Rules for reading and extending the matrix:
 
 - **Core** is the reference axis: every supported combination pins a concrete
-  core minor (`v2.1.1` is the current published core; `1.6.x` is closed and
+  core minor (`v2.5.0` is the current published core; `1.6.x` is closed and
   receives no fixes, including the approval-authorization fix released in 2.0.0).
 - **Operator / Helm** columns carry the released version; the verified
   digests are in *Released artifacts* below. Both lanes have landed
@@ -115,8 +121,8 @@ Superseded (do not use): operator image `0.12.0`/`0.12.1`
 (unsigned), and the `mcp-hangar` chart `0.12.0`/`0.13.0`/`0.13.1` (the `0.12.0`
 chart pointed at a non-existent core image tag; `0.13.1` predates the install
 fixes and still declares `appVersion 1.4.0`). The core image is versioned on its
-own `1.x` line (matching PyPI core); its release workflow already cosign-signs
-and attaches build provenance.
+own line, matching PyPI core release for release — currently `2.5.0`; its release
+workflow already cosign-signs and attaches build provenance.
 
 ## CRD upgrade and rollback policy
 
@@ -192,11 +198,14 @@ owner and security sign-off) plus a chart re-release.
       `sha256:91f8fea3…c34ce42f`, `install.yaml` attached to the release.
 - [x] First charts published with verified digests (`helm-charts#7`) — both
       charts public and signed: `mcp-hangar 0.13.1`, `mcp-hangar-operator 0.12.1`
-      (digests in *Released artifacts*). The current core
-      chart is `0.13.4`; `0.13.1` predates the install fixes and is superseded.
-- [x] The published charts install: the fixes found by live testing are present
-      in `charts/mcp-hangar 0.13.4` and `charts/mcp-hangar-operator 0.12.3` as
-      served today (verified by pulling and inspecting them).
+      (digests in *Released artifacts*). Both are long superseded — the current
+      core chart is `0.14.1` and the current operator chart is `0.12.5`; `0.13.1`
+      predates the install fixes.
+- [x] The published charts install: the fixes found by live testing were verified
+      present in `charts/mcp-hangar 0.13.4` and
+      `charts/mcp-hangar-operator 0.12.3` by pulling and inspecting them while
+      those were the published charts, and every chart released since builds on
+      them.
 - [x] **Chart releases are immutable** — the publish guard skips re-push of an
       already-published version (`mcp-hangar/helm-charts#36`, closed; fixed by the
       `crane manifest` probe in #37), so a released chart tag's digest is a stable

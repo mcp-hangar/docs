@@ -22,7 +22,7 @@ Complete reference for all MCP protocol tools exposed by MCP Hangar. These tools
 | [`hangar_discovered`](#hangar_discovered) | Discovery | List pending discovered MCP servers | None (read-only) |
 | [`hangar_quarantine`](#hangar_quarantine) | Discovery | List quarantined MCP servers | None (read-only) |
 | [`hangar_approve`](#hangar_approve) | Discovery | Approve a pending or quarantined MCP server | Registers MCP server |
-| [`hangar_sources`](#hangar_sources) | Discovery | List discovery source status | None (read-only) |
+| [`hangar_sources`](#hangar_sources) | Discovery | List discovery sources with id and health status | None (read-only) |
 | [`hangar_group_list`](#hangar_group_list) | Groups | List all MCP server groups with member details | None (read-only) |
 | [`hangar_group_rebalance`](#hangar_group_rebalance) | Groups | Rebalance group membership and reset circuit breaker | Re-checks members, resets circuit |
 | [`hangar_call`](#hangar_call) | Batch and Continuation | Invoke tools on MCP servers (single or batch) | May start cold MCP servers |
@@ -663,7 +663,20 @@ List the status of all configured discovery sources.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `sources` | `list[object]` | Sources with `source_type`, `mode`, `is_healthy`, `is_enabled`, `last_discovery`, `mcp_servers_count`, `error_message` |
+| `sources` | `list[object]` | Sources with `id`, `source_type`, `mode`, `is_healthy`, `is_enabled`, `last_discovery`, `mcp_servers_count`, `error_message` |
+
+`id` is the id the per-source REST routes take -- `PUT` and `DELETE
+/api/discovery/sources/{source_id}`, plus its `/scan` and `/enable` sub-routes.
+The collection routes, `GET` and `POST /api/discovery/sources`, take no id at
+all. A source declared in `config.yaml` derives its id from the source type
+rather than generating one, so it is the same id after a restart.
+
+This tool returns the raw source status; the REST listing is filtered. `GET
+/api/discovery/sources` strips the id of any source the discovery registry no
+longer knows, so an id listed there is always one the per-source routes accept.
+`hangar_sources` does not: after a `DELETE` of a source the orchestrator keeps
+running, it can still report that source's id, and the routes answer 404 for it.
+Script against the tool accordingly. *Since 2.5.0.*
 
 Returns `{error: ...}` when discovery is not configured.
 
@@ -676,7 +689,8 @@ Returns `{error: ...}` when discovery is not configured.
 // Response
 {
   "sources": [
-    {"source_type": "docker", "mode": "additive", "is_healthy": true,
+    {"id": "28018ad1-4d9d-54dc-9e4e-c5d856af4612",
+     "source_type": "docker", "mode": "additive", "is_healthy": true,
      "is_enabled": true, "last_discovery": "2026-01-15T10:30:00Z",
      "mcp_servers_count": 3, "error_message": null}
   ]

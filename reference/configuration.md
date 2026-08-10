@@ -297,6 +297,11 @@ Only `type` and `mode` are read by Hangar itself. Every other key is passed to
 that source's factory untouched — which is what lets a third-party source be
 configured here without core knowing its option names.
 
+`type: kubernetes` needs the Kubernetes Python client, which is an extra:
+`pip install mcp-hangar[kubernetes]`. The published image ships it. Without it
+Hangar starts, logs `discovery_source_unavailable`, and this source discovers
+nothing.
+
 | Key | Type | Description |
 |-----|------|-------------|
 | `type` | `str` | Source type: `kubernetes`, `docker`, `filesystem`, `entrypoint`, or any type registered under the `mcp_hangar.discovery_sources` entry point group. An unregistered type **fails startup** |
@@ -431,6 +436,12 @@ directory, nothing to install, nothing to run, and not shareable between
 processes. `postgresql` is the only one several gateways can share, and is
 therefore required for more than one replica -- see `coordination` below and
 [Running more than one replica](../cookbook/25-multiple-replicas.md).
+
+**`postgresql` needs its driver installed.** `psycopg2` is an extra rather than
+a base dependency -- `pip install mcp-hangar[postgres]`. The published image
+ships it, so image and chart deployments are unaffected; a plain
+`pip install mcp-hangar` is not, and the first connection raises `psycopg2 is
+required for PostgreSQL`.
 
 No migration is provided between backends. Selecting PostgreSQL on a gateway
 that has been running on SQLite starts an empty database.

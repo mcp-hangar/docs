@@ -117,9 +117,18 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.5.0**, released 2026-08-09 — a plain `pip install
+The stable Python core is **2.5.1**, released 2026-08-10 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
 the MCP 2026-07-28 protocol generation.
+
+**2.5.1 is a patch worth applying rather than noting.** The connect-time SSRF
+re-check that 2.5.0 advertised was not written to a server's stored record, so
+it was lost on every restart and never ran on a replica that learned of the
+registration from the shared log. 2.5.1 restores it, including for servers
+registered while 2.5.0 was running — upgrade and restart, no re-registration
+needed. It also refuses a `coordination:` block that names no
+`persistence.backend` at all, which used to boot into the fleet-per-pod failure
+the block exists to prevent. See [Upgrade to 2.5.1](../upgrade.md#upgrade-to-251).
 
 **2.5.0 makes storage one decision and lets a deployment run more than one
 replica.** `persistence.backend: sqlite | postgresql` picks one backend for
@@ -136,7 +145,7 @@ be shared, which a single gateway on PostgreSQL already is, with or without a
 nothing is gated on a header, but every mutating response carries
 `X-Hangar-Preview: discovery-source-management` so a client can detect the
 preview status — and re-checks SSRF policy at connect time rather than only at
-registration, though in 2.5.0 that second check is lost on restart (see
+registration, a check 2.5.0 lost on restart and 2.5.1 restores (see
 [hardening a public gateway](../cookbook/23-harden-public-gateway.md#threat-model)).
 See [Upgrade to 2.5.0](../upgrade.md#upgrade-to-250) and
 [Running more than one replica](../cookbook/25-multiple-replicas.md).
@@ -233,8 +242,8 @@ reshaped Tasks calls now.
 Install it:
 
 ```bash
-pip install mcp-hangar                # 2.5.0, the current stable release
-pip install "mcp-hangar==2.5.0"       # pin it explicitly
+pip install mcp-hangar                # 2.5.1, the current stable release
+pip install "mcp-hangar==2.5.1"       # pin it explicitly
 ```
 
 Watch the [Releases page](https://github.com/mcp-hangar/mcp-hangar/releases) for

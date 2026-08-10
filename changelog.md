@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.21](https://github.com/mcp-hangar/docs/compare/v1.1.20...v1.1.21) (2026-08-10)
+
+
+### Changed
+
+* **guides:** the connect-time guard survives a restart from 2.5.1 ([#178](https://github.com/mcp-hangar/docs/issues/178)) ([cee253d](https://github.com/mcp-hangar/docs/commit/cee253d81ea3c67dbf1da2ead03b29d95b277c32))
+* **release:** the version surfaces and the SSRF caveat move to 2.5.1 ([#177](https://github.com/mcp-hangar/docs/issues/177)) ([1668bc0](https://github.com/mcp-hangar/docs/commit/1668bc0dc33bed85c63d89f3caefaea854d5570b))
+
 ## [1.1.20](https://github.com/mcp-hangar/docs/compare/v1.1.19...v1.1.20) (2026-08-10)
 
 

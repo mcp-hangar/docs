@@ -1,5 +1,142 @@
 # Changelog
 
+## [1.1.19](https://github.com/mcp-hangar/docs/compare/v1.1.18...v1.1.19) (2026-08-10)
+
+
+### Changed
+
+* **guides:** point the deepest pages back at the concept behind them ([#168](https://github.com/mcp-hangar/docs/issues/168)) ([1849ef0](https://github.com/mcp-hangar/docs/commit/1849ef088f41493a36c963db2edc979fb9f0d411))
+* **operations:** write down the release surfaces so they stop drifting ([#169](https://github.com/mcp-hangar/docs/issues/169)) ([fd0cd9c](https://github.com/mcp-hangar/docs/commit/fd0cd9c85faef0abe99456960a01c54501e4d334))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#165](https://github.com/mcp-hangar/docs/issues/165)) ([352e16f](https://github.com/mcp-hangar/docs/commit/352e16f01006b9f87616ba1f986c586a48aa796e))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#167](https://github.com/mcp-hangar/docs/issues/167)) ([d03c9a4](https://github.com/mcp-hangar/docs/commit/d03c9a4a72876f1ce2b90f1caeb00c08f9000e7b))
+* **security:** settle MCP04 and MCP09 against the operator source ([#170](https://github.com/mcp-hangar/docs/issues/170)) ([5b7eee5](https://github.com/mcp-hangar/docs/commit/5b7eee508132ec3ab399176cff11f9929e3fef6b))
+
+## [1.1.18](https://github.com/mcp-hangar/docs/compare/v1.1.17...v1.1.18) (2026-08-09)
+
+
+### Changed
+
+* discovery source-management Preview + connect-time SSRF + pg pooling ([#162](https://github.com/mcp-hangar/docs/issues/162)) ([55f2448](https://github.com/mcp-hangar/docs/commit/55f24487dab758304fa703ae5c90b2927ba9e1ed))
+* **release:** advertise mcp-hangar 2.5.0 ([#164](https://github.com/mcp-hangar/docs/issues/164)) ([2c51c6d](https://github.com/mcp-hangar/docs/commit/2c51c6d6061295ea9f771bf025eeb48a4f7e7a3c))
+
+## [1.1.17](https://github.com/mcp-hangar/docs/compare/v1.1.16...v1.1.17) (2026-08-08)
+
+
+### Changed
+
+* **reference:** the CLI and the source listing say what they do ([#159](https://github.com/mcp-hangar/docs/issues/159)) ([54a92fb](https://github.com/mcp-hangar/docs/commit/54a92fb1f0943855e0756d6aa76ea75deaf7fe85))
+* **release:** the upgrade note for 2.5.0 ([#160](https://github.com/mcp-hangar/docs/issues/160)) ([b5ff3e7](https://github.com/mcp-hangar/docs/commit/b5ff3e7192187c260c9bcdc3255f63820655df53))
+
+## [1.1.16](https://github.com/mcp-hangar/docs/compare/v1.1.15...v1.1.16) (2026-08-08)
+
+
+### Changed
+
+* **guides:** the recipes can be run again ([#154](https://github.com/mcp-hangar/docs/issues/154)) ([ec5a913](https://github.com/mcp-hangar/docs/commit/ec5a913f216a448f527e479e4a46b0b567aa156a))
+* **guides:** three dead ends that are no longer dead ([#158](https://github.com/mcp-hangar/docs/issues/158)) ([2124ff4](https://github.com/mcp-hangar/docs/commit/2124ff44712d8ffa895fc6d0844b276b42e3dc0a))
+* **reference:** remove two knobs nothing reads, and correct a third ([#157](https://github.com/mcp-hangar/docs/issues/157)) ([38cc999](https://github.com/mcp-hangar/docs/commit/38cc999bc8072cbef3aaa616b6303698971e5147))
+* **reference:** the REST reference matches the API ([#156](https://github.com/mcp-hangar/docs/issues/156)) ([b07e563](https://github.com/mcp-hangar/docs/commit/b07e563319ea7a02b6407162d9da417fe06f135a))
+
+## [1.1.15](https://github.com/mcp-hangar/docs/compare/v1.1.14...v1.1.15) (2026-08-07)
+
+
+### Changed
+
+* **architecture:** ADR-019, one storage decision and two backends ([#149](https://github.com/mcp-hangar/docs/issues/149)) ([d028c7d](https://github.com/mcp-hangar/docs/commit/d028c7d03574c31491b41f58a3ed437b03793a42))
+* **architecture:** the tool catalogue is not a projection, and the tenure is the holder's ([#152](https://github.com/mcp-hangar/docs/issues/152)) ([91e0099](https://github.com/mcp-hangar/docs/commit/91e009907cbacf30e3ce62e10dcd7cba6125c832))
+* **architecture:** what it takes to run more than one gateway (ADR-020) ([#150](https://github.com/mcp-hangar/docs/issues/150)) ([f40558a](https://github.com/mcp-hangar/docs/commit/f40558a9ef4176e699f141d9a52fb3e9e15b0cba))
+* **guides:** running more than one replica, and the config that decides it ([#151](https://github.com/mcp-hangar/docs/issues/151)) ([ef1bd42](https://github.com/mcp-hangar/docs/commit/ef1bd42a946a747e373529e17d2da0fa84a34dd7))
+* **guides:** stop recommending a multi-replica deployment that breaks approvals ([#148](https://github.com/mcp-hangar/docs/issues/148)) ([6f0ba55](https://github.com/mcp-hangar/docs/commit/6f0ba55b690da60f2fec2c73265c9040ea9f2218))
+* **guides:** the recipes a second replica changes ([#153](https://github.com/mcp-hangar/docs/issues/153)) ([c0ed65a](https://github.com/mcp-hangar/docs/commit/c0ed65a9b4b4b18a7ea5e26f0b6eba842f55626a))
+* **release:** move the version surfaces to 2.4.0, and write the upgrade note ([#146](https://github.com/mcp-hangar/docs/issues/146)) ([d6129f8](https://github.com/mcp-hangar/docs/commit/d6129f80e0befd8e5c6861bc9df5b816b3202ae3))
+
+## [1.1.14](https://github.com/mcp-hangar/docs/compare/v1.1.13...v1.1.14) (2026-08-05)
+
+
+### Changed
+
+* **architecture:** ADR-018, event sourcing as actually wired ([#144](https://github.com/mcp-hangar/docs/issues/144)) ([21326d9](https://github.com/mcp-hangar/docs/commit/21326d9b4e1320ee5b1c7a5822bab7d04fa08ff7))
+
+## [1.1.13](https://github.com/mcp-hangar/docs/compare/v1.1.12...v1.1.13) (2026-08-05)
+
+
+### Changed
+
+* **guides:** document extending discovery and the namespace policy move ([#140](https://github.com/mcp-hangar/docs/issues/140)) ([0cd084f](https://github.com/mcp-hangar/docs/commit/0cd084fdbec42d3b4844f836099fe201fac8b1a2))
+* **guides:** install instructions that work, and two claims that did not ([#143](https://github.com/mcp-hangar/docs/issues/143)) ([c2822b2](https://github.com/mcp-hangar/docs/commit/c2822b25f0866189f495f11b03d76e1acb3ce428))
+
+## [1.1.12](https://github.com/mcp-hangar/docs/compare/v1.1.11...v1.1.12) (2026-08-05)
+
+
+### Changed
+
+* **guides:** document the changelog-fragment convention ([#138](https://github.com/mcp-hangar/docs/issues/138)) ([80e8be4](https://github.com/mcp-hangar/docs/commit/80e8be488ceed7008bb4701b892745c4ecd25c64))
+
+## [1.1.11](https://github.com/mcp-hangar/docs/compare/v1.1.10...v1.1.11) (2026-08-04)
+
+
+### Changed
+
+* **guides:** renumber the upgrade note to 2.3.0 and add the launcher removal ([#136](https://github.com/mcp-hangar/docs/issues/136)) ([922687a](https://github.com/mcp-hangar/docs/commit/922687a90078514453b70753d07cc9a827083586))
+
+## [1.1.10](https://github.com/mcp-hangar/docs/compare/v1.1.9...v1.1.10) (2026-08-04)
+
+
+### Changed
+
+* **architecture:** lock_hierarchy moved to the shared kernel ([#135](https://github.com/mcp-hangar/docs/issues/135)) ([004a48a](https://github.com/mcp-hangar/docs/commit/004a48a63e0e7e531fb2e61f9f1910edefcfa829))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#130](https://github.com/mcp-hangar/docs/issues/130)) ([63f4b60](https://github.com/mcp-hangar/docs/commit/63f4b60c8af9115514c7de4fce491bb6f064a837))
+* **release:** move the version surfaces to core 2.2.1 ([#131](https://github.com/mcp-hangar/docs/issues/131)) ([53fbbaa](https://github.com/mcp-hangar/docs/commit/53fbbaac6dfe5bcffd35f52582250310b5a7ba2c))
+* **upgrade:** add the 2.2.2 note for the event-sourcing auth store ([#134](https://github.com/mcp-hangar/docs/issues/134)) ([faeae19](https://github.com/mcp-hangar/docs/commit/faeae19b9838a9ffa4fd5e51bf35407cf7fb7095))
+
+## [1.1.9](https://github.com/mcp-hangar/docs/compare/v1.1.8...v1.1.9) (2026-08-03)
+
+
+### Changed
+
+* **reference:** document the 2.2.0 upgrade and correct the role table ([#128](https://github.com/mcp-hangar/docs/issues/128)) ([dbe14b6](https://github.com/mcp-hangar/docs/commit/dbe14b6b5200a118edb3baf77dea921508eed579))
+
+## [1.1.8](https://github.com/mcp-hangar/docs/compare/v1.1.7...v1.1.8) (2026-08-01)
+
+
+### Changed
+
+* **guides:** state what argument secret-pattern scanning does not catch ([#126](https://github.com/mcp-hangar/docs/issues/126)) ([2e7e30e](https://github.com/mcp-hangar/docs/commit/2e7e30e812daeba55d6f5f0f43e7c46b1c648217))
+
+## [1.1.7](https://github.com/mcp-hangar/docs/compare/v1.1.6...v1.1.7) (2026-08-01)
+
+
+### Changed
+
+* **release:** bump current core to 2.1.1 ([#124](https://github.com/mcp-hangar/docs/issues/124)) ([56d4142](https://github.com/mcp-hangar/docs/commit/56d4142e17411e871fb0ca165a7b1bb398089aef))
+
+## [1.1.6](https://github.com/mcp-hangar/docs/compare/v1.1.5...v1.1.6) (2026-08-01)
+
+
+### Changed
+
+* **reference:** document the approval gate and move version surfaces to 2.1.0 ([#122](https://github.com/mcp-hangar/docs/issues/122)) ([f94c218](https://github.com/mcp-hangar/docs/commit/f94c218ef0a4582547d0a70d40939a723734ad71))
+
+## [1.1.5](https://github.com/mcp-hangar/docs/compare/v1.1.4...v1.1.5) (2026-07-31)
+
+
+### Changed
+
+* **release:** move the version surfaces to core 2.0.1 ([#120](https://github.com/mcp-hangar/docs/issues/120)) ([ea185a4](https://github.com/mcp-hangar/docs/commit/ea185a4fd0bee694fe0a84838a05e412c9c32862))
+
+## [1.1.4](https://github.com/mcp-hangar/docs/compare/v1.1.3...v1.1.4) (2026-07-31)
+
+
+### Changed
+
+* **guides:** correct the RBAC role table against roles.py ([#119](https://github.com/mcp-hangar/docs/issues/119)) ([43809ef](https://github.com/mcp-hangar/docs/commit/43809ef8413d00f91086353fdc9b504094075d07))
+* **guides:** fix the API paths and framing that reach AI consumers verbatim ([#118](https://github.com/mcp-hangar/docs/issues/118)) ([dec9824](https://github.com/mcp-hangar/docs/commit/dec982462555a8f870148f22dbc4b494b8bf7c75))
+* **reference:** fix what the first 2.0.0 pass missed ([#116](https://github.com/mcp-hangar/docs/issues/116)) ([62b75d9](https://github.com/mcp-hangar/docs/commit/62b75d9a3f1be1f8424ab373fa3d68e74a89c231))
+* **reference:** move the compatibility matrix onto the 2.0.0 line ([#115](https://github.com/mcp-hangar/docs/issues/115)) ([7915ceb](https://github.com/mcp-hangar/docs/commit/7915ceb44cd9bd03c3e564cc77051d140fe25c57))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#114](https://github.com/mcp-hangar/docs/issues/114)) ([57f6956](https://github.com/mcp-hangar/docs/commit/57f6956db774f4ea83f2906855093278c7332a17))
+* **reference:** the chart that installs 2.0.0 exists now ([#117](https://github.com/mcp-hangar/docs/issues/117)) ([daf8f1c](https://github.com/mcp-hangar/docs/commit/daf8f1c659d617ebe181f7af623143ea4b951a7f))
+* **release:** move the documentation to 2.0.0 ([#112](https://github.com/mcp-hangar/docs/issues/112)) ([5de8fea](https://github.com/mcp-hangar/docs/commit/5de8fea95aeb0bd45c7cf6d3b3934c10498e9700))
+
 ## [1.1.3](https://github.com/mcp-hangar/docs/compare/v1.1.2...v1.1.3) (2026-07-29)
 
 

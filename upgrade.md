@@ -4,6 +4,108 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.5.2
+
+Drop-in from 2.5.1: nothing you wrote has to change. It is five fixes, and the
+first one decides whether a gateway starts at all.
+
+### An auth-enabled gateway could not start on a selected storage backend
+
+`persistence.backend` made storage one decision (ADR-019), and the branch
+implementing it handed the API-key, role and tool-access-policy stores out
+without creating their tables. Startup reached the auth bootstrap and died:
+
+```
+Unexpected error: relation "roles" does not exist
+```
+
+or, with no `auth.role_assignments` configured to trip that, on
+`tool_access_policies` a few lines later. **Both backends were affected** --
+SQLite failed the same way with `no such table: roles` -- so this was never a
+PostgreSQL problem, it was the handoff.
+
+That is the configuration [more than one replica](cookbook/25-multiple-replicas.md)
+requires, so the documented multi-replica deployment could not start on 2.5.0 or
+2.5.1.
+
+**What to do: upgrade.** The tables are created when the stores are built, the
+same way the event store already did it. Nothing to run by hand, and an existing
+database is unaffected -- the DDL is `CREATE TABLE IF NOT EXISTS`.
+
+If you worked around it by also naming the backend under `auth.storage:`, that
+block is now redundant. It is still legal (naming the *same* backend twice
+always was), so you can leave it or drop it.
+
+### `auth bootstrap-admin` refused to run on that same configuration
+
+The command reads the durable backend to claim the initial administrator on, and
+it consulted only `auth.storage.driver` -- whose default is `memory` -- so on a
+one-storage deployment it answered:
+
+```
+Error: Auth storage driver 'memory' is not durable
+```
+
+Since every `/api/auth/**` route requires an admin principal, with no carve-out
+for the first call, there was no other way to mint the first key. It now uses
+the backend `persistence.backend` selected.
+
+Related, and worth knowing if you scripted around it: bootstrapping a principal
+that `auth.role_assignments` also grants global admin used to fail on a
+duplicate key. It no longer does.
+
+### `provider-admin` could not deliver an egress policy
+
+`/api/mcp_servers/{id}/l7_policy` is mapped to `policy:write`, which is what
+`provider-admin` holds and why the role exists -- but the handlers demanded
+`mcp_servers:write` on top, which it does not hold. The operator's push answered
+403 while the `MCPEgressPolicy` CR still reported `Compiled` and
+`BackstopApplied`, so **a policy enforced its network half and silently dropped
+its L7 half**.
+
+**What to check.** If you run the operator with an API key scoped to
+`provider-admin`, look for `L7PushFailed` events on your `MCPEgressPolicy`
+objects. If you widened that key to `admin` or `developer` to get past it, you
+can narrow it back after upgrading.
+
+### `MCP_TRUSTED_HOSTS` did not reach the MCP endpoint
+
+It governed the REST API only. The MCP endpoint used the SDK's own
+DNS-rebinding guard, built from the SDK's default bind host, so `/mcp` answered
+`421 Invalid Host header` to the gateway's own Service DNS name and to every
+Ingress host -- while the same names were listed in `MCP_TRUSTED_HOSTS` and
+accepted by `/api/**` on the same process.
+
+**What to check.** If you worked around this by rewriting the upstream Host at
+your proxy (an nginx `upstream-vhost`, for example), you can drop that once the
+hostname is in `MCP_TRUSTED_HOSTS`. Entries now match with and without a port.
+
+One thing this does not change, and that is worth knowing when you put a Service
+or an Ingress in front of a replica set: **a Streamable HTTP session lives in one
+replica's memory.** A round-robin load balancer can send the second request of a
+session to a pod that never saw the first. Pin it -- `sessionAffinity: ClientIP`
+on the Service, or a client-address hash at the Ingress.
+
+### `front_door` projected no tools to any tenant
+
+`tool_access.mode: front_door` returned an **empty `tools/list` to every
+authenticated tenant** over Streamable HTTP. The per-request context that
+carries the caller was handed to the projection handlers and dropped, so the
+resolver saw no tenant and took its deny-all branch -- correctly, for a caller it
+could not identify. An empty list is indistinguishable from "no tools
+configured", which is why this was quiet.
+
+**What to check.** If you concluded that front-door mode needed a policy you had
+not written yet, it did not. Per-tenant `tool_access.member` policies and
+`tool_projection` withdrawals now apply as documented in
+[front-door multi-tenant](cookbook/16-front-door-multi-tenant.md).
+
+**Still not working, and not fixed here:** a *group* under front-door mode. Its
+members expose the same tool names by definition, the flat projection drops any
+name it finds in two servers, and so the group contributes nothing -- and takes
+co-located servers sharing those names down with it. Recipe 19 pairs the two;
+that combination is still open.
+
 ## Upgrade to 2.5.1
 
 Drop-in from 2.5.0 in the sense that nothing you wrote has to change. Two things

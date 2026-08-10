@@ -117,9 +117,23 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.5.1**, released 2026-08-10 — a plain `pip install
+The stable Python core is **2.5.2**, released 2026-08-10 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
 the MCP 2026-07-28 protocol generation.
+
+**2.5.2 is the release to be on if you select a storage backend.** On 2.5.0 and
+2.5.1, `persistence.backend` handed the auth stores out without creating their
+tables, so an auth-enabled gateway died at startup on `relation "roles" does not
+exist` — or, with no `role_assignments` configured to trip that, on
+`tool_access_policies`. Both backends were affected; SQLite failed the same way
+with `no such table: roles`. That is the configuration more than one replica
+requires, so the documented multi-replica deployment could not start. The same
+release makes `auth bootstrap-admin` work on that configuration (it consulted
+only `auth.storage.driver`, whose default is not durable, and refused), lets the
+`provider-admin` role deliver an egress policy instead of answering 403, applies
+`MCP_TRUSTED_HOSTS` to the MCP endpoint rather than the REST API alone, and
+gives `tool_access.mode: front_door` back its per-tenant tool list. See
+[Upgrade to 2.5.2](../upgrade.md#upgrade-to-252).
 
 **2.5.1 is a patch worth applying rather than noting.** The connect-time SSRF
 re-check that 2.5.0 advertised was not written to a server's stored record, so

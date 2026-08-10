@@ -80,7 +80,7 @@ Routing a follower's call to the holder was considered and rejected for now: it 
 
 Several replicas on a file-backed backend do not collide. Each gets its own file, grants itself its own lease -- the SQLite adapter always grants, correctly, because a file admits one writer -- runs its own management loops and holds its own fleet. They never disagree, because they cannot see each other, so every health check stays green while the deployment has as many fleets as it has pods. Measured: three replicas, all three reporting `manages_fleet: true`.
 
-A `coordination:` block is the statement that these replicas are meant to be **one** gateway, and it is refused on storage they cannot share. The question is asked on the axis the operator controls rather than by inspecting the environment: a thousand pods each with their own storage are a thousand gateways, which is a legitimate thing to run. What is not legitimate is calling them one.
+A `coordination:` block is the statement that these replicas are meant to be **one** gateway, and it is refused on storage they cannot share -- and refused equally when no storage was decided at all, since the legacy per-subsystem keys name a driver without naming what the replicas coordinate through. The question is asked on the axis the operator controls rather than by inspecting the environment: a thousand pods each with their own storage are a thousand gateways, which is a legitimate thing to run. What is not legitimate is calling them one.
 
 A backend that cannot be shared gets no lease keeper at all -- it would grant itself the lease every time, which is not coordination -- and `GET /api/system` reports `storage_is_shareable` next to a `coordinates_with_peers` that is true only when it is.
 

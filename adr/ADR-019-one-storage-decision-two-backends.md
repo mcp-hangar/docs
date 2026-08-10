@@ -1,9 +1,9 @@
 # ADR-019: One Storage Decision, and Two Backends That Are Never Mixed
 
-**Status:** Accepted
+**Status:** Accepted -- **amended 2026-08-09**: coordination landed in core 2.5.0 ([ADR-020](ADR-020-high-availability.md)) and three of the four accepted limits below no longer hold. The decision is unchanged; see the Amendment at the end.
 **Date:** 2026-08-06
 **Authors:** MCP Hangar Team
-**Related:** [ADR-018](ADR-018-event-sourcing-actually-wired.md) (what the event log is), [ADR-001](ADR-001-cqrs.md) (CQRS), core#779, core#778 (the HA readiness audit this unblocks).
+**Related:** [ADR-018](ADR-018-event-sourcing-actually-wired.md) (what the event log is), [ADR-020](ADR-020-high-availability.md) (the coordination this unblocked), [ADR-001](ADR-001-cqrs.md) (CQRS), core#779, core#778 (the HA readiness audit this unblocks).
 
 ## Context
 
@@ -60,3 +60,14 @@ Without `persistence.backend`, every subsystem configures its own storage exactl
 - **Storage is necessary, not sufficient, for HA.** Approval holds, session suspension, rate limits and the discovery loops remain process-local, so more than one replica is still wrong until coordination is addressed (core#778). This is what coordination will store its leases in.
 - Consumers are being moved onto the selected backend in sequence. The event log and its delivery mark take theirs from it; the rest still build their own when no backend is selected, which is the compatibility path rather than the destination.
 - No migration is provided between backends. Selecting PostgreSQL on a gateway that has been running on SQLite starts an empty database; moving existing history is a separate problem and is not claimed.
+
+## Amendment (2026-08-09): coordination landed, and three of the four limits are settled
+
+Released in core 2.5.0 and decided in [ADR-020](ADR-020-high-availability.md) (core#790). The decision above is unchanged; this records which of the accepted limits are no longer limits, because a limit left standing in writing after it has been fixed is read as still true.
+
+- **Approval holds are no longer process-local.** The wait now watches the approval record as well as the in-process hold, so a decision written on one instance releases the call held on another. The record was already in the selected backend; shared storage is what makes the decision visible, which is the dependency this ADR was written to supply.
+- **Session suspension is no longer process-local.** It crosses the replica boundary as a projection, so a suspended session is refused by every replica rather than by the one that ran the detection.
+- **The discovery loops are no longer process-local.** They run only while the instance holds the management lease -- a row with a TTL and a generation, in the backend selected here, exactly as anticipated above.
+- **Rate limits stay per instance, and that is the decision, not the leftover.** Three replicas admit three times the configured rate; the fleet-wide cap belongs at the ingress. A shared counter would put a database round trip on every request to bound something the edge already bounds.
+
+The sentence that more than one replica is still wrong no longer holds as written. What replaces it is narrower: more than one replica requires `persistence.backend: postgresql` and a `coordination:` block, and both are refused at startup rather than merely advised. The legacy per-subsystem keys are not a substitute for the selection: they configure storage without deciding what the replicas coordinate through, which is the whole point of making it one decision.

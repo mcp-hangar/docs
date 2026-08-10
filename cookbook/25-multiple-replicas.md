@@ -20,6 +20,12 @@ This page is what changed, what it requires, and what it still costs.
 replicas that cannot share storage are not one gateway -- each would hold its
 own fleet and its own lease, and they would never notice each other.
 
+**The PostgreSQL driver, which is an extra.** `psycopg2` is not a base
+dependency, so a plain `pip install mcp-hangar` cannot run
+`persistence.backend: postgresql` -- the first connection raises `psycopg2 is
+required for PostgreSQL`. Install `mcp-hangar[postgres]`. The published image
+installs it, so deployments from the image or the chart need nothing extra.
+
 **`remote`-mode servers.** `subprocess` and `docker` do not describe a server
 the gateway talks to; they describe one it *runs*, as a child process with its
 stdio attached. No peer can reach it, so a replica serving a call to such a
@@ -71,8 +77,21 @@ Everything else is a *projection*: fleet membership, risk scores, session
 suspensions and the websocket event feed are rebuilt on every replica from the
 shared event log, so what you get back does not depend on which pod answered.
 
-**One thing is not.** A server's tools are learned by connecting to it, so
-`GET /api/mcp_servers/<id>/tools` reports what *that* replica has seen -- a pod
+**Two things are not.** The first is not an answer at all but a defence.
+*In 2.5.0*, a `remote` server registered through the REST API is re-checked
+against the SSRF policy on every outbound connection -- but only on the replica
+that handled the registration, and only until that replica restarts. The shared
+record a follower rebuilds the server from does not carry the enforcement flag,
+so on every other pod the same server connects with the connect-time guard
+**off**, leaving the validation the endpoint passed at registration as what
+holds fleet-wide. Deleting and re-registering the server re-arms it on whichever
+replica serves that call, and no other. See
+[hardening a public gateway](23-harden-public-gateway.md#threat-model) for the
+consequence and the remedy.
+
+**The second is what a pod can tell you about a server's tools.** They are
+learned by connecting to it, so `GET /api/mcp_servers/<id>/tools` reports what
+*that* replica has seen -- a pod
 that has never started the server answers `[]`, and it can stay that way while
 another pod lists five tools. This is the REST inspection endpoint only: the MCP
 surface advertises the gateway's own tools on every replica alike, so a client's

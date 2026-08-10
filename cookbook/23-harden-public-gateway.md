@@ -331,19 +331,65 @@ State what you are defending against, and what you are not.
 | Compromised backend provider | Least-privilege per-provider service account; sandboxed container providers (recipe 20); deny-by-default L7 egress policy ([`MCPEgressPolicy`](../guides/EGRESS_POLICY.md)) constraining which upstreams/tool calls/arguments a server may make | provider + application |
 | Lost or tampered audit trail | Durable event log -- a selected `persistence.backend`, or `allow_memory_fallback: false` on 2.4.0 and earlier -- plus immutable SIEM ingest | application + external-infrastructure |
 | TLS interception | Managed/publicly trusted edge cert; verified backend TLS (`tls.verify_ssl: true`, the default) | external-infrastructure + provider |
-| SSRF / DNS rebinding to internal endpoints | A human-registered endpoint is refused if it resolves to any private range or the cloud metadata address; the check is re-applied **at connect time** against the IP actually dialed, and the connection is pinned to that validated IP (the original hostname is kept for the `Host` header and TLS verification), so a name that passed registration cannot be re-pointed at `169.254.169.254` / `10.x` / `127.0.0.1` on a later call. A discovery-sourced endpoint may be private, but only at an address the container runtime reported for it. | application |
+| SSRF / DNS rebinding to internal endpoints | A human-registered endpoint is refused if it resolves to any private range or the cloud metadata address; the check is re-applied **at connect time** against the IP actually dialed, and the connection is pinned to that validated IP (the original hostname is kept for the `Host` header and TLS verification), so a name that passed registration cannot be re-pointed at `169.254.169.254` / `10.x` / `127.0.0.1` on a later call. A discovery-sourced endpoint may be private, but only at an address the container runtime reported for it. **Both checks cover only servers registered at runtime** -- through the REST API or by a discovery source. A `remote` server declared in `config.yaml` never reaches the registration handler and gets neither check, deliberately. *In 2.5.0*, the connect-time check additionally does not survive a restart: the stored snapshot does not carry it, so a rebuilt server is registration-time validated only (see below) | application |
 
 **Backend SSRF / DNS rebinding.** The endpoint an operator registers for a
-remote (HTTP) MCP server is validated for SSRF when it is registered *and* again
-on every outbound connection: the guard re-resolves the hostname, refuses it if
-it now resolves to a private range or the cloud metadata endpoint (for a
+remote (HTTP) MCP server is validated for SSRF when it is registered and, for as
+long as the process that registered it is the one running, again on every
+outbound connection: the guard re-resolves the hostname, refuses it if it
+now resolves to a private range or the cloud metadata endpoint (for a
 human-supplied endpoint), and connects to the exact IP it validated while
-sending the original hostname as the `Host` header and TLS SNI. This closes DNS
-rebinding, where a name that resolved to a public address at registration is
-re-pointed at an internal one before the next tool call. A discovery-sourced
-endpoint is allowed to be private, but only at the specific address the
-container runtime reported for it -- provenance grants a *named address*, not a
-whole private range.
+sending the original hostname as the `Host` header and TLS SNI. That second
+check is the one that closes DNS rebinding, where a name that resolved to a
+public address at registration is re-pointed at an internal one before the next
+tool call -- and *in 2.5.0* it is also the one a restart drops, so read it
+together with **In 2.5.0, the connect-time check does not survive a restart**
+below before counting on it. A discovery-sourced endpoint is allowed to be
+private, but only at the specific address the container runtime reported for it
+-- provenance grants a *named address*, not a whole private range.
+
+**A provider declared in `config.yaml` is exempt from both checks.** The guard
+is attached by the registration handler, and the only two paths that reach it
+are the REST registration API and discovery. A `remote` server written into the
+config file is built directly, so it is neither validated at registration nor
+re-validated at connect time. This is deliberate. Read
+`https://reports.internal.example/mcp` as a stand-in for a name *your* resolver
+maps to a private address inside the service network: submitted to the REST
+registration API, that endpoint is refused with `SSRF blocked: endpoint resolves
+to private address`, while in the config file it is built directly and connected
+to. (The literal placeholder would not be refused either way -- `.example` is a
+reserved documentation TLD that resolves nowhere, and an unresolvable name is
+deliberately let through, because there is nothing to judge and nothing to
+connect to. Nor does the cloud-metadata hostname rule catch it: that rule matches
+names *ending* in `.internal`, `.compute.internal`, or
+`.metadata.google.internal`, and `reports.internal.example` ends in none of
+them.) The consequence to hold on to is that DNS rebinding on a
+config-file provider is *not* defended -- an endpoint you write into the file is
+trusted on your word, for as long as it stays in the file. Treat `config.yaml`
+and the names it resolves through with the same care as the credentials next to
+them: review changes to it, and own the resolver your gateway uses.
+
+**In 2.5.0, the connect-time check does not survive a restart.** The record a
+registered server is rebuilt from does not carry its SSRF enforcement flag (nor
+its provenance or the runtime addresses a discovered server was scoped to). So
+after a gateway restart -- and on every follower replica in a coordinated
+deployment, which builds its fleet from the same records -- a previously
+registered `remote` server comes back with the connect-time guard **off**. What
+remains is the validation the endpoint passed at the moment it was registered:
+from then on its name can be re-pointed at `169.254.169.254` / `10.x` /
+`127.0.0.1` and nothing re-checks it, exactly as for a config-file provider.
+Re-registering does not quietly fix it, because neither REST path re-runs the
+check on an id that is already there: a second `POST` of the same id is refused
+as a duplicate (`McpServer already exists`), and a `PUT`/`PATCH` update edits
+and re-records the aggregate that came back unguarded without ever revalidating
+the endpoint. The one sequence that restores the guard is
+`DELETE /api/mcp_servers/<id>` followed by a fresh registration of the same
+configuration -- that is a new registration, so it runs the check and attaches
+the guard again. Until you run it, plan a restart as the moment the
+DNS-rebinding defence lapses on that fleet, and treat owning the resolver as the
+control that is actually holding.
+This is a released-behaviour note, not a design intent; on a version after 2.5.0
+check the release notes before relying on it.
 
 **Out of scope / not claimed here:** Hangar is an OAuth *Resource Server*; it
 validates tokens but never issues them -- IdP hardening is the provider's job.

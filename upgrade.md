@@ -12,9 +12,11 @@ sets neither is unaffected -- omitting `persistence` keeps per-subsystem storage
 exactly as it was. That is deliberate: a storage rewiring must not change what a
 running deployment does.
 
-Four things below apply to every deployment regardless: interpolation, the
-bootstrap command, TLS, and the backup endpoint. Read those even if you are not
-opting in.
+Six things below apply to every deployment regardless: interpolation, the
+bootstrap command, TLS, the backup endpoint, the connect-time SSRF re-check, and
+the Preview header on discovery source management. Read those even if you are
+not opting in -- the SSRF section in particular, since it changes a security
+behaviour and describes a lapse to plan for.
 
 ### Selecting a backend takes over every persisted concern
 
@@ -42,6 +44,22 @@ Two consequences to check before you roll out:
 **There is no migration between backends.** Selecting PostgreSQL on a gateway
 that has been running on SQLite starts an empty database -- it does not move
 what is in the file.
+
+### `persistence.backend: postgresql` needs the `[postgres]` extra
+
+A plain `pip install mcp-hangar` carries no PostgreSQL driver, so a gateway that
+selects the backend without the extra fails the moment it opens a connection:
+`psycopg2 is required for PostgreSQL`. Install it with the backend:
+
+```bash
+pip install "mcp-hangar[postgres]"
+```
+
+The extra used to install `asyncpg`, which nothing in the codebase imports --
+the stores use `psycopg2` -- so an install that looked right still could not
+start. It now installs `psycopg2-binary`. The published image installs the extra
+already, so this applies to a pip install only. It applies to every replica set
+too, since a `coordination:` block requires PostgreSQL.
 
 ### Selecting PostgreSQL turns coordination on, at one replica
 
@@ -183,6 +201,63 @@ the log only.
 It now answers `503` naming the path and the reason. Anything monitoring this
 endpoint on status code should expect `503` for a filesystem refusal; mount a
 writable directory and point `--config` at it if you need it to succeed.
+
+### An endpoint registered through the API is re-checked on every connection
+
+**Who is affected:** `remote` servers registered through the REST API or by a
+discovery source. The SSRF check used to run once, at registration, against the
+addresses the hostname resolved to then -- and the HTTP client then re-resolved
+that name at every connect with no second check. A name that passed once could
+be re-pointed at `169.254.169.254`, `10.x` or `127.0.0.1` afterwards, and every
+later tool call followed it there.
+
+Now each request on such an upstream resolves the host again, applies the same
+policy the registration check used, and connects to the validated address, with
+the `Host` header and the TLS SNI/certificate check still carrying the original
+name. A refused address surfaces as a connection failure rather than a new error
+class.
+
+**What to do: know that in 2.5.0 this check does not survive a restart, and
+decide what that costs you.** The record a registered server is rebuilt from
+does not carry the enforcement flag, so after any restart -- and on every
+follower replica in a coordinated deployment, which builds its fleet from the
+same records -- those servers come back registration-time validated only, with
+the connect-time guard off. Re-registering does not restore it: a second `POST`
+of the same id is refused as a duplicate, and a `PUT`/`PATCH` update never
+revalidates the endpoint. Only `DELETE /api/mcp_servers/<id>` followed by a
+fresh registration does. So either re-register the upstreams you rely on this
+for after each restart, or plan on the registration-time check plus a resolver
+you control being the defence between restarts -- which is what a deployment on
+2.4.0 and earlier already ran on. The
+[hardening recipe](cookbook/23-harden-public-gateway.md#threat-model) has the
+full consequence. This is released behaviour, not a design intent; check the
+release notes of any version after 2.5.0 before assuming it still holds.
+
+One thing does change immediately: an upstream you registered through the API
+that resolves to an address the policy refuses now fails on every call, instead
+of working after a registration that passed. Servers declared in `config.yaml`
+are not re-checked at all, so a `remote` server deliberately pointed at an
+internal address in configuration keeps connecting as before.
+
+### Discovery source management ships as Preview
+
+The five mutating source routes -- `POST /api/discovery/sources`, `PUT` and
+`DELETE` on `/api/discovery/sources/{id}`, `POST .../scan` and `PUT
+.../enable` -- now answer with a response header:
+
+```
+X-Hangar-Preview: discovery-source-management
+```
+
+It gates nothing. The routes work, no request header is required, and nothing is
+refused for omitting one. It marks a surface that was broken end to end as late
+as `2.5.0-rc.4` and whose behaviour may still change. The read-only discovery
+flow -- listing sources, pending and quarantined servers, approve and reject --
+is stable and carries no such header.
+
+**What to do:** if you script these five, log the header rather than assert on
+it, and expect their shapes to move; if you only read discovery state, nothing
+changes.
 
 ## Upgrade to 2.4.0
 

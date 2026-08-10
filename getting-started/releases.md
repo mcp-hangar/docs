@@ -117,9 +117,29 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.5.0**, released 2026-08-08 — a plain `pip install
+The stable Python core is **2.5.0**, released 2026-08-09 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
 the MCP 2026-07-28 protocol generation.
+
+**2.5.0 makes storage one decision and lets a deployment run more than one
+replica.** `persistence.backend: sqlite | postgresql` picks one backend for
+every persisted concern, and a backend that does not serve all of them is
+refused rather than half-applied. A `coordination:` block is the statement that
+several replicas are one gateway: exactly one instance holds the management
+lease, PostgreSQL is required — replicas that cannot share storage are not a
+cluster, so a file-backed backend refuses to start — and a server declared there
+has to be in `remote` mode, because `subprocess`, `docker` and `container`
+attach a child process's stdio to a single replica. *Registering* one of those
+modes through the API is refused on a different axis: whenever the storage can
+be shared, which a single gateway on PostgreSQL already is, with or without a
+`coordination:` block. It also ships discovery source management as Preview —
+nothing is gated on a header, but every mutating response carries
+`X-Hangar-Preview: discovery-source-management` so a client can detect the
+preview status — and re-checks SSRF policy at connect time rather than only at
+registration, though in 2.5.0 that second check is lost on restart (see
+[hardening a public gateway](../cookbook/23-harden-public-gateway.md#threat-model)).
+See [Upgrade to 2.5.0](../upgrade.md#upgrade-to-250) and
+[Running more than one replica](../cookbook/25-multiple-replicas.md).
 
 **2.1.0 makes the human-in-the-loop approval gate reachable — for the first
 time.** The control was documented, unit-tested and wired nowhere: no

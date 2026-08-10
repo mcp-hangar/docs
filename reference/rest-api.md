@@ -425,6 +425,13 @@ restart and a script can keep using it. *Since 2.5.0:* before that, configured
 sources were listed without an `id` and the scan answered `404` for anything an
 operator could obtain.
 
+The listing carries an `id` only while the discovery registry still knows the
+source -- this route strips it from any source the orchestrator keeps running
+after a `DELETE`, so a listed id is always one the per-source routes accept,
+where the [`hangar_sources`](tools.md#hangar_sources) MCP tool returns the raw
+status and can keep reporting an id these routes now answer `404` for.
+*Since 2.5.0.*
+
 `last_discovery` is `null` until the first cycle completes, and `error_message`
 carries the last failure or `null`.
 
@@ -673,11 +680,11 @@ GET /system
     }
   }
 }
+```
 
 The counter is `total_invocations`, not `total_tool_calls`. `instance` is
 present from 2.5.0 and describes the replica that answered -- see
 [Running more than one replica](../cookbook/25-multiple-replicas.md).
-```
 
 ### Get Current User
 

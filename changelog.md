@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.22](https://github.com/mcp-hangar/docs/compare/v1.1.21...v1.1.22) (2026-08-10)
+
+
+### Changed
+
+* **release:** the version surfaces move to 2.5.2 ([#181](https://github.com/mcp-hangar/docs/issues/181)) ([aa240b4](https://github.com/mcp-hangar/docs/commit/aa240b4c36a43df068fbdbdfcf03f1fae1c297a3))
+
 ## [1.1.21](https://github.com/mcp-hangar/docs/compare/v1.1.20...v1.1.21) (2026-08-10)
 
 

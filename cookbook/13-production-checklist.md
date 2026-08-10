@@ -25,6 +25,9 @@
       volume) or `postgresql` -- *since 2.5.0*, a backend serves every persisted
       concern or startup is refused. On 2.4.0 and earlier: `event_store.driver:
       sqlite` plus `auth.storage.driver`, chosen separately
+- [ ] If `postgresql`: the driver installed -- it is an extra, not a base
+      dependency, so a pip install needs `pip install "mcp-hangar[postgres]"`.
+      The published image already carries it
 
 ## Observability
 
@@ -72,7 +75,9 @@
 *Since 2.5.0.* On 2.4.0 and earlier, run a **single** instance: replicas there
 disagree with each other and the failure is silent.
 
-- [ ] One PostgreSQL every replica shares (`persistence.backend: postgresql`)
+- [ ] One PostgreSQL every replica shares (`persistence.backend: postgresql`),
+      with the driver installed on every replica -- `pip install
+      "mcp-hangar[postgres]"`; the published image already carries it
 - [ ] A `coordination:` block, with the **same** `lease_ttl_s` on every replica
       -- the tenure in force is written by whoever holds the lease, so one
       stale ConfigMap sets the failover window for the whole set

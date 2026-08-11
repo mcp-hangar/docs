@@ -117,11 +117,32 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.5.3**, released 2026-08-11 — a plain `pip install
+The stable Python core is **2.6.0**, released 2026-08-11 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
 the MCP 2026-07-28 protocol generation.
 
-**2.5.3 makes the gateway stop saying things that are not true**, which is what
+**2.6.0 makes governance that was advertised actually run.** Three enforcement
+surfaces were declared and did nothing. Digest pins could only be addressed to a
+tenant, and the tenant comes from the authenticated principal — so on a gateway
+without authentication no pin was ever matched, while `initialize` went on
+advertising the capability with all three enforcement modes. Twenty-one of the
+twenty-two `hangar_*` tools authorized nothing at all, so any valid credential
+could stop a server or reload the configuration over MCP while the REST API
+refused the same identity. And a `remote` upstream declared in `config.yaml` sat
+outside the SSRF policy without saying so.
+
+Pins can now be declared for every caller, the `hangar_*` tools require the
+permission their REST equivalent has always required, and a config-file upstream
+outside the policy names itself at startup. A `front_door` gateway also shows an
+operator the management tools its role permits, so one deployment can serve an
+agent without a control plane and an operator with one.
+
+**Two of these can stop a gateway that works today** — a configuration with
+per-tenant pins and authentication off no longer boots, and an API key that drove
+the fleet over MCP now needs the role it always needed over REST. Read
+[Upgrade to 2.6.0](../upgrade.md#upgrade-to-260) before rolling out.
+
+**2.5.3 made the gateway stop saying things that are not true**, which is what
 the six fixes in it have in common. It advertised `prompts` and `resources` and
 served neither, so a client reading `{"prompts": []}` concluded the upstream had
 none; both capabilities are now withdrawn and those methods answer `-32601`. It

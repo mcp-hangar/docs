@@ -4,6 +4,139 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.6.0
+
+Not drop-in. Two changes can stop a gateway that works today, and both are the
+same shape: enforcement that was advertised and did not run now runs. Read the
+first two sections before you upgrade.
+
+A gateway with authentication off is unaffected by everything here except the
+boot refusal in the first section.
+
+### Per-tenant digest pins now refuse to boot without authentication
+
+A digest pin could only be addressed to a tenant, and the tenant reaches the
+enforcement path from the authenticated principal and from nowhere else. So on a
+gateway with `auth.enabled: false`, where every caller is anonymous and carries
+no tenant, **no pin was ever matched**: drift stayed computable and nothing
+stopped it, while `initialize` advertised `io.mcp-hangar.digest-pinning` with all
+three enforcement modes. The same miss reached the task path, where nothing bound
+a relayed task to a digest, so the fail-closed re-verification on result
+retrieval had nothing to check.
+
+Such a configuration now fails the boot, naming the pins it found and the auth
+setting that makes them unmatchable, rather than serving a guarantee it cannot
+keep.
+
+Two ways forward. Turn authentication on, so callers arrive carrying the tenant
+the pins name — or move the pins to the all-tenants block added in this release,
+which holds every caller including an anonymous one:
+
+```yaml
+mcp_servers:
+  payments:
+    tool_projection:
+      digest_enforcement: block
+      pins:                       # every caller, including an anonymous one
+        refund: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      tenant_overrides:
+        "tenant:a":
+          pins:                   # this tenant only; wins over the block above
+            refund: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+```
+
+Both forms can be used together; resolution is narrowest first. A gateway with
+authentication on is unaffected — its per-tenant pins were being enforced and
+continue to be.
+
+### The `hangar_*` tools now require permissions
+
+`hangar_call` authorized every call it dispatched. The other twenty-one
+`hangar_*` tools authorized nothing, so with authentication on any valid
+credential could stop a server, load one, reload the configuration or approve a
+discovered upstream over MCP — while the same operations over the REST API were
+refused for the same identity in the same process.
+
+Authorization is now resolved from the tool name, mirroring the REST route that
+performs the same operation. No permission was invented and no built-in role
+changed.
+
+| Tool | Permission | Built-in roles that hold it |
+| --- | --- | --- |
+| `hangar_list`, `hangar_status`, `hangar_details`, `hangar_tools`, `hangar_health` | `mcp_servers:read` | admin, provider-admin, developer, viewer |
+| `hangar_start`, `hangar_stop`, `hangar_warm` | `mcp_servers:lifecycle` | admin, developer |
+| `hangar_load`, `hangar_unload` | `mcp_servers:write` | admin, developer |
+| `hangar_reload_config` | `config:reload` | admin |
+| `hangar_discovered`, `hangar_sources` | `discovery:read` | admin, provider-admin, developer, viewer, auditor |
+| `hangar_discover` | `discovery:trigger` | admin, provider-admin |
+| `hangar_approve`, `hangar_quarantine` | `discovery:approve` | admin, provider-admin |
+| `hangar_group_list` | `group:read` | admin, provider-admin, developer, viewer |
+| `hangar_group_rebalance` | `group:update` | admin, provider-admin |
+| `hangar_metrics` | `metrics:read` | admin, provider-admin, viewer, auditor |
+| `hangar_fetch_continuation`, `hangar_delete_continuation` | `tool:invoke` | admin, provider-admin, developer, service-account |
+
+Check any API key or token that drives the fleet over MCP. If it worked because
+MCP asked for nothing, it now needs the role its REST equivalent has always
+needed. Two combinations are not guessable from the role names:
+
+* **`provider-admin` cannot start, stop, warm, load, unload or reload.** It holds
+  `mcp_servers:read` and neither `:write` nor `:lifecycle`, and not
+  `config:reload`. That is deliberate and it could not perform those operations
+  through the REST API either. An operator key that needs lifecycle wants `admin`
+  or a custom role.
+* **`developer` cannot approve, quarantine, trigger discovery, rebalance a group
+  or read metrics.** It holds fleet read, write and lifecycle and none of those.
+
+A refusal names the permission it wanted, so the log says what to grant:
+
+```text
+Not authorized to call 'hangar_stop': mcp_servers:lifecycle permission required
+```
+
+`hangar_call` is unchanged and still checks `tool:invoke` for each call in the
+batch. A gateway with authentication off allows every call exactly as before, so
+`--unsafe-no-auth` is unaffected.
+
+`metrics:read` is now enforced on `hangar_metrics`. The unauthenticated
+`/metrics` scrape endpoint is untouched and remains on the auth skip list.
+
+### `front_door` now shows an operator a control plane
+
+Additive; nothing to do. The mode served flat upstream names and no `hangar_*` to
+anybody, so an operator on a front door had no management surface over MCP and
+had to run a second instance in `egress` to get one.
+
+A management tool is now listed exactly when the caller is authorized to call it,
+by the same table and the same authorizer as the section above. An agent
+principal sees what it saw before; an operator's list grows by what its role
+permits. Nothing is shown that cannot be called, and a name that is not shown is
+still answered `-32601`.
+
+With authentication off the management surface stays empty — stricter than the
+invoke path on the same gateway, deliberately: a front door that shows an
+unauthenticated caller nothing today does not start showing it a control plane.
+
+`egress` is untouched and still serves every caller the whole meta-API. There it
+is not a management surface that happens to be visible, it is *the* surface: a
+client without `hangar_call` reaches no upstream tool at all. See
+[ADR-022](adr/ADR-022-the-management-surface-is-what-the-caller-may-call.md).
+
+New metric: `mcp_hangar_projected_tools`, a histogram of the tools a front-door
+`tools/list` returned, labelled `kind=governed|management`.
+
+### One log line per config-file remote upstream
+
+A `remote` server declared in `config.yaml` is outside the SSRF policy: it gets
+neither the registration check that answers `400 ssrf_blocked` on the REST path,
+nor the connect-time re-resolution added in 2.5.0 that closes DNS rebinding. That
+exclusion is deliberate — the configuration file is trusted input, see
+[ADR-021](adr/ADR-021-config-file-endpoints-outside-the-ssrf-policy.md) — and has
+not changed. What changed is that startup says so, once per such upstream,
+naming it and its endpoint.
+
+Nothing is refused and no request path is affected. To have an endpoint checked,
+register it through the REST API rather than the file.
+
 ## Upgrade to 2.5.3
 
 Drop-in from 2.5.2: nothing you wrote has to change. It is six fixes, all of

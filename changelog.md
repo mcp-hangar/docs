@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.25](https://github.com/mcp-hangar/docs/compare/v1.1.24...v1.1.25) (2026-08-11)
+
+
+### Changed
+
+* **repo:** draw the diagrams instead of spelling them in ASCII ([#189](https://github.com/mcp-hangar/docs/issues/189)) ([0fbd390](https://github.com/mcp-hangar/docs/commit/0fbd390f196a9e1958c00e5d63fa06ef577bf43e))
+
 ## [1.1.24](https://github.com/mcp-hangar/docs/compare/v1.1.23...v1.1.24) (2026-08-11)
 
 

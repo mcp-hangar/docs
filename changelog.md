@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.24](https://github.com/mcp-hangar/docs/compare/v1.1.23...v1.1.24) (2026-08-11)
+
+
+### Changed
+
+* **architecture:** record two decisions the code was carrying in comments ([#185](https://github.com/mcp-hangar/docs/issues/185)) ([4983bcf](https://github.com/mcp-hangar/docs/commit/4983bcf7e7498e0fc9f16cc6430887bf31cf0aca))
+* **reference:** the upgrade note for 2.6.0 ([#187](https://github.com/mcp-hangar/docs/issues/187)) ([1e1d162](https://github.com/mcp-hangar/docs/commit/1e1d16261a61be272a48141c64895bf85bd80eb0))
+* **reference:** the version surfaces move to 2.6.0 ([#188](https://github.com/mcp-hangar/docs/issues/188)) ([58f4bb0](https://github.com/mcp-hangar/docs/commit/58f4bb0f0b6a73832df293f87b574ffb286284d2))
+
 ## [1.1.23](https://github.com/mcp-hangar/docs/compare/v1.1.22...v1.1.23) (2026-08-11)
 
 

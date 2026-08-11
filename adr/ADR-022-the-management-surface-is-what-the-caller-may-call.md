@@ -44,7 +44,7 @@ Binding to authorization introduces no new vocabulary, no new role, and no secon
 
 A projection that hides a tool the caller could still invoke would be worse than no filter, because it reads as a control. The two directions are the same decision evaluated at two moments, so the invariant is that they agree.
 
-`hangar_call` is exempt from the table -- it authorizes each call in its batch, which is finer than a single entry can express -- and remains projected in `front_door` on the existing rule that governs the flat surface.
+`hangar_call` and the two continuation tools are excluded from this surface, as invoke path rather than control plane. On a front door the flat names are how a tool is called; `hangar_call` is the `egress` way in, and the continuation tools hand back the tail of a truncated *tool result*, which is the business of whoever made the call rather than of whoever administers the fleet. (A front-door client that receives a truncated result cannot currently fetch the rest -- the flat surface projects neither tool. That gap predates this decision and is not closed by it.)
 
 ## Consequences
 
@@ -53,6 +53,8 @@ A projection that hides a tool the caller could still invoke would be worse than
 **`front_door` still requires authentication.** With no identity the resolver already denies every tool fail-closed, and now there is a second reason: with no principal there is nothing to authorize the management tools against. This is a precondition of the mode, not a new one.
 
 **A caller with no permissions sees a smaller list than before.** In `front_door` that list was empty of `hangar_*` for everyone, so no caller loses anything it had.
+
+**The split is exactly as narrow as the roles are.** This decision makes the surface follow authorization; it does not make the authorization finer. `provider-admin` holds `mcp_servers:read` and not `:lifecycle`, so an operator reads the fleet here and cannot start or stop a server -- which is what that role can and cannot do over REST, and the mirroring is the point. Less comfortably, none of the built-in roles is a good fit for an agent: `developer` holds read, write *and* lifecycle, so an agent given it sees fleet tools. That is already true of the REST API, and the answer is a role scoped to what an agent does -- `tool:invoke` and nothing else -- rather than a second filter here that would disagree with the enforcement.
 
 **The projection costs an authorization decision per management tool per `tools/list`.** Twenty-two in-memory role lookups on a call that already walks the whole projection registry.
 

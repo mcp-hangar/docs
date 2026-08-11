@@ -4,6 +4,69 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.5.3
+
+Drop-in from 2.5.2: nothing you wrote has to change. It is six fixes, all of
+them defects, and two are visible from outside the gateway — a patch number
+promises they are not, so they are named here.
+
+### `prompts/list` and `resources/list` now answer `-32601`
+
+The gateway advertised the `prompts` and `resources` capabilities on every
+deployment and served neither. Nothing hard-coded that claim: the SDK derives
+each capability from whether its handler is registered, and the framework
+registers both unconditionally, empty or not.
+
+The cost was not the missing feature, it was the false statement.
+`{"prompts": []}` tells a conformant client *this server has no prompts*, which
+is a different thing from *this gateway does not carry prompts* — and nothing on
+the wire distinguished them. A registered upstream's whole prompt and resource
+surface was invisible, with no error anywhere.
+
+| | 2.5.2 | 2.5.3 |
+| --- | --- | --- |
+| `initialize` capabilities | `prompts` and `resources` advertised | neither advertised |
+| `prompts/list`, `resources/list` | `200` with an empty list | `-32601` Method not found |
+
+**Who has to do anything.** A client that reads the advertised capabilities
+before calling — which the specification tells it to do — sees no `prompts`
+capability and does not call. Nothing to change. A client that calls these
+methods unconditionally and treats a JSON-RPC error as fatal will now fail where
+it previously received an empty list; it needs to check capabilities first.
+
+This is derived rather than inverted: when the gateway proxies an upstream's
+prompts and resources, the capabilities come back on their own.
+
+### An upstream's tool catalogue may grow
+
+The gateway never finished the MCP handshake. It sent `initialize` and went
+straight to `tools/list`, skipping the `notifications/initialized` the lifecycle
+requires — so every upstream, in every mode, sat permanently mid-handshake. A
+server is entitled to defer work until that notification arrives, and servers
+do: against the official reference server, a tool registered in its
+`oninitialized` handler was neither listed nor callable through Hangar.
+
+**What to expect.** If your upstream registers tools on initialization, this
+release discovers them for the first time and its catalogue legitimately grows
+after the upgrade. Anything asserting on a **tool count** will notice. Tool
+**digests** are unchanged, so no existing pin moves — including pins on tools
+that now carry the forwarded `title`, `annotations`, `execution`, `icons` and
+`_meta`, which earlier releases discarded on the way through.
+
+The notification is best-effort: an upstream that mishandles it produces a
+warning in the log, not a failed start.
+
+### Also in this release, with nothing to do
+
+- The gateway identifies itself to upstreams as `mcp-hangar` at its running
+  version, rather than `mcp-registry / 1.0.0` — a product name that has not
+  existed for a long time. If you filter upstream logs or key server-side
+  workarounds on `mcp-registry`, those match on `mcp-hangar` from now on.
+- A `front_door` gateway that serves no tools now says why, at `WARNING`, and
+  counts it under `mcp_hangar_empty_projection_total{reason=...}`. The three
+  causes — no caller identity, nothing discovered yet, everything filtered by
+  policy — used to be indistinguishable from outside.
+
 ## Upgrade to 2.5.2
 
 Drop-in from 2.5.1: nothing you wrote has to change. It is five fixes, and the

@@ -42,7 +42,7 @@ installs both, so this applies to a pip install only.
 
 ## Which line you get
 
-`pip install mcp-hangar` resolves to **2.5.3**, the current stable release. It
+`pip install mcp-hangar` resolves to **2.6.0**, the current stable release. It
 is on a major line: 2.0.0 moved onto the MCP 2026-07-28 protocol generation and
 the stable `mcp==2.0.0` SDK, and removed the last vendor integration from core.
 2.1.0 makes the human-in-the-loop approval gate reachable — `approval_list` in a
@@ -77,6 +77,12 @@ empty list, because the gateway no longer advertises capabilities it does not
 serve; and an upstream that registers tools on initialization has them
 discovered for the first time, so its catalogue can grow — see
 [Upgrade to 2.5.3](../upgrade.md#upgrade-to-253).
+**2.6.0 is not drop-in**, and it is the one to read before upgrading: governance
+that was advertised and did not run now runs. A gateway with per-tenant digest
+pins and authentication off no longer starts, and the `hangar_*` tools now
+require the permission their REST equivalent has always required, so a
+credential that drove the fleet over MCP because MCP asked for nothing needs its
+role checked — see [Upgrade to 2.6.0](../upgrade.md#upgrade-to-260).
 Selecting a backend is opt-in, but those two changes land
 on every deployment regardless, as do interpolation (a `${VAR}` with no value
 and no `:-default` now fails the whole boot, not just the `auth` sub-block), the
@@ -131,11 +137,11 @@ make setup
 ## Docker
 
 ```bash
-docker pull ghcr.io/mcp-hangar/mcp-hangar:2.5.3
+docker pull ghcr.io/mcp-hangar/mcp-hangar:2.6.0
 
 # Run with config
 docker run -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  ghcr.io/mcp-hangar/mcp-hangar:2.5.3
+  ghcr.io/mcp-hangar/mcp-hangar:2.6.0
 ```
 
 > The tag above pins the current stable release, matching what

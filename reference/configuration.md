@@ -54,6 +54,31 @@ mcp_servers:
 | `max_concurrency` | `int` | -- | -- | Per-MCP server concurrency limit |
 | `capabilities` | `dict` | -- | -- | Declared capability contract (network, filesystem, environment, tools, resources, `enforcement_mode`). Hangar enforces these at runtime and flags deviations. |
 
+### `mode: remote` and the SSRF policy
+
+A `remote` upstream **declared here is not covered by the SSRF policy**, and the
+difference from registering one through the REST API is deliberate.
+
+`POST /api/mcp_servers` validates the endpoint before accepting it -- an address
+in a private range, or a cloud metadata host, is answered `400 ssrf_blocked` --
+and marks the upstream so that every later connection re-resolves the hostname
+and refuses an address the policy rejects. That second check is what closes DNS
+rebinding: a name that resolved to a public address when it was registered, and
+is later re-pointed at an internal one, is refused on the next connection rather
+than followed.
+
+An upstream declared in `config.yaml` gets neither check. The file is trusted
+input written by the operator, and a gateway sitting in the same cluster as its
+backends usually means the private address it wrote there; refusing it would
+break working deployments to enforce a rule about a channel the operator already
+controls. From 2.6.0 the gateway logs one line per such upstream at startup,
+naming the server, its endpoint and what does not apply to it. Nothing is
+refused.
+
+If you want an endpoint checked, register it through the REST API instead of the
+file. The reasoning is recorded in
+[ADR-021](../adr/ADR-021-config-file-endpoints-outside-the-ssrf-policy.md).
+
 ### `tools` dual format
 
 The `tools` key accepts two formats depending on intent.
@@ -224,8 +249,8 @@ should use only `allow_unverified`.
 Digest computation also normalizes `None`, `{}`, `[]`, and `""` as absent values
 and rejects tool entries with a missing, empty, or non-string `name` field.
 
-Since v1.4.0, digest pins can be scoped per tenant and enforced on the live
-invocation path:
+Since v1.4.0, digest pins are enforced on the live invocation path. Since v2.6.0
+they can be declared for every caller as well as per tenant:
 
 ```yaml
 mcp_servers:
@@ -234,20 +259,30 @@ mcp_servers:
     endpoint: https://payments.example.com/mcp
     tool_projection:
       digest_enforcement: block
+      pins:                                  # every caller, including an anonymous one
+        refund: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       tenant_overrides:
         "tenant:a":
-          pins:
-            refund: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          pins:                              # this tenant only; wins over the block above
+            refund: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `tool_projection.digest_enforcement` | `str` | `block` | Per-MCP server mismatch handling: `audit`, `warn`, or `block` |
-| `tool_projection.tenant_overrides.<tenant>.pins` | `dict[str, str]` | `{}` | Tool name to 64-character lowercase SHA-256 digest pins for one tenant |
+| `tool_projection.pins` | `dict[str, str]` | `{}` | Tool name to 64-character lowercase SHA-256 digest pins applied to every caller |
+| `tool_projection.tenant_overrides.<tenant>.pins` | `dict[str, str]` | `{}` | The same, for one tenant; takes precedence over `tool_projection.pins` |
 
-Tenant pins are independent per MCP server. A tenant pin only applies when the
-caller identity has a matching `tenant_id`; otherwise Hangar uses the normal
-projection and withdrawal logic.
+Pins are independent per MCP server, and resolution is narrowest first: a pin
+declared for the calling tenant wins over one declared for all tenants.
+
+**A per-tenant pin needs authentication.** The tenant id reaches the enforcement
+path from the authenticated principal and from nowhere else, so on a gateway
+with `auth.enabled: false` every caller is anonymous, carries no tenant, and
+matches no per-tenant pin -- drift stays computable and nothing stops it. Since
+v2.6.0 that configuration **refuses to start**, naming the pins it found and the
+auth setting that makes them unmatchable. Use `tool_projection.pins` to pin
+without authentication; it holds every caller, including an anonymous one.
 
 ## `execution`
 

@@ -31,6 +31,8 @@ taxonomy, and formatting conventions.
 | [018](ADR-018-event-sourcing-actually-wired.md) | Event Sourcing, Actually Wired -- and What Is Not Event-Sourced | Accepted | 2026-08-05 |
 | [019](ADR-019-one-storage-decision-two-backends.md) | One Storage Decision, and Two Backends That Are Never Mixed | Accepted (amended 2026-08-09 → [020](ADR-020-high-availability.md)) | 2026-08-06 |
 | [020](ADR-020-high-availability.md) | More Than One Gateway -- What Is Shared, What Is Leased, and What Stays Local | Accepted | 2026-08-06 |
+| [021](ADR-021-config-file-endpoints-outside-the-ssrf-policy.md) | A Remote Upstream in the Configuration File Stays Outside the SSRF Policy | Accepted | 2026-08-11 |
+| [022](ADR-022-the-management-surface-is-what-the-caller-may-call.md) | The Management Surface Is Whatever the Caller Is Allowed to Call | Accepted | 2026-08-11 |
 
 ## Summaries
 

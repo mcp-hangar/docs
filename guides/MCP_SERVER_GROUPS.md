@@ -270,16 +270,14 @@ mcp_servers:
 
 ### Circuit Breaker States
 
-```
-CLOSED (normal operation)
-   |
-   | total failures >= failure_threshold
-   v
-OPEN (all requests rejected)
-   |
-   | reset_timeout_s elapses
-   v
-CLOSED (normal operation resumes)
+```mermaid
+stateDiagram-v2
+    CLOSED: CLOSED<br/>normal operation
+    OPEN: OPEN<br/>all requests rejected
+
+    [*] --> CLOSED
+    CLOSED --> OPEN: total failures ≥ failure_threshold
+    OPEN --> CLOSED: reset_timeout_s elapses
 ```
 
 - **CLOSED** -- Normal operation. Requests are routed to healthy members. Each failure increments the failure counter.

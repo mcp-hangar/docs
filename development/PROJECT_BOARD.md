@@ -17,9 +17,12 @@ Board URL: `https://github.com/orgs/mcp-hangar/projects/<N>` (set after first ru
 
 ## Status flow
 
-```
-Triage -> Backlog -> Ready -> In Progress -> In Review -> Done
-                                  \-> Blocked -/
+```mermaid
+flowchart LR
+    triage["Triage"] --> backlog["Backlog"] --> ready["Ready"] --> progress["In Progress"]
+    progress --> review["In Review"] --> done["Done"]
+    progress -->|external dependency| blocked["Blocked"]
+    blocked -->|unblocked| progress
 ```
 
 - **Triage**: newly opened issues land here.

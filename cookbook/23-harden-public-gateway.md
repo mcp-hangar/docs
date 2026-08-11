@@ -38,34 +38,27 @@ There are two networks and one boundary. Public traffic terminates at an edge
 you operate; Hangar and its providers run on a private network with **no
 directly reachable service ports**.
 
-```text
-                    PUBLIC INTERNET (untrusted)
-                              |
-                    TLS (managed / publicly trusted cert)
-                              |
-        +---------------------v----------------------+
-        |   EDGE  (external-infrastructure)          |
-        |   managed LB / WAF / DDoS / edge rate cap  |
-        |   terminates TLS, routes by host           |
-        +---------------------+----------------------+
-                              |  private network only
-  ====== PRIVATE SERVICE NETWORK (no public ingress) ======
-                              |
-              +---------------v---------------+
-              |   Hangar front door (HA)      |   tool_access.mode: front_door
-              |   OIDC validation, RBAC,      |   auth.allow_anonymous: false
-              |   per-tenant projection,      |   MCP_TRUSTED_HOSTS / CORS scoped
-              |   rate limiting, audit        |
-              +---+-------------------+-------+
-                  |                   |
-        per-provider service    durable stores
-        accounts (least priv)   (auth + event/audit)
-                  |                   |
-        +---------v------+   +--------v---------+
-        |  MCP providers |   |  auth store +    |
-        |  (private)     |   |  event store     |
-        +----------------+   +------------------+
+```mermaid
+flowchart TD
+    internet["PUBLIC INTERNET<br/>(untrusted)"]
+
+    edge["EDGE (external-infrastructure)<br/>managed LB / WAF / DDoS / edge rate cap<br/>terminates TLS, routes by host"]
+
+    subgraph private["PRIVATE SERVICE NETWORK — no public ingress"]
+        front["Hangar front door (HA)<br/>OIDC validation, RBAC, per-tenant projection<br/>rate limiting, audit"]
+        providers["MCP providers<br/>(private)"]
+        stores["auth store +<br/>event store"]
+    end
+
+    internet -->|"TLS (managed / publicly trusted cert)"| edge
+    edge -->|private network only| front
+    front -->|"per-provider service accounts (least priv)"| providers
+    front -->|"durable stores (auth + event/audit)"| stores
 ```
+
+At the front door that boundary is three settings: `tool_access.mode: front_door`,
+`auth.allow_anonymous: false`, and `MCP_TRUSTED_HOSTS` / CORS scoped to the
+hostnames the edge actually routes.
 
 The single load-bearing idea, carried over from the
 [Deployment Playbook](../guides/DEPLOYMENT_PLAYBOOK.md): **the topology mode and

@@ -49,10 +49,14 @@ An adapter has an outbound half and an inbound half, and the inbound half is the
 
 That inbound shape is the point of the design. Core's `resolve` endpoint used to branch on an `X-Slack-Signature` header and dispatch to a vendor verifier, which meant an unauthenticated caller chose which authentication mechanism ran. Now there is one authentication path and one authorized chokepoint; your adapter is just another authenticated client of it.
 
-```
-Slack ──webhook──▶ your adapter ──POST /approvals/{id}/resolve──▶ Hangar
-                   verifies HMAC       Bearer <hangar token>
-                   maps user→principal
+```mermaid
+flowchart LR
+    slack["Slack"]
+    adapter["your adapter<br/>verifies HMAC<br/>maps user → principal"]
+    hangar["Hangar"]
+
+    slack -->|webhook| adapter
+    adapter -->|"POST /approvals/{id}/resolve<br/>Bearer &lt;hangar token&gt;"| hangar
 ```
 
 ## Registering a channel

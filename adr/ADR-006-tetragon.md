@@ -38,15 +38,16 @@ Pluggable backend architecture. The Hangar policy DSL is backend-agnostic.
 Specific enforcement engines are implementations of an interface, not core
 dependencies.
 
-```text
-MCP Policy DSL (Hangar Cloud)
-        |
-Policy Compiler (hangar-agent)
-        |
-+---------------+---------------+-------------+--------------+
-| NetworkPolicy |   Tetragon    |  KubeArmor  |    Falco     |
-|   (v1.0)      |   (v1.5+)     |   (v2.5+)   | (v2.5+, RO)  |
-+---------------+---------------+-------------+--------------+
+```mermaid
+flowchart TD
+    dsl["MCP Policy DSL<br/>(Hangar Cloud)"]
+    compiler["Policy Compiler<br/>(hangar-agent)"]
+
+    dsl --> compiler
+    compiler --> netpol["NetworkPolicy<br/>v1.0"]
+    compiler --> tetragon["Tetragon<br/>v1.5+"]
+    compiler --> kubearmor["KubeArmor<br/>v2.5+"]
+    compiler --> falco["Falco<br/>v2.5+, read-only"]
 ```
 
 Tetragon wins as the primary backend because: native Kubernetes awareness,

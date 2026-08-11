@@ -4,21 +4,23 @@ MCP Hangar implements the SEP-1763 interceptor framework with hook-based event d
 
 ## Architecture
 
-```
-Tool invocation
-    |
-    v
-DigestValidator            (ADR-004: schema integrity check)
-    |  emits DigestMismatchEvent on mismatch
-    v
-MutatorPipeline            (ADR-005: sequential transformation)
-    |  ResponseTruncator, future: PII redaction, schema enforcement
-    v
-EventBus.publish()
-    |
-    +---> flat subscribers     (backward-compatible)
-    +---> hook subscribers     (phase-wrapped Hook objects)
-    +---> wildcard filters     (EventPattern matching)
+```mermaid
+flowchart TD
+    invoke["Tool invocation"]
+    digest["DigestValidator<br/>ADR-004: schema integrity check"]
+    mutate["MutatorPipeline<br/>ADR-005: sequential transformation<br/>ResponseTruncator, future: PII redaction, schema enforcement"]
+    bus["EventBus.publish()"]
+
+    flat["flat subscribers<br/>(backward-compatible)"]
+    hooks["hook subscribers<br/>(phase-wrapped Hook objects)"]
+    wildcard["wildcard filters<br/>(EventPattern matching)"]
+
+    invoke --> digest
+    digest -->|emits DigestMismatchEvent on mismatch| mutate
+    mutate --> bus
+    bus --> flat
+    bus --> hooks
+    bus --> wildcard
 ```
 
 ## Components

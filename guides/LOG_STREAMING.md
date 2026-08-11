@@ -4,16 +4,15 @@ MCP Hangar captures stderr output from subprocess and Docker MCP servers and mak
 
 ## Architecture
 
-```
-MCP Server Process (stderr)
-        |
-   stderr-reader thread
-        |
-   ProviderLogBuffer (ring buffer, 1000 lines)
-        |
-   GET /api/mcp_servers/{id}/logs
-        |
-     REST API
+```mermaid
+flowchart TD
+    proc["MCP server process<br/>(stderr)"]
+    reader["stderr-reader thread"]
+    buffer["ProviderLogBuffer<br/>ring buffer, 1000 lines"]
+    endpoint["GET /api/mcp_servers/{id}/logs"]
+    api["REST API"]
+
+    proc --> reader --> buffer --> endpoint --> api
 ```
 
 Each MCP server gets a dedicated `ProviderLogBuffer` -- a thread-safe ring buffer holding the most recent 1000 log lines. A background reader thread continuously reads the MCP server's stderr and appends lines to the buffer.

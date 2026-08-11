@@ -21,26 +21,22 @@ We will integrate MCP Hangar with [Langfuse](https://langfuse.com), an open-sour
 
 ### Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Application Layer                           │
-│  ┌───────────────────┐  ┌─────────────────────────────────────┐ │
-│  │ ObservabilityPort │◄─│ TracedMcpServerService              │ │
-│  │     (interface)   │  │ (decorator for McpServerService)    │ │
-│  └───────────────────┘  └─────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Infrastructure Layer                        │
-│  ┌──────────────────────────────┐  ┌──────────────────────────┐ │
-│  │ LangfuseObservabilityAdapter │  │ NullObservabilityAdapter │ │
-│  │                              │  │  (when disabled)         │ │
-│  └──────────────────────────────┘  └──────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                       [ Langfuse SDK ]
+```mermaid
+flowchart TD
+    subgraph app["Application Layer"]
+        traced["TracedMcpServerService<br/>(decorator for McpServerService)"]
+        port["ObservabilityPort<br/>(interface)"]
+        traced --> port
+    end
+
+    subgraph infra["Infrastructure Layer"]
+        langfuse["LangfuseObservabilityAdapter"]
+        null["NullObservabilityAdapter<br/>(when disabled)"]
+    end
+
+    port --> langfuse
+    port --> null
+    langfuse --> sdk["Langfuse SDK"]
 ```
 
 ### Key Design Decisions

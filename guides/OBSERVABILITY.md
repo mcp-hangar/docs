@@ -73,23 +73,16 @@ curl http://localhost:8000/metrics | grep mcp_hangar
 
 ### Architecture
 
-```
-+----------------+     scrape      +------------+
-|  MCP Hangar    |---------------->| Prometheus |
-|  :8000/metrics |                 |   :9090    |
-+----------------+                 +-----+------+
-                                         |
-                                         | query
-                                         v
-                                   +------------+
-                                   |  Grafana   |
-                                   |   :3000    |
-                                   +------------+
+```mermaid
+flowchart LR
+    hangar["MCP Hangar<br/>:8000/metrics"]
+    prom["Prometheus<br/>:9090"]
+    grafana["Grafana<br/>:3000"]
+    am["Alertmanager<br/>:9093"]
 
-+----------------+     alerts      +-------------+
-|  Prometheus    |---------------->| Alertmanager|
-|  alert rules   |                 |    :9093    |
-+----------------+                 +-------------+
+    hangar -->|scrape| prom
+    prom -->|query| grafana
+    prom -->|alerts<br/>from alert rules| am
 ```
 
 ### Configuration Files

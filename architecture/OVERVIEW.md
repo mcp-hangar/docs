@@ -215,53 +215,38 @@ layers.
 
 ## System Architecture
 
-```
-+------------------------------------------------------------------+
-|                    REST API (Starlette)                           |
-|   /api/mcp_servers  /api/groups  /api/discovery  /api/ws/*         |
-+----------------------------------+-------------------------------+
-                                   |
-+----------------------------------v-------------------------------+
-|                    MCP Protocol Layer                             |
-|             FastMCP server (stdio or HTTP transport)              |
-|         hangar_* MCP tools  |  tools/call enforcement chokepoint  |
-+----------------------------------+-------------------------------+
-                                   |
-+----------------------------------v-------------------------------+
-|                    CQRS + Event Bus                               |
-|   CommandBus -> Handlers   QueryBus -> Handlers   EventBus       |
-+--------+-----------+-------------+-------------------------------+
-         |           |             |
-+--------v--+ +------v------+ +---v----+
-|  MCP Server  | | McpServerGroup| |  Sagas  |
-| Aggregate  | |  Aggregate   | |         |
-+--------+---+ +------+------+ +---------+
-         |           |
-+--------v-----------v--------------------------------------------+
-|                    Infrastructure                                |
-|  StdioClient | DockerLauncher | EventStore | HealthTracker       |
-|  Discovery Sources | Registry Client | Log Buffers               |
-+------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    rest["REST API (Starlette)<br/>/api/mcp_servers · /api/groups · /api/discovery · /api/ws/*"]
+    mcp["MCP Protocol Layer<br/>FastMCP server (stdio or HTTP transport)<br/>hangar_* MCP tools · tools/call enforcement chokepoint"]
+    cqrs["CQRS + Event Bus<br/>CommandBus → Handlers · QueryBus → Handlers · EventBus"]
+
+    server["McpServer<br/>Aggregate"]
+    group["McpServerGroup<br/>Aggregate"]
+    sagas["Sagas"]
+
+    infra["Infrastructure<br/>StdioClient · DockerLauncher · EventStore · HealthTracker<br/>Discovery Sources · Registry Client · Log Buffers"]
+
+    rest --> mcp
+    mcp --> cqrs
+    cqrs --> server
+    cqrs --> group
+    cqrs --> sagas
+    server --> infra
+    group --> infra
 ```
 
 ## State Machine
 
-```
-     COLD
-       | ensure_ready()
-       v
-  INITIALIZING
-       |
-       +-> SUCCESS --> READY
-       |                 | failures >= threshold
-       |                 v
-       |              DEGRADED
-       |                 | reinitialize
-       |                 +-> INITIALIZING
-       |
-       +-> FAILURE --> DEAD
-                         | retry < max
-                         +-> INITIALIZING
+```mermaid
+stateDiagram-v2
+    [*] --> COLD
+    COLD --> INITIALIZING: ensure_ready()
+    INITIALIZING --> READY: success
+    INITIALIZING --> DEAD: failure
+    READY --> DEGRADED: failures ≥ threshold
+    DEGRADED --> INITIALIZING: reinitialize
+    DEAD --> INITIALIZING: retry < max
 ```
 
 **Valid transitions:**

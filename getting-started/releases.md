@@ -117,9 +117,24 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.5.2**, released 2026-08-10 — a plain `pip install
+The stable Python core is **2.5.3**, released 2026-08-11 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
 the MCP 2026-07-28 protocol generation.
+
+**2.5.3 makes the gateway stop saying things that are not true**, which is what
+the six fixes in it have in common. It advertised `prompts` and `resources` and
+served neither, so a client reading `{"prompts": []}` concluded the upstream had
+none; both capabilities are now withdrawn and those methods answer `-32601`. It
+never finished the MCP handshake, so an upstream that registers tools on
+initialization had them silently missing from the catalogue — that handshake is
+finished now, and such a catalogue **grows** on upgrade. It introduced itself to
+every upstream as `mcp-registry / 1.0.0`, a product name that has not existed
+for a long time. It discarded a tool's `title`, `annotations`, `execution`,
+`icons` and `_meta`, so `readOnlyHint` and `destructiveHint` — how a client
+decides whether a call needs a human in front of it — never reached anyone.
+And a `front_door` serving zero tools was silent about which of three very
+different reasons produced that. Tool digests are unchanged, so no pin moves.
+See [Upgrade to 2.5.3](../upgrade.md#upgrade-to-253).
 
 **2.5.2 is the release to be on if you select a storage backend.** On 2.5.0 and
 2.5.1, `persistence.backend` handed the auth stores out without creating their

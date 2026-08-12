@@ -123,7 +123,7 @@ When `allow_list` is set, only matching tools are exposed. When only `deny_list`
 | `deny_list` | `list[str]` | `[]` | Glob patterns; matching tools are hidden. Wins over `approval_list` |
 | `approval_list` | `list[str]` | `[]` | Glob patterns; matching tools stay visible but each call is **held for a human decision** before it runs |
 | `approval_timeout_seconds` | `int` | `300` | How long a held call waits for a decision. Must be a positive integer |
-| `approval_channel` | `str` | `dashboard` | A label recorded on each approval this policy holds. It does **not** choose the adapter -- one delivery is built at startup from the global `approvals.channel` and handles every approval |
+| `approval_channel` | `str` | *(unset)* | Which delivery channel notifies for approvals this policy holds. Unset means the deployment's `approvals.channel`. Approvals are routed on it |
 
 The same block is accepted at every scope that takes an access policy — an
 `mcp_servers` entry, a `groups` entry, a group member, and the per-tenant
@@ -133,9 +133,10 @@ be honoured at one scope and dropped at another.
 ### Holding a tool for a human (`approval_list`)
 
 `approval_list` marks tools as visible but gated: the caller's `tools/call` is
-held, an approval record is created carrying `approval_channel` as a label, and the
-call runs only if a human approves it inside `approval_timeout_seconds`. A denial
-or an expiry refuses the call — the gate fails closed.
+held, an approval record is created and notified through this policy's channel,
+and the call runs only if a human approves it inside
+`approval_timeout_seconds`. A denial or an expiry refuses the call — the gate
+fails closed.
 
 ```yaml
 mcp_servers:
@@ -149,7 +150,7 @@ mcp_servers:
         - "refund_*"
         - "issue_credit"
       approval_timeout_seconds: 600
-      approval_channel: dashboard
+      approval_channel: slack       # optional; defaults to approvals.channel
 ```
 
 With that config, `list_transactions` runs straight through, `internal_reconcile`
@@ -160,10 +161,12 @@ hidden, not gated.
 Pending approvals are listed and resolved over the REST API
 (`GET /api/approvals`, `POST /api/approvals/{id}/resolve`) — see
 [REST API](rest-api.md). Resolution requires the `approval:resolve` permission.
-Notification is a separate concern from resolution: `dashboard` and `noop` ship
-in core, and any other channel resolves from the `mcp_hangar.approvals.delivery`
-entry-point group. See
-[Approval delivery adapters](../guides/APPROVAL_ADAPTERS.md).
+
+Notification is a separate concern from resolution. `event_stream` and `noop`
+ship in core; any other channel resolves from the
+`mcp_hangar.approvals.delivery` entry-point group. Each approval is delivered
+through the channel its policy names, so two servers can notify different
+places. See [Approval delivery adapters](../guides/APPROVAL_ADAPTERS.md).
 
 > **Before 2.1.0 this key did nothing.** `approval_list` existed on the internal
 > policy object but no config parser read it, so a `tools:` block naming it
@@ -172,13 +175,39 @@ entry-point group. See
 > a block, it becomes live on upgrade — see
 > [Upgrade to 2.1.0](../upgrade.md#upgrade-to-210).
 
-The gate itself is on by default and inert until a policy gates a tool. To turn
-it off:
+### Notification channels (`approvals`)
 
 ```yaml
 approvals:
-  enabled: false
+  enabled: true            # the gate itself; on by default, inert until a policy gates a tool
+  channel: event_stream    # the deployment default, used by any policy that names none
+  delivery:
+    required: false        # refuse to boot if a gated policy's channel notifies nobody
 ```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | `bool` | `true` | Turn the gate off entirely. See the interaction with [`startup_checks`](#startup_checks) below |
+| `channel` | `str` | `event_stream` | Channel for any policy that does not name one |
+| `delivery.required` | `bool` | `false` | When `true`, a gated policy whose channel reaches nobody **refuses the boot** instead of logging at `ERROR` |
+
+`event_stream` is the built-in channel: it does not push anywhere itself,
+because the notification already travels as a `ToolApprovalRequested` domain
+event on `/api/ws/events`, which any client holding `audit:read` can stream. A
+channel that has to reach somewhere else — Slack, a pager, a ticket queue — is
+an installed adapter.
+
+`noop` reaches nobody by design. Choosing it, or naming a channel no installed
+package claims, leaves the gate **armed and unmanned**: held calls wait out
+`approval_timeout_seconds` and then deny, which looks exactly like a broken
+gateway from the client side. That is why the startup check reports it, and why
+`delivery.required` exists for deployments that would rather not start at all.
+
+> **Before 2.7.0 `approval_channel` was a label.** It was recorded on the
+> approval and merged across scopes, but one global delivery handled every
+> approval whichever policy raised it. A config setting different channels per
+> server silently got one. Those configurations now route as written — check
+> them before upgrading if you relied on the old behaviour.
 
 Note the interaction with [`startup_checks`](#startup_checks): disabling the gate
 while a policy still names `approval_list` makes the server **refuse to boot**,
@@ -210,9 +239,18 @@ Two outcomes:
   <scope>`. A gateway that cannot hold a call is a gateway executing it
   unapproved, so starting anyway would be failing open.
 - **Logs at `ERROR`** — everything else, e.g. the governed task relay enabled by
-  `relay_tasks_enabled` with no governed task store. The event is
+  `relay_tasks_enabled` with no governed task store, or a gated policy whose
+  notification channel reaches nobody (`approval_delivery`). The event is
   `subsystem_configured_but_unreachable`, carrying `subsystem`, `required_by` and
   `fail_closed`.
+
+`approval_delivery` is the one check that starts in the second group and can be
+moved to the first. The gate it belongs to is already fail-closed — a held call
+that nobody decides expires and is denied — so a missing *notification* is a
+missing signal, not missing enforcement, and refusing the boot over it would
+trade a degraded notify path for an outage. Set
+[`approvals.delivery.required: true`](#notification-channels-approvals) to make
+it refuse anyway.
 
 Setting `enforce: false` downgrades the refusals to error logs. There is
 deliberately no switch that makes an unreachable subsystem silent.

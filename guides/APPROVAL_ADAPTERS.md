@@ -4,7 +4,7 @@
 
 Hangar's approval gate holds a `tools/call` until a human decides. **Where that decision is asked for, and how the answer comes back, is not core's business.**
 
-Core ships two channels — `dashboard` and `noop` — and resolves everything else from the `mcp_hangar.approvals.delivery` entry-point group. A vendor integration is a package you install, not a branch in the gateway. The reasoning is in [ADR-016](../adr/ADR-016-approval-resolution-chokepoint.md).
+Core ships two channels — `event_stream` and `noop` — and resolves everything else from the `mcp_hangar.approvals.delivery` entry-point group. A vendor integration is a package you install, not a branch in the gateway. The reasoning is in [ADR-016](../adr/ADR-016-approval-resolution-chokepoint.md).
 
 > **The gate only started holding calls in 2.1.0.** Everything on this page describes delivery, which is downstream of a gate that until then was not reachable on any shipped build: no config key put a tool behind it, the service was never constructed, and the REST routes answered `500` ([#678](https://github.com/mcp-hangar/mcp-hangar/issues/678)). If you wrote an adapter against an earlier release and never saw it fire, that is why — there was nothing to deliver. Put a tool behind the gate with [`approval_list`](../reference/configuration.md#holding-a-tool-for-a-human-approval_list) first.
 
@@ -21,23 +21,71 @@ mcp_servers:
       approval_list:
         - "refund_*"
       approval_timeout_seconds: 600
-      approval_channel: slack       # a label on the request, NOT a router
+      approval_channel: slack       # this policy's approvals go to Slack
 ```
 
-`approval_channel` is recorded on each approval this policy holds and travels
-with the request, so a dashboard or an adapter can read it. **It does not select
-an adapter.** The gateway builds exactly one delivery at startup, from the
-global `approvals.channel`, and every approval goes through it whichever policy
-raised it -- so per-server routing to different adapters is not available.
+`approval_channel` selects the adapter for approvals this policy holds. Leave it
+unset and they go to the deployment's `approvals.channel`; name one and they go
+there instead, so two servers can notify two different places.
 
-An unknown value in the *global* `approvals.channel` degrades to `noop` with a
-warning: approvals still queue and stay resolvable over REST, but nobody is
-notified. An unknown value in a per-policy `approval_channel` does nothing at
-all, warning included, because nothing dispatches on it.
+A channel nothing claims degrades to `noop` with a warning — approvals still
+queue and stay resolvable over REST, but nobody is notified. The gateway does
+not refuse to boot over it by default; the startup check reports it at `ERROR`
+instead, naming the scope and the channel:
+
+```text
+subsystem_configured_but_unreachable
+  subsystem=approval_delivery
+  required_by="tools.approval_list on mcp_server:payments (channel 'slack')"
+```
+
+That default is deliberate: the gate is fail-closed by timeout, so what is
+missing is a signal rather than enforcement, and refusing the boot over a
+notification channel turns a degraded notify path into an outage. A deployment
+that would rather not start at all sets `approvals: {delivery: {required:
+true}}`.
+
+> **This changed in 2.7.0.** `approval_channel` used to be a label: it was
+> recorded on the approval and merged across scopes, and one global delivery
+> handled every approval whichever policy raised it. If your config sets
+> different channels per server, they were all going to one place and now go
+> where they say.
 
 Full key reference: [Configuration → `tools` dual format](../reference/configuration.md#tools-dual-format).
 
 > **Migrating from `approvals.channel: slack`?** Core carried a built-in Slack channel through 1.x. It was removed in 2.0. Nothing breaks silently: the channel now logs `approval_delivery_channel_unknown` and degrades to `noop`, so approvals queue undelivered but stay resolvable over the REST API. Restore delivery by installing an adapter — the full reference implementation is below.
+
+## The built-in channel, and what it does not do
+
+`event_stream` is what a deployment gets when it configures nothing. It writes a
+log line and returns — no push of its own — because the notification has already
+left by the time it runs. `ApprovalGateService` publishes a
+`ToolApprovalRequested` domain event before it calls `send` and before it starts
+waiting, and `/api/ws/events` streams every domain event to any client holding
+`audit:read`:
+
+```json
+{
+  "event_type": "ToolApprovalRequested",
+  "approval_id": "0f2c…",
+  "mcp_server_id": "payments",
+  "tool_name": "refund_payment",
+  "channel": "event_stream",
+  "expires_at": "2026-08-12T09:15:00Z"
+}
+```
+
+So a UI that holds a socket open sees held calls in real time and resolves them
+over REST, with no adapter installed. What `event_stream` does not do is reach
+anywhere a socket cannot: a room, a phone, a queue. That is what an adapter is
+for.
+
+> **This channel used to be called `dashboard`**, after a management UI that
+> shipped with the Hangar Cloud tier and was archived with it. Nothing renders
+> that UI, and the channel never pushed to it — its `send` wrote a log line
+> while its docstring claimed a WebSocket integration that was never wired.
+> `channel: dashboard` still resolves, to the same delivery, and logs
+> `approval_delivery_channel_renamed` once at boot.
 
 ## The two halves
 

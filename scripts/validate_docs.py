@@ -39,6 +39,10 @@ ALLOWLIST: set[str] = {
     # Old tool names kept in migration / "before -> after" tables.
     "hangar_invoke",
     "hangar_batch",
+    # Removed in 2.7.0 and named in that upgrade note so an operator calling it
+    # learns why it is gone. Nothing registered it and no channel it referenced
+    # existed, but the name has to survive here to say so.
+    "hangar_approve_prompt",
     # Example container env var in cookbook/04 (belongs to the demo image,
     # not to Hangar itself).
     "MCP_PORT",

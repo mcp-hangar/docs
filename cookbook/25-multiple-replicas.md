@@ -32,6 +32,32 @@ stdio attached. No peer can reach it, so a replica serving a call to such a
 server starts its own copy, with its own mounted volumes. Registering one is
 refused in a coordinated deployment, and starting one is refused on a follower.
 
+**Sticky routing to a replica, on every hop in front of the pods.** An MCP
+Streamable HTTP session lives in **one replica's memory**. Nothing shares it --
+the gateway writes no session to the database -- so a request routed to a pod
+other than the one that answered `initialize` is refused with `Session not
+found`. Round-robin across three replicas fails most requests, not a few:
+measured at 13 of 15 attempts, against 10 of 10 clean on a single replica.
+
+The Helm chart pins the Service for you (`service.sessionAffinity: ClientIP`,
+the default). **An ingress needs pinning of its own** -- Service affinity is
+kube-proxy behaviour, and a controller that routes straight to pod endpoints
+never passes through kube-proxy. For ingress-nginx:
+
+```yaml
+nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+```
+
+Use the hash rather than the usual cookie affinity: an MCP client is not a
+browser and will not carry the cookie back.
+
+Two limits remain after both hops are pinned, because pinning is a mitigation
+and not a fix. Affinity keys on the source address *as the proxy presents it*,
+so behind anything that does not preserve the client address every session
+hashes to one backend -- the pin holds, the balance does not. And a pin does not
+outlive its pod: a rolling restart or a scale-down takes the owning replica away
+and the session with it, and the client starts over.
+
 ```yaml
 persistence:
   backend: postgresql
@@ -183,7 +209,8 @@ rather than inventing a configuration. It resolves when the rollout completes.
 | No pod answers `true` | the database is unreachable, or the lease is held by a pod that has stopped -- it clears within the TTL |
 | `fleet_writer_absent` in the logs | no durable config repository was in use; registrations are not being written down |
 | A server exists on one pod only | the tail is stalled -- look for `event_tailer_read_failed` |
-| `/tools` is empty on one pod and not another | expected: tools are learned per replica when it connects. The MCP surface is unaffected |
+| `Session not found` on most requests | nothing is pinning sessions to a replica -- see [what a replica set requires](#what-a-replica-set-requires). Check the ingress as well as the Service; affinity on the Service does nothing for a controller that routes to pod endpoints |
+| `/tools` is empty on one pod and not another | expected: tools are learned per replica when it connects. In `egress` mode the MCP surface is unaffected, because `tools/list` is the fixed `hangar_*` surface. In `front_door` it is **not** -- there `tools/list` is that per-replica projection, so replicas answer differently ([core#886](https://github.com/mcp-hangar/mcp-hangar/issues/886)) |
 | Discovery finds nothing, and no `discovery_cycle_complete` anywhere | the replica configured for discovery is not the holder -- look for `discovery_idle_not_the_lease_holder` |
 | Failover took far longer than `lease_ttl_s` | the *holder* wrote the tenure from its own config. Compare `expires_in_s` with `my_lease_ttl_s` under `management_lease` in `GET /api/system` |
 | `409 LocalModeNotOwnedError` | a `subprocess` or `docker` server started on a follower; ask the pod reporting `manages_fleet: true`, or use `remote` |

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.26](https://github.com/mcp-hangar/docs/compare/v1.1.25...v1.1.26) (2026-08-12)
+
+
+### Changed
+
+* **guides:** approval delivery routes, is named after its surface, and says when it is silent ([#191](https://github.com/mcp-hangar/docs/issues/191)) ([e22d979](https://github.com/mcp-hangar/docs/commit/e22d9796ffda4b023bb6d97320614a3849a41aa3))
+
 ## [1.1.25](https://github.com/mcp-hangar/docs/compare/v1.1.24...v1.1.25) (2026-08-11)
 
 

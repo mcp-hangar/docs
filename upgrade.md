@@ -4,6 +4,92 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.7.0
+
+Drop-in for most deployments. One behaviour changes without a config change:
+`approval_channel`, which was recorded and ignored, now selects where approvals
+are notified. Read the second section if any of your policies set it.
+
+### A consent gate no longer disappears on restart
+
+Fixed, not a migration step — but worth knowing whether it happened to you.
+
+The tool-access-policy store held `allow_list` and `deny_list` and nothing else,
+and the startup replay rebuilt policies from those two fields, assigning over
+whatever the YAML had already registered. A server with `tools.approval_list` in
+its config and **any** prior policy update over the REST API came back **ungated**
+after a restart: the tools it named ran without being held, and the startup check
+that guards this class saw no `approval_list` left to demand a gate, so the boot
+was clean.
+
+The store now persists the approval fields and the replay hands back whole
+policies. An existing database is widened in place on first open. A row written
+by an older build carries no approval columns; rather than let that erase a gate
+one last time, the replay carries the in-force gate forward and logs
+`tap_replay_carried_approval_gate`.
+
+Nothing to do. If a gate was lost to this, it is back on the next restart — the
+YAML declaration was never what went missing. If you keep audit records, calls to
+`approval_list` tools between an affected restart and this upgrade ran without a
+human decision.
+
+### `approval_channel` now routes, and the built-in channel is renamed
+
+`approval_channel` was documented as a policy's delivery channel and merged
+carefully across scope narrowing — and dispatched nowhere. One delivery, built
+from the global `approvals.channel`, handled every approval whichever policy
+raised it. A config that set `approval_channel: slack` on one server and
+something else on another got one channel, silently.
+
+They now route as written. **Check your policies before upgrading**: if two
+servers name different channels and only one adapter is installed, the other
+now degrades to `noop` where it previously borrowed the global channel.
+
+The core channel formerly called `dashboard` is now `event_stream`. It was named
+after a management UI that shipped with the Hangar Cloud tier and was archived
+with it, and it never pushed to that UI anyway — its `send` wrote a log line
+while its docstring claimed a WebSocket integration that was never wired. The
+new name points at the surface that does carry the notification: the
+`ToolApprovalRequested` domain event on `/api/ws/events`.
+
+`channel: dashboard` still resolves, to the same delivery, and logs
+`approval_delivery_channel_renamed` once at boot. No config change is required.
+
+### An armed gate now says when nobody is listening
+
+A policy that gates a tool while its channel reaches nothing outside the process
+— `noop`, or a vendor name no installed package claims — is now reported at
+startup:
+
+```text
+subsystem_configured_but_unreachable
+  subsystem=approval_delivery
+  required_by="tools.approval_list on mcp_server:payments (channel 'slack')"
+  fail_closed=False
+```
+
+The gateway still starts. The gate is fail-closed by timeout, so what is missing
+is a signal rather than enforcement, and refusing the boot over a notification
+channel would trade a degraded notify path for an outage. A deployment that
+wants the refusal opts in:
+
+```yaml
+approvals:
+  delivery:
+    required: true
+```
+
+Three metrics land with it —
+`mcp_hangar_approval_requests`, `mcp_hangar_approval_deliveries` and
+`mcp_hangar_approval_decisions`, all labelled by channel. See
+[Observability → Approval Gate](guides/OBSERVABILITY.md).
+
+### Removed
+
+`hangar_approve_prompt`, an MCP tool nothing registered, whose docstring pointed
+at an `approvals.channel: mcp_prompt` that no builtin or entry point has provided
+since 2.0. If you were calling it, you were getting a `tool not found`.
+
 ## Upgrade to 2.6.0
 
 Not drop-in. Two changes can stop a gateway that works today, and both are the

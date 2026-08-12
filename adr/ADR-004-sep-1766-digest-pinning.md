@@ -43,6 +43,14 @@ We will implement SEP-1766 and SEP-1763 compliance **preemptively**, treating ou
 
 ### Scope
 
+> Three of the components below no longer exist. `hangar-agent`, `hangar-cloud`
+> and `hangar-app` — the sidecar, the SaaS control plane and its management UI —
+> were retired with the agent/cloud tier
+> ([ADR-010](ADR-010-retire-agent-cloud-tier.md)). The table is kept as the
+> record of what was decided on 2026-05-01, not as a plan. Digest pinning itself
+> shipped in core; see
+> [Configuration → `tool_projection`](../reference/configuration.md).
+
 | Component | What to implement |
 |-----------|-------------------|
 | hangar-agent | Extract `digest` from `tools/list` responses. Compare against cloud-provided allowlist. Enforce policy. Emit `DigestMismatchEvent`. |

@@ -41,7 +41,7 @@ Requiring a principal unconditionally would 401 every resolution on an auth-off 
 
 **4. Core knows no vendors. Adapters are installed, not imported.**
 
-The `X-Slack-Signature` branch is removed; the route has one authentication path. Delivery channels resolve through the `mcp_hangar.approvals.delivery` entry-point group, with `dashboard` and `noop` shipped by core. A vendor adapter terminates the webhook itself — verifies the vendor signature, maps the vendor identity onto a Hangar principal, calls `POST /approvals/{id}/resolve` with an ordinary token.
+The `X-Slack-Signature` branch is removed; the route has one authentication path. Delivery channels resolve through the `mcp_hangar.approvals.delivery` entry-point group, with `event_stream` and `noop` shipped by core. A vendor adapter terminates the webhook itself — verifies the vendor signature, maps the vendor identity onto a Hangar principal, calls `POST /approvals/{id}/resolve` with an ordinary token.
 
 A **reference** adapter ships in the docs rather than as a published package. Publishing one under the organization would make it ours to version, release, and keep working against a third party's API — a maintenance commitment taken on to demonstrate a boundary, which undercuts the boundary.
 

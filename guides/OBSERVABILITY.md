@@ -236,6 +236,38 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 |--------|------|--------|-------------|
 | `mcp_hangar_rate_limit_hits_total` | Counter | principal | Rate limit rejections |
 
+#### Approval Gate
+
+*Since 2.7.0.*
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `mcp_hangar_approval_requests_total` | Counter | channel | Tool invocations held by the gate |
+| `mcp_hangar_approval_deliveries_total` | Counter | channel, outcome | Notifications handed to a channel: `sent`, `failed`, `not_notified` |
+| `mcp_hangar_approval_decisions_total` | Counter | channel, decision | How each hold ended: `granted`, `denied`, `expired` |
+
+**Example queries:**
+
+```promql
+# Armed and unmanned: the gate is holding calls and nobody is being told.
+sum(rate(mcp_hangar_approval_requests_total[15m])) by (channel)
+  - sum(rate(mcp_hangar_approval_deliveries_total{outcome="sent"}[15m])) by (channel)
+
+# The same story from the other end: holds ending in expiry rather than a decision.
+sum(rate(mcp_hangar_approval_decisions_total{decision="expired"}[1h])) by (channel)
+  / sum(rate(mcp_hangar_approval_decisions_total[1h])) by (channel)
+
+# A configured adapter that is failing rather than absent.
+sum(rate(mcp_hangar_approval_deliveries_total{outcome="failed"}[5m])) by (channel)
+```
+
+`outcome="not_notified"` tracking requests one-for-one means the resolved
+channel reaches nothing outside the process. That is not an outage — held calls
+still expire closed and stay resolvable over REST — but every gated call waits
+out its timeout first, which from the client side looks like a broken gateway.
+The startup check reports the same condition at boot; see
+[Configuration → `approvals`](../reference/configuration.md#notification-channels-approvals).
+
 #### GC (Garbage Collection)
 
 | Metric | Type | Labels | Description |

@@ -117,9 +117,20 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.6.0**, released 2026-08-11 — a plain `pip install
+The stable Python core is **2.7.0**, released 2026-08-14 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
 the MCP 2026-07-28 protocol generation.
+
+**2.7.0 makes a replica set one server.** An MCP session used to live in one
+replica's memory, so a client that initialized against one pod and called against
+another was told `Session not found` — 13 of 15 attempts through a three-replica
+Service. Sticky routing papered over it and could not fix it, because an affinity
+pin does not outlive its pod. The gateway now serves the transport without a
+session at all: `initialize` returns no id, any replica answers anything, and
+`DELETE /mcp` answers `405` because there is nothing to terminate. In the same
+release, a `front_door` gateway starts its configured servers at boot, so
+`tools/list` follows the configuration instead of one replica's warm-up history,
+and `approval_channel` routes as written instead of being recorded and ignored.
 
 **2.6.0 makes governance that was advertised actually run.** Three enforcement
 surfaces were declared and did nothing. Digest pins could only be addressed to a

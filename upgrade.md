@@ -6,9 +6,55 @@ This guide covers user-visible migration steps between MCP Hangar releases.
 
 ## Upgrade to 2.7.0
 
-Drop-in for most deployments. One behaviour changes without a config change:
+Drop-in for most deployments. Two behaviours change without a config change:
 `approval_channel`, which was recorded and ignored, now selects where approvals
-are notified. Read the second section if any of your policies set it.
+are notified; and the MCP endpoint stops handing out session ids. Read the
+`approval_channel` section if any of your policies set it, and the session
+section if anything in front of your pods pins traffic.
+
+### The MCP endpoint no longer hands out a session id
+
+`initialize` returns no `Mcp-Session-Id`, and no request needs one.
+
+A session lived in one replica's memory, so a client that initialized against one
+pod and called against another was told `Session not found` -- 13 of 15 attempts
+through a three-replica Service. Session affinity papered over that and could not
+fix it: a pin does not outlive its pod, so a rolling restart or a scale-down took
+the session with it.
+
+| | before | from 2.7.0 |
+|---|---|---|
+| `initialize` | returns `Mcp-Session-Id` | returns no session id |
+| a request carrying a stale or foreign `Mcp-Session-Id` | `Session not found` | served; the header is ignored |
+| `DELETE /mcp` | `200` | **`405 Method Not Allowed`** |
+
+The last row is the only one that can surface in a client's logs. There is no
+session to terminate, so teardown is refused rather than acknowledged.
+
+**What this does not change.** Nothing about the 2026-07-28 revision, which has
+no sessions at all and was already served this way. Nothing about session
+*suspension* (`/api/sessions`), which keys on the caller identity from
+`x-session-id` or the JWT `sid` claim and never on the transport. Nothing about
+authorization, which is per request.
+
+**Deployments.** Sticky routing is no longer a requirement for a replica set --
+see [running more than one replica](cookbook/25-multiple-replicas.md). Existing
+pinning is now merely unhelpful rather than wrong, so there is no rush to remove
+it; leave it if you still run an older gateway behind the same ingress.
+
+### `front_door` no longer serves an empty tool list after a restart
+
+Also fixed here, and worth knowing whether it happened to you. In
+`tool_access.mode: front_door`, `tools/list` **is** the per-tenant projection, and
+the projection was built from whatever that replica had started. A replica that
+had started nothing served an empty list to a valid tenant, with no client-
+reachable way to fix it, and two replicas that had warmed different servers
+answered the same tenant differently.
+
+A `front_door` gateway now starts every configured mcp_server at boot, on its own
+thread so readiness never waits on a backend handshake. A backend that fails to
+start is logged as `front_door_warmup_failed` rather than costing the others their
+projection. `egress` is unchanged: backends still start lazily on first use.
 
 ### A consent gate no longer disappears on restart
 

@@ -32,31 +32,45 @@ stdio attached. No peer can reach it, so a replica serving a call to such a
 server starts its own copy, with its own mounted volumes. Registering one is
 refused in a coordinated deployment, and starting one is refused on a follower.
 
-**Sticky routing to a replica, on every hop in front of the pods.** An MCP
-Streamable HTTP session lives in **one replica's memory**. Nothing shares it --
-the gateway writes no session to the database -- so a request routed to a pod
-other than the one that answered `initialize` is refused with `Session not
-found`. Round-robin across three replicas fails most requests, not a few:
-measured at 13 of 15 attempts, against 10 of 10 clean on a single replica.
+That is the whole list from 2.7.0. Sticky routing used to be a fourth entry; it
+is not one any more, and the next section is what replaced it.
 
-The Helm chart pins the Service for you (`service.sessionAffinity: ClientIP`,
-the default). **An ingress needs pinning of its own** -- Service affinity is
-kube-proxy behaviour, and a controller that routes straight to pod endpoints
-never passes through kube-proxy. For ingress-nginx:
+## Sticky routing: required before 2.7.0, unnecessary from 2.7.0
 
-```yaml
-nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
-```
+*Changed in 2.7.0.*
 
-Use the hash rather than the usual cookie affinity: an MCP client is not a
-browser and will not carry the cookie back.
+**Before 2.7.0**, an MCP Streamable HTTP session lived in **one replica's
+memory**. Nothing shared it, so a request routed to a pod other than the one that
+answered `initialize` was refused with `Session not found` -- most requests, not a
+few: measured at 13 of 15 attempts across three replicas, against 10 of 10 clean
+on a single replica. Every hop in front of the pods had to pin, and even pinned,
+two limits remained: affinity keys on the source address *as the proxy presents
+it*, so behind anything that does not preserve the client address the pin holds
+and the balance does not; and a pin does not outlive its pod, so a rolling
+restart or a scale-down took the owning replica away and the session with it.
 
-Two limits remain after both hops are pinned, because pinning is a mitigation
-and not a fix. Affinity keys on the source address *as the proxy presents it*,
-so behind anything that does not preserve the client address every session
-hashes to one backend -- the pin holds, the balance does not. And a pin does not
-outlive its pod: a rolling restart or a scale-down takes the owning replica away
-and the session with it, and the client starts over.
+**From 2.7.0** the gateway serves the transport without a session at all.
+`initialize` returns no `Mcp-Session-Id`, no request needs one, and a request
+carrying a stale one is served rather than refused. Any replica answers anything,
+so a round-robin Service is correct and a rolling restart costs a client nothing.
+See [core#877](https://github.com/mcp-hangar/mcp-hangar/issues/877) for the
+measurements and the decision.
+
+**What to do about pinning you already configured.** Nothing urgent -- a pin is
+now merely unhelpful rather than wrong. When you get to it:
+
+* the chart's `service.sessionAffinity` defaults to `None` from chart 0.15.0;
+  earlier charts default it to `ClientIP` and you can set it yourself;
+* an ingress-nginx `upstream-hash-by: "$remote_addr"` annotation can come off.
+
+Leave both in place if you are still running a gateway older than 2.7.0 behind
+the same ingress -- the chart deploys whatever image tag you give it, and an older
+image still needs the pin.
+
+**One thing this changes for clients.** There is no session to end, so
+`DELETE /mcp` answers `405 Method Not Allowed` where it used to answer `200`. A
+client that treats a failed teardown as fatal would need to stop sending it; we
+know of none that does.
 
 ```yaml
 persistence:
@@ -209,8 +223,9 @@ rather than inventing a configuration. It resolves when the rollout completes.
 | No pod answers `true` | the database is unreachable, or the lease is held by a pod that has stopped -- it clears within the TTL |
 | `fleet_writer_absent` in the logs | no durable config repository was in use; registrations are not being written down |
 | A server exists on one pod only | the tail is stalled -- look for `event_tailer_read_failed` |
-| `Session not found` on most requests | nothing is pinning sessions to a replica -- see [what a replica set requires](#what-a-replica-set-requires). Check the ingress as well as the Service; affinity on the Service does nothing for a controller that routes to pod endpoints |
-| `/tools` is empty on one pod and not another | expected: tools are learned per replica when it connects. In `egress` mode the MCP surface is unaffected, because `tools/list` is the fixed `hangar_*` surface. In `front_door` it is **not** -- there `tools/list` is that per-replica projection, so replicas answer differently ([core#886](https://github.com/mcp-hangar/mcp-hangar/issues/886)) |
+| `Session not found` on most requests | the gateway is older than 2.7.0, where sessions were per-replica. Pin the Service and the ingress both, or upgrade -- see [sticky routing](#sticky-routing-required-before-270-unnecessary-from-270). From 2.7.0 this cannot happen: there is no session to miss |
+| `DELETE /mcp` answers `405` | expected from 2.7.0. There is no session to terminate |
+| `/tools` is empty on one pod and not another | before 2.7.0, expected: tools were learned per replica as it connected, and in `front_door` -- where `tools/list` **is** that projection -- replicas answered the same tenant differently. From 2.7.0 a `front_door` replica starts every configured mcp_server at boot, so the catalogue follows the configuration rather than one replica's warm-up history ([core#886](https://github.com/mcp-hangar/mcp-hangar/issues/886)). A pod still short of the others is one whose warm-up failed: look for `front_door_warmup_failed` |
 | Discovery finds nothing, and no `discovery_cycle_complete` anywhere | the replica configured for discovery is not the holder -- look for `discovery_idle_not_the_lease_holder` |
 | Failover took far longer than `lease_ttl_s` | the *holder* wrote the tenure from its own config. Compare `expires_in_s` with `my_lease_ttl_s` under `management_lease` in `GET /api/system` |
 | `409 LocalModeNotOwnedError` | a `subprocess` or `docker` server started on a follower; ask the pod reporting `manages_fleet: true`, or use `remote` |

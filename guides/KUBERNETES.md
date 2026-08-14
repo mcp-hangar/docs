@@ -5,7 +5,7 @@
 Deploy and manage MCP servers as native Kubernetes resources using the MCP-Hangar Operator.
 
 > **The MCP-Hangar Operator is shipped from a separate repository:
-> [hangar-operator](https://github.com/mcp-hangar/hangar-operator).**
+> [mcp-hangar-operator](https://github.com/mcp-hangar/mcp-hangar-operator).**
 > Helm charts live in [helm-charts](https://github.com/mcp-hangar/helm-charts).
 
 ## Overview
@@ -13,7 +13,7 @@ Deploy and manage MCP servers as native Kubernetes resources using the MCP-Hanga
 The MCP-Hangar Operator provides:
 
 - **MCPServer** - Declarative MCP server management
-- **MCPServerGroup** - Load balancing and high availability
+- **MCPServerGroup** - Aggregates member health by label selector against a `healthPolicy`
 - **MCPDiscoverySource** - Automatic MCP server discovery
 - **MCPEgressPolicy** - Declarative, deny-by-default egress control (which
   upstreams a server may reach, which tool calls it may make, and what happens
@@ -31,16 +31,10 @@ The MCP-Hangar Operator provides:
 
 ### Install CRDs
 
-CRDs are bundled with the operator. They are installed automatically by the Helm
-chart. To install manually:
+The Helm chart owns the CRDs (`crds.install`, on by default) and keeps them on
+uninstall (`crds.keep`). There is no separate manual step:
 
 ```bash
-# Install Custom Resource Definitions (from the operator repo)
-kubectl apply -f https://raw.githubusercontent.com/mcp-hangar/hangar-operator/main/deploy/crds/mcpserver.yaml
-kubectl apply -f https://raw.githubusercontent.com/mcp-hangar/hangar-operator/main/deploy/crds/mcpservergroup.yaml
-kubectl apply -f https://raw.githubusercontent.com/mcp-hangar/hangar-operator/main/deploy/crds/mcpdiscoverysource.yaml
-
-# Verify
 kubectl get crds | grep mcp-hangar.io
 ```
 
@@ -98,7 +92,6 @@ spec:
   image: ghcr.io/modelcontextprotocol/mcp-sqlite:latest
   replicas: 1
 
-  idleTTL: "10m"
   startupTimeout: "60s"
 
   resources:
@@ -112,12 +105,11 @@ spec:
   env:
     - name: SQLITE_DB_PATH
       value: /data/database.db
-
-  healthCheck:
-    enabled: true
-    interval: "30s"
-    failureThreshold: 3
 ```
+
+The operator checks health on its own reconcile cadence — Hangar's health
+endpoint for `remote` servers, pod phase for `container` ones. There is no
+per-server interval to set.
 
 ### MCP Server with Secrets
 
@@ -137,14 +129,12 @@ spec:
         secretKeyRef:
           name: github-credentials
           key: token
-
-  tools:
-    allowList:
-      - create_issue
-      - list_issues
-    rateLimit:
-      requestsPerMinute: 30
 ```
+
+**Restricting which tools this server may expose is not an `MCPServer` field.**
+That is `MCPEgressPolicy` — see the [Egress Policy guide](EGRESS_POLICY.md).
+Core's own `tools.allow_list` in `config.yaml` is a separate mechanism for a
+server Hangar runs itself.
 
 ### Remote MCP Server
 
@@ -158,16 +148,12 @@ spec:
   mode: remote
   endpoint: https://api.example.com/mcp
 
-  healthCheck:
-    enabled: true
-    interval: "1m"
-    timeout: "10s"
-
-  circuitBreaker:
-    enabled: true
-    failureThreshold: 5
-    resetTimeout: "30s"
+  startupTimeout: "30s"
 ```
+
+Circuit breaking lives in core (`config.yaml`), not on the CR. The operator's
+own consecutive-failure cap before it marks a server Degraded is a constant, not
+a setting.
 
 ### Cold Start (Scale to Zero)
 
@@ -182,14 +168,20 @@ spec:
 
   # Start with 0 replicas - will start on first request
   replicas: 0
-
-  # Shutdown after 5 minutes of inactivity
-  idleTTL: "5m"
 ```
+
+**Idle shutdown is core's, not the CR's.** Hangar stops an idle backend on
+`idle_ttl_s`; a server it discovers in the cluster takes core's create default
+of 300s. The `MCPServer` spec has no idle field, and the discovery-entry TTL
+annotation (`mcp-hangar.io/ttl`) is a different quantity — how long core keeps
+an entry it has stopped seeing.
 
 ## MCPServerGroup
 
-### High Availability Group
+A group is a **status aggregator**: it selects `MCPServer`s by label, counts
+their states, and reports Ready / Degraded / Available against a `healthPolicy`.
+**Traffic is not routed through it** — there is no strategy, failover or session
+affinity to configure, and none of those were ever honoured.
 
 ```yaml
 apiVersion: mcp-hangar.io/v1alpha2
@@ -203,20 +195,15 @@ spec:
     matchLabels:
       mcp-hangar.io/category: database
 
-  # Load balancing strategy
-  strategy: LeastConnections  # RoundRobin, LeastConnections, Random, Failover
-
-  # Failover configuration
-  failover:
-    enabled: true
-    maxRetries: 2
-    retryDelay: "500ms"
-
-  # Health requirements
+  # When does this group report Degraded?
   healthPolicy:
     minHealthyPercentage: 50
     unhealthyThreshold: 3
 ```
+
+Load balancing across members of a Hangar *group* is a core feature
+(`config.yaml` / `POST /api/groups`), on a different object. The operator does
+not call that API.
 
 ### Label MCP servers for Grouping
 
@@ -265,7 +252,7 @@ spec:
 
   providerTemplate:
     spec:
-      idleTTL: "5m"
+      startupTimeout: "60s"
       resources:
         requests:
           memory: "64Mi"
@@ -487,9 +474,8 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 | `image` | string | For container | - | Container image |
 | `endpoint` | string | For remote | - | HTTP endpoint URL |
 | `replicas` | int | No | `1` | Desired replicas (0 = cold) |
-| `idleTTL` | duration | No | `5m` | Idle timeout |
 | `startupTimeout` | duration | No | `30s` | Startup timeout |
-| `healthCheck` | object | No | enabled | Health check config |
+| `shutdownGracePeriod` | duration | No | `30s` | Pod termination grace period |
 | `resources` | object | No | - | Resource requirements |
 | `env` | array | No | - | Environment variables |
 | `volumes` | array | No | - | Volume mounts |
@@ -497,8 +483,9 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 | `serviceAccountName` | string | No | - | ServiceAccount |
 | `nodeSelector` | map | No | - | Node selection |
 | `tolerations` | array | No | - | Tolerations |
-| `tools` | object | No | - | Tool configuration |
-| `circuitBreaker` | object | No | enabled | Circuit breaker config |
+| `capabilities.network` | object | No | - | Declared egress; feeds the generated `NetworkPolicy` |
+| `capabilities.tools` | object | No | - | `maxCount` / `expectedTools`; drives violation events |
+| `capabilities.enforcementMode` | string | No | - | `audit` or `block` |
 
 ### MCPServer Status
 

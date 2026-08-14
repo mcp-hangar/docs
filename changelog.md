@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.28](https://github.com/mcp-hangar/docs/compare/v1.1.27...v1.1.28) (2026-08-14)
+
+
+### Changed
+
+* **guides:** KUBERNETES.md teaches only fields the operator honours ([#202](https://github.com/mcp-hangar/docs/issues/202)) ([148301a](https://github.com/mcp-hangar/docs/commit/148301aaf5935d78c2cfeaf1ba10b3884998252b))
+
 ## [1.1.27](https://github.com/mcp-hangar/docs/compare/v1.1.26...v1.1.27) (2026-08-14)
 
 

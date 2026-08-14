@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.27](https://github.com/mcp-hangar/docs/compare/v1.1.26...v1.1.27) (2026-08-14)
+
+
+### Changed
+
+* **cookbook:** sticky routing is a requirement of running replicas ([#195](https://github.com/mcp-hangar/docs/issues/195)) ([7ca06b9](https://github.com/mcp-hangar/docs/commit/7ca06b9e2c3b85f62e99f1e6844d74e29c2ff139))
+* **guides:** a replica set no longer requires sticky routing ([#199](https://github.com/mcp-hangar/docs/issues/199)) ([ad46144](https://github.com/mcp-hangar/docs/commit/ad461449e29050f2aae546cf26e351d89fde10ae))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#201](https://github.com/mcp-hangar/docs/issues/201)) ([2cee7d1](https://github.com/mcp-hangar/docs/commit/2cee7d13fac0d2e2faecb094a62196b9470d15e5))
+* **reference:** the version surfaces move to 2.7.0 ([#200](https://github.com/mcp-hangar/docs/issues/200)) ([12126fe](https://github.com/mcp-hangar/docs/commit/12126fe23fec87d69638b7c1442fd39bd63ea607))
+
 ## [1.1.26](https://github.com/mcp-hangar/docs/compare/v1.1.25...v1.1.26) (2026-08-12)
 
 

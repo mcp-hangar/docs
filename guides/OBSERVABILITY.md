@@ -31,27 +31,21 @@ pip install mcp-hangar
 pip install mcp-hangar[opentelemetry,langfuse]
 ```
 
-### Start Monitoring Stack
+### Ship the Dashboards and Alerts
 
-The monitoring stack is in `monitoring/` and includes Prometheus, Grafana, and Alertmanager:
+MCP Hangar does not ship a monitoring stack. Bring your own Prometheus and
+Grafana; what Hangar maintains is the payloads that go into them, and those
+ship with the Helm chart:
 
 ```bash
-# Using Docker Compose
-cd monitoring
-docker compose up -d
-
-# Using Podman
-cd monitoring
-podman compose up -d
+helm upgrade --install hangar mcp-hangar/mcp-hangar \
+  --set serviceMonitor.enabled=true \
+  --set prometheusRule.enabled=true \
+  --set dashboards.enabled=true
 ```
 
-Access dashboards:
-
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| Grafana | http://localhost:3000 | admin / admin |
-| Prometheus | http://localhost:9090 | - |
-| Alertmanager | http://localhost:9093 | - |
+See [Monitoring Stack](#monitoring-stack) for what each value renders and where
+the payloads live.
 
 ### Start MCP Hangar with Metrics
 
@@ -85,23 +79,29 @@ flowchart LR
     prom -->|alerts<br/>from alert rules| am
 ```
 
-### Configuration Files
+### What Hangar Ships, and What You Bring
 
-| File | Purpose |
-|------|---------|
-| `monitoring/docker-compose.yaml` | Container orchestration |
-| `monitoring/prometheus/prometheus.yaml` | Scrape configuration |
-| `monitoring/prometheus/alerts.yaml` | Alert rules |
-| `monitoring/alertmanager/alertmanager.yaml` | Notification routing |
-| `monitoring/grafana/provisioning/` | Dashboard/datasource provisioning |
-| `monitoring/grafana/dashboards/` | Pre-built dashboard JSON files |
+Prometheus, Grafana and Alertmanager are yours to run. Hangar maintains the
+three payloads that go into them, and the [`mcp-hangar` Helm
+chart](https://github.com/mcp-hangar/helm-charts) is the only place they ship
+from:
+
+| What | Chart value | Renders | Source |
+|------|-------------|---------|--------|
+| Scrape target | `serviceMonitor.enabled=true` | a `ServiceMonitor` (needs the Prometheus Operator) | the chart |
+| Alert rules | `prometheusRule.enabled=true` | a `PrometheusRule` with 30 rules | [`mcp-hangar/files/prometheus-alerts.yaml`](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/files/prometheus-alerts.yaml) |
+| Dashboards | `dashboards.enabled=true` | four ConfigMaps labelled `grafana_dashboard` for the Grafana sidecar | [`mcp-hangar/files/dashboards/`](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files/dashboards) |
+
+Everything else is your own: a raw Prometheus scrape config, Alertmanager
+routing, and Grafana provisioning are **not shipped in any form**. The examples
+below are illustrations of what to write, not files you can copy from this
+project.
 
 ### Prometheus Configuration
 
-The default configuration scrapes MCP Hangar every 10 seconds:
+Without the Prometheus Operator, scrape the gateway directly:
 
 ```yaml
-# monitoring/prometheus/prometheus.yaml
 scrape_configs:
   - job_name: 'mcp-hangar'
     static_configs:
@@ -114,7 +114,8 @@ scrape_configs:
     scrape_timeout: 5s
 ```
 
-For Kubernetes deployments, use service discovery:
+On Kubernetes, prefer `serviceMonitor.enabled=true`. If you are not running the
+Prometheus Operator, use service discovery:
 
 ```yaml
 scrape_configs:
@@ -277,7 +278,10 @@ The startup check reports the same condition at boot; see
 
 ## Grafana Dashboards
 
-Pre-built dashboards are provisioned automatically from `monitoring/grafana/dashboards/`:
+Four maintained dashboards ship with the Helm chart. `dashboards.enabled=true`
+renders each as a ConfigMap labelled `grafana_dashboard`, which the Grafana
+sidecar imports on its own; the JSON lives in
+[`mcp-hangar/files/dashboards/`](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files/dashboards).
 
 ### Overview Dashboard
 
@@ -295,8 +299,8 @@ Provides high-level system health:
 
 ### MCP Server Details Dashboard
 
-**File:** `MCP server-details.json`
-**URL:** http://localhost:3000/d/mcp-hangar-MCP server-details
+**File:** `provider-details.json`
+**URL:** http://localhost:3000/d/mcp-hangar-provider
 
 Deep dive into individual MCP servers:
 
@@ -331,19 +335,24 @@ MCP Hangar 1.4.0 adds a governance dashboard for tenant and policy operations:
 
 ### Importing Dashboards Manually
 
-If not using provisioning:
+If you are not running the Grafana sidecar:
 
-1. Open Grafana at http://localhost:3000
-2. Go to Dashboards > Import
-3. Upload JSON file from `monitoring/grafana/dashboards/`
-4. Select Prometheus data source
-5. Click Import
+1. Download the JSON from [`mcp-hangar/files/dashboards/`](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files/dashboards) in the helm-charts repo
+2. Open Grafana at http://localhost:3000
+3. Go to Dashboards > Import
+4. Upload the JSON file
+5. Select Prometheus data source
+6. Click Import
 
 ## Alerting
 
 ### Alert Configuration
 
-Alert rules are defined in `monitoring/prometheus/alerts.yaml` and organized by severity:
+The 30 maintained alert rules ship with the Helm chart. `prometheusRule.enabled=true`
+renders them as a `PrometheusRule` CR, which needs the Prometheus Operator CRDs
+installed; the source is
+[`mcp-hangar/files/prometheus-alerts.yaml`](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/files/prometheus-alerts.yaml).
+They are organized by severity:
 
 #### Critical Alerts (Page On-Call)
 
@@ -383,7 +392,7 @@ Alert rules are defined in `monitoring/prometheus/alerts.yaml` and organized by 
 
 #### Governance and Availability Alert Groups
 
-1.4.0 adds two dedicated Prometheus groups in `monitoring/prometheus/alerts.yaml`:
+1.4.0 adds two dedicated Prometheus groups:
 
 - `mcp-hangar-governance` -- security, policy/enforcement, and concurrency saturation signals. (Cost is tracked on the governance dashboard but is not alerted.)
 - `mcp-hangar-availability` -- MCP server state, discovery health, remote transport errors, and runtime rate limiting.
@@ -401,7 +410,8 @@ availability and transport alerts.
 
 ### Alertmanager Configuration
 
-Configure notification routing in `monitoring/alertmanager/alertmanager.yaml`:
+Hangar ships no Alertmanager configuration — routing is yours. The rules above
+carry `severity` labels, so a routing tree keyed on them works out of the box:
 
 ```yaml
 route:

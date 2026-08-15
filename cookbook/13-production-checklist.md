@@ -32,7 +32,8 @@
 ## Observability
 
 - [ ] Prometheus scraping `/metrics` endpoint
-- [ ] Grafana dashboards imported from `monitoring/grafana/`
+- [ ] Grafana dashboards shipped by the chart (`dashboards.enabled=true`), or
+      imported by hand from [`mcp-hangar/files/dashboards/`](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files/dashboards)
 - [ ] Alertmanager rules configured for:
   - MCP server state transitions to DEAD
   - Circuit breaker OPEN events

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.31](https://github.com/mcp-hangar/docs/compare/v1.1.30...v1.1.31) (2026-08-15)
+
+
+### Changed
+
+* **reference:** stop restating generated versions, and drop the dispatch nobody sends ([#210](https://github.com/mcp-hangar/docs/issues/210)) ([c613b01](https://github.com/mcp-hangar/docs/commit/c613b016e41ad5a16b1bccfe5d680ba05b94a6a0)), closes [#209](https://github.com/mcp-hangar/docs/issues/209)
+
 ## [1.1.30](https://github.com/mcp-hangar/docs/compare/v1.1.29...v1.1.30) (2026-08-15)
 
 

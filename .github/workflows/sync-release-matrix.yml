@@ -1,16 +1,26 @@
 # Regenerates the "Released artifacts" table in RELEASE_COMPATIBILITY.md from the
 # GHCR registry (versions + digests + chart appVersions) and opens a PR when it
 # drifts — replacing the by-hand maintenance that got the numbers wrong three
-# times. Fires on a schedule, on demand, and (instantly) on a `core-released`
-# repository_dispatch from the core release workflow.
+# times.
+#
+# It used to declare `repository_dispatch: types: [core-released]` and claim it
+# fired instantly on a core release. Nothing ever sent that event: core's
+# `release.yml` has no dispatch step, so the trigger never fired once and the
+# weekly cron below was the only thing keeping the table current — a cadence
+# chosen on the assumption the dispatch existed.
+#
+# Not re-wired, deliberately. A release lands as two artifacts from two repos:
+# dispatching when the core tag is cut is too early (the image publish job is
+# still running — tried it, `MANIFEST_UNKNOWN`), and the chart publishes later
+# still, from `helm-charts`. One event cannot catch both. Daily, like every
+# other sync in this org, plus the manual trigger for "just released, sync now",
+# bounds the drift to a day without pretending to be instant.
 name: sync-release-matrix
 
 on:
   schedule:
-    - cron: "41 6 * * 1" # weekly; release dispatch + manual cover the rest
+    - cron: "41 6 * * *" # daily, matching sync-core-appversion and sync-core-version
   workflow_dispatch: {}
-  repository_dispatch:
-    types: [core-released]
 
 permissions:
   contents: write

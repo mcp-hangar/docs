@@ -52,7 +52,6 @@ mcp-hangar/
 ├── docs/                 # internal architecture/design docs (not this docs
 │                         # site -- that's the separate docs repo)
 ├── examples/             # Quick starts, OTEL recipes
-├── monitoring/           # Grafana, Prometheus configs
 ├── docker/               # Per-example-server Dockerfiles
 ├── security/             # Seccomp profiles, network policies
 ├── scripts/              # Dev/release tooling
@@ -302,7 +301,7 @@ MCP Hangar is licensed under the MIT License:
 | Directory | License |
 |-----------|---------|
 | `src/mcp_hangar/` | MIT |
-| `tests/`, `docs/`, `examples/`, `monitoring/` | MIT |
+| `tests/`, `docs/`, `examples/` | MIT |
 
 ## Code of Conduct
 

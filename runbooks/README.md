@@ -1,7 +1,8 @@
 # Runbooks
 
 Operational runbooks for the alerts shipped with MCP Hangar
-(`helm-charts` → `prometheusRule.enabled`, source in the repo's `monitoring/`).
+(`helm-charts` → `prometheusRule.enabled`, source in
+[`mcp-hangar/files/prometheus-alerts.yaml`](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/files/prometheus-alerts.yaml)).
 Each critical alert links here via its `runbook_url` annotation.
 
 | Runbook | Alerts |

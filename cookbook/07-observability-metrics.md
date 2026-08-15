@@ -1,7 +1,7 @@
 # 07 -- Observability: Metrics
 
 > **Prerequisite:** [01 -- HTTP Gateway](01-http-gateway.md)
-> **You will need:** Running Hangar in HTTP mode, Docker for monitoring stack
+> **You will need:** Running Hangar in HTTP mode, your own Prometheus and Grafana
 > **Time:** 10 minutes
 > **Adds:** Prometheus metrics and Grafana dashboards
 > **Concept:** [Governance observability](https://mcp-hangar.io/learn/governance-observability)
@@ -46,16 +46,23 @@ No config changes needed -- metrics are always available at `/metrics` on the HT
    # TYPE mcp_hangar_mcp_server_state gauge
    ```
 
-3. Start the monitoring stack:
+3. Point your own Prometheus at that endpoint:
 
-   ```bash
-   # From the repository root: the compose file is `docker-compose.monitoring.yml`
-   # there, and its mounts are root-relative. `monitoring/` holds only the
-   # Prometheus, Grafana and Alertmanager configuration it mounts.
-   docker compose -f docker-compose.monitoring.yml up -d
+   ```yaml
+   scrape_configs:
+     - job_name: 'mcp-hangar'
+       static_configs:
+         - targets: ['localhost:8000']
+       metrics_path: /metrics
    ```
 
-4. Open Grafana at `http://localhost:3000` (admin/admin) and check the MCP Hangar dashboard.
+   Hangar ships no monitoring stack to start. On Kubernetes the chart does the
+   wiring for you — `serviceMonitor.enabled=true` and `dashboards.enabled=true`,
+   see [Observability → Monitoring Stack](../guides/OBSERVABILITY.md#monitoring-stack).
+
+4. Import a dashboard into your Grafana from
+   [`mcp-hangar/files/dashboards/`](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files/dashboards)
+   (`overview.json` is the one to start with).
 
 5. Make some tool calls and watch the metrics update in real time:
 
@@ -65,7 +72,7 @@ No config changes needed -- metrics are always available at `/metrics` on the HT
 
 ## What Just Happened
 
-Hangar exposes Prometheus-format metrics at `/metrics`. The monitoring stack in `monitoring/` includes pre-configured Prometheus scraping and Grafana dashboards. Key metrics:
+Hangar exposes Prometheus-format metrics at `/metrics`; scraping them and rendering them is your Prometheus and Grafana's job. The maintained dashboards and alert rules ship with the Helm chart. Key metrics:
 
 | Metric | Type | What it tells you |
 |--------|------|-------------------|

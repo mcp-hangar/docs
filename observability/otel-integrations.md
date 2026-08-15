@@ -306,27 +306,20 @@ Hangar exposes Prometheus metrics at the `/metrics` HTTP endpoint. Grafana can
 scrape these directly or consume them through the OTEL Collector's Prometheus
 exporter.
 
-Pre-built Grafana dashboards are available in the [`monitoring/`](https://github.com/mcp-hangar/mcp-hangar/tree/main/monitoring)
-directory:
+Four maintained Grafana dashboards ship with the [`mcp-hangar` Helm
+chart](https://github.com/mcp-hangar/helm-charts), source in
+[`mcp-hangar/files/dashboards/`](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files/dashboards):
 
 - **Overview dashboard:** MCP server states, tool call rates, error rates
-- **MCP Server details dashboard:** Per-MCP server metrics, health check history
+- **Provider details dashboard:** Per-MCP server metrics, health check history
 - **Alerts dashboard:** Circuit breaker state, violation counts
+- **Governance dashboard:** Cost attribution, policy violations, enforcement actions
 
 ### Getting started
 
-Start the monitoring stack:
-
-```bash
-cd monitoring
-docker compose up -d
-```
-
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| Grafana | <http://localhost:3000> | admin / admin |
-| Prometheus | <http://localhost:9090> | -- |
-| Alertmanager | <http://localhost:9093> | -- |
+Prometheus and Grafana are yours to run — Hangar ships no stack. On Kubernetes,
+`dashboards.enabled=true` renders the four as ConfigMaps for the Grafana
+sidecar to auto-import; elsewhere, import the JSON by hand from the link above.
 
 Start Hangar in HTTP mode so the `/metrics` endpoint is available:
 

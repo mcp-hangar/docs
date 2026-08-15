@@ -4,131 +4,102 @@
 
 ```bash
 uv sync --extra dev
-uv run pytest tests/ -v -m "not slow"
+uv run pytest tests/unit
 ```
+
+The unit tier is the one you run while working — roughly 6,600 tests in about
+half a minute. `pytest` with no path runs everything under `tests/`, which adds
+the integration tier and the in-process conformance and CI-metadata checks.
 
 ## Running Tests
 
 ```bash
-# All unit tests
-pytest tests/unit/ -v
+# The tier you edit against
+pytest tests/unit
 
-# By marker
-pytest tests/ -m unit
-pytest tests/ -m integration
-pytest tests/ -m "not container"
+# One file, or one test
+pytest tests/unit/test_registry_cache.py
+pytest tests/unit/test_registry_cache.py::TestRegistryCache::test_set_and_get
 
-# Coverage
-pytest tests/ -m "not slow" --cov=mcp_hangar --cov-report=html
+# Everything CI runs on a PR
+pytest --ignore=tests/integration
+pytest tests/integration/
+
+# Coverage, when you actually want it
+pytest tests/unit tests/integration --cov=mcp_hangar --cov-report=term-missing
 ```
+
+Coverage is not on by default. It costs about 18 seconds and 6,600 lines of
+output on every run, including a run of a single file, so the jobs that read a
+report ask for it explicitly.
 
 ### Markers
 
 | Marker | Description |
 |--------|-------------|
-| `unit` | Fast, isolated, no external dependencies |
-| `integration` | Multiple components working together |
-| `container` | Requires Docker/Podman containers |
-| `slow` | Long-running tests (>5 seconds) |
-| `postgres` | Requires PostgreSQL container |
-| `redis` | Requires Redis container |
-| `langfuse` | Requires Langfuse container |
-| `prometheus` | Requires Prometheus container |
-| `property` | Property-based tests using Hypothesis |
+| `benchmark` | Performance benchmarks (pytest-benchmark) |
+| `security` | Security regression tests — the category is the marker, not a directory |
+| `live` | Black-box verification against a running gateway; opt-in |
+| `t0` | Live tier 0 — single process, stub backend |
+| `t1` | Live tier 1 — multi-backend / groups, needs compose |
+| `t2` | Live tier 2 — auth / IdP, needs Keycloak |
 
-## Testcontainers Integration
+That is the whole list, and all six are registered in `pyproject.toml`.
+`pytest` does not run with `--strict-markers`, so `-m something-else` selects
+nothing and exits green — a passing run of zero tests. Check the collected
+count when a marker filter returns suspiciously fast.
 
-MCP Hangar uses [Testcontainers](https://testcontainers.com/) for integration tests with real services.
+### There are no opt-in flags
 
-### Installation
+A test that only runs behind a flag nobody passes does not run. `--run-containers`
+and `--run-slow`, the testcontainers fixtures behind them, and the `containers`
+pip extra were all deleted for that reason: the tiers had been dead for months
+and nothing noticed. Anything that needs a real runtime belongs in `tests/live`
+(nightly) or in a lab you drive by hand.
+
+## Test Tiers
+
+| Path | What it is | How it runs |
+|------|-----------|-------------|
+| `tests/unit/` | The bulk of the suite, in-process | every PR |
+| `tests/integration/` | Multiple components together, still in-process | every PR, its own job |
+| `tests/conformance/` | The gateway against the MCP spec | every PR |
+| `tests/ci/` | Assertions about the repo's own workflows | every PR |
+| `tests/benchmark/` | pytest-benchmark timings | every PR (collected by the bare `pytest` run) |
+| `tests/live/` | Black-box against a running gateway | nightly, opt-in |
+| `tests/acceptance/` | A shell script against a cluster you own | by hand |
+
+### Live verification
+
+`tests/live` is gated on an environment variable, not a flag, and skips
+entirely without it:
 
 ```bash
-pip install mcp-hangar[containers]
-# or
-pip install "testcontainers[postgres]>=4.0.0" httpx
+MCP_HANGAR_LIVE_VERIFY=1 pytest tests/live -m t0 --timeout=180 -ra
 ```
 
-### Running Container Tests
+Tier `t0` needs only a running gateway. `t1` needs a compose stack, `t2` needs
+Keycloak. See `tests/live/README.md` in the core repo for what each tier
+assumes.
 
-```bash
-# Run all container tests (requires Docker/Podman)
-pytest tests/integration/containers/ --run-containers -v
+### Acceptance
 
-# Run specific container tests
-pytest tests/integration/containers/test_postgres.py --run-containers -v
-pytest tests/integration/containers/test_langfuse.py --run-containers -v
-pytest tests/integration/containers/test_redis.py --run-containers -v
-
-# Skip slow container tests
-pytest tests/integration/containers/ --run-containers -m "not slow" -v
-```
-
-### Available Container Fixtures
-
-| Fixture | Description | Required Extra |
-|---------|-------------|----------------|
-| `postgres_container` | PostgreSQL 15 Alpine | `testcontainers[postgres]` |
-| `redis_container` | Redis 7 Alpine | `testcontainers` |
-| `langfuse_container` | Langfuse 2 with PostgreSQL | `testcontainers[postgres]` |
-| `prometheus_container` | Prometheus v2.47 | `testcontainers` |
-| `math_provider_container` | MCP Math MCP Server | Local image required |
-| `sqlite_provider_container` | MCP SQLite MCP Server | Local image required |
-
-### Example: Using PostgreSQL Container
-
-```python
-import pytest
-
-@pytest.mark.container
-@pytest.mark.postgres
-def test_database_operations(postgres_container):
-    """Test with real PostgreSQL database."""
-    dsn = postgres_container["dsn"]
-
-    import asyncpg
-    conn = await asyncpg.connect(dsn)
-    result = await conn.fetchval("SELECT 1")
-    assert result == 1
-```
-
-### Example: Using Langfuse Container
-
-```python
-import pytest
-
-@pytest.mark.container
-@pytest.mark.langfuse
-def test_langfuse_tracing(langfuse_config, langfuse_container, http_client):
-    """Test with real Langfuse instance."""
-    from mcp_hangar.infrastructure.observability.langfuse_adapter import (
-        LangfuseObservabilityAdapter,
-    )
-
-    adapter = LangfuseObservabilityAdapter(langfuse_config)
-    span = adapter.start_tool_span("test", "tool", {"arg": 1})
-    span.end_success({"result": "ok"})
-    adapter.flush()
-
-    # Query Langfuse API
-    response = http_client.get(
-        f"{langfuse_container['url']}/api/public/traces",
-        auth=(langfuse_container["public_key"], langfuse_container["secret_key"]),
-    )
-    assert response.status_code == 200
-```
+`tests/acceptance/ha_two_gateways.sh` is a shell script, run by hand against a
+cluster you own — it kills a pod. It is deliberately not pytest: it tests the
+deployment, which is how it found that a shipped image carried no PostgreSQL
+driver. Apply the manifests beside it (`ha-postgres.yaml`, `ha-gateway.yaml`)
+first.
 
 ## Property-Based Testing
 
-MCP Hangar uses [Hypothesis](https://hypothesis.readthedocs.io/) for property-based testing.
-
-### Running Property Tests
+MCP Hangar uses [Hypothesis](https://hypothesis.readthedocs.io/) for
+property-based testing.
 
 ```bash
-# All property tests
 pytest tests/unit/observability/test_property_based.py -v
 
-# With more examples
-pytest tests/unit/observability/test_property_based.py -v --hypothesis-seed=12345
+# Reproduce a specific run
+pytest tests/unit/observability/test_property_based.py --hypothesis-seed=12345
 ```
 
 ### Example Property Test
@@ -147,33 +118,29 @@ def test_adapter_accepts_any_strings(mcp_server_name, tool_name):
     assert isinstance(span, NullSpanHandle)
 ```
 
-## Container Tests
-
-```bash
-# Build images first
-podman build -t localhost/mcp-sqlite -f docker/Dockerfile.sqlite .
-
-# Prepare data directory
-mkdir -p data && chmod 777 data
-
-# Run tests
-pytest tests/feature/ -v
-```
-
 ## Manual Testing
 
-### Subprocess MCP Server
+### Mock MCP server
+
+`tests/mock_provider.py` implements the JSON-RPC MCP protocol and is what the
+suite points a subprocess MCP server at:
 
 ```yaml
 # config.yaml
 mcp_servers:
   math:
     mode: subprocess
-    command: [python, tests/mock_mcp_server.py]
+    command: [python, tests/mock_provider.py]
 ```
 
 ```bash
-python -m mcp_hangar.server
+mcp-hangar serve --http
+```
+
+Drive it directly to check a handshake:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | python tests/mock_provider.py
 ```
 
 ### Test via Python
@@ -184,7 +151,7 @@ from mcp_hangar.domain.model import McpServer
 mcp_server = McpServer(
     mcp_server_id="test",
     mode="subprocess",
-    command=["python", "tests/mock_mcp_server.py"]
+    command=["python", "tests/mock_provider.py"]
 )
 
 mcp_server.ensure_ready()
@@ -195,19 +162,12 @@ print(result)  # {"result": 8}
 mcp_server.shutdown()
 ```
 
-### Test MCP Server Directly
-
-```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | python tests/mock_mcp_server.py
-```
-
 ## Common Issues
 
-### MCP Server won't start
+### MCP server won't start
 
 ```bash
-# Test directly
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | python tests/mock_mcp_server.py
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | python tests/mock_provider.py
 ```
 
 ### Permission denied (container)

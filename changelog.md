@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.29](https://github.com/mcp-hangar/docs/compare/v1.1.28...v1.1.29) (2026-08-15)
+
+
+### Changed
+
+* **guides:** make the testing guide describe the suite that exists ([#205](https://github.com/mcp-hangar/docs/issues/205)) ([7eec727](https://github.com/mcp-hangar/docs/commit/7eec727d51b75c03dae087a42e930896ab5b7105))
+* **guides:** point observability at the chart, not core's deleted monitoring/ ([#204](https://github.com/mcp-hangar/docs/issues/204)) ([7c37662](https://github.com/mcp-hangar/docs/commit/7c3766278303a899c96fc473dcd458c401d22411))
+
 ## [1.1.28](https://github.com/mcp-hangar/docs/compare/v1.1.27...v1.1.28) (2026-08-14)
 
 

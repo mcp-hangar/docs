@@ -11,12 +11,12 @@ governs how the images and charts are published and verified.
 > **Status: released, signed, and pinned — the published charts carry their
 > fixes and chart tags are now immutable (`mcp-hangar/helm-charts#36`, closed;
 > fixed by the fail-safe publish guard #37).**
-> As of 2026-08-09 every lane has a published, public, **cosign-signed**,
-> digest-verified artifact with SBOM/provenance (see *Released artifacts*): core
-> image `2.5.0`, operator `0.15.0`, and both Helm charts. The `2.x` line went
-> stable on 2026-07-31 and `2.5.x` is the current stable release, so it is the
-> reference row below; the line was previously excluded here as a release
-> candidate, which this page kept asserting after it stopped being true.
+> Since 2026-08-09 every lane — core image, operator image, and both Helm
+> charts — has a published, public, **cosign-signed**, digest-verified artifact
+> with SBOM/provenance. Which versions those are is not restated here: read
+> *Released artifacts* below, which is regenerated from the registry. The `2.x`
+> line went stable on 2026-07-31; it was previously excluded from this page as a
+> release candidate, which the page kept asserting after it stopped being true.
 > Image signing + SBOM (`mcp-hangar/mcp-hangar#467`) is done.
 >
 > Live cluster testing found defects that made a default `helm install` fail
@@ -25,8 +25,8 @@ governs how the images and charts are published and verified.
 > API server refuses. Those are **fixed, and every chart published since carries
 > the fixes**: first verified by pulling `charts/mcp-hangar 0.13.4` and
 > `charts/mcp-hangar-operator 0.12.3` — the published charts at that time — from
-> GHCR and inspecting their contents, not by inference. The charts published today
-> (`0.14.1` / `0.12.5`, see *Released artifacts*) descend from those.
+> GHCR and inspecting their contents, not by inference. Every chart published
+> since descends from those; the current ones are in *Released artifacts*.
 > The `helm-charts` repo also had no chart lint/render/install CI at
 > all — that gate now exists, which is why this class of defect will not ship
 > again.
@@ -46,9 +46,12 @@ governs how the images and charts are published and verified.
 - **Owner:** the release maintainers (the `#453` / ADR-009 owners). The matrix
   has a single named owner recorded in the repository `CODEOWNERS` for this
   file; changes require that owner's review.
-- **Update trigger:** every artifact release updates this matrix in the same
-  PR, or in an immediate follow-up PR, that cuts the release. A release whose
-  compatibility is not reflected here is incomplete.
+- **Update trigger:** *Released artifacts* is regenerated from the registry by
+  the `sync-release-matrix` workflow — daily, or on demand right after a release.
+  The **compatibility matrix** above it is a human judgement about supported
+  combinations and is not generated: a release adds its row in the PR that cuts
+  it, or in an immediate follow-up. A release whose compatibility is not
+  reflected here is incomplete, and nothing automated will notice.
 - **Cadence:** the matrix is reviewed at least once per core minor release even
   if satellites did not move, to re-confirm the Kubernetes support window.
 
@@ -59,14 +62,19 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Helm charts (core / operator) | Kubernetes |
 | --- | --- | --- | --- |
+| `2.8.x` | `0.15.2` | `0.15.1` / `0.12.8` | `1.25` -- `1.36` |
+| `2.7.x` | `0.15.2` | `0.15.0` / `0.12.7` | `1.25` -- `1.36` |
+| `2.6.x` | `0.15.2` | `0.14.4` / `0.12.7` | `1.25` -- `1.36` |
 | `2.5.x` | `0.15.0` | `0.14.1` / `0.12.5` | `1.25` -- `1.36` |
 | `2.0.x` | `0.15.0` | `0.13.7` / `0.12.5` | `1.25` -- `1.36` |
 | `1.6.x` | `0.15.0` | `0.13.6` / `0.12.5` | `1.25` -- `1.36` |
 
-`charts/mcp-hangar 0.14.1` carries `appVersion: 2.5.0` — that is the value the
-generated *Released artifacts* table below reads back out of the registry — and
-`image.tag` defaults to `appVersion`, so a plain `helm install` of it pulls the
-2.5.0 image. Older charts stay on their own lines: `0.13.7` carries
+Each chart in the table carries the matching core as its `appVersion`, and
+`image.tag` defaults to `appVersion`, so a plain `helm install` of a chart pulls
+the core on its row: `0.15.1` carries `2.8.0`, `0.15.0` carries `2.7.0`, `0.14.4`
+carries `2.6.0`, `0.14.1` carries `2.5.0`. The newest chart's `appVersion` is
+what the generated *Released artifacts* table below reads back out of the
+registry. Older charts stay on their own lines: `0.13.7` carries
 `appVersion: 2.0.0` and `0.13.6` carries `appVersion: 1.6.2`. Charts before
 `0.13.6` each carry whichever core they shipped against at the time (down to
 `1.4.0` on `0.13.1`), so they are not a way onto the `1.6.x` row. Pin the chart
@@ -75,8 +83,9 @@ version, not just the image tag, if you are staying on an older line.
 Rules for reading and extending the matrix:
 
 - **Core** is the reference axis: every supported combination pins a concrete
-  core minor (`v2.5.1` is the current published core; `1.6.x` is closed and
-  receives no fixes, including the approval-authorization fix released in 2.0.0).
+  core minor. The current published core is in *Released artifacts*, not named
+  here. `1.6.x` is closed and receives no fixes, including the
+  approval-authorization fix released in 2.0.0.
 - **Operator / Helm** columns carry the released version; the verified
   digests are in *Released artifacts* below. Both lanes have landed
   (`mcp-hangar-operator#26`, `helm-charts#7`) and the
@@ -199,8 +208,7 @@ owner and security sign-off) plus a chart re-release.
 - [x] First charts published with verified digests (`helm-charts#7`) — both
       charts public and signed: `mcp-hangar 0.13.1`, `mcp-hangar-operator 0.12.1`
       (digests in *Released artifacts*). Both are long superseded — the current
-      core chart is `0.14.1` and the current operator chart is `0.12.5`; `0.13.1`
-      predates the install fixes.
+      charts are in *Released artifacts*; `0.13.1` predates the install fixes.
 - [x] The published charts install: the fixes found by live testing were verified
       present in `charts/mcp-hangar 0.13.4` and
       `charts/mcp-hangar-operator 0.12.3` by pulling and inspecting them while

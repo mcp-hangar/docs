@@ -78,5 +78,8 @@ jobs:
       - name: Check version-currency claims and freshness tokens
         run: python docs/scripts/check_freshness.py --docs docs --source source
 
+      - name: Check config blocks against the product's config schema
+        run: python docs/scripts/check_config.py --docs docs --source source
+
       - name: Validate docs against source
         run: python docs/scripts/validate_docs.py --docs docs --source source

@@ -33,6 +33,7 @@ taxonomy, and formatting conventions.
 | [020](ADR-020-high-availability.md) | More Than One Gateway -- What Is Shared, What Is Leased, and What Stays Local | Accepted | 2026-08-06 |
 | [021](ADR-021-config-file-endpoints-outside-the-ssrf-policy.md) | A Remote Upstream in the Configuration File Stays Outside the SSRF Policy | Accepted | 2026-08-11 |
 | [022](ADR-022-the-management-surface-is-what-the-caller-may-call.md) | The Management Surface Is Whatever the Caller Is Allowed to Call | Accepted | 2026-08-11 |
+| [023](ADR-023-mcp-registry-listing.md) | The MCP Registry Entry Describes a Package, Not a Service | Accepted | 2026-08-16 |
 
 ## Summaries
 

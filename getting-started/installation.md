@@ -40,6 +40,21 @@ brings the client the Kubernetes discovery source imports; without it the source
 cannot be constructed and discovers nothing. The published image already
 installs both, so this applies to a pip install only.
 
+## Install from the MCP Registry
+
+Hangar is listed in the [Official MCP Registry](https://registry.modelcontextprotocol.io)
+as `io.mcp-hangar/hangar`. A client that reads the registry (and the aggregators
+that ingest from it) finds it there by name and installs the same PyPI
+distribution as above, started over stdio:
+
+```bash
+uvx mcp-hangar          # what the registry entry describes
+```
+
+The entry names a package, not a service. There is no hosted Hangar to connect
+to, so it declares no remote endpoint -- set `MCP_CONFIG` to your own
+`config.yaml` to give the gateway something to govern.
+
 ## Which line you get
 
 `pip install mcp-hangar` resolves to the current stable release -- pip prints

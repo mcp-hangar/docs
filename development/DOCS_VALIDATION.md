@@ -148,6 +148,19 @@ version is more than one minor ahead of it. The token is an acknowledgement that
 a human re-read the page, so it is deliberately **not** bumped automatically -- a
 bot that advances it turns the gate into a formality.
 
+**Upgrade coverage.** The same script asserts that `upgrade.md` has an `## Upgrade
+to X.Y` section for the released minor. This is a different failure from the two
+above, and the reason it is worth its own assertion: both of those check what a
+page *says*, and neither notices a page that says nothing. `upgrade.md` stopped
+at 2.7.0 while 2.9.0 was released -- two releases that removed public API, each
+with a changelog entry reading "see `UPGRADE.md`", and nothing there to see. All
+five other gates were green over it.
+
+A release with no migration steps satisfies the gate with a one-line section
+saying so. That is the intended cost: cheap to write, and it distinguishes
+"nothing to do" from "nobody wrote it yet", which a reader cannot do from an
+absence.
+
 ### Symbol drift
 
 `scripts/validate_docs.py` extracts high-signal identifiers from every Markdown

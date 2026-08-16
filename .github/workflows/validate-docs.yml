@@ -39,5 +39,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Runs before the drift detector on purpose: it needs no source checkout
+      # and finishes in well under a second, so a broken link is reported
+      # immediately rather than after cloning the product.
+      - name: Check internal links and anchors
+        run: python docs/scripts/check_links.py --docs docs
+
       - name: Validate docs against source
         run: python docs/scripts/validate_docs.py --docs docs --source source

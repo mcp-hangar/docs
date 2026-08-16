@@ -90,7 +90,7 @@ src/mcp_hangar/
 
 ## Licensing
 
-- **All code** -- MIT. See [LICENSE](../../LICENSE).
+- **All code** -- MIT. See [LICENSE](../LICENSE).
 - Core and former enterprise code live in `src/mcp_hangar/`; imports stay within package boundaries.
 
 ## Code Style

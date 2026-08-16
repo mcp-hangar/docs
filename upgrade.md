@@ -1230,7 +1230,7 @@ mutating storage. No secret is printed.
   longer blocks a healthy remaining member from serving.
 - **Command-bus rate limit is configurable.** The previously-fixed command-bus
   rate limit can now be tuned in `config.yaml`; review the
-  [configuration reference](reference/configuration) if you relied on the old
+  [configuration reference](reference/configuration.md) if you relied on the old
   fixed value.
 
 ## Upgrade to 1.4.0

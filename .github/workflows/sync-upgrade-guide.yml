@@ -1,0 +1,91 @@
+# Brings released upgrade sections over from the product's `UPGRADE.md` and
+# opens a PR — replacing the by-hand copy that ran exactly once.
+#
+# That copy is why this exists. The 2.7.0 session-id note lives in both files,
+# promoted here and still headed `## Next` there; 2.8.0 and 2.9.0 never arrived
+# at all, so two releases removed public API while their changelog entries
+# pointed at an upgrade note nobody had written (mcp-hangar/mcp-hangar#983).
+#
+# Daily, like every other sync in this org, plus the manual trigger for "just
+# released, sync now". Not a `repository_dispatch` on the core release: core's
+# `release.yml` sends no such event, and the one workflow here that claimed to
+# listen for it (`sync-release-matrix`) never fired once in its lifetime.
+#
+# The upgrade-coverage gate in `check_freshness.py` is the backstop: if this
+# workflow stops delivering, the docs build fails on the next release rather
+# than going quietly stale.
+name: sync-upgrade-guide
+
+on:
+  schedule:
+    - cron: "23 6 * * *" # daily, ahead of sync-release-matrix at 06:41
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  RELEASE_BOT_APP_ID: ${{ secrets.RELEASE_BOT_APP_ID }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        if: ${{ env.RELEASE_BOT_APP_ID != '' }}
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          path: docs
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          # Do NOT leave the token in the local git config. `create-pull-request`
+          # authenticates its own push, and checkout's persisted
+          # `http.extraheader` adds a second one -- GitHub answers with
+          # `remote: Duplicate header: "Authorization"` and a bare 400, which is
+          # what kept `sync-release-matrix` from ever delivering its output.
+          persist-credentials: false
+
+      - uses: actions/checkout@v7
+        with:
+          repository: mcp-hangar/mcp-hangar
+          path: source
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Bring over any released section this repo is missing
+        run: python docs/scripts/sync_upgrade_guide.py --docs docs --source source
+
+      - name: Open PR on drift
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          path: docs
+          branch: chore/sync-upgrade-guide
+          delete-branch: true
+          commit-message: "docs(guides): bring over upgrade notes for the latest release"
+          title: "docs(guides): bring over upgrade notes for the latest release"
+          body: |
+            ## Why
+
+            Opened by `sync-upgrade-guide`. An upgrade note is written in
+            `mcp-hangar` at PR time, next to the change that motivates it, and
+            the release job gives it a version. This brings the versioned result
+            here, which is where readers find it.
+
+            ## How tested
+
+            The sync only **prepends** sections this repo does not already have.
+            Nothing existing is rewritten, including a section edited here after
+            it was synced.
+
+            **Read the prose before merging.** These notes were written per-PR
+            against the product, and drafts written against different PRs can
+            contradict each other once they land in one release.

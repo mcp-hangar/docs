@@ -131,8 +131,9 @@ Superseded (do not use): operator image `0.12.0`/`0.12.1`
 (unsigned), and the `mcp-hangar` chart `0.12.0`/`0.13.0`/`0.13.1` (the `0.12.0`
 chart pointed at a non-existent core image tag; `0.13.1` predates the install
 fixes and still declares `appVersion 1.4.0`). The core image is versioned on its
-own line, matching PyPI core release for release — currently `2.5.0`; its release
-workflow already cosign-signs and attaches build provenance.
+own line, matching PyPI core release for release (see *Released artifacts*
+above); its release workflow already cosign-signs and attaches build
+provenance.
 
 ## CRD upgrade and rollback policy
 

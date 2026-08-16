@@ -42,8 +42,9 @@ installs both, so this applies to a pip install only.
 
 ## Which line you get
 
-`pip install mcp-hangar` resolves to **2.7.0**, the current stable release. It
-is on a major line: 2.0.0 moved onto the MCP 2026-07-28 protocol generation and
+`pip install mcp-hangar` resolves to the current stable release -- pip prints
+which one, and [Releases & Artifacts](releases.md) lists them. It is on a major
+line: 2.0.0 moved onto the MCP 2026-07-28 protocol generation and
 the stable `mcp==2.0.0` SDK, and removed the last vendor integration from core.
 2.1.0 makes the human-in-the-loop approval gate reachable — `approval_list` in a
 `tools:` block now actually holds a call for a human — and adds a startup check

@@ -112,6 +112,42 @@ reasoned out:
   has checked nothing. The script fails on an implausibly small count, and
   cross-checks the number promtool reports against the number of rules written.
 
+### Version currency
+
+`scripts/check_freshness.py` turns a stale "current version" claim into a build
+error instead of something a reader finds.
+
+```bash
+python scripts/check_freshness.py --source /path/to/mcp-hangar
+```
+
+A line that says something is **current**, **latest**, or true **today** and
+names a version is a promise with a shelf life -- the page keeps reading
+plausibly long after it stops being true. `architecture/OVERVIEW.md` advertised
+core `v1.6.0` and operator `v0.14.0` three releases after both had moved, and
+`getting-started/installation.md` told readers `pip install` resolves to
+`2.7.0` when it resolved to `2.9.0`.
+
+A statement about the past is not a currency claim and is never flagged:
+"since 2.6.0", "fixed as of 2.5.0", "shipped in 2.0.0" stay true forever. A gate
+that cannot tell those apart is one somebody switches off.
+
+**The first fix to reach for is not naming the version.** Point at the generated
+*Released artifacts* table, or at what `pip install` prints. All five claims
+that existed when this gate landed were fixed that way, and none of them needed
+a token.
+
+Where a page genuinely must name the current version, it carries one:
+
+```markdown
+<!-- verified-against: 2.9.0 -->
+```
+
+That permits currency claims in the file, and fails the build once the released
+version is more than one minor ahead of it. The token is an acknowledgement that
+a human re-read the page, so it is deliberately **not** bumped automatically -- a
+bot that advances it turns the gate into a formality.
+
 ### Symbol drift
 
 `scripts/validate_docs.py` extracts high-signal identifiers from every Markdown

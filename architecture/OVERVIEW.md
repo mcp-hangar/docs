@@ -123,15 +123,15 @@ version is `v1alpha2`. See [ADR-013](../adr/ADR-013-egress-policy-enforcement-mo
   L7 policy down to the core engine, where it is enforced at the tool-invocation
   chokepoint (control #10 above).
 
-**End-to-end L7 egress enforcement is available today** with core engine v1.6.0 +
-operator **v0.14.0**, which shipped the MCPEgressPolicy controller. The latest
-operator release is **v0.15.0** (2026-07-27), which forwards the policy `mode`
-to the compiled L7 payload. The core L7 engine and REST intake are armed
-in v1.6.0; the operator now delivers policies to it end-to-end.
+**End-to-end L7 egress enforcement is shipped.** The core L7 engine and REST
+intake arrived in 1.6.0; the operator's MCPEgressPolicy controller compiles a
+policy and delivers it to core, forwarding the policy `mode` to the compiled L7
+payload, so a declared policy is enforced at the invocation chokepoint.
 
-Current chart versions: `mcp-hangar` 0.13.6 (appVersion 1.6.2),
-`mcp-hangar-operator` 0.12.5 (appVersion 0.15.0). Read live from GHCR — see the
-[released-artifacts matrix](../operations/RELEASE_COMPATIBILITY.md) for digests.
+Which versions carry that, and the chart and image digests, are in the
+[released-artifacts matrix](../operations/RELEASE_COMPATIBILITY.md) -- regenerated
+from the registry, rather than restated here where it would go quietly out of
+date.
 
 ## Governed async task relay + consent (shipped in 2.0)
 

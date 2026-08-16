@@ -75,5 +75,8 @@ jobs:
             | tar xz -C /usr/local/bin --strip-components=1 "prometheus-${PROMETHEUS_VERSION#v}.linux-amd64/promtool"
           python docs/scripts/check_promql.py --docs docs
 
+      - name: Check version-currency claims and freshness tokens
+        run: python docs/scripts/check_freshness.py --docs docs --source source
+
       - name: Validate docs against source
         run: python docs/scripts/validate_docs.py --docs docs --source source

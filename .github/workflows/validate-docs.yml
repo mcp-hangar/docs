@@ -34,6 +34,15 @@ jobs:
           # the MCP_HANGAR_REPO_TOKEN secret and uncomment the next line.
           # token: ${{ secrets.MCP_HANGAR_REPO_TOKEN }}
 
+      # The CRD schema is read from here, never from a copy in this repo: a
+      # copied schema drifts, and a drifted schema is a gate that approves the
+      # wrong thing.
+      - name: Checkout mcp-hangar-operator
+        uses: actions/checkout@v7
+        with:
+          repository: mcp-hangar/mcp-hangar-operator
+          path: operator
+
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
@@ -47,6 +56,11 @@ jobs:
 
       - name: Check CLI commands cited in bash blocks
         run: python docs/scripts/check_cli.py --docs docs --source source
+
+      - name: Check Kubernetes manifests against the operator CRDs
+        run: |
+          pip install --quiet pyyaml
+          python docs/scripts/check_manifests.py --docs docs --operator operator
 
       - name: Validate docs against source
         run: python docs/scripts/validate_docs.py --docs docs --source source

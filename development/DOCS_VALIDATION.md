@@ -64,6 +64,30 @@ failure mode -- a change in how commands are registered would stop finding them
 -- so the script **fails when it finds implausibly few** rather than approving
 everything by default.
 
+### Kubernetes manifests
+
+`scripts/check_manifests.py` validates every `mcp-hangar.io` manifest in a
+```yaml fence against the operator's CRDs -- the kind, the `apiVersion`, every
+`spec` key, and every key one level into `spec.capabilities`.
+
+```bash
+python scripts/check_manifests.py --operator /path/to/mcp-hangar-operator
+```
+
+The schema is read from the operator repository's `config/crd/bases`, never
+from a copy kept here. A copied schema drifts, and a drifted schema is a gate
+that approves the wrong thing.
+
+**Served is not the same as current.** `v1alpha1` is still served for
+conversion, so a manifest using it is valid to the API server and is still the
+wrong thing to teach -- that is the defect the product's own
+`examples/kubernetes/` carried until mcp-hangar/mcp-hangar#928. The gate
+therefore requires the *storage* version, not merely a served one.
+
+Kubernetes' own kinds sharing a fence -- `Secret`, `ConfigMap`, `Deployment` --
+are not checked. Those are the API server's schema, and `kubeconform` is the
+tool for that if it is ever wanted.
+
 ### Symbol drift
 
 `scripts/validate_docs.py` extracts high-signal identifiers from every Markdown

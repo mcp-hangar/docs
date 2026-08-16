@@ -56,8 +56,8 @@ gone through the factory. The two assemblies had drifted far enough to prove it:
 the factory mounted flat `/health` and `/ready`, while a running Hangar serves
 `/health/live`, `/health/ready`, `/health/startup` and `/metrics`.
 
-Keeping a second construction path that looked serviceable is what made
-#592, #594, #595 and #596 possible — each was a capability wired into the
+Keeping a second construction path that looked serviceable is what made four
+bugs possible (#592, #594, #595, #596): each was a capability wired into the
 factory, which made it appear wired and shipped it dead.
 
 **If you were embedding through the factory** there is no drop-in replacement,

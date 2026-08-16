@@ -88,6 +88,30 @@ Kubernetes' own kinds sharing a fence -- `Secret`, `ConfigMap`, `Deployment` --
 are not checked. Those are the API server's schema, and `kubeconform` is the
 tool for that if it is ever wanted.
 
+### PromQL
+
+`scripts/check_promql.py` wraps every query in a ```promql fence as a recording
+rule and hands the set to `promtool check rules` -- there is no "parse this
+expression" mode, so this is the way to reach the parser.
+
+```bash
+python scripts/check_promql.py --promtool /path/to/promtool
+```
+
+Two things it has to get right, both learned from the repository rather than
+reasoned out:
+
+- **queries are written two ways here.** The guides separate them with blank
+  lines and a `#` comment above each; the runbooks put one whole query per line
+  with nothing between. Splitting on blank lines alone merged the runbooks'
+  queries and reported nine valid ones as broken. A line beginning with an infix
+  operator, or following one with unbalanced brackets, continues the query
+  above it.
+- **`promtool check rules` answers `SUCCESS: 0 rules found` for an empty file.**
+  If the extraction ever yields nothing, promtool reports success and the gate
+  has checked nothing. The script fails on an implausibly small count, and
+  cross-checks the number promtool reports against the number of rules written.
+
 ### Symbol drift
 
 `scripts/validate_docs.py` extracts high-signal identifiers from every Markdown

@@ -16,6 +16,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # promtool ships inside the Prometheus release tarball. Pinned rather
+  # than `latest`, so this gate does not turn red on somebody else's
+  # release day -- the same rule helm-charts applies to its own pins.
+  PROMETHEUS_VERSION: v3.13.2
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -61,6 +67,13 @@ jobs:
         run: |
           pip install --quiet pyyaml
           python docs/scripts/check_manifests.py --docs docs --operator operator
+
+      - name: Check PromQL queries parse
+        run: |
+          set -euo pipefail
+          curl -sSL "https://github.com/prometheus/prometheus/releases/download/${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION#v}.linux-amd64.tar.gz" \
+            | tar xz -C /usr/local/bin --strip-components=1 "prometheus-${PROMETHEUS_VERSION#v}.linux-amd64/promtool"
+          python docs/scripts/check_promql.py --docs docs
 
       - name: Validate docs against source
         run: python docs/scripts/validate_docs.py --docs docs --source source

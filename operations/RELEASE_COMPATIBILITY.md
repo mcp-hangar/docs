@@ -62,6 +62,7 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Helm charts (core / operator) | Kubernetes |
 | --- | --- | --- | --- |
+| `2.9.x` | `0.15.2` | `0.15.2` / `0.12.8` | `1.25` -- `1.36` |
 | `2.8.x` | `0.15.2` | `0.15.1` / `0.12.8` | `1.25` -- `1.36` |
 | `2.7.x` | `0.15.2` | `0.15.0` / `0.12.7` | `1.25` -- `1.36` |
 | `2.6.x` | `0.15.2` | `0.14.4` / `0.12.7` | `1.25` -- `1.36` |
@@ -71,7 +72,7 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 Each chart in the table carries the matching core as its `appVersion`, and
 `image.tag` defaults to `appVersion`, so a plain `helm install` of a chart pulls
-the core on its row: `0.15.1` carries `2.8.0`, `0.15.0` carries `2.7.0`, `0.14.4`
+the core on its row: `0.15.2` carries `2.9.0`, `0.15.1` carries `2.8.0`, `0.15.0` carries `2.7.0`, `0.14.4`
 carries `2.6.0`, `0.14.1` carries `2.5.0`. The newest chart's `appVersion` is
 what the generated *Released artifacts* table below reads back out of the
 registry. Older charts stay on their own lines: `0.13.7` carries

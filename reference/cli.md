@@ -40,6 +40,7 @@ These options are available for all commands:
 | [`serve`](#serve) | Start the MCP server |
 | [`completion`](#completion) | Generate shell completion scripts |
 | [`auth`](#auth) | Manage authentication (bootstrap the initial admin) |
+| [`config`](#config) | Validate `config.yaml` without starting a gateway |
 
 ---
 
@@ -527,6 +528,48 @@ is no second one:
 mcp-hangar auth bootstrap-admin --config /etc/mcp-hangar/config.yaml \
   --principal service:my-app --show-key
 ```
+
+---
+
+## config
+
+Answer "is this configuration valid" without starting a gateway.
+
+### `config check`
+
+```bash
+mcp-hangar config check [PATH]
+```
+
+Reports every key that Hangar does not read. A key it does not read is kept and
+ignored, so the setting simply does not apply -- which is why a misspelling
+surfaces as a server that will not start, or as authentication that is quietly
+off, rather than as a configuration error.
+
+`PATH` defaults to `$MCP_CONFIG`, then `./config.yaml`.
+
+| exit code | meaning |
+|---|---|
+| `0` | every key is one Hangar reads |
+| `1` | at least one key is not |
+| `2` | the file is missing, or is not YAML |
+
+```console
+$ mcp-hangar config check config.yaml
+FAIL config.yaml: 2 key(s) nothing reads:
+
+  auth has unknown key(s) ['enabledd']; allowed keys: ['allow_anonymous',
+  'api_key', 'enabled', 'oidc', 'opa', 'rate_limit', 'role_assignments', 'storage']
+  mcp_servers.math has unknown key(s) ['commandd']; allowed keys: [...]
+```
+
+The command is always strict. Loading a config only **warns** about an unknown
+key today -- see [Unknown keys](configuration.md#unknown-keys) for what changes
+in 3.0.0 -- but this command exists to be asked the question directly, so it
+answers it. That makes it the thing to run in CI, and before a rollout.
+
+Checked: top-level section names, the direct keys of each section, and the keys
+of an `mcp_servers.<id>` spec. Not checked: anything deeper.
 
 ---
 

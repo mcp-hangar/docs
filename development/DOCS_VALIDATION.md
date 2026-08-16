@@ -161,6 +161,40 @@ saying so. That is the intended cost: cheap to write, and it distinguishes
 "nothing to do" from "nobody wrote it yet", which a reader cannot do from an
 absence.
 
+### Config blocks
+
+`scripts/check_config.py` pushes every `config.yaml` block in the docs through
+the product's own config schema.
+
+```bash
+python scripts/check_config.py --source /path/to/mcp-hangar
+```
+
+This gate was blocked for months, and the reason is the useful part. The obvious
+implementation -- run each block through `load_configuration()` -- **validates
+nothing**: `config.yaml` had no schema, so the loader accepted `commandd:
+[python]`, `idle_tt1_s: 60` and a whole misspelled `authh:` section without a
+word. A gate built on it would have been green over a documented typo.
+
+So the schema was built first, in the product
+(mcp-hangar/mcp-hangar#984), and this consumes it. It is deliberately **not** a
+key allowlist kept here: that would be a copy of `server/config.py` living one
+repository away from the code it describes, and a drifted copy either misses new
+keys or rejects them. Both are worse than nothing.
+
+`config_schema.py` imports only `os` and `typing`, so it is loaded from the
+source checkout by path -- installing the product to lint prose is a hammer this
+job does not need.
+
+What it catches is a reader copying a block and getting a setting that silently
+does not apply. Note that `rate_limit` exists **both** at the top level (`rps`,
+`burst`) and under `auth`, and they take different keys; the nesting is the easy
+thing to get wrong.
+
+Depth matches the schema: section names, each section's own keys, and
+`mcp_servers.<id>` spec keys. Deeper keys are not checked, because below that
+level there is no single reader in the product to enumerate from.
+
 ### Symbol drift
 
 `scripts/validate_docs.py` extracts high-signal identifiers from every Markdown

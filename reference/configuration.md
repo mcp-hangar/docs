@@ -771,6 +771,60 @@ Each member entry supports all standard MCP server keys (`mode`, `command`, `ima
 | `priority` | `int` | -- | 1--100 | Priority for priority strategy (lower number = higher priority) |
 | `tools` | `dict` | -- | -- | Member-level tool access policy, same keys as the group-level block |
 
+## Unknown keys
+
+A key Hangar does not read is **kept and ignored**. It does not fail, and it does
+not warn about anything except itself -- so the setting simply never applies, and
+the consequence turns up somewhere else:
+
+<!-- Deliberately wrong, so it is not a ```yaml block: the docs CI checks every
+     yaml config block against the product's schema and would reject this one. -->
+
+```text
+mcp_servers:
+  math:
+    mode: subprocess
+    commandd: [python, -m, server]   # a server that will not start
+    idle_tt1_s: 60                   # a digit for an l; idle stop never happens
+
+auth:
+  enabledd: true                     # authentication is off
+```
+
+Each of those loads. The first reads as a broken server, the second as a memory
+leak, and the third as nothing at all until someone tries an unauthenticated
+request.
+
+Hangar reports these on load:
+
+```text
+unknown_config_key  detail=auth has unknown key(s) ['enabledd']; allowed keys:
+['allow_anonymous', 'api_key', 'enabled', 'oidc', 'opa', 'rate_limit',
+'role_assignments', 'storage']
+```
+
+**Throughout 2.x it warns and starts. From 3.0.0 it refuses.** Set
+`HANGAR_CONFIG_STRICT=1` to refuse now -- worth doing in CI and in staging. Any
+`unknown_config_key` warning in your logs is a configuration that will not load
+after the 3.0.0 upgrade.
+
+To check a file without starting a gateway, use
+[`mcp-hangar config check`](cli.md#config-check), which is always strict and
+exits non-zero on an unknown key.
+
+### What is checked
+
+Top-level section names, the direct keys of each section, and the keys of an
+`mcp_servers.<id>` spec. Not keys deeper than that: below that level there is no
+single place in the product that enumerates them, and a schema assembled from
+twenty readers would drift into rejecting valid configuration -- a worse failure
+than accepting a typo.
+
+One thing the check will not catch, because both spellings are real:
+`rate_limit` exists at the top level, where it takes `rps` and `burst`, **and**
+under `auth`, where it does not. Nesting it in the wrong place gives you a valid
+config that throttles nothing.
+
 ## Environment Variables
 
 Environment variables override corresponding YAML settings. Variables follow the `MCP_` prefix convention. Third-party integrations (OpenTelemetry, Langfuse, Jaeger) use their standard prefixes.

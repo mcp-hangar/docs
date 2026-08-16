@@ -4,6 +4,146 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.9.0
+
+Drop-in for every deployment that runs the gateway. Nothing about a served
+Hangar changes. One tool starts working, and a Python API that no shipped code
+path ever executed is gone.
+
+### `hangar_load` can now succeed, and wants `uvx` or `npx` on PATH
+
+Hot-loading has been enabled by default and unable to complete since it shipped:
+bootstrap handed its resolver a runtime table with every entry `False` and an
+empty installer list, so every call answered
+
+```json
+{"status": "failed", "message": "No compatible package found (missing runtime?)",
+ "warnings": ["Available runtimes: []"]}
+```
+
+It now resolves `pypi` packages through `uvx` and `npm` packages through `npx`,
+and reports availability from the installers rather than from a hardcoded table.
+
+The runtime has to be on the gateway process's PATH, which is the part to check
+before expecting different behaviour:
+
+- **the published container image carries neither `uvx` nor `npx`**, so
+  hot-loading still fails there — now with a message naming what is missing
+  rather than an empty list. Derive your own image from ours and add `uv`,
+  Node, or both if you want it working in a container.
+- running from a `pip install`, install [uv](https://docs.astral.sh/uv/) for
+  PyPI-published servers and Node for npm-published ones. Either alone is fine.
+
+`oci` and `mcpb` packages remain unloadable, deliberately: OCI needs a container
+runtime the image does not ship, and `mcpb` has no defined install path. Both
+are now reported *unavailable* instead of being selected and then dropped.
+
+Nothing to do if you do not use `hangar_load`. `hot_loading.enabled: false`
+keeps the tool switched off.
+
+### The `fastmcp_server` factory stack is gone
+
+Removed from `mcp_hangar.fastmcp_server`: `MCPServerFactory` with its
+`builder()` and `create_asgi_app()`, `MCPServerFactoryBuilder`,
+`HangarFunctions`, `ServerConfig`, the thirteen `Hangar*Fn` protocols, and the
+ASGI combiners `create_health_routes`, `create_combined_asgi_app` and
+`create_auth_combined_app`.
+
+**Nothing about a running Hangar changes.** No shipped code constructed any of
+it. `serve --http` builds its MCP server in `mcp_hangar.server.bootstrap` and
+its ASGI app in `mcp_hangar.server.lifecycle.mcp_app_for_serving`, and has never
+gone through the factory. The two assemblies had drifted far enough to prove it:
+the factory mounted flat `/health` and `/ready`, while a running Hangar serves
+`/health/live`, `/health/ready`, `/health/startup` and `/metrics`.
+
+Keeping a second construction path that looked serviceable is what made four
+bugs possible (#592, #594, #595, #596): each was a capability wired into the
+factory, which made it appear wired and shipped it dead.
+
+**If you were embedding through the factory** there is no drop-in replacement,
+because the factory was never how the product ran. Either run the gateway
+(`mcp-hangar serve --http`) and drive it over MCP or the REST API, or call the
+composition root the CLI itself uses: `server.bootstrap` to build and register,
+`lifecycle.mcp_app_for_serving` for the ASGI app, and
+`server.api.middleware.create_auth_enforced_app` to apply the same
+authentication. Those are tested on every PR and are what a released Hangar
+executes.
+
+`HANGAR_SERVER_NAME` is unchanged and still exported from
+`mcp_hangar.fastmcp_server`. The v0.4.0 note further down names the factory as
+the successor to `setup_fastmcp_server()`; it describes what that release did
+and stays as history.
+
+## Upgrade to 2.8.0
+
+Two things can break a build rather than a deployment: an extra that no longer
+exists, and a bundled monitoring stack that has moved to the Helm chart.
+
+### `pip install mcp-hangar[containers]` now fails
+
+The `containers` extra is gone. It installed `testcontainers` for a test tier
+that never ran — those tests were gated behind `--run-containers` / `--run-slow`
+and no CI job, `Makefile` target or script ever passed either flag, so every one
+of them reported `skipped` on every run. Nothing in the shipped package imported
+it.
+
+Drop `[containers]` from your install line. If you depended on `testcontainers`
+yourself, depend on it directly.
+
+### The bundled compose monitoring stack is gone
+
+`monitoring/` and `docker-compose.monitoring.yml` are removed from the
+repository. The four Grafana dashboards and the 30 Prometheus alert rules ship
+with the Helm chart instead: `dashboards.enabled` renders them as
+sidecar-labelled ConfigMaps, `prometheusRule.enabled` renders a `PrometheusRule`.
+
+Instrumentation is untouched — `/metrics`, tracing and the OTLP exporter are
+unchanged; only bundled config moved. There is no one-command local Grafana any
+more. If you were running it, either use the chart or keep a copy of the compose
+file from the 2.7.0 tag.
+
+### The published container runs Python 3.14
+
+`pip install` still supports 3.11 through 3.14, and 3.14 is now a required CI
+citizen rather than an advisory one. Relevant only if you build on top of our
+image and pin something against the interpreter version.
+
+### Three unused symbols left the application layer
+
+`CallbackAlertSink` and `LogAuditStore` are gone from
+`mcp_hangar.application.event_handlers`, and `detect_runtime_availability` with
+its `IRuntimeChecker` protocol from `mcp_hangar.application.services`. None had a
+caller outside this repository's own tests.
+
+- **`CallbackAlertSink`** — production `get_alert_handler()` builds a
+  `LogAlertSink`. To capture alerts in your own code, implement the ABC:
+
+  ```python
+  from mcp_hangar.application.event_handlers.alert_handler import Alert, AlertSink
+
+  class CapturingSink(AlertSink):
+      def __init__(self) -> None:
+          self.alerts: list[Alert] = []
+
+      def send(self, alert: Alert) -> None:
+          self.alerts.append(alert)
+  ```
+
+- **`LogAuditStore`** — it could not have served as an audit store: `query()`
+  raised `NotImplementedError`, because a log sink cannot answer a query. Write
+  the sink you want against the `AuditStore` ABC, or use the OTLP exporter path
+  (`OTLPAuditEventHandler` / `IAuditExporter`), which is built for shipping
+  audit records off the box.
+
+- **`detect_runtime_availability`** — no replacement, deliberately. Ask the
+  installer you care about (`is_runtime_available()`) and construct the
+  `RuntimeAvailability` yourself, which is all the removed function did, in a
+  fixed order, for a list it did not validate.
+
+`AlertSink`, `Alert`, `LogAlertSink`, `AlertEventHandler`, `get_alert_handler`,
+`AuditRecord`, `AuditStore`, `InMemoryAuditStore`, `AuditEventHandler`,
+`get_audit_handler`, `PackageResolver` and `RuntimeAvailability` are unchanged.
+
 ## Upgrade to 2.7.0
 
 Drop-in for most deployments. Two behaviours change without a config change:

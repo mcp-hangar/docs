@@ -55,6 +55,17 @@ ALLOWLIST: set[str] = {
 # historical record and intentionally names removed/renamed symbols.
 EXCLUDED_DOCS = {"changelog.md"}
 
+# An upgrade guide names removed symbols on purpose -- telling a reader that
+# `pip install mcp-hangar[containers]` now fails requires naming an extra that
+# no longer exists. So a line there that says the thing is *gone* is exempt.
+#
+# The file is not excluded wholesale, which would be the smaller change: an
+# upgrade note also recommends the *replacement*, and a replacement that does
+# not exist is the one phantom in that file worth catching.
+REMOVAL_RE = re.compile(
+    r"\b(gone|removed|no longer|is not|are not|now fails|deleted|retired|dropped|used to)\b", re.I
+)
+
 TOOL_RE = re.compile(r"\bhangar_[a-z][a-z0-9_]*")
 METRIC_RE = re.compile(r"\bmcp_hangar_[a-z][a-z0-9_]*")
 ENV_RE = re.compile(r"\b(?:MCP|HANGAR)_[A-Z][A-Z0-9_]+")
@@ -154,7 +165,10 @@ def main() -> int:
     for doc in iter_doc_files(docs):
         scanned += 1
         rel = doc.relative_to(docs)
+        upgrade_guide = rel.name == "upgrade.md"
         for lineno, line in enumerate(doc.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+            if upgrade_guide and REMOVAL_RE.search(line):
+                continue
             env_line = DOC_REF_RE.sub("", INTERP_RE.sub("", line))
             for category, regex, exists in checks:
                 target = env_line if category == "env" else line

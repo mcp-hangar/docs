@@ -23,6 +23,14 @@ the build once the released version moves more than one minor ahead. The token
 is an acknowledgement that a human read the page -- so it is deliberately not
 bumped automatically. A bot that advances it turns the gate into a formality.
 
+**Upgrade coverage.** The two mechanisms above check what a page *says*. Neither
+notices a page that says nothing, which is how `upgrade.md` came to stop at
+2.7.0 while 2.9.0 was the released version -- two releases, both removing public
+API, both with a changelog entry reading "see `UPGRADE.md`" and nothing to see.
+So the released minor must have a `## Upgrade to X.Y...` section. A release with
+no migration steps is a one-line section saying so, which is a cheaper thing to
+write than this paragraph is to read.
+
 The released version is read from the product's `pyproject.toml` in the source
 checkout, so this needs no network.
 
@@ -54,6 +62,26 @@ GENERATED_RE = re.compile(r"<!--\s*BEGIN generated.*?<!--\s*END generated[^>]*--
 # How far the released version may move past a token before the page must be
 # re-read. One minor: a patch is a fix, a minor is new surface.
 MAX_MINOR_DRIFT = 1
+
+UPGRADE_DOC = "upgrade.md"
+UPGRADE_HEADING_RE = re.compile(r"^#{2,3}\s+Upgrade to (\d+)\.(\d+)", re.M)
+
+
+def upgrade_gap(root: Path, major: int, minor: int) -> str | None:
+    """The released minor has no section in the upgrade guide, or a reason it does."""
+    doc = root / UPGRADE_DOC
+    if not doc.is_file():
+        return f"{UPGRADE_DOC} is missing -- the upgrade guide is where a removal is explained."
+    covered = {(int(a), int(b)) for a, b in UPGRADE_HEADING_RE.findall(doc.read_text(encoding="utf-8"))}
+    if not covered:
+        return f"{UPGRADE_DOC} has no `## Upgrade to X.Y` heading at all -- the parse here broke."
+    if (major, minor) in covered:
+        return None
+    newest = max(covered)
+    return (
+        f"{UPGRADE_DOC}: no section for the released {major}.{minor}; newest is "
+        f"{newest[0]}.{newest[1]}. Add one -- 'nothing to do' is a valid section."
+    )
 
 
 def resolve_source(arg: str | None) -> Path:
@@ -122,14 +150,19 @@ def main() -> int:
             if CURRENCY_RE.search(line) and VERSION_RE.search(line):
                 unbacked.append(f"{rel}:{lineno}: {line.strip()[:90]}")
 
+    gap = upgrade_gap(root, rel_major, rel_minor)
+
     if not args.quiet:
         print(f"docs:     {root}")
         print(f"released: {rel_major}.{rel_minor}.{rel_patch}")
         print(f"files carrying a freshness token: {tokened}\n")
 
-    if not unbacked and not stale:
-        print("OK: no unbacked currency claim, no stale freshness token.")
+    if not unbacked and not stale and not gap:
+        print("OK: no unbacked currency claim, no stale freshness token, upgrade guide covers the release.")
         return 0
+
+    if gap:
+        print(f"FAIL: {gap}\n")
 
     if stale:
         print(f"FAIL: {len(stale)} stale freshness token(s):\n")

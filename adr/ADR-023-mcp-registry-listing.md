@@ -35,7 +35,7 @@ Stable releases only. PyPI serves a prerelease under its PEP 440 spelling (`2.5.
 
 ### 4. The key is an environment secret behind a required reviewer
 
-`MCP_PRIVATE_KEY` authorises publishing anything under `io.mcp-hangar/*`, so it lives on the `mcp-registry-publish` environment -- restricted to `v*` tags, with a required reviewer -- and never as a repository or organisation secret. Each release therefore pauses for an explicit approval before it publishes. That pause is the point.
+The Ed25519 signing key authorises publishing anything under `io.mcp-hangar/*`, so the Actions secret holding it lives on the `mcp-registry-publish` environment -- restricted to `v*` tags, with a required reviewer -- and never as a repository or organisation secret. Each release therefore pauses for an explicit approval before it publishes. That pause is the point.
 
 ## Consequences
 

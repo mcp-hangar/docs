@@ -7,7 +7,41 @@ drift and the review steps that automation cannot cover.
 
 [src]: https://github.com/mcp-hangar/mcp-hangar
 
-## Automated check
+## Automated checks
+
+Two scripts run in CI (`.github/workflows/validate-docs.yml`) on every pull
+request, on push to `main`, and weekly. They are separate because they need
+different things: the link checker needs only this repository, the drift
+detector needs the product source tree checked out beside it.
+
+### Links and anchors
+
+`scripts/check_links.py` resolves every relative link, and for a Markdown target
+also the `#anchor`, against the headings that file actually produces. Run it
+locally with no arguments and no product checkout:
+
+```bash
+python scripts/check_links.py
+```
+
+Two things it does that are easy to get wrong, both found by running it against
+this repository rather than by reasoning:
+
+- an underscore survives slugging, so a heading written as `startup_checks` in
+  backticks becomes `#startup_checks`. Stripping the underscore as emphasis
+  markup reported eight live anchors as broken.
+- an explicit `{#custom-id}` on a heading wins over the slug. `reference/tools.md`
+  uses 22 of them; without honouring those, every link into that page failed.
+
+External URLs are not checked -- liveness is flaky, rate-limited and needs the
+network. Bare `#fragment` self-links are not checked either: the renderer emits
+ids for things that are not headings, so the heading set is not the full anchor
+set for a link into the same page.
+
+If the extraction ever matches nothing, the script **fails** rather than
+reporting success over an empty set. A gate that cannot fail is not a gate.
+
+### Symbol drift
 
 `scripts/validate_docs.py` extracts high-signal identifiers from every Markdown
 file and verifies each one still exists in the product source tree. It runs in

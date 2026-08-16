@@ -41,6 +41,29 @@ set for a link into the same page.
 If the extraction ever matches nothing, the script **fails** rather than
 reporting success over an empty set. A gate that cannot fail is not a gate.
 
+### CLI commands
+
+`scripts/check_cli.py` checks that every `mcp-hangar <command>` a bash block
+tells the reader to run is a command the CLI actually registers, including the
+second level for groups (`auth`, `completion`).
+
+```bash
+python scripts/check_cli.py --source /path/to/mcp-hangar
+```
+
+**Extraction is from ```bash fences only, and that is the whole difficulty.** A
+naive `mcp-hangar\s+(\w+)` over the full text reports sixteen phantom
+subcommands -- `mcp-hangar resource`, `mcp-hangar spec`, `mcp-hangar kubectl` --
+every one of them prose or a YAML fragment that happens to follow the product
+name. A gate that noisy gets switched off, so the match must sit where a command
+sits: at the start of a line, or after a pipe, `&&`, `;`, `sudo`, or a prompt.
+
+The command set is parsed out of the CLI source rather than imported, because
+this job checks the product out but does not install it. That tradeoff has one
+failure mode -- a change in how commands are registered would stop finding them
+-- so the script **fails when it finds implausibly few** rather than approving
+everything by default.
+
 ### Symbol drift
 
 `scripts/validate_docs.py` extracts high-signal identifiers from every Markdown

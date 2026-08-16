@@ -45,5 +45,8 @@ jobs:
       - name: Check internal links and anchors
         run: python docs/scripts/check_links.py --docs docs
 
+      - name: Check CLI commands cited in bash blocks
+        run: python docs/scripts/check_cli.py --docs docs --source source
+
       - name: Validate docs against source
         run: python docs/scripts/validate_docs.py --docs docs --source source

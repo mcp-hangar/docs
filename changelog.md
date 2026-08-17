@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.32](https://github.com/mcp-hangar/docs/compare/v1.1.31...v1.1.32) (2026-08-17)
+
+
+### Changed
+
+* **architecture:** adr-023 — the MCP Registry entry describes a package, not a service ([#230](https://github.com/mcp-hangar/docs/issues/230)) ([0c92475](https://github.com/mcp-hangar/docs/commit/0c924751ccbf521681a23797b8aca3440b87ad40))
+* **guides:** bring over upgrade notes for the latest release ([#231](https://github.com/mcp-hangar/docs/issues/231)) ([417a506](https://github.com/mcp-hangar/docs/commit/417a506cd1ff24247d24573f9d193e12226997fc))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#212](https://github.com/mcp-hangar/docs/issues/212)) ([61759a0](https://github.com/mcp-hangar/docs/commit/61759a0eb8a0162ec8c2efd1217a3756f8563fd5))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#232](https://github.com/mcp-hangar/docs/issues/232)) ([8fefaaa](https://github.com/mcp-hangar/docs/commit/8fefaaaf8ff2a18f38e1ef8350dbaf99c263a78b))
+
 ## [1.1.31](https://github.com/mcp-hangar/docs/compare/v1.1.30...v1.1.31) (2026-08-15)
 
 

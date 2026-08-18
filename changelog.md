@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.39](https://github.com/mcp-hangar/docs/compare/v1.1.38...v1.1.39) (2026-08-18)
+
+
+### Changed
+
+* **reference:** document truncation/interceptors/hot_loading and correct ADR-020 claims ([#250](https://github.com/mcp-hangar/docs/issues/250)) ([ca986b6](https://github.com/mcp-hangar/docs/commit/ca986b6907304171f8a8fc7979455e0463639f65))
+
 ## [1.1.38](https://github.com/mcp-hangar/docs/compare/v1.1.37...v1.1.38) (2026-08-18)
 
 

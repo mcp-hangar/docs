@@ -1,6 +1,6 @@
 # ADR-020: More Than One Gateway -- What Is Shared, What Is Leased, and What Stays Local
 
-**Status:** Accepted
+**Status:** Accepted -- tool-catalogue paragraph corrected 2026-08-18 against the core source (docs#193): `tools/list` is identical across replicas only in `egress` mode, and the tool-projection registry is fed by per-replica discovery, not by configuration. See the corrected paragraph in Decision 4.
 **Date:** 2026-08-06
 **Authors:** MCP Hangar Team
 **Related:** [ADR-018](ADR-018-event-sourcing-actually-wired.md) (the log this rests on), [ADR-019](ADR-019-one-storage-decision-two-backends.md) (the storage decision this needed first), [ADR-001](ADR-001-cqrs.md) (CQRS), core#778 (the readiness audit), core#788 (the flow analysis), core#789 (the design), core#790 (the work).
@@ -50,7 +50,12 @@ Required at subscription, with no default: an unclassified effect exports the sa
 - A **projection** keeps a local view -- fleet membership, risk scores, session suspensions, the websocket feed. It runs on every replica for every event, whoever produced it, and publishes nothing.
 - An **effect** acts outward -- SIEM export, cost accounting, alerts, enforcement. It runs **only on the instance that produced the event**.
 
-**The tool catalogue is not among them, and this decision does not make it one.** A server's tools are learned by connecting to it: the replica that starts a server lists its tools and holds them; a peer that has never started it answers with an empty list until it does. Measured on two replicas sharing one database, fifteen seconds after the leader had listed five tools, `GET /api/mcp_servers/<id>/tools` on the follower returned `[]`. The MCP surface is unaffected -- it advertises the gateway's own tools and reaches upstream ones through them, so both replicas answer `tools/list` identically -- and the tool-projection registry the digest pin resolves against is fed from configuration, so it is the same everywhere. What differs is the REST inspection endpoint, and what it reports is honestly per-instance: the tools *this* replica has seen. Making the catalogue a projection means putting a learned schema into the log, which is a change to what the log carries and is not attempted here.
+**The tool catalogue is not among them, and this decision does not make it one.** A server's tools are learned by connecting to it: the replica that starts a server lists its tools and holds them; a peer that has never started it answers with an empty list until it does. Measured on two replicas sharing one database, fifteen seconds after the leader had listed five tools, `GET /api/mcp_servers/<id>/tools` on the follower returned `[]`. The REST inspection endpoint reports honestly per-instance: the tools *this* replica has seen. Making the catalogue a projection means putting a learned schema into the log, which is a change to what the log carries and is not attempted here.
+
+*Corrected 2026-08-18 (docs#193).* This paragraph originally claimed that the MCP surface was unaffected -- "both replicas answer `tools/list` identically" -- and that the tool-projection registry the digest pin resolves against "is fed from configuration, so it is the same everywhere". Both claims were wrong:
+
+- **`tools/list` is identical across replicas only in `egress` mode**, where the surface is the gateway's own fixed `hangar_*` tools and upstream tools are reached through them. In `front_door` mode `tools/list` *is* the flat per-tenant projection of discovered upstream tools, and that projection is per-replica: measured on two replicas, one database, one tenant, one token -- 18 tools versus 0, alternating through the Service (core#886).
+- **The tool-projection registry is fed by discovery, not by configuration.** `build_from_tools` runs on `McpServerStarted`, per replica; config load seeds only withdrawal and pin *overlays*, which exist precisely so a name resolves before discovery populates it. The original sentence used "fed from configuration" as the premise for "the digest pin resolves the same everywhere" -- since the true input is per-replica discovery, that conclusion does not follow from that premise. Whether digest pinning is nonetheless safe across replicas has to be argued from what actually feeds the registry, and is **open**, not established here.
 
 That last rule is what makes exactly-once free: a tool call happens on exactly one replica, so the replica that did the work is the one that exports it. No cursor, no coordination, no leader bottleneck.
 
@@ -67,6 +72,7 @@ The rule, applied four times and stated once: **state about this replica's own r
 | Lifecycle state | local | answers "can *I* serve this"; in subprocess mode each replica runs its own child |
 | Circuit breakers | local | shared, one replica with a network problem cuts a healthy upstream off from the rest |
 | Rate limits | local | per instance, and said so; see the failure modes below |
+| Truncation continuation cache | local unless Redis is actually configured | `truncation.cache_driver: memory` is per-replica -- a continuation is fetchable only on the replica that minted it, and from 2.7.0 no session affinity hides that; `cache_driver: redis` shares it, and fails closed at boot when Redis is unusable |
 
 ### 6. Local modes belong to the instance that runs them
 

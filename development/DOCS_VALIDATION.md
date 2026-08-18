@@ -140,7 +140,7 @@ a token.
 Where a page genuinely must name the current version, it carries one:
 
 ```markdown
-<!-- verified-against: 2.9.0 -->
+<!-- verified-against: 2.11.0 -->
 ```
 
 That permits currency claims in the file, and fails the build once the released

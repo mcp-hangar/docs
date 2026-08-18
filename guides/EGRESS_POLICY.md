@@ -150,10 +150,14 @@ The L7 half runs in the core, on the connections Hangar already proxies. It is *
 **Tool-call matching** resolves a tool name by glob, in precedence order:
 
 1. `deny` — reject.
-2. `requireApproval` — **fail closed**: the call is blocked pending out-of-band
-   approval. This is a hard gate, not an interactive approval queue — routing a
-   gated call into the interactive approval workflow is a follow-up (see
-   [Limitations](#limitations-and-notes)).
+2. `requireApproval` — the call is routed into the interactive approval gate
+   (core 2.11.0): a typed pending approval is created and delivered on the
+   configured channel, resolution requires `approval:resolve`, and the
+   decision is revalidated at dispatch — so an approval granted while a
+   policy was in force is not usable after that policy changes, and `deny`
+   still wins if the policy hardens during the hold. With **no approval
+   channel configured, the verdict fails closed** (blocked), exactly as
+   before 2.11.0 (see [Limitations](#limitations-and-notes)).
 3. `allow` — permit.
 4. otherwise — the policy's `defaultAction`.
 
@@ -194,7 +198,7 @@ Unknown group names are ignored by the scanner (they are caught by CRD validatio
 - **L7 needs core integration.** The tool-call / argument rules are enforced only when the operator runs with `--hangar-url`; otherwise a policy applies its L3/L4 backstop but its L7 rules are not delivered.
 - **FQDN enforcement requires Cilium.** Under other CNIs, list upstreams as CIDRs, or accept that hostname upstreams are denied (fail closed) and surfaced via `Degraded`.
 - **L7 rules are merged per server.** Because the core enforces one policy per server (not per upstream connection), a policy's upstream `tools`/`arguments` rules are flattened together (see [above](#l7-semantics)). Scope host-specific tool rules with separate policies if you need them kept apart.
-- **`requireApproval` currently fails closed** — a gated call is blocked pending out-of-band approval; routing it into the interactive approval queue is a follow-up.
+- **`requireApproval` needs an approval channel to be interactive** — since core 2.11.0 a gated call blocks on the approval gate (typed pending approval, `approval:resolve` chokepoint, dispatch-time revalidation); on a deployment with no approval channel configured it fails closed, as it always did. `Audit` mode records the would-be verdict and never asks a human.
 - `toFQDNs` interacts with NodeLocal DNSCache; the operator's DNS-topology configuration (`ExtraDNSEgressPeers`) covers the same ground.
 
 ## See also

@@ -204,6 +204,24 @@ itself whether it can reach an upstream, because a single replica with a network
 problem must not cut a healthy server off from the other two. The cost is that
 each discovers an outage independently.
 
+**If you enable `truncation`, you need a Redis every replica shares.** The
+continuation cache defaults to `cache_driver: memory`, which is per-replica: a
+continuation minted where a batch was truncated is unfetchable on the other
+two, and from 2.7.0 there is no sticky routing to hide that -- the retry lands
+wherever the load balancer sends it. Set `cache_driver: redis` with a
+`redis_url` all replicas resolve, and make sure the install can
+`import redis` -- the `[redis]` extra (`pip install mcp-hangar[redis]`; the
+published image ships it). A Redis that is unusable at boot **refuses the
+boot** rather than silently falling back to the per-replica cache. **One plain
+Redis is enough**: the payloads are ephemeral truncation overflow with a TTL of
+minutes, and losing them costs a re-run of a batch, so Sentinel or clustering
+is not required. This Redis is *not* a general HA bus, and deliberately so
+(rejected in the design, core#790 §3.1): rate limits and circuit breakers stay
+per-replica, fleet state, the lease and the event log stay on PostgreSQL, and
+sessions stopped needing affinity in 2.7.0. The continuation cache is the one
+piece of state with a Redis in it -- see the shared-vs-local table in
+[ADR-020](../adr/ADR-020-high-availability.md).
+
 ## Rolling updates
 
 Two versions run against one database for the length of the rollout. Hangar's

@@ -426,15 +426,138 @@ retry:
     retry_on:
       - ConnectionError
       - TimeoutError
+  per_mcp_server:
+    sqlite:
+      max_attempts: 5
+    fetch:
+      max_attempts: 2
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `default_policy.max_attempts` | `int` | -- | Maximum retry attempts |
-| `default_policy.backoff` | `str` | -- | Backoff strategy (e.g., `exponential`) |
-| `default_policy.initial_delay` | `float` | -- | Initial delay in seconds |
-| `default_policy.max_delay` | `float` | -- | Maximum delay in seconds |
+| `default_policy.max_attempts` | `int` | `3` | Maximum retry attempts |
+| `default_policy.backoff` | `str` | `exponential` | Backoff strategy: `exponential`, `linear`, or `constant` |
+| `default_policy.initial_delay` | `float` | `1.0` | Initial delay in seconds |
+| `default_policy.max_delay` | `float` | `30.0` | Maximum delay in seconds |
 | `default_policy.retry_on` | `list[str]` | -- | Exception types to retry on |
+| `default_policy.jitter` | `bool` | `true` | Add random jitter to each delay |
+| `default_policy.jitter_factor` | `float` | `0.25` | Jitter range as a fraction of the delay (`0.25` = ±25%) |
+| `per_mcp_server` | `dict[str, dict]` | `{}` | Per-server overrides keyed by MCP server ID; each value takes the same keys as `default_policy` and is **merged over it** (unset keys inherit the default) |
+
+## `truncation`
+
+Batch-response truncation with continuation IDs. **Opt-in.** When enabled,
+[`hangar_call`](tools.md#hangar_call) batch responses that exceed the size
+budget are truncated; each truncated result carries a `continuation_id`, and the full
+payload is held in a cache for
+[`hangar_fetch_continuation`](tools.md#hangar_fetch_continuation) /
+[`hangar_delete_continuation`](tools.md#hangar_delete_continuation) to retrieve
+or drop. A truncated result only advertises a `continuation_id` when the full
+payload was actually stored -- a cache write that fails yields a truncated
+result with no continuation rather than an ID that cannot be fetched.
+
+```yaml
+truncation:
+  enabled: true
+  max_batch_size_bytes: 900000
+  min_per_response_bytes: 10000
+  cache_ttl_s: 300
+  cache_driver: memory        # or: redis
+  # redis_url: redis://redis:6379/0   # required when cache_driver: redis
+  max_cache_entries: 10000
+  preserve_json_structure: true
+  truncate_on_line_boundary: true
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | `bool` | `false` | Enable truncation (opt-in) |
+| `max_batch_size_bytes` | `int` | `900000` | Maximum total batch response size in bytes |
+| `min_per_response_bytes` | `int` | `10000` | Minimum bytes allocated to each response in a batch; must not exceed `max_batch_size_bytes` |
+| `cache_ttl_s` | `int` | `300` | TTL for cached full responses, in seconds |
+| `cache_driver` | `str` | `memory` | Continuation cache backend: `memory` or `redis` |
+| `redis_url` | `str` | -- | Redis connection URL; **required** when `cache_driver: redis` |
+| `max_cache_entries` | `int` | `10000` | Maximum entries held by the `memory` cache |
+| `preserve_json_structure` | `bool` | `true` | Truncate JSON payloads without breaking JSON validity |
+| `truncate_on_line_boundary` | `bool` | `true` | Truncate text payloads at line boundaries |
+
+### Choosing the cache driver
+
+**`memory` is per-replica.** A continuation minted on one replica is only
+fetchable on the replica that truncated the response. On a single instance that
+is correct and needs no Redis. On a coordinated deployment (a `coordination:`
+block) it is legal but almost certainly wrong -- Hangar logs
+`truncation_memory_cache_is_per_replica` at boot to say so. See
+[Running more than one replica](../cookbook/25-multiple-replicas.md).
+
+**`redis` is shared, and it fails closed.** When the operator asked for Redis,
+Hangar **refuses to boot** if Redis is unusable: the `redis` package missing, a
+bad `redis_url`, or a server that cannot serve a `SETEX` (the boot probe is a
+real `SETEX` round trip, not a `PING`, so a Sentinel listen port cannot pass
+for a working store). There is no silent fallback to the in-memory cache; the
+boot log names the backend actually in use. Install the client with the
+`[redis]` extra (`pip install mcp-hangar[redis]`) -- the published container
+image already ships it.
+
+## `interceptors`
+
+Opt-in built-in validators that gate every `tools/call` on the invoke path.
+**Off by default:** an absent or empty section registers no validators. Each
+entry names a built-in validator `type`; the remaining keys are passed to that
+validator. A spec naming an unknown `type`, or missing `type` entirely,
+**refuses startup** rather than silently skipping the guard.
+
+```yaml
+interceptors:
+  validators:
+    - type: payload_size
+      max_bytes: 1000000
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `validators` | `list[dict]` | `[]` | Validator specs, registered in source order; each is a dict with a `type` key plus per-type parameters |
+| `validators[].type` | `str` | required | Built-in validator name; the only one today is `payload_size` |
+
+### `payload_size` validator
+
+Denies a `tools/call` whose JSON-encoded payload exceeds a byte cap, guarding
+upstream servers from oversized arguments. **Fail-closed:** a payload that
+cannot be serialized for measurement is denied too.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `max_bytes` | `int` | `1000000` | Maximum JSON-encoded payload size in bytes; larger requests are denied |
+
+## `hot_loading`
+
+Registry-backed on-demand loading: [`hangar_load`](tools.md#hangar_load)
+resolves a server from an MCP registry, installs its package (uvx/npx) and
+starts it at runtime; [`hangar_unload`](tools.md#hangar_unload) reverses it.
+**Enabled by default**; `enabled: false` switches the capability off entirely.
+Requires `httpx`; without it hot loading is unavailable and Hangar logs
+`hot_loading_unavailable` at boot.
+
+```yaml
+hot_loading:
+  enabled: true
+  registry:
+    base_url: https://registry.modelcontextprotocol.io/v0
+    timeout_s: 10.0
+    max_retries: 3
+  cache:
+    ttl_s: 3600
+    max_entries: 1000
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | `bool` | `true` | Enable runtime loading from the registry |
+| `registry.base_url` | `str` | `https://registry.modelcontextprotocol.io/v0` | Registry API base URL |
+| `registry.timeout_s` | `float` | `10.0` | Registry request timeout in seconds |
+| `registry.max_retries` | `int` | `3` | Retry attempts for registry requests |
+| `cache.ttl_s` | `int` | `3600` | TTL for cached registry lookups, in seconds |
+| `cache.max_entries` | `int` | `1000` | Maximum entries in the registry lookup cache |
 
 ## `event_store`
 
@@ -680,6 +803,11 @@ rate_limit:
 | `oidc.groups_claim` | `str` | -- | JWT groups claim field |
 | `oidc.email_claim` | `str` | -- | JWT email claim field |
 | `oidc.tenant_claim` | `str` | -- | JWT tenant claim field |
+| `oidc.max_token_lifetime_seconds` | `int` | `3600` | Maximum accepted JWT lifetime (`exp - iat`); `0` disables the check |
+| `oidc.clock_skew_leeway_seconds` | `int` | `60` | Leeway applied to `exp`/`nbf`/`iat` validation to absorb clock skew between Hangar and the issuer |
+| `oidc.require_tenant` | `bool` | `false` | **Fail-closed multi-tenant gate.** When `true`, a trusted token whose tenant claim is missing or empty is rejected instead of falling back to an untenanted principal |
+| `oidc.strict_tenant_audience` | `bool` | `false` | Opt-in strict per-tenant audience binding (RFC 8707): the token's audience must match the audience mapped to its claimed tenant in `tenant_audiences`, so a token minted for one tenant cannot be replayed as another |
+| `oidc.tenant_audiences` | `dict[str, str]` | `{}` | Explicit tenant -> expected audience/resource URI map, used when `strict_tenant_audience` is `true` |
 | `opa.enabled` | `bool` | -- | Enable Open Policy Agent authorization |
 | `opa.url` | `str` | -- | OPA server URL |
 | `opa.policy_path` | `str` | -- | OPA policy path |

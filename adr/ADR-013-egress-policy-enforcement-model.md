@@ -49,6 +49,7 @@ The enforcement mechanism is the load-bearing decision. The realistic options ar
 - **Fail-closed by construction.** Deny-default + generated backstop + a `Degraded(FailOpenRisk)` condition mean a policy that cannot compile its backstop is visibly unsafe rather than silently permissive.
 - **Cost (accepted):** enforcement covers MCP-over-Hangar traffic plus the network backstop, *not* arbitrary application-layer egress. A workload that bypasses DNS + NetworkPolicy bypasses Hangar — stated as the trust boundary, not hidden.
 - **Cost (accepted):** `Audit` default means early adopters get visibility before enforcement; a policy left in `Audit` enforces nothing. This is deliberate (adoption path), and surfaced in status.
+- **Cost (accepted):** `Enforce` bounds *new* connections only. NetworkPolicy enforcement rides on conntrack, so an established session opened before the policy applied keeps flowing until it closes (measured on kind + Calico). Guaranteeing that existing sessions are cut requires rolling the governed pods after switching to `Enforce`. Likewise, an in-pod **stdio** server produces no network traffic, so the generated backstop has nothing to govern for it — only the L7 layer applies there. Both limits are stated in the [egress policy guide](../guides/EGRESS_POLICY.md#limitations-and-notes).
 - Known gotcha to test before shipping the Cilium flavor: `toFQDNs` × NodeLocal DNSCache interplay.
 - v1 deliberately forecloses eBPF L7 parsing and transparent TLS interception; revisiting either is a future ADR, not an implementation detail.
 

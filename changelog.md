@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.40](https://github.com/mcp-hangar/docs/compare/v1.1.39...v1.1.40) (2026-08-18)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#253](https://github.com/mcp-hangar/docs/issues/253)) ([2308e09](https://github.com/mcp-hangar/docs/commit/2308e094198c22bd59d4807d2e84ccc1570bb9d3))
+
 ## [1.1.39](https://github.com/mcp-hangar/docs/compare/v1.1.38...v1.1.39) (2026-08-18)
 
 

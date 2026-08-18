@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.37](https://github.com/mcp-hangar/docs/compare/v1.1.36...v1.1.37) (2026-08-18)
+
+
+### Changed
+
+* **guides:** requireApproval routes to the approval gate since core 2.11.0 ([#243](https://github.com/mcp-hangar/docs/issues/243)) ([b44be02](https://github.com/mcp-hangar/docs/commit/b44be02cf7d24fd297528ad3c4e8694541ab5648))
+* **repo:** re-verify DOCS_VALIDATION.md against 2.11.0 and fold in the 2.11.0 upgrade notes ([#245](https://github.com/mcp-hangar/docs/issues/245)) ([1c2ee05](https://github.com/mcp-hangar/docs/commit/1c2ee050f30c66d8eaedbbd0db47147b35f7a72e))
+
 ## [1.1.36](https://github.com/mcp-hangar/docs/compare/v1.1.35...v1.1.36) (2026-08-17)
 
 

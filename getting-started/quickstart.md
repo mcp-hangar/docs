@@ -66,7 +66,7 @@ mcp-hangar add postgres   # PostgreSQL access
 Use bundles to quickly configure common setups:
 
 | Bundle | MCP servers | Use Case |
-|--------|-----------|----------|
+| -------- | ----------- | ---------- |
 | `starter` | filesystem, fetch, memory | General everyday use |
 | `developer` | starter + github, git | Software development |
 | `data` | starter + sqlite, postgres | Data analysis |

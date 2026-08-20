@@ -254,7 +254,7 @@ load balancer.
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `canary.member` | string | -- | Group member ID that receives canary traffic. Cleared with a warning if it is not a member of the group. Requires a tenant ID on the call to take effect. |
 | `canary.split_pct` | int | `0` | Deterministic percentage of tenants routed to `canary.member`, range `0`--`100`. Bucket is `SHA-256(tenant_id) % 100`; routed when `bucket < split_pct`. Out-of-range values reset to `0` with a warning. Requires a tenant ID. |
 | `canary.pinned_tenants` | dict (tenant ID -> member ID) | `{}` | Explicit tenant-to-member pins; checked before the split and always win. Entries pointing at a non-member or with the wrong type are skipped with a warning. Requires a tenant ID. |

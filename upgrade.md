@@ -251,7 +251,7 @@ fix it: a pin does not outlive its pod, so a rolling restart or a scale-down too
 the session with it.
 
 | | before | from 2.7.0 |
-|---|---|---|
+| --- | --- | --- |
 | `initialize` | returns `Mcp-Session-Id` | returns no session id |
 | a request carrying a stale or foreign `Mcp-Session-Id` | `Session not found` | served; the header is ignored |
 | `DELETE /mcp` | `200` | **`405 Method Not Allowed`** |
@@ -1168,7 +1168,7 @@ pre-rename `provider:*` permissions, which the REST API checks against nothing,
 so it could not make **any** of the operator's calls.
 
 | Operator key role | Before 2.2.0 | From 2.2.0 |
-|---|---|---|
+| --- | --- | --- |
 | `admin` | works | works |
 | `provider-admin` | broken (could not read servers) | **works** |
 | `developer` | works | **stops delivering policy** |

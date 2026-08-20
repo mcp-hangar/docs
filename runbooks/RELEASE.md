@@ -76,7 +76,7 @@ Use this procedure for critical bugs in production releases.
 ### Severity Assessment
 
 | Severity | Description | Response Time |
-|----------|-------------|---------------|
+| ---------- | ------------- | --------------- |
 | P0 | Security vulnerability, data loss | Immediate |
 | P1 | Major functionality broken | < 4 hours |
 | P2 | Significant bug, workaround exists | < 24 hours |
@@ -256,7 +256,7 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ## Contacts
 
 | Role | Contact |
-|------|---------|
+| ------ | --------- |
 | Release Manager | @maintainer |
 | Security Issues | [GitHub Security](https://github.com/mcp-hangar/mcp-hangar/security) |
 | Infrastructure | @infra-team |
@@ -266,5 +266,5 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ## Changelog
 
 | Date | Change | Author |
-|------|--------|--------|
+| ------ | -------- | -------- |
 | 2026-01-12 | Initial runbook creation | CI/CD Setup |

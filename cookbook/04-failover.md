@@ -215,7 +215,7 @@ Both MCP servers have their own health checks and circuit breakers. The group or
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `mcp_servers.<name>.strategy` | string | — | Routing strategy. Use `priority` for failover |
 | `mcp_servers.<name>.members[].id` | string | — | MCP Server ID (must exist in `mcp_servers:` section) |
 | `mcp_servers.<name>.members[].priority` | int | `1` | Routing priority (lower number = higher priority) |

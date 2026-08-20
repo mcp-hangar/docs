@@ -17,7 +17,7 @@ kill -HUP $(pgrep -f "mcp-hangar serve")
 ## Overview
 
 | Trigger | Latency | Use Case |
-|---------|---------|----------|
+| --------- | --------- | ---------- |
 | File watcher (watchdog) | ~1s | Development, real-time updates |
 | File polling | 5s (configurable) | Environments without inotify/fsevents |
 | SIGHUP signal | Immediate | Scripted deployments, CI/CD |
@@ -38,7 +38,7 @@ config_reload:
 ### Options
 
 | Option | Type | Default | Description |
-|--------|------|---------|-------------|
+| -------- | ------ | --------- | ------------- |
 | `enabled` | bool | `true` | Enable automatic file watching |
 | `use_watchdog` | bool | `true` | Use watchdog library (inotify/fsevents) |
 | `interval_s` | int | `5` | Polling interval in seconds |
@@ -89,7 +89,7 @@ hangar_reload_config(graceful=false)      # Immediate shutdown
 ## Reload Behavior
 
 | Scenario | Behavior | Final State |
-|----------|----------|-------------|
+| ---------- | ---------- | ------------- |
 | **Added** | Registered but not started | `COLD` |
 | **Removed** | Stopped gracefully, then removed | (deleted) |
 | **Modified** | Old stopped, new registered | `COLD` |
@@ -100,7 +100,7 @@ hangar_reload_config(graceful=false)      # Immediate shutdown
 Changes to any of these fields trigger MCP server restart:
 
 | Field | Description |
-|-------|-------------|
+| ------- | ------------- |
 | `mode` | MCP Server mode (subprocess, docker, remote) |
 | `command` | Command and arguments |
 | `image` | Container image |
@@ -231,7 +231,7 @@ mcp_servers:
 Hot-reload emits domain events for observability:
 
 | Event | When |
-|-------|------|
+| ------- | ------ |
 | `ConfigurationReloadRequested` | Before reload starts |
 | `ConfigurationReloaded` | After successful reload |
 | `ConfigurationReloadFailed` | On validation/apply failure |
@@ -262,7 +262,7 @@ config_reload:
 ### Log Events
 
 | Event | Description |
-|-------|-------------|
+| ------- | ------------- |
 | `config_reload_worker_started` | Worker initialized |
 | `config_file_modified_detected` | File change detected |
 | `triggering_config_reload` | Reload initiated |
@@ -279,7 +279,7 @@ config_reload:
 ## Limitations
 
 | Limitation | Workaround |
-|------------|------------|
+| ------------ | ------------ |
 | MCP Server groups cleared on reload | Groups reconstructed from new config |
 | Hot-loaded MCP servers unaffected | Use `hangar_unload` to manage separately |
 | Event store config requires restart | Restart server for event store changes |
@@ -329,7 +329,7 @@ hangar_start(mcp_server="my-mcp-server")
 ## Security
 
 | Consideration | Implementation |
-|---------------|----------------|
+| --------------- | ---------------- |
 | Validation before apply | Invalid config rejected |
 | Atomic operations | All-or-nothing semantics |
 | Graceful shutdown | Active requests complete first |

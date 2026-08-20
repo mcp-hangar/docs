@@ -41,7 +41,7 @@ services:
 ```
 
 | Label | Required | Default |
-|-------|----------|---------|
+| ------- | ---------- | --------- |
 | `mcp.hangar.enabled` | yes | - |
 | `mcp.hangar.name` | no | container name |
 | `mcp.hangar.mode` | no | `http` |
@@ -192,7 +192,7 @@ factory untouched, so `datacenter` and `token` are yours to name and yours to
 validate.
 
 | Situation | What happens |
-|-----------|--------------|
+| ----------- | -------------- |
 | `type` has no factory | Startup **fails** — a configured source that silently watches nothing is worse than a crash |
 | Your package fails to import | Logged as `discovery_source_plugin_failed` and skipped; the gateway still starts |
 | Your entry point names a built-in | Logged as `discovery_source_plugin_ignored`; a plugin cannot quietly shadow `kubernetes` |
@@ -224,7 +224,7 @@ than a special case in core.
 ## Discovery Modes
 
 | Mode | Behavior |
-|------|----------|
+| ------ | ---------- |
 | `additive` | Only adds MCP servers, never removes |
 | `authoritative` | Adds and removes (for dynamic environments) |
 
@@ -262,7 +262,7 @@ the REST API, so it passes the same duplicate and SSRF checks, and the
 ## Tools
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `hangar_discover` | Trigger discovery cycle |
 | `hangar_sources` | List sources with status |
 | `hangar_quarantine` | List quarantined MCP servers |
@@ -277,7 +277,7 @@ the REST API, so it passes the same duplicate and SSRF checks, and the
 ## Prometheus Metrics
 
 | Metric | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `mcp_hangar_discovery_mcp_servers` | MCP servers per source (Gauge) |
 | `mcp_hangar_discovery_registrations_total` | New registrations |
 | `mcp_hangar_discovery_quarantine_total` | Refused registrations, by `reason` — including a source's own policy |

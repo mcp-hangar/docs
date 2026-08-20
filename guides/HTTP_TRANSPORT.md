@@ -180,7 +180,7 @@ Health checks use the MCP `initialize` or `tools/list` methods to verify connect
 HTTP transport exposes the following metrics:
 
 | Metric | Type | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `mcp_hangar_http_requests_total` | Counter | Total HTTP requests, labeled by mcp_server, method, status_code |
 | `mcp_hangar_http_request_duration_seconds` | Histogram | Request latency |
 | `mcp_hangar_http_errors_total` | Counter | HTTP errors by type |

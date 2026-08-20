@@ -60,7 +60,7 @@ Returns an empty list if the MCP server exists but has no log buffer yet (MCP se
 Log capture is automatic for subprocess and Docker MCP servers. No configuration is required.
 
 | Behavior | Value |
-|----------|-------|
+| ---------- | ------- |
 | Buffer size | 1000 lines per MCP server |
 | Line length limit | 8192 bytes (truncated with `...`) |
 | Encoding | UTF-8 with `replace` error handling |

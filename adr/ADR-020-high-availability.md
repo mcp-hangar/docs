@@ -66,7 +66,7 @@ The classification landed *before* the tailer, not after. The tailer is what cre
 The rule, applied four times and stated once: **state about this replica's own resources stays local; state about the fleet is shared.**
 
 | | | |
-|---|---|---|
+| --- | --- | --- |
 | Fleet membership | shared | a projection; otherwise which servers exist depends on which replica you asked |
 | Session suspension | shared | a decision about the *session*; local, it is a block avoided by retrying |
 | Lifecycle state | local | answers "can *I* serve this"; in subprocess mode each replica runs its own child |
@@ -108,7 +108,7 @@ This is the standing rule, and it outlives every decision above. A rolling updat
 **Failure modes, and what each one costs.**
 
 | What happens | What breaks | What does not |
-|---|---|---|
+| --- | --- | --- |
 | The holder is killed | management pauses for up to the TTL | serving, on every replica |
 | A holder stalls past its expiry | nothing: its destructive writes match zero rows | the new holder's work |
 | The database is unreachable | management stops after the renew deadline; the tail stalls | serving from each replica's current view |
@@ -122,7 +122,7 @@ This is the standing rule, and it outlives every decision above. A rolling updat
 **What fencing covers, and what rests on local belief.** At the database there is never more than one holder: acquisition is a single conditional statement, and sixteen threads racing produce one winner. In *belief* there can be two, briefly -- an instance that stalls past its expiry believes it holds the lease until its keeper's next tick. Measured with `SIGSTOP`: the belief ended in the same second as the thaw, because the keeper's wait had already elapsed, but that is a scheduling accident and not a guarantee. What bounds the damage is fencing, and it does not cover everything:
 
 | a stalled leader's action | what stops it |
-|---|---|
+| --- | --- |
 | deregistering a server | the generation, in the `WHERE` clause -- zero rows |
 | writing the shared circuit-breaker row | the lease gate |
 | registering from discovery | local belief only |

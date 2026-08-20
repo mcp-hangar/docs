@@ -236,7 +236,7 @@ rather than inventing a configuration. It resolves when the rollout completes.
 ## If something looks wrong
 
 | Symptom | Cause |
-|---|---|
+| --- | --- |
 | Every pod answers `manages_fleet: true` | the storage is not shared; check `storage_is_shareable` |
 | No pod answers `true` | the database is unreachable, or the lease is held by a pod that has stopped -- it clears within the TTL |
 | `fleet_writer_absent` in the logs | no durable config repository was in use; registrations are not being written down |

@@ -170,7 +170,7 @@ non-root process can write to it while everything else stays read-only.
 ## Where To Grant Writes (and Where Not)
 
 | Component | Root filesystem | Writable mount | Why |
-|-----------|-----------------|----------------|-----|
+| ----------- | ----------------- | ---------------- | ----- |
 | Stateless provider (fetch, calculators) | read-only | none | Never persists; a write is a red flag |
 | Stateful provider (sqlite, memory) | read-only | one `:rw` volume | Persists to a single audited path |
 | Hangar event store | read-only | `/app/data` (`:rw`) | Durable audit/event-sourcing trail |
@@ -195,7 +195,7 @@ cannot name what it persists, it does not get a volume.
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `mcp_servers.<id>.read_only` | bool | `true` | Read-only container root filesystem |
 | `mcp_servers.<id>.volumes` | list | `[]` | `host:container[:ro\|rw]`; host path absolute |
 | `mcp_servers.<id>.network` | string | `none` | `none`, `bridge`, or `host` |

@@ -397,7 +397,7 @@ spec:
 The operator exposes metrics at `:8080/metrics`:
 
 | Metric | Type | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `mcp_operator_reconcile_total` | Counter | Total reconciliations |
 | `mcp_operator_reconcile_duration_seconds` | Histogram | Reconciliation duration |
 | `mcp_operator_provider_state` | Gauge | MCP server state (1 = active) |
@@ -506,7 +506,7 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 ### MCPServer Spec
 
 | Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
+| ------- | ------ | ---------- | --------- | ------------- |
 | `mode` | string | Yes | - | `container` or `remote` |
 | `image` | string | For container | - | Container image |
 | `endpoint` | string | For remote | - | HTTP endpoint URL |
@@ -527,7 +527,7 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 ### MCPServer Status
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `state` | string | Cold, Initializing, Ready, Degraded, Dead |
 | `replicas` | int | Current replicas |
 | `readyReplicas` | int | Ready replicas |

@@ -5,7 +5,7 @@ How MCP Hangar maps against the [OWASP MCP Top 10 (2025)](https://owasp.org/www-
 This page is deliberately honest about scope. Hangar is a **policy enforcement plane**: it enforces deterministic policy on the MCP call path and produces an attributable audit trail. It does **not** parse prompt or tool-argument semantics and will not pretend to — so several categories are **out of scope by design**, and a few are **partially** covered with the remaining enforcement tracked in open issues. Each row says which.
 
 | # | Category | Hangar posture | Mechanism / tracking |
-|---|----------|----------------|----------------------|
+| --- | ---------- | ---------------- | ---------------------- |
 | MCP01 | Token Mismanagement & Secret Exposure | **Partial** | RFC 8707 audience binding, RFC 9728 protected-resource metadata, JWT/OIDC + JWKS, API keys (SHA-256) with optional expiry; DNS-exfiltration channel closed (operator#56) |
 | MCP02 | Privilege Escalation via Scope Creep | **Partial** | Per-tenant scoping, tool allow/deny lists, human approval gates on privileged calls |
 | MCP03 | Tool Poisoning | **Covered** | Per-tenant tool-schema digest pinning (detects rug-pull / description drift), policy-configurable block/advisory |

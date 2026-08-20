@@ -25,7 +25,7 @@ We will align hangar-agent with the SEP-1763 spec (PR #2624) as it evolves, posi
 ### What We Already Have (Alignment Map)
 
 | SEP-1763 Concept | hangar-agent Today | Gap |
-|------------------|-------------------|-----|
+| ------------------ | ------------------- | ----- |
 | Validator (enforce mode) | Policy engine rules, block/allow | Terminology only |
 | Validator (audit mode) | Audit mode — logs decisions, never blocks | Terminology only |
 | Trust-boundary execution order | Different rules for inbound (`tools/list` responses) vs outbound (`tools/call` requests) | Verify ordering matches spec (Mutate->Validate->Send / Validate->Mutate->Process) |
@@ -36,7 +36,7 @@ We will align hangar-agent with the SEP-1763 spec (PR #2624) as it evolves, posi
 ### What We Need to Add
 
 | Capability | Description | Priority |
-|-----------|-------------|----------|
+| ----------- | ------------- | ---------- |
 | `interceptors/list` JSON-RPC method | Expose agent as discoverable interceptor per spec | P1 |
 | `interceptor/invoke` JSON-RPC method | Allow explicit invocation (for non-transparent mode) | P2 |
 | Hook-based event model | Migrate from flat event types to hook objects (event + phase wrapping) | P1 |
@@ -50,7 +50,7 @@ We will align hangar-agent with the SEP-1763 spec (PR #2624) as it evolves, posi
 ### Design Choices
 
 | Decision | Choice | Rationale |
-|----------|--------|-----------|
+| ---------- | -------- | ----------- |
 | Implementation mode | Transparent sidecar (primary) + explicit `interceptor/invoke` (secondary) | Sidecar is our deployment model; explicit mode for SDK integrations |
 | Mutator scope (initial) | PII redaction, argument schema enforcement, response truncation | Highest customer demand; builds on existing truncation infrastructure |
 | Hook model migration | Internal abstraction layer; expose spec-compliant hooks externally, keep internal event types for backward compat | Non-breaking migration path |

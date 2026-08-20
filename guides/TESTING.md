@@ -36,7 +36,7 @@ report ask for it explicitly.
 ### Markers
 
 | Marker | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `benchmark` | Performance benchmarks (pytest-benchmark) |
 | `security` | Security regression tests — the category is the marker, not a directory |
 | `live` | Black-box verification against a running gateway; opt-in |
@@ -60,7 +60,7 @@ and nothing noticed. Anything that needs a real runtime belongs in `tests/live`
 ## Test Tiers
 
 | Path | What it is | How it runs |
-|------|-----------|-------------|
+| ------ | ----------- | ------------- |
 | `tests/unit/` | The bulk of the suite, in-process | every PR |
 | `tests/integration/` | Multiple components together, still in-process | every PR, its own job |
 | `tests/conformance/` | The gateway against the MCP spec | every PR |

@@ -104,7 +104,7 @@ mypy src/mcp_hangar
 ### Conventions
 
 | Item | Style |
-|------|-------|
+| ------ | ------- |
 | Classes | `PascalCase` |
 | Functions | `snake_case` |
 | Constants | `UPPER_SNAKE_CASE` |
@@ -275,7 +275,7 @@ Before releasing, ensure:
 We follow Semantic Versioning (SemVer):
 
 | Change Type | Version Bump | Example |
-|-------------|--------------|---------|
+| ------------- | -------------- | --------- |
 | Bug fixes, patches | PATCH | 1.0.0 → 1.0.1 |
 | New features (backward-compatible) | MINOR | 1.0.1 → 1.1.0 |
 | Breaking changes | MAJOR | 1.1.0 → 2.0.0 |
@@ -285,7 +285,7 @@ We follow Semantic Versioning (SemVer):
 Each release produces:
 
 | Artifact | Location | Tags |
-|----------|----------|------|
+| ---------- | ---------- | ------ |
 | Python Package | [PyPI](https://pypi.org/project/mcp-hangar/) | Version number |
 | Docker Image | [GHCR](https://ghcr.io/mcp-hangar/mcp-hangar) | `latest`, `X.Y.Z`, `X.Y`, `X` |
 | GitHub Release | Repository Releases | Changelog, install instructions |
@@ -299,7 +299,7 @@ For urgent fixes on released versions, follow the [HOTFIX_RUNBOOK.md](HOTFIX_RUN
 MCP Hangar is licensed under the MIT License:
 
 | Directory | License |
-|-----------|---------|
+| ----------- | --------- |
 | `src/mcp_hangar/` | MIT |
 | `tests/`, `docs/`, `examples/` | MIT |
 

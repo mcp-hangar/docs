@@ -23,7 +23,7 @@ tool_access:
 ```
 
 | | `egress` (default) | `front_door` |
-|---|---|---|
+| --- | --- | --- |
 | Caller trust | Trusted internal callers | Untrusted external agents |
 | Caller without a tenant identity | Allowed (server-level policy applies) | **Denied** (fail-closed) |
 | Tool surface exposed to clients | Full `hangar_*` meta-API | Flat per-tenant backend tool names |
@@ -137,7 +137,7 @@ admin permission (the `lifecycle` action on the `mcp_servers` resource) and
 publish a domain event (`ToolWithdrawn` / `ToolRestored`).
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `POST` | `/api/admin/tools/{server}/{tool}/withdraw` | Withdraw a tool at runtime |
 | `POST` | `/api/admin/tools/{server}/{tool}/restore` | Remove a runtime withdrawal |
 

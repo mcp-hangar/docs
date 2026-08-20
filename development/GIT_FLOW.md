@@ -21,7 +21,7 @@ Enforcement details are listed under Automation surface.
 The following table tracks the evolution of git and workflow standards.
 
 | # | Original recommendation | Final decision | Reasoning |
-|---|-------------------------|----------------|-----------|
+| --- | ------------------------- | ---------------- | ----------- |
 | 1 | Merge strategy | squash-merge by default | - |
 | 2 | Issue # in branch name | optional (not required) | - |
 | 3 | Discussions categories | defer until sustained external traffic exists | Original proposed 4 categories. Final decision defers implementation to avoid maintaining empty forums while traffic is low. |
@@ -79,7 +79,7 @@ define their own the same way.
 ### `mcp-hangar/mcp-hangar` (core)
 
 | Scope | Description |
-|-------|-------------|
+| ------- | ------------- |
 | core | Logic in src/mcp_hangar/domain/ or application/ |
 | enterprise | **Legacy.** Pre-MIT-relicense name for logic in src/mcp_hangar/auth, compliance, integrations, approvals, and infrastructure/persistence. The scope is still CI-accepted for compatibility; prefer `core` or `security` in new commits. |
 | cli | Command line interface and Typer registration |
@@ -189,7 +189,7 @@ Agents may draft ADRs in issue comments but never author the PR.
 ### Decision Tree: Issue vs Discussion vs PR
 
 | Question | Issue | Discussion | PR |
-|----------|-------|------------|----|
+| ---------- | ------- | ------------ | ---- |
 | Is the decision known? | No | No | Yes |
 | Do we need consensus? | Yes | Yes | No |
 | Will this produce a mergeable artifact? | No | No | Yes |

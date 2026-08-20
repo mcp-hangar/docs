@@ -30,7 +30,7 @@ mcp_servers:
 ```
 
 | Key | Type | Default | Range | Description |
-|-----|------|---------|-------|-------------|
+| ----- | ------ | --------- | ------- | ------------- |
 | `mode` | `str` | `"subprocess"` | subprocess, docker, remote | MCP Server mode. `container` and `podman` normalize to `docker`. |
 | `command` | `list[str]` | -- | -- | Command for subprocess mode (required for subprocess) |
 | `image` | `str` | -- | -- | Docker image for docker mode (required for docker) |
@@ -118,7 +118,7 @@ mcp_servers:
 When `allow_list` is set, only matching tools are exposed. When only `deny_list` is set, all tools except matches are exposed.
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `allow_list` | `list[str]` | `[]` | Glob patterns; when set, **only** matching tools are exposed and `deny_list` is ignored |
 | `deny_list` | `list[str]` | `[]` | Glob patterns; matching tools are hidden. Wins over `approval_list` |
 | `approval_list` | `list[str]` | `[]` | Glob patterns; matching tools stay visible but each call is **held for a human decision** before it runs |
@@ -186,7 +186,7 @@ approvals:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | `true` | Turn the gate off entirely. See the interaction with [`startup_checks`](#startup_checks) below |
 | `channel` | `str` | `event_stream` | Channel for any policy that does not name one |
 | `delivery.required` | `bool` | `false` | When `true`, a gated policy whose channel reaches nobody **refuses the boot** instead of logging at `ERROR` |
@@ -227,7 +227,7 @@ startup_checks:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `enforce` | `bool` | `true` | When `false`, a fail-closed subsystem that is unreachable logs at `ERROR` instead of refusing the boot |
 
 Two outcomes:
@@ -306,7 +306,7 @@ mcp_servers:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `tool_projection.digest_enforcement` | `str` | `block` | Per-MCP server mismatch handling: `audit`, `warn`, or `block` |
 | `tool_projection.pins` | `dict[str, str]` | `{}` | Tool name to 64-character lowercase SHA-256 digest pins applied to every caller |
 | `tool_projection.tenant_overrides.<tenant>.pins` | `dict[str, str]` | `{}` | The same, for one tenant; takes precedence over `tool_projection.pins` |
@@ -333,7 +333,7 @@ execution:
 ```
 
 | Key | Type | Default | Range | Description |
-|-----|------|---------|-------|-------------|
+| ----- | ------ | --------- | ------- | ------------- |
 | `max_concurrency` | `int` | `50` | 0 = unlimited | System-wide maximum concurrent tool invocations |
 | `default_mcp_server_concurrency` | `int` | `10` | -- | Default per-MCP server concurrency limit |
 
@@ -356,7 +356,7 @@ discovery:
 ```
 
 | Key | Type | Default | Range | Description |
-|-----|------|---------|-------|-------------|
+| ----- | ------ | --------- | ------- | ------------- |
 | `enabled` | `bool` | -- | -- | Enable or disable discovery |
 | `refresh_interval_s` | `int` | -- | -- | Interval between discovery scans in seconds |
 | `auto_register` | `bool` | -- | -- | Automatically register discovered MCP servers |
@@ -376,7 +376,7 @@ Hangar starts, logs `discovery_source_unavailable`, and this source discovers
 nothing.
 
 | Key | Type | Description |
-|-----|------|-------------|
+| ----- | ------ | ------------- |
 | `type` | `str` | Source type: `kubernetes`, `docker`, `filesystem`, `entrypoint`, or any type registered under the `mcp_hangar.discovery_sources` entry point group. An unregistered type **fails startup** |
 | `mode` | `str` | `additive` (only adds) or `authoritative` (adds and removes) |
 | `path` / `pattern` | `str` | File path or glob pattern (filesystem source) |
@@ -394,7 +394,7 @@ nothing.
 Constraints applied to every source, whatever it discovers.
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `allowed_namespaces` | `list[str]` | -- | **Deprecated** — moved to the kubernetes source entry above. Still honoured, and logs `discovery_namespace_policy_deprecated_location`; the source's own setting wins when both are present |
 | `denied_namespaces` | `list[str]` | -- | **Deprecated** — see `allowed_namespaces` |
 | `require_health_check` | `bool` | -- | Require health check before registration |
@@ -407,7 +407,7 @@ Constraints applied to every source, whatever it discovers.
 ### `lifecycle` sub-section
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `default_ttl_s` | `int` | -- | Default TTL for discovered MCP servers |
 | `check_interval_s` | `int` | -- | Lifecycle check interval in seconds |
 | `drain_timeout_s` | `int` | -- | Drain timeout before removal |
@@ -434,7 +434,7 @@ retry:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `default_policy.max_attempts` | `int` | `3` | Maximum retry attempts |
 | `default_policy.backoff` | `str` | `exponential` | Backoff strategy: `exponential`, `linear`, or `constant` |
 | `default_policy.initial_delay` | `float` | `1.0` | Initial delay in seconds |
@@ -470,7 +470,7 @@ truncation:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | `false` | Enable truncation (opt-in) |
 | `max_batch_size_bytes` | `int` | `900000` | Maximum total batch response size in bytes |
 | `min_per_response_bytes` | `int` | `10000` | Minimum bytes allocated to each response in a batch; must not exceed `max_batch_size_bytes` |
@@ -515,7 +515,7 @@ interceptors:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `validators` | `list[dict]` | `[]` | Validator specs, registered in source order; each is a dict with a `type` key plus per-type parameters |
 | `validators[].type` | `str` | required | Built-in validator name; the only one today is `payload_size` |
 
@@ -526,7 +526,7 @@ upstream servers from oversized arguments. **Fail-closed:** a payload that
 cannot be serialized for measurement is denied too.
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `max_bytes` | `int` | `1000000` | Maximum JSON-encoded payload size in bytes; larger requests are denied |
 
 ## `hot_loading`
@@ -551,7 +551,7 @@ hot_loading:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | `true` | Enable runtime loading from the registry |
 | `registry.base_url` | `str` | `https://registry.modelcontextprotocol.io/v0` | Registry API base URL |
 | `registry.timeout_s` | `float` | `10.0` | Registry request timeout in seconds |
@@ -572,7 +572,7 @@ event_store:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | -- | Enable event persistence |
 | `driver` | `str` | -- | Storage driver: `sqlite` or `memory` |
 | `path` | `str` | -- | SQLite database path (sqlite driver only) |
@@ -609,7 +609,7 @@ persistence:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `backend` | `str` | -- | `sqlite` or `postgresql`. Omit the block entirely and each subsystem configures its own storage as before |
 | `<backend name>` | `map` | -- | Passed to that backend untouched. `data_dir` means nothing to PostgreSQL and `host` means nothing to SQLite |
 
@@ -656,7 +656,7 @@ coordination:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `lease_ttl_s` | `float` | `15.0` | How long a management tenure lasts without renewal |
 | `renew_interval_s` | `float` | `5.0` | How often the holder renews, and how often a follower retries |
 | `renew_deadline_s` | `float` | `10.0` | How long this instance will go without a *successful* renewal before it gives the lease up on its own. Must be under `lease_ttl_s` |
@@ -688,7 +688,7 @@ logging:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `level` | `str` | `"INFO"` | Log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `json_format` | `bool` | `false` | Enable structured JSON logging |
 | `file` | `str` | -- | Log file path |
@@ -709,7 +709,7 @@ observability:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | -- | Enable OpenTelemetry tracing |
 | `otlp_endpoint` | `str` | `"http://localhost:4317"` | OTLP exporter endpoint |
 | `service_name` | `str` | `"mcp-hangar"` | Service name for traces |
@@ -732,7 +732,7 @@ observability:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | `false` | Enable Langfuse LLM observability |
 | `public_key` | `str` | -- | Langfuse public API key |
 | `secret_key` | `str` | -- | Langfuse secret key. Supports env var interpolation: `${LANGFUSE_SECRET_KEY}` |
@@ -784,7 +784,7 @@ rate_limit:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | -- | Enable authentication |
 | `allow_anonymous` | `bool` | -- | Allow unauthenticated requests |
 | `api_key.enabled` | `bool` | -- | Enable API key authentication |
@@ -828,7 +828,7 @@ config_reload:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | -- | Enable automatic config file watching |
 | `use_watchdog` | `bool` | -- | Use watchdog library for file system events |
 | `interval_s` | `int` | -- | Polling interval in seconds (fallback when watchdog unavailable) |
@@ -872,7 +872,7 @@ mcp_servers:
 ```
 
 | Key | Type | Default | Range | Description |
-|-----|------|---------|-------|-------------|
+| ----- | ------ | --------- | ------- | ------------- |
 | `mode` | `str` | -- | `"group"` | Must be `"group"` |
 | `strategy` | `str` | `"round_robin"` | round_robin, weighted_round_robin, least_connections, random, priority | Load balancing strategy |
 | `min_healthy` | `int` | `1` | >= 1 | Minimum healthy members for group HEALTHY state |
@@ -893,7 +893,7 @@ mcp_servers:
 Each member entry supports all standard MCP server keys (`mode`, `command`, `image`, `endpoint`, `env`, etc.) plus:
 
 | Key | Type | Default | Range | Description |
-|-----|------|---------|-------|-------------|
+| ----- | ------ | --------- | ------- | ------------- |
 | `id` | `str` | -- | -- | Unique member ID (required) |
 | `weight` | `int` | -- | 1--100 | Weight for weighted_round_robin and random strategies |
 | `priority` | `int` | -- | 1--100 | Priority for priority strategy (lower number = higher priority) |
@@ -960,7 +960,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 ### Server / CLI
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_CONFIG` | `"config.yaml"` | Path to YAML configuration file |
 | `MCP_MODE` | `"stdio"` | Server mode: `stdio` or `http` |
 | `MCP_HTTP_HOST` | `"0.0.0.0"` | HTTP bind host |
@@ -971,7 +971,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 ### Security / Runtime
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_RATE_LIMIT_RPS` | `"10"` | Rate limit: requests per second |
 | `MCP_RATE_LIMIT_BURST` | `"20"` | Rate limit: burst size |
 | `MCP_ALLOW_ABSOLUTE_PATHS` | `"false"` | Allow absolute paths in input validation |
@@ -979,7 +979,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 ### Persistence
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_PERSISTENCE_ENABLED` | `"false"` | Enable state persistence |
 | `MCP_DATABASE_PATH` | `"data/mcp_hangar.db"` | SQLite database file path |
 | `MCP_DATABASE_WAL` | `"true"` | Enable WAL mode for SQLite |
@@ -989,7 +989,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 ### Observability / Tracing
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_TRACING_ENABLED` | `"true"` | Enable OpenTelemetry tracing |
 | `MCP_TRACING_CONSOLE` | from config | Enable console trace export |
 | `MCP_ENVIRONMENT` | `"development"` | Deployment environment label |
@@ -1001,7 +1001,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 ### Langfuse
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_LANGFUSE_ENABLED` | `"false"` | Enable Langfuse LLM observability |
 | `LANGFUSE_PUBLIC_KEY` | -- | Langfuse public API key |
 | `LANGFUSE_SECRET_KEY` | -- | Langfuse secret key (sensitive) |
@@ -1030,7 +1030,7 @@ custom deployment checks for `license_tier`, `LicenseTier`, or
 ### Container Runtime
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_CONTAINER_RUNTIME` | -- | Force container runtime (`docker` or `podman`) |
 | `MCP_CI_RELAX_VOLUME_PERMS` | -- | Relax volume permission checks in CI environments |
 | `MCP_CONTAINER_INHERIT_STDERR` | -- | Inherit stderr from container processes |
@@ -1038,5 +1038,5 @@ custom deployment checks for `license_tier`, `LicenseTier`, or
 ### Auth
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_JWT_MAX_TOKEN_LIFETIME` | -- | Maximum JWT token lifetime |

@@ -53,7 +53,7 @@ All endpoints return JSON. Error responses follow the envelope format:
 ### MCP servers
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `GET` | `/api/mcp_servers` | List all MCP servers (optional `?state=ready` filter) |
 | `POST` | `/api/mcp_servers` | Create a new MCP server |
 | `GET` | `/api/mcp_servers/{id}` | Get MCP server details |
@@ -70,20 +70,20 @@ All endpoints return JSON. Error responses follow the envelope format:
 ### Sessions
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `POST` | `/api/sessions/{id}/suspend` | Suspend a session |
 | `DELETE` | `/api/sessions/{id}/suspend` | Resume (unsuspend) a session |
 
 ### Tools
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `GET` | `/api/tools` | List all tools aggregated across MCP servers |
 
 ### Groups
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `GET` | `/api/groups` | List all MCP server groups |
 | `POST` | `/api/groups` | Create a new group |
 | `GET` | `/api/groups/{id}` | Get group details |
@@ -99,7 +99,7 @@ All endpoints return JSON. Error responses follow the envelope format:
 > See the [Discovery guide](DISCOVERY.md) for setup.
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `GET` | `/api/discovery/sources` | List discovery sources |
 | `POST` | `/api/discovery/sources` | Register a new source |
 | `PUT` | `/api/discovery/sources/{id}` | Update a source |
@@ -114,7 +114,7 @@ All endpoints return JSON. Error responses follow the envelope format:
 ### Configuration
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `GET` | `/api/config` | Get sanitized current configuration |
 | `POST` | `/api/config/reload` | Trigger hot-reload from disk |
 | `POST` | `/api/config/export` | Export current state as YAML |
@@ -124,27 +124,27 @@ All endpoints return JSON. Error responses follow the envelope format:
 ### System
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `GET` | `/api/system` | System info (uptime, version, metrics summary) |
 | `GET` | `/api/system/me` | Current authenticated principal info |
 
 ### L7 Egress Policy
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `POST` | `/api/mcp_servers/{id}/l7_policy` | Push a compiled L7 egress policy for a server (operator → core) |
 
 ### Admin Tools
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `POST` | `/api/admin/tools/{server}/{tool}/withdraw` | Withdraw a tool |
 | `POST` | `/api/admin/tools/{server}/{tool}/restore` | Restore a withdrawn tool |
 
 ### Auth Management
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `POST` | `/api/auth/keys` | Create an API key |
 | `GET` | `/api/auth/keys` | List API keys |
 | `DELETE` | `/api/auth/keys/{key_id}` | Revoke an API key |
@@ -167,7 +167,7 @@ All endpoints return JSON. Error responses follow the envelope format:
 ### Approvals
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `GET` | `/api/approvals` | List approval requests |
 | `GET` | `/api/approvals/{id}` | Get an approval request |
 | `POST` | `/api/approvals/{id}/resolve` | Resolve an approval request (requires `approval:resolve`) |
@@ -177,7 +177,7 @@ All endpoints return JSON. Error responses follow the envelope format:
 These endpoints are outside the `/api/` prefix and skip authentication:
 
 | Method | Path | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `GET` | `/health/live` | Liveness probe |
 | `GET` | `/health/ready` | Readiness probe |
 | `GET` | `/health/startup` | Startup probe |
@@ -186,7 +186,7 @@ These endpoints are outside the `/api/` prefix and skip authentication:
 ### WebSockets
 
 | Path | Description |
-|------|-------------|
+| ------ | ------------- |
 | `/api/ws/events` | Real-time domain event stream (filterable) |
 
 See the [WebSockets guide](WEBSOCKETS.md) for connection details.
@@ -257,7 +257,7 @@ curl -X POST http://localhost:8000/api/discovery/sources \
 CORS is configured via environment variables:
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_CORS_ORIGINS` | `http://localhost:5173` | Allowed origins (comma-separated) |
 | `MCP_CORS_CREDENTIALS` | `false` | Allow credentials (requires explicit non-wildcard origins) |
 
@@ -272,7 +272,7 @@ export MCP_CORS_ORIGINS="https://dashboard.example.com"
 All domain exceptions are mapped to HTTP status codes:
 
 | Exception | Status Code |
-|-----------|-------------|
+| ----------- | ------------- |
 | `McpServerNotFoundError` | 404 |
 | `ValidationError` | 422 |
 | `RateLimitExceeded` | 429 |

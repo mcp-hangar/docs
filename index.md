@@ -14,7 +14,7 @@ Production-grade MCP server registry with lazy loading, health monitoring, and c
 MCP Hangar is a monorepo containing multiple packages:
 
 | Package | Description | Location |
-|---------|-------------|----------|
+| --------- | ------------- | ---------- |
 | **Core** | Python library (PyPI: `mcp-hangar`) | `src/mcp_hangar/` |
 | **Core package** | MIT-only features | `src/mcp_hangar/` |
 

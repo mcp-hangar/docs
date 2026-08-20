@@ -62,7 +62,7 @@ hangar_call(
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `calls` | `list[dict]` | required | List of call specifications |
 | `max_concurrency` | `int` | 10 | Maximum parallel workers (1-50) |
 | `timeout` | `float` | 60.0 | Global timeout for entire batch (1-300s) |
@@ -74,7 +74,7 @@ hangar_call(
 Each item in `calls` must be a dictionary with:
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `mcp_server` | `str` | Yes | MCP Server ID |
 | `tool` | `str` | Yes | Tool name |
 | `arguments` | `dict` | Yes | Tool arguments |
@@ -282,7 +282,7 @@ Truncated responses have `truncated: true` flag:
 ## Limits
 
 | Limit | Value | Behavior |
-|-------|-------|----------|
+| ------- | ------- | ---------- |
 | Max calls per batch | 100 | Validation error |
 | Max concurrency | 50 | Clamped to limit |
 | Max timeout | 300s | Clamped to limit |
@@ -314,7 +314,7 @@ having no knob at all: the operator believes a limit was raised and it was not.
 The values in force:
 
 | | |
-|---|---|
+| --- | --- |
 | Calls per batch | 100 |
 | Concurrency | 50 global, 10 per server |
 | Timeout | 60s default, 300s maximum |
@@ -328,7 +328,7 @@ Per-call concurrency is tunable, through `execution:` -- see
 If you were using the previous tools, here's how to migrate:
 
 | Old API | New API |
-|---------|---------|
+| --------- | --------- |
 | `registry_invoke(mcp_server, tool, arguments)` | `hangar_call(calls=[{"mcp_server": ..., "tool": ..., "arguments": ...}])` |
 | `registry_invoke_ex(..., max_retries=5)` | `hangar_call(calls=[...], max_attempts=5)` |
 | `registry_invoke_stream(...)` | `hangar_call(calls=[...])` (progress logged internally) |

@@ -205,7 +205,7 @@ Hangar **validates** the JWTs your IdP issues; it never issues tokens itself.
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `tool_access.mode` | string | `egress` | Topology mode: `egress` or `front_door` |
 | `tool_access.member.<tenant>.allow_list` | list | `[]` | Tools this tenant may call |
 | `tool_access.member.<tenant>.deny_list` | list | `[]` | Tools this tenant may not call |

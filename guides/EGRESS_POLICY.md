@@ -11,7 +11,7 @@ Declarative, deny-by-default egress policy for MCP servers: control which upstre
 Enforcement has two layers, applied together:
 
 | Layer | Enforced by | Governs |
-|-------|-------------|---------|
+| ------- | ------------- | --------- |
 | **L3/L4** (network backstop) | operator → `NetworkPolicy` or `CiliumNetworkPolicy` | which upstream hosts/CIDRs the server's pods can reach |
 | **L7** (semantics) | core, on connections Hangar proxies | which tool calls (by name) and which arguments are allowed |
 
@@ -105,7 +105,7 @@ spec:
 ### Top level
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `mode` | `Audit` \| `Enforce` | `Audit` | `Audit` observes violations; `Enforce` blocks. Audit-default gives a Gatekeeper-style adoption path. |
 | `targetRef.kind` | `MCPServer` \| `MCPServerGroup` | — | What the policy attaches to. A group applies the policy to every member server. |
 | `targetRef.name` | string | — | Referent name, resolved in the policy's namespace. |
@@ -116,7 +116,7 @@ spec:
 ### `upstreams[]`
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `name` | string | Rule name, unique within the policy (enforced by a CEL rule). |
 | `match.host` | string | Upstream host: an FQDN (needs Cilium), or a literal IP/CIDR (works under any CNI). |
 | `match.toolSchemaDigestRef` | string | References an existing per-tenant tool-schema pin. |
@@ -129,7 +129,7 @@ spec:
 ### `networkBackstop`
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `generate` | bool | `true` | Emit the L3/L4 backstop. `false` removes it (the policy then relies on the namespace default-deny alone). |
 | `flavor` | `Auto` \| `Cilium` \| `Vanilla` | `Auto` | Backstop implementation. |
 
@@ -172,7 +172,7 @@ Globs are case-sensitive for determinism (`get_*` does not match `GET_user`).
 `secretPatterns` names groups; each maps to deterministic value-regexes shared with Hangar's output redactor, so what the redactor masks on the way out is what a policy refuses on the way in:
 
 | Group | Detects |
-|-------|---------|
+| ------- | --------- |
 | `aws-keys` | AWS access key IDs (`AKIA…`) |
 | `jwt` | JSON Web Tokens (`eyJ….…`) |
 | `pem-blocks` | PEM private-key blocks |
@@ -188,7 +188,7 @@ Unknown group names are ignored by the scanner (they are caught by CRD validatio
 ## Status conditions
 
 | Condition | Meaning |
-|-----------|---------|
+| ----------- | --------- |
 | `Compiled` | The policy was structurally compiled. |
 | `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`). |
 | `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), or `TargetNotFound`. |

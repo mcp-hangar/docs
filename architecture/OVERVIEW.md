@@ -30,7 +30,7 @@ runs on top of.
 MCP Hangar is organized as a monorepo plus the operator:
 
 | Package | Description | Location |
-|---------|-------------|----------|
+| --------- | ------------- | ---------- |
 | **Core package** | Python library (PyPI: `mcp-hangar`) — enforcement pipeline, auth, compliance, approvals, integrations, persistence | `src/mcp_hangar/` |
 | **Operator** | Kubernetes operator (Go) — admission webhooks, CRDs, network policy, MCPEgressPolicy controller | `mcp-hangar-operator` (separate repo) |
 
@@ -60,7 +60,7 @@ pipeline, not a flat seam — and the egress L7 gate sits at the very end, insid
 tool invocation, just before any bytes leave for the upstream:
 
 | # | Control | Notes | Status |
-|---|---------|-------|--------|
+| --- | --------- | ------- | -------- |
 | 1 | **Identity / auth middleware** | Authenticates the request and binds the tenant (ASGI middleware, upstream of the pipeline) | v1.6.0 |
 | 2 | **Tool-access authz** | Tenant/member scope check — is this caller allowed this tool? | v1.6.0 |
 | 3 | **Tool-withdrawal check** | Per-tenant withdrawal of a previously exposed tool | v1.6.0 |
@@ -252,7 +252,7 @@ stateDiagram-v2
 **Valid transitions:**
 
 | From | To |
-|------|----|
+| ------ | ---- |
 | COLD | INITIALIZING |
 | INITIALIZING | READY, DEAD, DEGRADED |
 | READY | COLD, DEAD, DEGRADED |
@@ -289,7 +289,7 @@ PROVIDER(10) < PROVIDER_GROUP(11) < EVENT_BUS(20) < EVENT_STORE(30) < SAGA_MANAG
 ### Threads
 
 | Thread | Purpose |
-|--------|---------|
+| -------- | --------- |
 | Main | FastMCP server, tool calls |
 | Reader (per MCP server) | Read stdout, dispatch responses |
 | Stderr Reader (per MCP server) | Capture stderr into log buffer |
@@ -310,7 +310,7 @@ response = client.call(...)  # Outside lock
 ## Error Handling
 
 | Category | Strategy |
-|----------|----------|
+| ---------- | ---------- |
 | Transient (timeout) | Retry with backoff |
 | Permanent (not found) | Fail fast, mark DEAD |
 | MCP Server (app error) | Propagate, track metrics |

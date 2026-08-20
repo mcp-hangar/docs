@@ -39,7 +39,7 @@ GET /mcp_servers?state={state}
 ```
 
 | Parameter | In | Type | Required | Description |
-|-----------|------|------|----------|-------------|
+| ----------- | ------ | ------ | ---------- | ------------- |
 | `state` | query | string | No | Filter: `cold`, `ready`, `degraded`, `dead` |
 
 **Response 200:**
@@ -70,7 +70,7 @@ POST /mcp_servers
 **Request body:**
 
 | Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
+| ------- | ------ | ---------- | --------- | ------------- |
 | `mcp_server_id` | string | Yes | -- | Unique identifier |
 | `mode` | string | Yes | -- | `subprocess`, `docker`, or `remote` |
 | `command` | list[string] | For subprocess | -- | Command to run |
@@ -120,7 +120,7 @@ Both `PUT` and `PATCH` are accepted and behave identically (partial update).
 **Request body (all fields optional):**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `description` | string | New description |
 | `env` | dict | New environment variables (replaces existing) |
 | `idle_ttl_s` | int | New idle timeout |
@@ -163,7 +163,7 @@ POST /mcp_servers/{mcp_server_id}/stop
 **Request body (optional):**
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `reason` | string | `"user_request"` | Reason for stopping |
 
 **Response 200:** Stop result object.
@@ -213,7 +213,7 @@ GET /mcp_servers/{mcp_server_id}/logs?lines={n}
 ```
 
 | Parameter | In | Type | Default | Range | Description |
-|-----------|------|------|---------|-------|-------------|
+| ----------- | ------ | ------ | --------- | ------- | ------------- |
 | `lines` | query | int | `100` | 1--1000 | Number of recent lines |
 
 **Response 200:**
@@ -235,7 +235,7 @@ GET /mcp_servers/{mcp_server_id}/tools/history?limit={n}&from_position={pos}
 ```
 
 | Parameter | In | Type | Default | Range | Description |
-|-----------|------|------|---------|-------|-------------|
+| ----------- | ------ | ------ | --------- | ------- | ------------- |
 | `limit` | query | int | `100` | 1--500 | Max records |
 | `from_position` | query | int | `0` | -- | Event store version offset |
 
@@ -284,7 +284,7 @@ POST /groups
 **Request body:**
 
 | Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
+| ------- | ------ | ---------- | --------- | ------------- |
 | `group_id` | string | Yes | -- | Unique identifier |
 | `strategy` | string | No | `"round_robin"` | Load balancing strategy |
 | `min_healthy` | int | No | `1` | Minimum healthy members |
@@ -313,7 +313,7 @@ PUT /groups/{group_id}
 **Request body (all optional):**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `strategy` | string | New strategy |
 | `min_healthy` | int | New minimum healthy count |
 | `description` | string | New description |
@@ -359,7 +359,7 @@ POST /groups/{group_id}/members
 **Request body:**
 
 | Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
+| ------- | ------ | ---------- | --------- | ------------- |
 | `member_id` | string | Yes | -- | MCP Server ID to add |
 | `weight` | int | No | `1` | Routing weight |
 | `priority` | int | No | `1` | Routing priority |
@@ -444,7 +444,7 @@ POST /discovery/sources
 **Request body:**
 
 | Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
+| ------- | ------ | ---------- | --------- | ------------- |
 | `source_type` | string | Yes | -- | `docker`, `filesystem`, `kubernetes`, `entrypoint` |
 | `mode` | string | Yes | -- | `additive` or `authoritative` |
 | `enabled` | bool | No | `true` | Activate immediately |
@@ -579,7 +579,7 @@ POST /config/reload
 **Request body (optional):**
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `graceful` | bool | `true` | Graceful reload |
 
 Sending `config_path` is **refused** with `422` and
@@ -737,7 +737,7 @@ Adds a session to the in-memory suspended registry.
 **Request body (optional):**
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `reason` | string | -- | Reason for suspension |
 
 **Response 200:**
@@ -773,7 +773,7 @@ POST /auth/keys
 **Request body:**
 
 | Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
+| ------- | ------ | ---------- | --------- | ------------- |
 | `principal_id` | string | Yes | -- | Principal this key authenticates as |
 | `name` | string | Yes | -- | Human-readable key name |
 | `created_by` | string | No | `"system"` | Creator principal |
@@ -797,7 +797,7 @@ DELETE /auth/keys/{key_id}
 **Request body (optional):**
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `revoked_by` | string | `"system"` | Revoking principal |
 | `reason` | string | `""` | Revocation reason |
 
@@ -808,7 +808,7 @@ GET /auth/keys
 ```
 
 | Parameter | In | Type | Required | Description |
-|-----------|------|------|----------|-------------|
+| ----------- | ------ | ------ | ---------- | ------------- |
 | `principal_id` | query | string | Yes | Principal whose keys to list |
 | `include_revoked` | query | bool | No | Include revoked keys (default `true`) |
 
@@ -819,7 +819,7 @@ GET /auth/roles/all
 ```
 
 | Parameter | In | Type | Required | Description |
-|-----------|------|------|----------|-------------|
+| ----------- | ------ | ------ | ---------- | ------------- |
 | `include_builtin` | query | bool | No | Include built-in roles (default `true`) |
 
 ### List Built-in Roles
@@ -889,7 +889,7 @@ GET /auth/principals/roles
 ```
 
 | Parameter | In | Type | Required | Description |
-|-----------|------|------|----------|-------------|
+| ----------- | ------ | ------ | ---------- | ------------- |
 | `principal_id` | query | string | Yes | Principal whose roles to list |
 | `scope` | query | string | No | Scope filter (default `*` = all) |
 
@@ -926,7 +926,7 @@ GET /auth/policies/{scope}/{target_id}
 ```
 
 | Parameter | In | Type | Required | Description |
-|-----------|------|------|----------|-------------|
+| ----------- | ------ | ------ | ---------- | ------------- |
 | `scope` | path | string | Yes | `provider`, `group`, or `member` |
 | `target_id` | path | string | Yes | Identifier of the provider, group, or member |
 
@@ -973,7 +973,7 @@ behave identically. Requires `mcp_servers:write`.
 `MCPEgressPolicy`:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `tools` | dict | Tool-name globs: `allow`, `deny`, `requireApproval` |
 | `arguments` | dict | Argument-level constraints: `secretPatterns`, `maxPayloadBytes` |
 | `defaultAction` | string | Action when no rule matches |
@@ -1028,7 +1028,7 @@ Withdraws a tool at runtime (survives reload). Withdrawal persists in the runtim
 **Request body (optional):**
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `tenant_id` | string | `null` | Tenant to withdraw for. Omit/null withdraws globally for all tenants. |
 
 **Response 200:**
@@ -1048,7 +1048,7 @@ Removes a runtime withdrawal (config-declared withdrawals persist independently)
 **Request body (optional):**
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `tenant_id` | string | `null` | Tenant to restore. Omit/null removes the entire runtime entry. |
 
 **Response 200:**
@@ -1074,7 +1074,7 @@ GET /api/approvals?state={state}&provider_id={id}
 ```
 
 | Parameter | In | Type | Default | Description |
-|-----------|------|------|---------|-------------|
+| ----------- | ------ | ------ | --------- | ------------- |
 | `state` | query | string | `pending` | Filter: `pending`, `approved`, `denied`, `expired` |
 | `provider_id` | query | string | -- | Optional provider filter |
 
@@ -1105,7 +1105,7 @@ On a gateway with auth disabled the decision is attributed to the system princip
 **Request body:**
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
+| ------- | ------ | ---------- | ------------- |
 | `decision` | string | Yes | `approve` or `deny` |
 | `reason` | string | No | Optional resolution reason |
 

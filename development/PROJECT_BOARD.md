@@ -9,7 +9,7 @@ Board URL: `https://github.com/orgs/mcp-hangar/projects/<N>` (set after first ru
 ## Custom fields
 
 | Field | Type | Values |
-|---|---|---|
+| --- | --- | --- |
 | Priority | Single select | p0-critical, p1-high, p2-normal, p3-low |
 | Scope | Single select | core, enterprise, cli, operator, helm, ui, observability, security, docs, deps, release, infra, tests, repo |
 | Target Release | Text | Freeform, e.g. `1.1.0` |

@@ -36,7 +36,7 @@ mcp_servers:
 ### Options
 
 | Option | Description | Default |
-|--------|-------------|---------|
+| -------- | ------------- | --------- |
 | `image` | Container image | required |
 | `volumes` | Mount points (`host:container:mode`) | `[]` |
 | `env` | Environment variables | `{}` |
@@ -179,6 +179,6 @@ Or set `MCP_CI_RELAX_VOLUME_PERMS=true`.
 ## Environment Variables
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_CONTAINER_RUNTIME` | auto | Force `podman` or `docker` |
 | `MCP_CI_RELAX_VOLUME_PERMS` | `false` | Chmod 777 on volumes (CI) |

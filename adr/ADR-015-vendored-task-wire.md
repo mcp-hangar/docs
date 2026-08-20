@@ -17,7 +17,7 @@ What SDK v2 exposes in `mcp_types` is the **SEP-1686** generation of Tasks -- th
 The replacement, SEP-2663, is wire-incompatible with them on nearly every field:
 
 | | `mcp_types` (SEP-1686) | SEP-2663 |
-|---|---|---|
+| --- | --- | --- |
 | create result | nested `{task: {...}}` | flat, `resultType: "task"` |
 | TTL | `ttl` (required) | `ttlMs` (required, nullable) |
 | poll hint | `pollInterval` | `pollIntervalMs` |

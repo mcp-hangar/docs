@@ -64,7 +64,7 @@ The `TracedMcpServerService` wraps tool invocations with Langfuse spans via the 
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `observability.langfuse.enabled` | bool | `false` | Enable Langfuse tracing |
 | `observability.langfuse.public_key` | string | -- | Langfuse public key (use env var) |
 | `observability.langfuse.secret_key` | string | -- | Langfuse secret key (use env var) |

@@ -37,7 +37,7 @@ may reach and the tool calls it may make, and everything else is refused.
 Two very different things share the word "egress." Do not confuse them:
 
 | | `tool_access.mode: egress` | `MCPEgressPolicy` (this recipe) |
-|---|---|---|
+| --- | --- | --- |
 | Direction | **Inbound** -- how Hangar treats the *callers in front of it* | **Outbound** -- what a server may do to its *upstreams* |
 | What it is | A topology/trust mode (the default; trusted internal callers see the full `hangar_*` meta-API) -- see [Front-Door Mode](../guides/FRONT_DOOR.md) | A Kubernetes CRD compiled and enforced by the operator + core |
 | Governs | Client-facing tool projection and caller trust | Upstream hosts, tool-call globs, and argument content |
@@ -52,7 +52,7 @@ Enforcement is two layers applied together (see
 [ADR-013](../adr/ADR-013-egress-policy-enforcement-model.md)):
 
 | Layer | Enforced by | Governs |
-|-------|-------------|---------|
+| ------- | ------------- | --------- |
 | **L3/L4** (network backstop) | operator → `NetworkPolicy` / `CiliumNetworkPolicy` | which upstream hosts/CIDRs the pods can reach |
 | **L7** (semantics) | core, on the connections Hangar proxies | which tool calls (by name) and which arguments are allowed |
 
@@ -142,7 +142,7 @@ shared with Hangar's output redactor -- what the redactor masks on the way out i
 what a policy refuses on the way in:
 
 | Group | Detects |
-|-------|---------|
+| ------- | --------- |
 | `aws-keys` | AWS access key IDs (`AKIA…`) |
 | `jwt` | JSON Web Tokens |
 | `pem-blocks` | PEM private-key blocks |
@@ -228,7 +228,7 @@ the L7 rules from the core.
 ## Key Config Reference
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `spec.mode` | `Audit` \| `Enforce` | `Audit` | `Audit` observes; `Enforce` blocks (Gatekeeper-style adoption path) |
 | `spec.targetRef.kind` | `MCPServer` \| `MCPServerGroup` | — | What the policy attaches to (a group covers every member) |
 | `spec.defaultAction` | `Deny` \| `Allow` | `Deny` | Outcome for a tool name no `upstreams[].tools` rule matches |

@@ -2,7 +2,8 @@
 
 > Looking for the operator image or Helm charts? See
 > [Releases & Artifacts](releases.md) for every published artifact and its
-> install command.
+> install command. The charts support both Helm 3 and Helm 4 — see
+> [Helm versions](../guides/KUBERNETES.md#helm-versions).
 
 ## Requirements
 

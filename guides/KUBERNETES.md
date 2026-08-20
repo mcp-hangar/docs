@@ -6,7 +6,10 @@ Deploy and manage MCP servers as native Kubernetes resources using the MCP-Hanga
 
 > **The MCP-Hangar Operator is shipped from a separate repository:
 > [mcp-hangar-operator](https://github.com/mcp-hangar/mcp-hangar-operator).**
-> Helm charts live in [helm-charts](https://github.com/mcp-hangar/helm-charts).
+> Helm charts live in [helm-charts](https://github.com/mcp-hangar/helm-charts),
+> and both packages are listed on Artifact Hub:
+> [mcp-hangar](https://artifacthub.io/packages/helm/mcp-hangar/mcp-hangar),
+> [mcp-hangar-operator](https://artifacthub.io/packages/helm/mcp-hangar-operator/mcp-hangar-operator).
 
 ## Overview
 
@@ -26,8 +29,42 @@ The MCP-Hangar Operator provides:
 ### Prerequisites
 
 - Kubernetes 1.25+
-- Helm 3.x
+- Helm 3.x or 4.x (see [Helm versions](#helm-versions))
 - kubectl configured for your cluster
+
+### Helm versions
+
+Helm 3 and Helm 4 are both supported and CI-tested on every helm-charts PR:
+lint/render under both majors, identical rendered output across them, the full
+install → test → upgrade → rollback lifecycle under each, and the cross path
+(installed by Helm 3, upgraded by Helm 4). The pinned versions live in the
+helm-charts CI; the
+[Helm versions section of the helm-charts README](https://github.com/mcp-hangar/helm-charts#helm-versions)
+is the source of truth.
+
+What the majors do differently, as observed by those CI assertions:
+
+- **One release = one apply model.** A fresh Helm 4 install uses server-side
+  apply (SSA); a release created by Helm 3 keeps client-side apply across
+  Helm 4 upgrades until you opt in with `helm upgrade --server-side=true` (the
+  flag takes a value). Don't mix majors on the same release ad hoc.
+- **SSA turns silent overwrites into explicit conflicts** — relevant here
+  because the operator chart ships its CRDs as templates. On an SSA-installed
+  release, a plain out-of-band `kubectl apply --server-side` to a helm-owned
+  field is refused by the apiserver (`conflict with "helm"`). If the other
+  writer forces the conflict and takes the field, the next `helm upgrade` fails
+  with an explicit conflict error naming the competing manager — it does
+  **not** silently take the field back; `helm upgrade --force-conflicts` is the
+  documented way to reclaim it. A Helm-3-created (client-side) release has none
+  of this protection: the same out-of-band write goes through silently.
+- **`--wait` and `helm test` are stricter under Helm 4** (kstatus judges real
+  readiness — probes and conditions, not the Helm 3 pod-status heuristic). A
+  deploy that "passed" under Helm 3 and fails under 4 is the check getting
+  honest, not the chart regressing. One concrete flip in the other direction:
+  `helm3 test --logs` exits non-zero on a *passing* test of the mcp-hangar
+  chart, because Helm 3 deletes the `hook-succeeded` test pod before fetching
+  its logs (Helm 4 prints the logs first); run `helm test` without `--logs`
+  under Helm 3.
 
 ### Install CRDs
 

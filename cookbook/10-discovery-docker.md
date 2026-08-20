@@ -113,7 +113,7 @@ for the same rule stated in full, and
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `discovery.enabled` | bool | `false` | Enable auto-discovery |
 | `discovery.refresh_interval_s` | int | `30` | Seconds between scans |
 | `discovery.auto_register` | bool | **`true`** | Register a discovered server without approval. The default registers -- set it to `false`, as this recipe does, if you want the pending queue |
@@ -123,7 +123,7 @@ for the same rule stated in full, and
 ### Docker Labels
 
 | Label | Required | Default | Description |
-|-------|----------|---------|-------------|
+| ------- | ---------- | --------- | ------------- |
 | `mcp.hangar.enabled` | Yes | -- | Must be `"true"` |
 | `mcp.hangar.name` | No | Container name | MCP Server name |
 | `mcp.hangar.mode` | No | `container` | MCP Server mode |

@@ -16,7 +16,7 @@ MCP Server Groups allow you to treat multiple MCP servers as a single logical un
 ### Group States
 
 | State | Condition | Accepts Requests |
-|-------|-----------|------------------|
+| ------- | ----------- | ------------------ |
 | inactive | 0 healthy members | No |
 | partial | healthy members < `min_healthy` | Yes (if circuit closed and healthy >= 1) |
 | healthy | healthy members >= `min_healthy` | Yes |
@@ -44,7 +44,7 @@ mcp_servers:
 ```
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `mode` | `str` | -- | Must be `"group"` |
 | `strategy` | `str` | `"round_robin"` | Load balancing strategy |
 | `min_healthy` | `int` | `1` | Minimum healthy members for `healthy` state |
@@ -55,7 +55,7 @@ mcp_servers:
 Each member entry accepts the same keys as a regular MCP server (`mode`, `command`, `image`, `endpoint`, `env`, `idle_ttl_s`, etc.) plus group-specific keys:
 
 | Key | Type | Default | Range | Description |
-|-----|------|---------|-------|-------------|
+| ----- | ------ | --------- | ------- | ------------- |
 | `id` | `str` | required | -- | Unique member identifier |
 | `weight` | `int` | `50` | 1-100 | Weight for weighted strategies |
 | `priority` | `int` | `50` | 1-100 | Priority for priority strategy (lower = higher priority) |
@@ -200,7 +200,7 @@ All requests go to `local-llm` (priority 1) while it is healthy. If `local-llm` 
 The group tracks each member's health independently based on consecutive successes and failures.
 
 | Parameter | Default | Description |
-|-----------|---------|-------------|
+| ----------- | --------- | ------------- |
 | `health.unhealthy_threshold` | `2` | Consecutive failures before a member is removed from rotation |
 | `health.healthy_threshold` | `1` | Consecutive successes before a member is re-added to rotation |
 
@@ -244,7 +244,7 @@ The `hangar_group_rebalance` tool can be used to manually trigger a health re-ev
 The group-level circuit breaker protects against cascading failures by halting all requests when the total failure count exceeds a threshold.
 
 | Parameter | Default | Description |
-|-----------|---------|-------------|
+| ----------- | --------- | ------------- |
 | `circuit_breaker.failure_threshold` | `10` | Total group failures before the circuit opens |
 | `circuit_breaker.reset_timeout_s` | `60.0` | Seconds before the circuit auto-resets |
 
@@ -330,7 +330,7 @@ pinned or canary member is not in rotation, Hangar falls back to the normal load
 balancer instead of routing to an unavailable member.
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `canary.member` | `str` | -- | Group member that receives split traffic |
 | `canary.split_pct` | `int` | `0` | Percentage of tenants routed to `canary.member` (`0`--`100`) |
 | `canary.pinned_tenants` | `dict[str, str]` | `{}` | Tenant ID to member ID pins |
@@ -385,7 +385,7 @@ mcp_servers:
 ### Resolution Rules
 
 | Condition | Behavior |
-|-----------|----------|
+| ----------- | ---------- |
 | `allow_list` is set (non-empty) | Only tools matching an allow pattern are visible |
 | `allow_list` is empty, `deny_list` is set | All tools visible except those matching a deny pattern |
 | Both empty | All tools visible |

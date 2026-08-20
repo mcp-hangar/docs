@@ -23,7 +23,7 @@ stable contract that partner backends consume without Hangar-specific plugins.
 ### MCP Server attributes
 
 | Attribute | Type | Description |
-|-----------|------|-------------|
+| ----------- | ------ | ------------- |
 | `mcp.server.id` | string | Unique MCP server identifier (e.g. `math-server`) |
 | `mcp.server.mode` | string | Operational mode: `subprocess`, `docker`, `remote` |
 | `mcp.server.state` | string | Lifecycle state: `COLD`, `INITIALIZING`, `READY`, `DEGRADED`, `DEAD` |
@@ -35,7 +35,7 @@ stable contract that partner backends consume without Hangar-specific plugins.
 ### Tool invocation attributes
 
 | Attribute | Type | Description |
-|-----------|------|-------------|
+| ----------- | ------ | ------------- |
 | `gen_ai.tool.name` | string | Tool name as advertised by the MCP server |
 | `mcp.tool.duration_ms` | float | Call duration in milliseconds |
 | `mcp.tool.status` | string | Result: `success`, `error`, `timeout`, `blocked` |
@@ -50,7 +50,7 @@ stable contract that partner backends consume without Hangar-specific plugins.
 ### Enforcement attributes
 
 | Attribute | Type | Description |
-|-----------|------|-------------|
+| ----------- | ------ | ------------- |
 | `mcp.enforcement.policy_result` | string | Policy evaluation result: `allow`, `deny`, `quarantine` |
 | `mcp.enforcement.policy_name` | string | Name of the evaluated policy |
 | `mcp.enforcement.action` | string | Action taken: `none`, `alert`, `block`, `quarantine`, `rate_limit` |
@@ -61,7 +61,7 @@ stable contract that partner backends consume without Hangar-specific plugins.
 ### Audit attributes
 
 | Attribute | Type | Description |
-|-----------|------|-------------|
+| ----------- | ------ | ------------- |
 | `mcp.audit.principal_type` | string | Principal type: `api_key`, `jwt`, `oidc`, `anonymous` |
 | `mcp.audit.principal_id` | string | Principal identifier (API key ID, JWT sub claim) |
 | `mcp.audit.principal_roles` | string | Roles held at call time (comma-separated) |
@@ -77,7 +77,7 @@ stable contract that partner backends consume without Hangar-specific plugins.
 > reserved contract for a future release.
 
 | Attribute | Type | Description |
-|-----------|------|-------------|
+| ----------- | ------ | ------------- |
 | `mcp.behavioral.matches_baseline` | string | Whether call matches baseline pattern (`true`/`false`) |
 | `mcp.behavioral.anomaly_score` | float | Anomaly score (0.0 = normal, 1.0 = highly anomalous) |
 | `mcp.behavioral.rule_id` | string | Detection rule that matched |
@@ -88,7 +88,7 @@ stable contract that partner backends consume without Hangar-specific plugins.
 ### Caller attributes (identity propagation)
 
 | Attribute | Type | Description |
-|-----------|------|-------------|
+| ----------- | ------ | ------------- |
 | `mcp.caller.type` | string | Caller type: `human`, `agent`, `service`, `anonymous` |
 | `mcp.caller.id` | string | Caller identifier (user ID, service account, API key ID) |
 | `mcp.caller.roles` | string | Roles held at invocation time (comma-separated) |
@@ -96,7 +96,7 @@ stable contract that partner backends consume without Hangar-specific plugins.
 ### Cost attributes (FinOps)
 
 | Attribute | Type | Description |
-|-----------|------|-------------|
+| ----------- | ------ | ------------- |
 | `mcp.cost.cents` | int | Cost of invocation in hundredths of a cent |
 | `mcp.cost.model` | string | Pricing model: `token`, `duration`, `fixed`, `composite` |
 | `gen_ai.usage.input_tokens` | int | Input tokens consumed (LLM-backed tools) |
@@ -118,7 +118,7 @@ behavioral anomaly-scoring path, which is **not yet enabled**: these session-lev
 scores are not populated in the current release.
 
 | Attribute | Type | Description |
-|-----------|------|-------------|
+| ----------- | ------ | ------------- |
 | `mcp.risk.rule_id` | string | Matched detection rule identifier (e.g. `credential-exfiltration`) |
 | `mcp.risk.pattern_name` | string | Human-readable name of the matched detection pattern |
 | `mcp.risk.severity` | string | Severity: `critical`, `high`, `medium`, `low` |
@@ -131,7 +131,7 @@ scores are not populated in the current release.
 ### Health attributes
 
 | Attribute | Type | Description |
-|-----------|------|-------------|
+| ----------- | ------ | ------------- |
 | `mcp.health.result` | string | Health check result: `passed`, `failed`, `timeout` |
 | `mcp.health.consecutive_failures` | int | Number of consecutive failures |
 | `mcp.health.duration_ms` | float | Health check response time in milliseconds |
@@ -139,7 +139,7 @@ scores are not populated in the current release.
 ### Prometheus metric names
 
 | Metric | Type | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `mcp_hangar_tool_calls_total` | Counter | Total tool invocations |
 | `mcp_hangar_tool_call_duration_seconds` | Histogram | Tool call latency distribution |
 | `mcp_hangar_mcp_server_state` | Gauge | Current MCP server lifecycle state (0=cold, 1=initializing, 2=ready, 3=degraded, 4=dead) |
@@ -183,7 +183,7 @@ docker-compose up
 This starts:
 
 | Service | Port | Purpose |
-|---------|------|---------|
+| --------- | ------ | --------- |
 | Hangar | 8080 | MCP control plane with OTLP export |
 | OTEL Collector | 4317 (gRPC), 4318 (HTTP) | Telemetry receiver and router |
 | Prometheus | 9090 | Metrics storage and query |
@@ -288,7 +288,7 @@ observability:
 ### How Hangar maps to Langfuse concepts
 
 | Langfuse concept | Hangar mapping |
-|------------------|----------------|
+| ------------------ | ---------------- |
 | Trace | One MCP session (`mcp.session.id`) |
 | Span | MCP Server tool invocation |
 | Generation | Tool call with input/output |

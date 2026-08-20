@@ -139,7 +139,7 @@ Tokens with a missing, empty, non-string, or untrusted `iss` claim fail closed.
 ### Built-in Roles
 
 | Role | Description | Permissions |
-|------|-------------|-------------|
+| ------ | ------------- | ------------- |
 | `admin` | Full access | Everything |
 | `provider-admin` | Manage servers, deliver egress policy, invoke tools | **`providers:read`**, **`policy:write`**, `provider:*`, `group:*`, `discovery:read/trigger/approve`, `tool:invoke`, `tool:list`, `metrics:read`, **`approval:read`**, **`approval:resolve`** |
 | `developer` | Use tools, start servers on demand | `provider:read/list/start/load/load_verified/unload`, `providers:read/write/lifecycle`, `tool:invoke/list`, `group:read/list`, `discovery:read` |

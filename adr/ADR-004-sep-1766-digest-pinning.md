@@ -35,7 +35,7 @@ We will implement SEP-1766 and SEP-1763 compliance **preemptively**, treating ou
 ### Design Choices
 
 | Decision | Choice | Alternatives Considered |
-|----------|--------|------------------------|
+| ---------- | -------- | ------------------------ |
 | Digest source of truth | Explicit admin approval | Auto-pin on first-seen (rejected: security risk) |
 | Enforcement model | audit / warn / block per-org | Binary allow/deny (rejected: too rigid for adoption) |
 | Servers without digest | Admin-configurable policy (allow-degraded / warn / block) | Always block (rejected: breaks backward compat) |
@@ -52,7 +52,7 @@ We will implement SEP-1766 and SEP-1763 compliance **preemptively**, treating ou
 > [Configuration → `tool_projection`](../reference/configuration.md).
 
 | Component | What to implement |
-|-----------|-------------------|
+| ----------- | ------------------- |
 | hangar-agent | Extract `digest` from `tools/list` responses. Compare against cloud-provided allowlist. Enforce policy. Emit `DigestMismatchEvent`. |
 | hangar-cloud | Store approved digests per org/workspace. CRUD API. Approval workflow (new -> pending -> approved/rejected). Audit trail. |
 | Proto/API | New messages: `ToolDigest`, `DigestPolicy`, `DigestMismatchEvent`. Extend policy push with digest allowlists. |
@@ -82,7 +82,7 @@ P1 landed in PRs #123, #136, #137, #138 (epic #118): domain types, digest comput
 ### Risks and Mitigations
 
 | Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
+| ------ | ----------- | -------- | ------------ |
 | SEP-1766 changes digest field name/format | Medium | Low | Abstract behind internal `ToolDigest` value object; rename is mechanical |
 | SEP-1766 rejected entirely | Low | Medium | Our implementation still provides value; rebrand as "Hangar Tool Integrity" |
 | SEP-1763 defines interceptor API incompatible with agent | Low | Medium | Agent already uses adapter pattern; new adapter for spec-compliant interface |

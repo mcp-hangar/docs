@@ -122,7 +122,7 @@ The `round_robin` strategy cycles through healthy members sequentially. Each req
 Other available strategies:
 
 | Strategy | Behavior |
-|----------|----------|
+| ---------- | ---------- |
 | `round_robin` | Cycle through members sequentially |
 | `random` | Random member selection |
 | `least_connections` | Route to member with fewest active calls |
@@ -132,7 +132,7 @@ Other available strategies:
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `strategy` | string | `round_robin` | Load balancing strategy |
 | `members[].weight` | int | `1` | Relative routing weight (used by `weighted` strategy) |
 

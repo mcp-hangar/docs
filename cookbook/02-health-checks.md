@@ -160,7 +160,7 @@ State machine transitions:
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `health_check_interval_s` | int | `60` | Recorded on the server and reported by the API. It does **not** set the probe cadence: the background worker checks on its own interval, adjusted per state by the health tracker (skipped while cold or initializing, backed off once degraded). Treat it as documentation of intent until the scheduler reads it |
 | `max_consecutive_failures` | int | `3` | Failures before state transition to DEGRADED |
 

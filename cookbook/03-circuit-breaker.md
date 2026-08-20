@@ -182,7 +182,7 @@ They complement each other. Health checks catch dead MCP servers. Circuit breake
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `mcp_servers.<name>.mode` | string | — | Set to `group` for MCP server groups |
 | `mcp_servers.<name>.strategy` | string | `round_robin` | Load balancing strategy |
 | `mcp_servers.<name>.min_healthy` | int | `1` | Minimum healthy members required |

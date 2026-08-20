@@ -28,7 +28,7 @@ flowchart TD
 ### Digest Pinning (ADR-004)
 
 | Type | Location | Purpose |
-|------|----------|---------|
+| ------ | ---------- | --------- |
 | `ToolDigest` | `domain/value_objects/tool_digest.py` | SHA-256 fingerprint of a tool's canonical schema |
 | `DigestPolicy` | `domain/value_objects/tool_digest.py` | Enforcement level + unknown-tool handling + allowlist |
 | `DigestEnforcement` | `domain/value_objects/tool_digest.py` | Enum: `audit`, `warn`, `block` |
@@ -44,7 +44,7 @@ rejected before digest computation.
 ### Hook-Based Event Model (ADR-005)
 
 | Type | Location | Purpose |
-|------|----------|---------|
+| ------ | ---------- | --------- |
 | `HookPhase` | `domain/value_objects/hook.py` | `StrEnum`: `PRE_VALIDATE` (`"pre_validate"`), `POST_VALIDATE` (`"post_validate"`), `PRE_MUTATE` (`"pre_mutate"`), `POST_MUTATE` (`"post_mutate"`), `OBSERVE` (`"observe"`) |
 | `Hook` | `domain/value_objects/hook.py` | Wraps `(event, phase, sequence_number)` |
 | `IHookSubscriber` | `domain/contracts/hook_subscriber.py` | Protocol for phase-aware event delivery |
@@ -53,7 +53,7 @@ rejected before digest computation.
 ### Mutator Pipeline (ADR-005)
 
 | Type | Location | Purpose |
-|------|----------|---------|
+| ------ | ---------- | --------- |
 | `IMutator` | `domain/contracts/mutator.py` | Protocol: `priority_hint`, `applies_to`, `mutate()` |
 | `MutationContext` | `domain/contracts/mutator.py` | Input: method, direction, payload, correlation_id |
 | `MutationResult` | `domain/contracts/mutator.py` | Output: payload, changed flag, audit_only flag |
@@ -63,7 +63,7 @@ rejected before digest computation.
 ### Wildcard Subscriptions (ADR-005)
 
 | Type | Location | Purpose |
-|------|----------|---------|
+| ------ | ---------- | --------- |
 | `EventPattern` | `domain/value_objects/event_pattern.py` | Segment-wise wildcard matching (`*`, `tools/*`, `*/response`) |
 | `compile_event_patterns()` | `server/api/ws/filters.py` | Compiles raw strings into `EventPattern` objects |
 | `matches_filters()` | `server/api/ws/filters.py` | Tests events against wildcard-aware subscription filters |
@@ -104,7 +104,7 @@ method per SEP-1763 (PR #2624).
 Mutators execute in ascending `priority_hint` order. Ties are broken by registration order (stable sort).
 
 | Mutator | priority_hint | Rationale |
-|---------|--------------|-----------|
+| --------- | -------------- | ----------- |
 | (future: PII redactor) | 100 | Runs early to redact before other transforms |
 | (future: schema enforcer) | 500 | Validates structure after redaction |
 | ResponseTruncator | 1000 | Runs last to truncate after all other transforms |

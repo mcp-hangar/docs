@@ -99,7 +99,7 @@ The `HangarConfig` builder provides a fluent API for programmatic configuration.
 ### Builder Methods
 
 | Method | Returns | Description |
-|--------|---------|-------------|
+| -------- | --------- | ------------- |
 | `HangarConfig()` | `HangarConfig` | Create an empty config builder |
 | `.add_mcp_server(name, ...)` | `self` | Add a MCP server definition |
 | `.enable_discovery(...)` | `self` | Enable discovery sources |
@@ -111,7 +111,7 @@ The `HangarConfig` builder provides a fluent API for programmatic configuration.
 ### `.add_mcp_server()` Parameters
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `name` | `str` | required | Unique MCP server identifier |
 | `mode` | `str` | `"subprocess"` | MCP Server mode: `subprocess`, `docker`, or `remote` |
 | `command` | `list[str] \| None` | `None` | Command for subprocess mode (required for subprocess) |
@@ -123,7 +123,7 @@ The `HangarConfig` builder provides a fluent API for programmatic configuration.
 ### `.enable_discovery()` Parameters
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `docker` | `bool` | `False` | Enable Docker label discovery |
 | `kubernetes` | `bool` | `False` | Enable Kubernetes annotation discovery |
 | `filesystem` | `list[str] \| None` | `None` | Filesystem paths to scan for MCP server YAML files |
@@ -131,13 +131,13 @@ The `HangarConfig` builder provides a fluent API for programmatic configuration.
 ### `.max_concurrency()` Parameter
 
 | Parameter | Type | Default | Range | Description |
-|-----------|------|---------|-------|-------------|
+| ----------- | ------ | --------- | ------- | ------------- |
 | `value` | `int` | `20` | 1-100 | Thread pool size for concurrent `invoke()` calls |
 
 ### `.set_intervals()` Parameters
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `gc_interval_s` | `int \| None` | `30` | Garbage collection interval in seconds |
 | `health_check_interval_s` | `int \| None` | `10` | Health check interval in seconds |
 
@@ -234,7 +234,7 @@ Validation errors (empty MCP server name, invalid mode, missing mode-specific pa
     ```
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `mcp_server_name` | `str` | required | MCP Server to invoke |
 | `tool_name` | `str` | required | Tool name on the MCP server |
 | `arguments` | `dict \| None` | `None` | Tool arguments |
@@ -295,7 +295,7 @@ Cold MCP servers are auto-started on first invocation.
 Frozen dataclass representing a MCP server state snapshot.
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `name` | `str` | MCP Server name |
 | `state` | `str` | Current state: `cold`, `ready`, `degraded`, `dead` |
 | `mode` | `str` | MCP Server mode: `subprocess`, `docker`, `remote` |
@@ -304,7 +304,7 @@ Frozen dataclass representing a MCP server state snapshot.
 | `error` | `str \| None` | Error message if MCP server is in error state |
 
 | Property | Type | Description |
-|----------|------|-------------|
+| ---------- | ------ | ------------- |
 | `is_ready` | `bool` | `True` if `state == "ready"` |
 | `is_cold` | `bool` | `True` if `state == "cold"` |
 
@@ -313,13 +313,13 @@ Frozen dataclass representing a MCP server state snapshot.
 Frozen dataclass with aggregate health information.
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `mcp_servers` | `dict[str, str]` | Mapping of MCP server name to state |
 | `ready_count` | `int` | Number of MCP servers in `ready` state |
 | `total_count` | `int` | Total number of MCP servers |
 
 | Property | Type | Description |
-|----------|------|-------------|
+| ---------- | ------ | ------------- |
 | `all_ready` | `bool` | `True` if all MCP servers are ready |
 | `any_ready` | `bool` | `True` if at least one MCP server is ready |
 
@@ -328,7 +328,7 @@ Frozen dataclass with aggregate health information.
 Dataclass holding the built configuration.
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `mcp_servers` | `dict[str, dict]` | `{}` | MCP Server definitions |
 | `discovery` | `DiscoverySpec` | default | Discovery configuration |
 | `gc_interval_s` | `int` | `30` | Garbage collection interval |
@@ -340,7 +340,7 @@ Dataclass holding the built configuration.
 Dataclass for discovery source configuration.
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `docker` | `bool` | `False` | Enable Docker discovery |
 | `kubernetes` | `bool` | `False` | Enable Kubernetes discovery |
 | `filesystem` | `list[str]` | `[]` | Filesystem paths to scan |
@@ -401,7 +401,7 @@ async def lifespan(app: FastAPI):
 The Facade API raises specific exceptions for different failure modes:
 
 | Exception | When Raised |
-|-----------|-------------|
+| ----------- | ------------- |
 | `ConfigurationError` | Invalid configuration, Hangar not started, builder already built |
 | `McpServerNotFoundError` | MCP Server name does not exist in configuration |
 | `ToolNotFoundError` | Tool name not found on the specified MCP server |

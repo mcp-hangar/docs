@@ -10,7 +10,7 @@ taxonomy, and formatting conventions.
 ## Index
 
 | ADR | Title | Status | Date |
-|-----|-------|--------|------|
+| ----- | ------- | -------- | ------ |
 | [001](ADR-001-cqrs.md) | Command Query Responsibility Segregation (CQRS) | Accepted | 2026-04-17 |
 | [002](ADR-002-event-sourcing.md) | Event Sourcing | Superseded by [018](ADR-018-event-sourcing-actually-wired.md) | 2026-04-17 |
 | [003](ADR-003-sagas.md) | Saga Pattern | Accepted | 2026-04-17 |

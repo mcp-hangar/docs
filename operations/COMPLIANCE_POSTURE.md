@@ -37,7 +37,7 @@ The AI Act's high-risk requirements (Chapter III, applicable to Annex III system
 ### 3.1 For providers of high-risk AI systems
 
 | AI Act obligation | Article | What MCP Hangar provides |
-|---|---|---|
+| --- | --- | --- |
 | Automatic recording of events (logs) over the system's lifetime; logging capability must be designed in | Art. 12(1)–(2) | Event-sourced, append-only audit trail of every MCP tool invocation, identity, decision, and policy outcome ([ADR-002](../adr/ADR-002-event-sourcing.md)). Configurable retention. |
 | Logs sufficient to identify situations presenting risk | Art. 12(2)(a), Art. 79 | Detection events, anomaly flags, and policy-violation records are first-class event types, not free-text log lines. |
 | Human oversight measures, including the ability to intervene or interrupt (the "stop button") | Art. 14(3)–(4), esp. 14(4)(e) | Approval gates requiring a mandatory human decision before designated tool calls proceed; manual override; suspension controls. The gate contains no AI recommendation component — the decision is fully human, which avoids the automation-bias problem Art. 14(4)(b) warns about. |
@@ -46,7 +46,7 @@ The AI Act's high-risk requirements (Chapter III, applicable to Annex III system
 ### 3.2 For deployers of high-risk AI systems
 
 | AI Act obligation | Article | What MCP Hangar provides |
-|---|---|---|
+| --- | --- | --- |
 | Assign human oversight to competent, trained persons | Art. 26(2) | Approval gates give those persons an actual mechanism, with RBAC controlling who can approve what. The *assignment and training* is your job. |
 | Monitor operation of the system; suspend use and inform the provider on risk | Art. 26(5) | Governance dashboards, SIEM export, and suspension controls provide the monitoring and the kill switch. The *process* around them is your job. |
 | Retain automatically generated logs for at least six months | Art. 26(6) | Retention is configurable; set it ≥ 6 months (or longer where other EU/national law requires) and the audit trail satisfies the record-keeping substrate. |
@@ -63,7 +63,7 @@ The AI Act's high-risk requirements (Chapter III, applicable to Annex III system
 SOC 2 is an attestation of **your organization's** controls, performed by a licensed CPA firm, over **your** system. A codebase you download and run yourself is outside SOC 2's object of attestation by definition — the attestable thing is your deployment. MCP Hangar's role in that audit is as a control implementation and an evidence source inside your scope.
 
 | TSC | Criteria area | MCP Hangar as control / evidence |
-|---|---|---|
+| --- | --- | --- |
 | CC6.1–CC6.3 | Logical access controls | RBAC over tool access and approvals; OAuth resource-server enforcement with audience binding (RFC 8707); multi-issuer trust with explicit issuer allow-lists; end-to-end identity propagation making tool calls attributable to a principal (when configured — anonymous access paths, if you allow them, are your scoping decision). |
 | CC7.2–CC7.3 | System monitoring and evaluation | Deterministic, rule- and threshold-based detection events; export to your SIEM in CEF/LEEF 2.0, RFC 5424 syslog, JSONL, and OTLP — meaning the evidence lands where your auditor already looks ([COMPLIANCE.md](./COMPLIANCE.md) covers the formats). (Behavioral/anomaly-based profiling is on the roadmap, not yet shipped.) |
 | CC7.4 | Incident response support | Suspension controls and human-in-the-loop gates give responders an enforcement point; the event log gives them a timeline. Append-only is enforced at the application layer; the deployer controls the underlying storage, so pair it with database-level immutability or WORM/object-lock storage where your audit requires tamper *evidence*, not just tamper *resistance*. |

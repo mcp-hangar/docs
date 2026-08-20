@@ -5,7 +5,7 @@ MCP Hangar provides a WebSocket endpoint for real-time streaming of domain event
 ## Endpoint
 
 | Endpoint | Description |
-|----------|-------------|
+| ---------- | ------------- |
 | `/api/ws/events` | All domain events (filterable via subscribe message) |
 
 ## Connecting

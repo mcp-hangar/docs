@@ -39,7 +39,7 @@ The store holds governance metadata **only** -- never a result payload, never ex
 Once a task is relayed, a client follows up through the three `tasks/*` methods [SEP-2663](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2663) defines. Every handler is fail-closed, ownership-scoped, and upstream-truthful -- it never fabricates state.
 
 | Handler | Wire method | What it does |
-|---------|-------------|--------------|
+| --------- | ------------- | -------------- |
 | **Poll** | `tasks/get` | Relays to the owning upstream, syncs the local snapshot from the upstream status verbatim, and returns it flat with the outcome **inlined**. A `working → completed` transition emits `TaskCompleted` exactly once. An upstream error returns the local snapshot unchanged, with no outcome fields. |
 | **Answer input** | `tasks/update` | The governed mid-flight input path -- see [the consent gate](#the-mid-flight-consent-gate-322). Relays the client's answers upstream verbatim and acknowledges empty. |
 | **Cancel** | `tasks/cancel` | Best-effort relay. Retires the entry **only** on a confirmed upstream cancellation (clean `result`, status `cancelled` or absent, no `error`); otherwise keeps the entry with its true status. Confirmation emits `TaskCancelled` once. Acknowledges **empty**: cancellation is cooperative, so the ack must not claim an outcome the upstream never reported. |
@@ -53,7 +53,7 @@ Removing `tasks/result` downstream does not mean Hangar stops *calling* it upstr
 SEP-2663 splits refusal into distinct codes, and the split is deliberate.
 
 | Caller | Answer |
-|---|---|
+| --- | --- |
 | 2026-07-28 client declaring `io.modelcontextprotocol/tasks` | served |
 | 2026-07-28 client that did not declare it | `-32021` + machine-readable `requiredCapabilities` |
 | 2025-11-25 or older connection | `-32601` -- the methods do not exist there |
@@ -87,7 +87,7 @@ This is the ADR-008 "zombie" closed for the async case: a task can never complet
 `task_id → provenance` is an append-only event chain, built on ADR-002 event sourcing. Every event is keyed by `task_id` and carries `tenant_id` + `correlation_id`, threaded from the `TaskCreated` head so the whole chain shares one provenance thread:
 
 | Event | Emitted when |
-|-------|--------------|
+| ------- | -------------- |
 | `TaskCreated` | The relay seam registers the task (the provenance head, written under the registration lock). |
 | `TaskCompleted` | A `working → completed` transition is observed on poll -- deduplicated atomically, so repeated polls emit at most one. |
 | `TaskCancelled` | A `tasks/cancel` is confirmed by the upstream -- deduplicated. |

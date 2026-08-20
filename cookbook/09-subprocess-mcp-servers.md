@@ -107,7 +107,7 @@ use `mode: remote`. See
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `mode` | string | -- | Set to `subprocess` |
 | `command` | list[string] | -- | Command and arguments to start the MCP server |
 | `idle_ttl_s` | int | `300` | Seconds of inactivity before auto-stop |

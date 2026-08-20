@@ -174,7 +174,7 @@ See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `discovery.sources[].type` | string | -- | Set to `kubernetes` |
 | `discovery.sources[].mode` | string | -- | `additive` or `authoritative` |
 | `discovery.sources[].namespaces` | list | all namespaces | Kubernetes namespaces to watch |
@@ -185,7 +185,7 @@ See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 ### Kubernetes Annotations
 
 | Annotation | Required | Default | Description |
-|------------|----------|---------|-------------|
+| ------------ | ---------- | --------- | ------------- |
 | `mcp-hangar.io/enabled` | Yes | -- | Must be `"true"` |
 | `mcp-hangar.io/name` | No | Pod name | MCP Server name |
 | `mcp-hangar.io/port` | No | `8080` | MCP Server port |

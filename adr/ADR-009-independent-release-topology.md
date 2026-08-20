@@ -59,7 +59,7 @@ of that answer and is delegated, not decided here.
    related by the compatibility matrix (`#453`), not by a shared tag.
 
    | Lane | Owner repo | Trigger (as decided) | Artifact |
-   |------|-----------|----------------------|----------|
+   | ------ | ----------- | ---------------------- | ---------- |
    | Core | `mcp-hangar` | `release-please` -> `vX.Y.Z` tag | PyPI package |
    | Operator image + manifest | `mcp-hangar-operator` | `push` tag `v*.*.*` | multi-arch GHCR image + install manifest |
    | Agent image | `mcp-hangar-agent` | `push` tag `v*.*.*` (workflow to be authored) | multi-arch GHCR image |

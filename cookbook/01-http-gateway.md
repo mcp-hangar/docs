@@ -145,7 +145,7 @@ docker rm -f mcp-math
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `mode` | string | — | MCP Server mode. Use `remote` for HTTP/SSE MCP servers |
 | `endpoint` | string | — | Full URL of the remote MCP server (including path) |
 | `description` | string | `""` | Human-readable description shown in status |

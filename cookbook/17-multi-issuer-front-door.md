@@ -227,7 +227,7 @@ registration.
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `tool_access.mode` | string | `egress` | Topology mode: `egress` or `front_door` |
 | `auth.oidc.enabled` | bool | `false` | Enable OIDC/JWT validation |
 | `auth.oidc.resource_uri` | string | `""` | Public URI advertised as `resource`; also enforced as JWT `aud` when set |

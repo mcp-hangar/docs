@@ -5,7 +5,7 @@ Complete reference for all MCP protocol tools exposed by MCP Hangar. These tools
 ## Quick Reference
 
 | Tool | Category | Description | Side Effects |
-|------|----------|-------------|--------------|
+| ------ | ---------- | ------------- | -------------- |
 | [`hangar_list`](#hangar_list) | Lifecycle | List all MCP servers with state and tool counts | None (read-only) |
 | [`hangar_start`](#hangar_start) | Lifecycle | Start a MCP server or group | Starts process/container |
 | [`hangar_stop`](#hangar_stop) | Lifecycle | Stop a MCP server or group | Stops process/container |
@@ -38,7 +38,7 @@ List all configured MCP servers, groups, and runtime (hot-loaded) MCP servers wi
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `state_filter` | `str \| None` | `None` | Filter by state: `"cold"`, `"ready"`, `"degraded"`, `"dead"` |
 
 **Side Effects:** None (read-only).
@@ -46,7 +46,7 @@ List all configured MCP servers, groups, and runtime (hot-loaded) MCP servers wi
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `mcp_servers` | `list[object]` | Configured MCP servers with `mcp_server`, `state`, `mode`, `alive`, `tools_count`, `health_status`, `tools_predefined`, `description` |
 | `groups` | `list[object]` | Groups with `group_id`, `state`, `strategy`, `healthy_count`, `total_members` |
 | `runtime_mcp_servers` | `list[object]` | Hot-loaded MCP servers with `mcp_server`, `state`, `source`, `verified`, `ephemeral`, `loaded_at`, `lifetime_seconds` |
@@ -75,7 +75,7 @@ Start a MCP server or group. Transitions the MCP server from COLD to READY.
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `mcp_server` | `str` | required | MCP Server ID or Group ID |
 
 **Side Effects:** Starts MCP server process or container. State transitions from COLD to READY.
@@ -85,7 +85,7 @@ Start a MCP server or group. Transitions the MCP server from COLD to READY.
 For a MCP server:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `mcp_server` | `str` | MCP Server ID |
 | `state` | `str` | New state (typically `"ready"`) |
 | `tools` | `list[str]` | Available tool names |
@@ -93,7 +93,7 @@ For a MCP server:
 For a group:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `group` | `str` | Group ID |
 | `state` | `str` | Group state |
 | `members_started` | `int` | Number of members started |
@@ -119,7 +119,7 @@ Stop a running MCP server or group.
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `mcp_server` | `str` | required | MCP Server ID or Group ID |
 
 **Side Effects:** Stops MCP server process or container. State transitions to COLD.
@@ -129,14 +129,14 @@ Stop a running MCP server or group.
 For a MCP server:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `stopped` | `str` | MCP Server ID |
 | `reason` | `str` | Stop reason |
 
 For a group:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `group` | `str` | Group ID |
 | `state` | `str` | Group state |
 | `stopped` | `bool` | `true` |
@@ -164,7 +164,7 @@ Human-readable health dashboard with state indicators for all MCP servers and gr
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `mcp_servers` | `list[object]` | MCP servers with `id`, `indicator`, `state`, `mode`, `last_used` |
 | `groups` | `list[object]` | Groups with `id`, `indicator`, `state`, `healthy_members`, `total_members` |
 | `runtime_mcp_servers` | `list[object]` | Hot-loaded MCP servers with `id`, `indicator`, `state`, `source`, `verified` |
@@ -198,7 +198,7 @@ Reload configuration from disk, applying MCP server additions, removals, and upd
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `graceful` | `bool` | `true` | Wait for idle before stopping modified/removed MCP servers |
 
 **Side Effects:** Stops removed/modified MCP servers, registers new MCP servers, updates changed MCP servers.
@@ -206,7 +206,7 @@ Reload configuration from disk, applying MCP server additions, removals, and upd
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `status` | `str` | `"success"` or `"failed"` |
 | `message` | `str` | Human-readable result description |
 | `mcp_servers_added` | `list[str]` | Newly added MCP server IDs |
@@ -241,7 +241,7 @@ Load a MCP server from the MCP registry at runtime. Hot-loaded MCP servers are e
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `name` | `str` | required | Registry name of the MCP server |
 | `force_unverified` | `bool` | `false` | Load unverified MCP servers without confirmation |
 | `allow_tools` | `list[str] \| None` | `None` | Fnmatch patterns for allowed tools |
@@ -254,7 +254,7 @@ Load a MCP server from the MCP registry at runtime. Hot-loaded MCP servers are e
 The primary success response:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `status` | `str` | `"loaded"` |
 | `mcp_server` | `str` | Assigned MCP server ID |
 | `tools` | `list[str]` | Available tool names |
@@ -278,7 +278,7 @@ Unload a hot-loaded MCP server. Only works for MCP servers loaded via `hangar_lo
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `mcp_server` | `str` | required | MCP Server ID (from `hangar_load` result) |
 
 **Side Effects:** Stops the MCP server process and removes it from the runtime registry.
@@ -286,7 +286,7 @@ Unload a hot-loaded MCP server. Only works for MCP servers loaded via `hangar_lo
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `status` | `str` | `"unloaded"` or `"not_hot_loaded"` or `"failed"` |
 | `mcp_server` | `str` | MCP Server ID |
 | `message` | `str` | Result description |
@@ -312,7 +312,7 @@ List the tools available on a MCP server or group. Tool access filtering (allow_
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `mcp_server` | `str` | required | MCP Server ID or Group ID |
 
 **Side Effects:** May start a cold MCP server to discover its tools.
@@ -320,7 +320,7 @@ List the tools available on a MCP server or group. Tool access filtering (allow_
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `mcp_server` | `str` | MCP Server ID |
 | `state` | `str` | MCP server state |
 | `predefined` | `bool` | Whether tools are predefined (not discovered at runtime) |
@@ -353,7 +353,7 @@ Detailed information about a MCP server or group, including health tracking, idl
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `mcp_server` | `str` | required | MCP Server ID or Group ID |
 
 **Side Effects:** None (read-only).
@@ -363,7 +363,7 @@ Detailed information about a MCP server or group, including health tracking, idl
 For a MCP server:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `mcp_server` | `str` | MCP Server ID |
 | `state` | `str` | Current state |
 | `mode` | `str` | MCP Server mode |
@@ -377,7 +377,7 @@ For a MCP server:
 For a group:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `group_id` | `str` | Group ID |
 | `description` | `str \| None` | Group description |
 | `state` | `str` | Group state |
@@ -414,7 +414,7 @@ Pre-start one or more MCP servers so the first tool call does not incur cold-sta
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `mcp_servers` | `str \| None` | `None` | Comma-separated MCP server IDs. `None` warms all MCP servers. |
 
 **Side Effects:** Starts specified MCP server processes.
@@ -422,7 +422,7 @@ Pre-start one or more MCP servers so the first tool call does not incur cold-sta
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `warmed` | `list[str]` | Successfully warmed MCP server IDs |
 | `already_warm` | `list[str]` | MCP servers that were already running |
 | `failed` | `list[object]` | Failed MCP servers with `id` and `error` |
@@ -454,7 +454,7 @@ System-wide health summary with MCP server state counts and security information
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `status` | `str` | Overall system status |
 | `mcp_servers` | `object` | `total` and `by_state` breakdown (`cold`, `ready`, `degraded`, `dead`) |
 | `groups` | `object` | `total`, `by_state`, `total_members`, `healthy_members` |
@@ -482,7 +482,7 @@ MCP Server metrics in JSON or Prometheus exposition format.
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `format` | `str` | `"json"` | Output format: `"json"` or `"prometheus"` |
 
 **Side Effects:** None (read-only).
@@ -490,7 +490,7 @@ MCP Server metrics in JSON or Prometheus exposition format.
 **Returns (JSON format):**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `mcp_servers` | `dict[str, object]` | Per-MCP server metrics: `state`, `mode`, `tools_count`, `invocations`, `errors`, `avg_latency_ms` |
 | `groups` | `dict[str, object]` | Per-group metrics: `state`, `strategy`, `total_members`, `healthy_members` |
 | `tool_calls` | `dict[str, object]` | Per-tool metrics keyed by `MCP server.tool`: `count`, `errors` |
@@ -530,7 +530,7 @@ Trigger a discovery scan across all enabled sources. Discovered MCP servers are 
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `discovered_count` | `int` | Total MCP servers discovered |
 | `registered_count` | `int` | MCP servers auto-registered |
 | `updated_count` | `int` | Existing MCP servers updated |
@@ -567,7 +567,7 @@ List MCP servers discovered but not yet registered (pending approval).
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `pending` | `list[object]` | Pending MCP servers with `name`, `source`, `mode`, `discovered_at`, `fingerprint` |
 
 Returns `{error: ...}` when discovery is not configured.
@@ -598,7 +598,7 @@ List MCP servers that failed health checks during discovery and were quarantined
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `quarantined` | `list[object]` | Quarantined MCP servers with `name`, `source`, `reason`, `quarantine_time` |
 
 Returns `{error: ...}` when discovery is not configured.
@@ -625,7 +625,7 @@ Approve a pending or quarantined MCP server for registration.
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `mcp_server` | `str` | required | MCP Server name from `hangar_discovered` or `hangar_quarantine` output |
 
 **Side Effects:** Registers the MCP server in COLD state. Removes from pending or quarantine list.
@@ -633,7 +633,7 @@ Approve a pending or quarantined MCP server for registration.
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `approved` | `bool` | Whether approval succeeded |
 | `mcp_server` | `str` | MCP Server name |
 | `status` | `str` | `"registered"` on success |
@@ -662,7 +662,7 @@ List the status of all configured discovery sources.
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `sources` | `list[object]` | Sources with `id`, `source_type`, `mode`, `is_healthy`, `is_enabled`, `last_discovery`, `mcp_servers_count`, `error_message` |
 
 `id` is the id the per-source REST routes take -- `PUT` and `DELETE
@@ -710,7 +710,7 @@ List all MCP server groups with member details, health state, and load balancing
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `groups` | `list[object]` | Groups with `group_id`, `description`, `state`, `strategy`, `min_healthy`, `healthy_count`, `total_members`, `is_available`, `circuit_open`, `members` |
 
 Each member in the `members` list contains: `id`, `state`, `in_rotation`, `weight`, `priority`, `consecutive_failures`.
@@ -746,7 +746,7 @@ Rebalance a group by re-checking all members. Recovered members rejoin rotation,
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `group` | `str` | required | Group ID |
 
 **Side Effects:** Re-checks all members. Updates rotation membership. Resets circuit breaker.
@@ -754,7 +754,7 @@ Rebalance a group by re-checking all members. Recovered members rejoin rotation,
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `group_id` | `str` | Group ID |
 | `state` | `str` | Group state after rebalance |
 | `healthy_count` | `int` | Healthy member count |
@@ -785,7 +785,7 @@ Invoke tools on MCP servers. Supports single calls and parallel batch execution 
 **Parameters:**
 
 | Parameter | Type | Default | Range | Description |
-|-----------|------|---------|-------|-------------|
+| ----------- | ------ | --------- | ------- | ------------- |
 | `calls` | `list[object]` | required | 1--100 items | List of `{MCP server, tool, arguments, timeout?}` objects |
 | `max_concurrency` | `int` | `10` | 1--50 | Parallel workers for this batch |
 | `timeout` | `float` | `60` | 1--300 | Batch timeout in seconds |
@@ -797,7 +797,7 @@ Invoke tools on MCP servers. Supports single calls and parallel batch execution 
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `batch_id` | `str` | Unique batch identifier |
 | `success` | `bool` | `true` if all calls succeeded |
 | `total` | `int` | Total calls in batch |
@@ -842,7 +842,7 @@ Fetch full data for a truncated batch response. Continuation IDs are returned wh
 **Parameters:**
 
 | Parameter | Type | Default | Range | Description |
-|-----------|------|---------|-------|-------------|
+| ----------- | ------ | --------- | ------- | ------------- |
 | `continuation_id` | `str` | required | starts with `"cont_"` | Continuation ID from a truncated result |
 | `offset` | `int` | `0` | >= 0 | Byte offset to start reading from |
 | `limit` | `int` | `500000` | 1--2000000 | Maximum bytes to return |
@@ -852,7 +852,7 @@ Fetch full data for a truncated batch response. Continuation IDs are returned wh
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `found` | `bool` | Whether the continuation data exists |
 | `data` | `any` | The continuation data (when found) |
 | `total_size_bytes` | `int` | Total size of the cached data |
@@ -884,7 +884,7 @@ Delete cached continuation data to free memory.
 **Parameters:**
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| ----------- | ------ | --------- | ------------- |
 | `continuation_id` | `str` | required | Continuation ID to delete |
 
 **Side Effects:** Removes the cached response from memory.
@@ -892,7 +892,7 @@ Delete cached continuation data to free memory.
 **Returns:**
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `deleted` | `bool` | Whether the data was found and deleted |
 | `continuation_id` | `str` | The requested continuation ID |
 

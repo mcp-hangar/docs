@@ -270,7 +270,7 @@ Observing in `audit`, copying the emitted digest into the pin, then flipping to
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `tool_projection.digest_enforcement` | string | `block` | Per-MCP server mismatch handling: `audit`, `warn`, or `block` |
 | `tool_projection.tenant_overrides.<tenant>.pins` | dict[str, str] | `{}` | Tool name to 64-char lowercase hex SHA-256 pin, applied only to that tenant |
 | `tool_projection.tenant_overrides.<tenant>.withdrawn` | list | `[]` | Tools withdrawn for one tenant |

@@ -87,7 +87,7 @@ chart](https://github.com/mcp-hangar/helm-charts) is the only place they ship
 from:
 
 | What | Chart value | Renders | Source |
-|------|-------------|---------|--------|
+| ------ | ------------- | --------- | -------- |
 | Scrape target | `serviceMonitor.enabled=true` | a `ServiceMonitor` (needs the Prometheus Operator) | the chart |
 | Alert rules | `prometheusRule.enabled=true` | a `PrometheusRule` with 30 rules | [`mcp-hangar/files/prometheus-alerts.yaml`](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/files/prometheus-alerts.yaml) |
 | Dashboards | `dashboards.enabled=true` | four ConfigMaps labelled `grafana_dashboard` for the Grafana sidecar | [`mcp-hangar/files/dashboards/`](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files/dashboards) |
@@ -137,7 +137,7 @@ MCP Hangar exports Prometheus metrics at `/metrics`. All metrics use the `mcp_ha
 #### Tool Invocations
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_tool_calls_total` | Counter | MCP server, tool, status | Total tool invocations |
 | `mcp_hangar_tool_call_duration_seconds` | Histogram | MCP server, tool | Invocation latency (buckets: 0.01-30s) |
 | `mcp_hangar_tool_call_errors_total` | Counter | MCP server, tool, error_type | Failed invocations by error type |
@@ -158,7 +158,7 @@ sum(rate(mcp_hangar_tool_call_errors_total[5m])) / sum(rate(mcp_hangar_tool_call
 #### Batch Invocations
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_batch_calls_total` | Counter | result | Batch invocations (success/failure) |
 | `mcp_hangar_batch_duration_seconds` | Histogram | - | Batch execution time |
 | `mcp_hangar_batch_size` | Histogram | - | Number of calls per batch |
@@ -180,7 +180,7 @@ rate(mcp_hangar_batch_size_sum[5m]) / rate(mcp_hangar_batch_size_count[5m])
 #### Health Checks
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_health_checks_total` | Counter | MCP server, result | Health check executions |
 | `mcp_hangar_health_check_duration_seconds` | Histogram | MCP server | Health check latency |
 | `mcp_hangar_health_check_consecutive_failures` | Gauge | MCP server | Current consecutive failure count |
@@ -199,7 +199,7 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 #### MCP Server Lifecycle
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_mcp_server_state` | Gauge | mcp_server | Current state (0=cold, 1=initializing, 2=ready, 3=degraded, 4=dead) |
 | `mcp_hangar_mcp_server_up` | Gauge | mcp_server | 1 if MCP server is reachable |
 | `mcp_hangar_mcp_server_starts_total` | Counter | mcp_server | MCP server start attempts |
@@ -210,7 +210,7 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 #### Discovery
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_discovery_mcp_servers` | Gauge | source | Discovered MCP servers per source |
 | `mcp_hangar_discovery_registrations_total` | Counter | source | New registrations |
 | `mcp_hangar_discovery_errors_total` | Counter | source | Errors by source |
@@ -219,14 +219,14 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 #### HTTP Transport
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_http_requests_total` | Counter | mcp_server, method, status_code | HTTP requests to remote MCP servers |
 | `mcp_hangar_http_request_duration_seconds` | Histogram | method | HTTP request latency |
 
 #### Messages (stdio + HTTP)
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_messages_sent_total` | Counter | mcp_server, method | JSON-RPC messages sent to an upstream server |
 | `mcp_hangar_messages_received_total` | Counter | mcp_server, type | JSON-RPC messages received (`type`: response/notification/error) |
 | `mcp_hangar_message_size_bytes` | Histogram | mcp_server, direction | JSON-RPC message payload size (`direction`: sent/received) |
@@ -234,7 +234,7 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 #### Rate Limiting
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_rate_limit_hits_total` | Counter | principal | Rate limit rejections |
 
 #### Approval Gate
@@ -242,7 +242,7 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 *Since 2.7.0.*
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_approval_requests_total` | Counter | channel | Tool invocations held by the gate |
 | `mcp_hangar_approval_deliveries_total` | Counter | channel, outcome | Notifications handed to a channel: `sent`, `failed`, `not_notified` |
 | `mcp_hangar_approval_decisions_total` | Counter | channel, decision | How each hold ended: `granted`, `denied`, `expired` |
@@ -272,7 +272,7 @@ The startup check reports the same condition at boot; see
 #### GC (Garbage Collection)
 
 | Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
+| -------- | ------ | -------- | ------------- |
 | `mcp_hangar_gc_cycles_total` | Counter | - | GC cycle executions |
 | `mcp_hangar_gc_cycle_duration_seconds` | Histogram | - | GC cycle duration |
 
@@ -357,7 +357,7 @@ They are organized by severity:
 #### Critical Alerts (Page On-Call)
 
 | Alert | Condition | For | Description |
-|-------|-----------|-----|-------------|
+| ------- | ----------- | ----- | ------------- |
 | `MCPHangarNotResponding` | `up{job="mcp-hangar"} == 0` | 1m | Service unreachable |
 | `MCPHangarHighErrorRate` | Error rate > 10% | 2m | Significant failures |
 | `MCPHangarBatchHighFailureRate` | Batch failure > 20% | 3m | Batch operations failing |
@@ -369,7 +369,7 @@ They are organized by severity:
 #### Warning Alerts (Investigate)
 
 | Alert | Condition | For | Description |
-|-------|-----------|-----|-------------|
+| ------- | ----------- | ----- | ------------- |
 | `MCPHangarHighConsecutiveFailures` | Consecutive failures > 2 | 2m | Health check issues |
 | `MCPHangarHealthCheckSlow` | P95 health check > 5s | 5m | Slow health checks |
 | `MCPHangarHighLatencyP95` | P95 latency > 3s | 5m | Performance degradation |
@@ -404,7 +404,7 @@ availability and transport alerts.
 #### Info Alerts (Tracking)
 
 | Alert | Condition | Description |
-|-------|-----------|-------------|
+| ------- | ----------- | ------------- |
 | `MCPHangarProviderStarted` | Any MCP server start | MCP Server lifecycle event |
 | `MCPHangarHighToolCallVolume` | Rate > 100/s | High traffic notification |
 
@@ -530,7 +530,7 @@ MCP Hangar can export audit events in SIEM-compatible formats alongside
 OTLP. Available exporters (in `src/mcp_hangar/compliance/`):
 
 | Format | Class | Use Case |
-|--------|-------|----------|
+| -------- | ------- | ---------- |
 | CEF | `CEFExporter` | ArcSight, QRadar, Splunk via CEF |
 | JSON-lines | `JSONLinesExporter` | Splunk HEC, Elasticsearch, custom pipelines |
 | LEEF | `LEEFExporter` | IBM QRadar native format |
@@ -542,7 +542,7 @@ or stderr (for container log collection). Configure via the compliance bootstrap
 ### Environment Variables
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `MCP_TRACING_ENABLED` | `true` | Enable/disable tracing |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4317` | OTLP collector endpoint (also activates OTLP audit export) |
 | `OTEL_SERVICE_NAME` | `mcp-hangar` | Service name in traces |
@@ -662,7 +662,7 @@ logger.info("processing", trace_id=get_current_trace_id())
 ### HTTP Endpoints
 
 | Endpoint | Purpose | Use Case |
-|----------|---------|----------|
+| ---------- | --------- | ---------- |
 | `/health/live` | Liveness | Container restart decisions |
 | `/health/ready` | Readiness | Traffic routing |
 | `/health/startup` | Startup | Initial boot gate |
@@ -707,7 +707,7 @@ readinessProbe:
 ### Service Level Indicators
 
 | SLI | Metric | Measurement |
-|-----|--------|-------------|
+| ----- | -------- | ------------- |
 | Availability | Service up | `up{job="mcp-hangar"}` |
 | Latency | Tool call duration | P95 < 3s |
 | Error Rate | Failed invocations | Error rate < 1% |
@@ -716,7 +716,7 @@ readinessProbe:
 ### Recommended SLOs
 
 | SLI | Target | Window |
-|-----|--------|--------|
+| ----- | -------- | -------- |
 | Availability | 99.9% | 30 days |
 | Latency (P95) | < 3s | 5 minutes |
 | Error Rate | < 1% | 5 minutes |
@@ -792,7 +792,7 @@ If `MCPHangarHighConsecutiveFailures` fires:
 Common patterns and fixes:
 
 | Error | Cause | Fix |
-|-------|-------|-----|
+| ------- | ------- | ----- |
 | `ModuleNotFoundError` | Missing dependency | `pip install <package>` |
 | `FileNotFoundError` | Wrong path | Check command in config |
 | `PermissionError` | Not executable | `chmod +x <script>` |

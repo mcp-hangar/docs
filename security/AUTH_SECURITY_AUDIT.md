@@ -62,7 +62,7 @@ add-on. This section covers the import hygiene around that module boundary.
 ## Findings Status
 
 | Finding | Status | Notes |
-|--------|--------|-------|
+| -------- | -------- | ------- |
 | K-1 L7 policy push auth bypass | Fixed | `/api/mcp_servers/{id}/l7_policy` requires authenticated principal + `policy:write`; rejection events emitted |
 | K-2 WebSocket auth / CSWSH gaps | Fixed | Shared auth enforcement, pre-accept Origin validation, bounded queue backpressure |
 | K-3 Unsafe unauthenticated HTTP exposure | Fixed | Non-loopback HTTP bind blocked without auth unless explicitly overridden |
@@ -77,7 +77,7 @@ add-on. This section covers the import hygiene around that module boundary.
 ## Recommendations
 
 | Item | Status | Notes |
-|------|--------|-------|
+| ------ | -------- | ------- |
 | API key hash-only storage | Pass | Raw keys are not persisted |
 | JWT algorithm-family validation | Pass | Mixed HS*/RS*/ES*/PS* families rejected |
 | Trusted proxy validation | Pass | Only configured proxies may influence forwarded source identity |

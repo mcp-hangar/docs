@@ -75,7 +75,7 @@ No config changes needed -- metrics are always available at `/metrics` on the HT
 Hangar exposes Prometheus-format metrics at `/metrics`; scraping them and rendering them is your Prometheus and Grafana's job. The maintained dashboards and alert rules ship with the Helm chart. Key metrics:
 
 | Metric | Type | What it tells you |
-|--------|------|-------------------|
+| -------- | ------ | ------------------- |
 | `mcp_hangar_tool_calls_total` | Counter | Total tool invocations per MCP server/tool |
 | `mcp_hangar_tool_call_duration_seconds` | Histogram | Latency distribution per MCP server/tool |
 | `mcp_hangar_mcp_server_state` | Gauge | Current state per MCP server (0=cold, 1=initializing, 2=ready, 3=degraded, 4=dead) |
@@ -88,7 +88,7 @@ Hangar exposes Prometheus-format metrics at `/metrics`; scraping them and render
 No new config keys. Metrics are always available in HTTP mode.
 
 | Endpoint | Description |
-|----------|-------------|
+| ---------- | ------------- |
 | `/metrics` | Prometheus text format |
 
 ## What's Next

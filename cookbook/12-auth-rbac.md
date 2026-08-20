@@ -145,7 +145,7 @@ Enabling auth adds the `AuthMiddleware` to the HTTP stack. Every request must in
 Built-in roles:
 
 | Role | Can do |
-|------|--------|
+| ------ | -------- |
 | `admin` | Everything |
 | `provider-admin` | Manage servers and groups, deliver compiled egress policy (`policy:write`). The least-privilege role for a Kubernetes operator API key. |
 | `developer` | Invoke tools, read and manage server state. Cannot touch egress policy. |
@@ -156,7 +156,7 @@ Tool access policies add fine-grained control per (principal, MCP server, tool) 
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `auth.enabled` | bool | `false` | Enable authentication |
 | `auth.allow_anonymous` | bool | `false` | Allow unauthenticated requests |
 | `auth.api_key.enabled` | bool | `true` | Enable API key authentication |

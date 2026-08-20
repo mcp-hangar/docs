@@ -21,7 +21,7 @@ mcp-hangar [OPTIONS] COMMAND [ARGS]...
 These options are available for all commands:
 
 | Option | Short | Type | Default | Env Variable | Description |
-|--------|-------|------|---------|--------------|-------------|
+| -------- | ------- | ------ | --------- | -------------- | ------------- |
 | `--config` | `-c` | PATH | - | `MCP_CONFIG` | Path to config.yaml file |
 | `--verbose` | `-v` | FLAG | false | - | Show verbose output including debug information |
 | `--quiet` | `-q` | FLAG | false | - | Suppress non-essential output |
@@ -32,7 +32,7 @@ These options are available for all commands:
 ## Commands
 
 | Command | Description |
-|---------|-------------|
+| --------- | ------------- |
 | [`init`](#init) | Interactive setup wizard |
 | [`status`](#status) | Show MCP server health dashboard |
 | [`add`](#add) | Add MCP server from registry |
@@ -57,7 +57,7 @@ mcp-hangar init [OPTIONS]
 ### Options
 
 | Option | Short | Type | Default | Description |
-|--------|-------|------|---------|-------------|
+| -------- | ------- | ------ | --------- | ------------- |
 | `--non-interactive` | `-y` | FLAG | false | Run without prompts, using defaults |
 | `--bundle` | `-b` | TEXT | - | MCP Server bundle to install |
 | `--mcp_servers` | - | TEXT | - | Comma-separated list of MCP servers |
@@ -70,7 +70,7 @@ mcp-hangar init [OPTIONS]
 ### MCP Server Bundles
 
 | Bundle | MCP servers | Use Case |
-|--------|-----------|----------|
+| -------- | ----------- | ---------- |
 | `starter` | filesystem, fetch, memory | General use, getting started |
 | `developer` | filesystem, fetch, memory, github, git | Software development |
 | `data` | filesystem, fetch, memory, sqlite, postgres | Data analysis |
@@ -121,13 +121,13 @@ mcp-hangar status [OPTIONS] [MCP_SERVER]
 ### Arguments
 
 | Argument | Required | Description |
-|----------|----------|-------------|
+| ---------- | ---------- | ------------- |
 | `MCP_SERVER` | No | Show detailed status for specific MCP server |
 
 ### Options
 
 | Option | Short | Type | Default | Description |
-|--------|-------|------|---------|-------------|
+| -------- | ------- | ------ | --------- | ------------- |
 | `--watch` | `-w` | FLAG | false | Continuously update the display |
 | `--interval` | `-i` | FLOAT | 2.0 | Update interval in seconds (with --watch) |
 | `--details` | `-d` | FLAG | false | Show additional columns (mode, memory, uptime) |
@@ -135,7 +135,7 @@ mcp-hangar status [OPTIONS] [MCP_SERVER]
 ### MCP Server States
 
 | State | Indicator | Description |
-|-------|-----------|-------------|
+| ------- | ----------- | ------------- |
 | READY | `OK` (green) | MCP Server is running and healthy |
 | COLD | `--` (dim) | MCP Server not started |
 | INITIALIZING | `..` (cyan) | MCP Server starting up |
@@ -196,13 +196,13 @@ mcp-hangar add [OPTIONS] NAME
 ### Arguments
 
 | Argument | Required | Description |
-|----------|----------|-------------|
+| ---------- | ---------- | ------------- |
 | `NAME` | Yes | MCP Server name or search query |
 
 ### Options
 
 | Option | Short | Type | Default | Description |
-|--------|-------|------|---------|-------------|
+| -------- | ------- | ------ | --------- | ------------- |
 | `--search` | `-s` | FLAG | false | Search registry instead of exact match |
 | `--yes` | `-y` | FLAG | false | Skip confirmation prompts |
 | `--no-reload` | - | FLAG | false | Don't hot-reload running server |
@@ -210,7 +210,7 @@ mcp-hangar add [OPTIONS] NAME
 ### Available MCP servers
 
 | MCP Server | Description | Requires Config |
-|----------|-------------|-----------------|
+| ---------- | ------------- | ----------------- |
 | `filesystem` | File system access | Yes (allowed paths) |
 | `fetch` | HTTP requests | No |
 | `memory` | Key-value storage | No |
@@ -270,13 +270,13 @@ mcp-hangar remove [OPTIONS] NAME
 ### Arguments
 
 | Argument | Required | Description |
-|----------|----------|-------------|
+| ---------- | ---------- | ------------- |
 | `NAME` | Yes | MCP Server name to remove |
 
 ### Options
 
 | Option | Short | Type | Default | Description |
-|--------|-------|------|---------|-------------|
+| -------- | ------- | ------ | --------- | ------------- |
 | `--yes` | `-y` | FLAG | false | Skip confirmation prompt |
 | `--keep-running` | - | FLAG | false | Don't stop running MCP server instance |
 
@@ -318,7 +318,7 @@ mcp-hangar [OPTIONS]
 ### Options
 
 | Option | Short | Type | Default | Env Variable | Description |
-|--------|-------|------|---------|--------------|-------------|
+| -------- | ------- | ------ | --------- | -------------- | ------------- |
 | `--http` | - | FLAG | false | `MCP_MODE=http` | Run in HTTP mode |
 | `--host` | - | TEXT | 0.0.0.0 | `MCP_HTTP_HOST` | HTTP server host |
 | `--port` | `-p` | INT | 8000 | `MCP_HTTP_PORT` | HTTP server port |
@@ -360,7 +360,7 @@ mcp-hangar serve --http --host 127.0.0.1 --port 8080
 When running in HTTP mode:
 
 | Endpoint | Method | Description |
-|----------|--------|-------------|
+| ---------- | -------- | ------------- |
 | `/mcp` | POST/GET | MCP protocol endpoint |
 | `/health/live` | GET | Liveness probe |
 | `/health/ready` | GET | Readiness probe |
@@ -416,7 +416,7 @@ mcp-hangar completion COMMAND
 ### Subcommands
 
 | Command | Description |
-|---------|-------------|
+| --------- | ------------- |
 | `bash` | Generate bash completion script |
 | `zsh` | Generate zsh completion script |
 | `fish` | Generate fish completion script |
@@ -487,7 +487,7 @@ mcp-hangar auth bootstrap-admin --config PATH --principal PRINCIPAL [OPTIONS]
 #### Options
 
 | Option | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `--config PATH` | Path to the server `config.yaml` whose durable auth backend to bootstrap. |
 | `--principal PRINCIPAL` | Existing external principal to grant global admin (e.g. `user:admin`). |
 | `--key-name NAME` | Human-readable label recorded for the bootstrap claim. |
@@ -549,7 +549,7 @@ off, rather than as a configuration error.
 `PATH` defaults to `$MCP_CONFIG`, then `./config.yaml`.
 
 | exit code | meaning |
-|---|---|
+| --- | --- |
 | `0` | every key is one Hangar reads |
 | `1` | at least one key is not |
 | `2` | the file is missing, or is not YAML |
@@ -624,7 +624,7 @@ event_store:
 ## Environment Variables
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+| ---------- | ------------- | --------- |
 | `MCP_CONFIG` | Path to configuration file | - |
 | `MCP_MODE` | Server mode (`stdio` or `http`) | `stdio` |
 | `MCP_HTTP_HOST` | HTTP server host | `0.0.0.0` |
@@ -637,7 +637,7 @@ event_store:
 ## Exit Codes
 
 | Code | Meaning |
-|------|---------|
+| ------ | --------- |
 | 0 | Success |
 | 1 | User error (invalid input, missing file, permission denied) |
 | 2 | System error (network failure, MCP server crash) |

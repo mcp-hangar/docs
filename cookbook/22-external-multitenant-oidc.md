@@ -371,7 +371,7 @@ tokens; Hangar only validates them.
 ## Troubleshooting Token Validation
 
 | Symptom | Likely cause | Fix |
-|---------|--------------|-----|
+| --------- | -------------- | ----- |
 | `401`, message `Invalid JWT audience` | token `aud` does not equal `auth.oidc.resource_uri` | add/repair the Keycloak audience mapper so `aud` is `http://localhost:8000` |
 | `401`, message `Untrusted JWT issuer` | token `iss` is not the configured issuer | align `auth.oidc.issuer` with the realm URL in the token's `iss` |
 | `401`, message `JWT token has expired` | clock skew or long-lived token | shorten `accessTokenLifespan`; mint a fresh token |
@@ -409,7 +409,7 @@ tenants are isolated and that access decisions fail closed.
 ## Key Config Reference
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| ----- | ------ | --------- | ------------- |
 | `tool_access.mode` | string | `egress` | Topology mode: `egress` or `front_door` |
 | `auth.enabled` | bool | `false` | Master switch for authentication |
 | `auth.allow_anonymous` | bool | `false` | If `true`, unauthenticated requests run as anonymous |

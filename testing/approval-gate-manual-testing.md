@@ -88,12 +88,12 @@ mcp_servers:
 
 ### Policy Precedence
 
-| List           | Effect          |
-|----------------|-----------------|
-| `deny_list`    | Blocked (highest) |
-| `approval_list`| Held for approval |
-| `allow_list`   | Immediate execution |
-| (none)         | Unrestricted    |
+| List | Effect |
+| ---------------- | ----------------- |
+| `deny_list` | Blocked (highest) |
+| `approval_list` | Held for approval |
+| `allow_list` | Immediate execution |
+| (none) | Unrestricted |
 
 A tool on `deny_list` is always blocked -- even if also on `approval_list`.
 
@@ -345,11 +345,11 @@ intended behaviour, not a failure to debug.
 
 ### 6.1 Roles
 
-| Role            | Can view approvals | Can resolve |
-|-----------------|-------------------|-------------|
-| mcp_server_admin  | Yes               | Yes         |
-| auditor         | Yes               | No          |
-| viewer          | No                | No          |
+| Role | Can view approvals | Can resolve |
+| ----------------- | ------------------- | ------------- |
+| mcp_server_admin | Yes | Yes |
+| auditor | Yes | No |
+| viewer | No | No |
 
 ### 6.2 Test Steps
 
@@ -367,12 +367,12 @@ intended behaviour, not a failure to debug.
 
 After each approval action, verify events in the event store/log:
 
-| Action   | Expected Event            |
-|----------|--------------------------|
-| Request  | `ToolApprovalRequested`  |
-| Approve  | `ToolApprovalGranted`    |
-| Deny     | `ToolApprovalDenied`     |
-| Timeout  | `ToolApprovalExpired`    |
+| Action | Expected Event |
+| ---------- | -------------------------- |
+| Request | `ToolApprovalRequested` |
+| Approve | `ToolApprovalGranted` |
+| Deny | `ToolApprovalDenied` |
+| Timeout | `ToolApprovalExpired` |
 
 Check via:
 

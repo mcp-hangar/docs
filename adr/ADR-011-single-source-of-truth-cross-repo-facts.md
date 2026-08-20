@@ -26,7 +26,7 @@ These are four symptoms of one defect: **there is no designated owner for any cr
 Preference order for consuming a fact: **link > generate > hand-copy.** A hand-copied cross-repo value is treated as a defect.
 
 | Fact | Owner (SSOT) | How every other repo consumes it |
-|------|--------------|----------------------------------|
+| ------ | -------------- | ---------------------------------- |
 | **Domain** | the constant `mcp-hangar.io` | Published docs and templates use it verbatim. A reusable CI lint rejects `*.github.io`, `*.vercel.app`, and `mcp-hangar.github.io` in tracked docs, so no other domain can regress in. |
 | **Released versions & digests** | the release-please manifests + GHCR, materialized into `docs/operations/RELEASE_COMPATIBILITY.md` (generated in CI, docs#56) | READMEs carry **no** hardcoded version numbers; they link to the releases page / the matrix. |
 | **Install commands** | one canonical **unpinned** snippet per artifact | The `helm-charts` and operator READMEs use the same snippet plus a note to pin a version from the compatibility matrix -- not two hand-written variants. |

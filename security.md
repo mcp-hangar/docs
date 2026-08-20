@@ -49,11 +49,11 @@ This project implements multiple security layers:
 
 ## Supported Versions
 
-| Version | Supported          |
+| Version | Supported |
 | ------- | ------------------ |
-| 2.0.x   | :white_check_mark: |
-| 1.6.x   | :x:                |
-| < 1.6   | :x:                |
+| 2.0.x | :white_check_mark: |
+| 1.6.x | :x: |
+| < 1.6 | :x: |
 
 Security fixes land on 2.0.x only. The 1.6.x line is closed — notably, the
 approval-resolution authorization fix released in 2.0.0 is **not** backported.

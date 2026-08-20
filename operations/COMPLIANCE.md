@@ -13,7 +13,7 @@ syslog.
 Two environment variables control the compliance pipeline:
 
 | Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
+| ---------- | ---------- | --------- | ------------- |
 | `MCP_COMPLIANCE_FORMAT` | Yes | _(unset)_ | Format to use: `cef`, `leef`, `jsonlines`, `json-lines`, `syslog`. Case-insensitive. |
 | `MCP_COMPLIANCE_OUTPUT` | No | stderr | File path to write output. When unset, lines go to stderr for container log collection. |
 
@@ -82,7 +82,7 @@ MCP_COMPLIANCE_FORMAT=jsonlines mcp-hangar serve --http --port 8000
 Each tool invocation record includes:
 
 | Field | Source | Notes |
-|-------|--------|-------|
+| ------- | -------- | ------- |
 | `mcp_server_id` | Event | MCP server that handled the call |
 | `tool_name` | Event | Tool name |
 | `status` | Event | `success` or `error` |

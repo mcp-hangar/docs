@@ -124,7 +124,7 @@ See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 ## Key Config Reference
 
 | Environment Variable | Type | Default | Description |
-|---------------------|------|---------|-------------|
+| --------------------- | ------ | --------- | ------------- |
 | `MCP_RATE_LIMIT_RPS` | float | `10` | Requests per second steady-state limit |
 | `MCP_RATE_LIMIT_BURST` | int | `20` | Maximum burst above the rate limit |
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.41](https://github.com/mcp-hangar/docs/compare/v1.1.40...v1.1.41) (2026-08-20)
+
+
+### Fixed
+
+* **repo:** catch up with the v1alpha2 CRD split, cover 2.13.0, and stop the freshness gate reading its own example ([#260](https://github.com/mcp-hangar/docs/issues/260)) ([911bbba](https://github.com/mcp-hangar/docs/commit/911bbbadb0fab1fbdbb5c475788a5ae8c3dab1a1))
+
+
+### Changed
+
+* **guides:** mirror the Helm 3/4 support statement into the install docs ([#257](https://github.com/mcp-hangar/docs/issues/257)) ([62ea5d4](https://github.com/mcp-hangar/docs/commit/62ea5d45487eadc5df4e694601b56614bb6c4df9)), closes [#235](https://github.com/mcp-hangar/docs/issues/235)
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#259](https://github.com/mcp-hangar/docs/issues/259)) ([fc9e575](https://github.com/mcp-hangar/docs/commit/fc9e5758a0f75ac5b2fba7faf00166ca4e452275))
+
 ## [1.1.40](https://github.com/mcp-hangar/docs/compare/v1.1.39...v1.1.40) (2026-08-18)
 
 

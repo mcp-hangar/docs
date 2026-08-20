@@ -319,15 +319,22 @@ spec:
 All MCP server pods run with secure defaults:
 
 ```yaml
-securityContext:
+podSecurityContext:
   runAsNonRoot: true
   runAsUser: 65534
+containerSecurityContext:
   readOnlyRootFilesystem: true
   allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
 ```
+
+The two fields mirror Kubernetes' own split: `podSecurityContext` is
+`corev1.PodSecurityContext` and applies to the pod, `containerSecurityContext`
+is `corev1.SecurityContext` and applies to the provider container. Settings
+that exist at only one level -- `readOnlyRootFilesystem`, `capabilities`,
+`allowPrivilegeEscalation` -- belong to the container one.
 
 Override if needed:
 
@@ -337,8 +344,9 @@ kind: MCPServer
 metadata:
   name: my-mcp-server
 spec:
-  securityContext:
+  podSecurityContext:
     runAsUser: 1000
+  containerSecurityContext:
     readOnlyRootFilesystem: false  # If mcp_server needs writable fs
 ```
 
@@ -515,8 +523,10 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 | `shutdownGracePeriod` | duration | No | `30s` | Pod termination grace period |
 | `resources` | object | No | - | Resource requirements |
 | `env` | array | No | - | Environment variables |
-| `volumes` | array | No | - | Volume mounts |
-| `securityContext` | object | No | secure defaults | Security context |
+| `volumes` | array | No | - | Pod volumes (`corev1.Volume`) |
+| `volumeMounts` | array | No | - | Where the provider container mounts them (`corev1.VolumeMount`) |
+| `podSecurityContext` | object | No | secure defaults | Pod-level security context (`corev1.PodSecurityContext`) |
+| `containerSecurityContext` | object | No | secure defaults | Container-level security context (`corev1.SecurityContext`) |
 | `serviceAccountName` | string | No | - | ServiceAccount |
 | `nodeSelector` | map | No | - | Node selection |
 | `tolerations` | array | No | - | Tolerations |

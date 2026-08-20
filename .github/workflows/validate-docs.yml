@@ -75,6 +75,11 @@ jobs:
             | tar xz -C /usr/local/bin --strip-components=1 "prometheus-${PROMETHEUS_VERSION#v}.linux-amd64/promtool"
           python docs/scripts/check_promql.py --docs docs
 
+      # The stripper decides what counts as code, a token and a claim, and every
+      # way it can be wrong is silent. Runs before the check it guards.
+      - name: Check the freshness gate's own parsing
+        run: python docs/scripts/check_freshness.py --selftest
+
       - name: Check version-currency claims and freshness tokens
         run: python docs/scripts/check_freshness.py --docs docs --source source
 

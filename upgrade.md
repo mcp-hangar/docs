@@ -4,6 +4,48 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.13.0
+
+No migration steps are required. Two changes are worth knowing about before
+you upgrade, both in `front_door` mode only -- `egress` mode is untouched.
+
+### An upstream's prompts and resources are now served
+
+The gateway previously projected tools and nothing else: an upstream's prompts
+were unreachable, and `resources/list` answered with only the
+`resource_link`s a tenant had already been handed. Both surfaces are now
+proxied in full, so after the upgrade a tenant sees prompts and resources it
+could not see before -- from its own upstreams only; cross-tenant isolation is
+unchanged.
+
+If you want either surface restricted, they are governed by the same policy
+surface tools use, keyed by kind:
+
+```yaml
+access:
+  prompt:   {deny_list: ["draft_*"]}
+  resource: {allow_list: ["docs://*"]}
+tool_projection:
+  withdrawn_prompts: [retired_prompt]
+  withdrawn_resources: ["demo://gone/1"]
+```
+
+`allow_list` / `deny_list` / `approval_list` mean exactly what they mean for
+tools, and an undefined block leaves that kind unrestricted -- the same rule
+tools have always followed. A resource is matched by its **upstream** uri
+(`demo://doc/1`), not the projected form below.
+
+### `resource_link` uris carry the owning upstream
+
+A projected resource uri is now `hangar://<upstream id>/<upstream uri>`, so two
+upstreams using the same scheme -- or the same uri -- no longer collide. The
+gateway translates back on `resources/read`, so nothing changes for a client
+that uses the links it is handed.
+
+This is not a migration step: the link map lives in a replica's memory, so an
+upgrade re-issues every link regardless. It matters only if you have tooling
+that parses these uris rather than passing them back verbatim.
+
 ## Upgrade to 2.12.0
 
 ### `truncation.cache_driver: redis` now fails closed (#1007)

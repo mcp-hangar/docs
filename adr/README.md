@@ -34,6 +34,7 @@ taxonomy, and formatting conventions.
 | [021](ADR-021-config-file-endpoints-outside-the-ssrf-policy.md) | A Remote Upstream in the Configuration File Stays Outside the SSRF Policy | Accepted | 2026-08-11 |
 | [022](ADR-022-the-management-surface-is-what-the-caller-may-call.md) | The Management Surface Is Whatever the Caller Is Allowed to Call | Accepted | 2026-08-11 |
 | [023](ADR-023-mcp-registry-listing.md) | The MCP Registry Entry Describes a Package, Not a Service | Accepted | 2026-08-16 |
+| [024](ADR-024-approval-hold-belongs-on-a-tool-call.md) | A Human Approval Hold Belongs on a Tool Call, Not on a Fetch | Accepted | 2026-08-23 |
 
 ## Summaries
 

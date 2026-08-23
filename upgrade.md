@@ -30,10 +30,16 @@ tool_projection:
   withdrawn_resources: ["demo://gone/1"]
 ```
 
-`allow_list` / `deny_list` / `approval_list` mean exactly what they mean for
-tools, and an undefined block leaves that kind unrestricted -- the same rule
-tools have always followed. A resource is matched by its **upstream** uri
-(`demo://doc/1`), not the projected form below.
+`allow_list` / `deny_list` mean exactly what they mean for tools, and an
+undefined block leaves that kind unrestricted -- the same rule tools have always
+followed. A resource is matched by its **upstream** uri (`demo://doc/1`), not the
+projected form below.
+
+`approval_list` is **not** among them. The human approval gate runs on tool calls
+and nowhere else, so an approval-listed prompt or resource is served immediately;
+2.13.0 said otherwise and was wrong. A later release refuses the key at load
+rather than accepting it silently -- until then, use `deny_list` for anything a
+prompt or resource surface must not hand out.
 
 ### `resource_link` uris carry the owning upstream
 

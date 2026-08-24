@@ -163,7 +163,7 @@ same rule an undefined `tools:` block has always followed.
 load. The approval gate runs on tool calls and nowhere else; a hold on a fetch is
 decided against in
 [ADR-024](../adr/ADR-024-approval-hold-belongs-on-a-tool-call.md). Use
-`deny_list` to withhold a prompt or a resource. Before 2.14.0 the key parsed,
+`deny_list` to withhold a prompt or a resource. Before 2.13.1 the key parsed,
 registered, and enforced nothing while the startup check refused the boot over it
 ([#1042](https://github.com/mcp-hangar/mcp-hangar/issues/1042)).
 
@@ -290,7 +290,7 @@ Two independent gates have to pass before delivery, and both fail closed:
 Listing does not ask for consent — only delivery does, so a `resources/list`
 carrying ten allowlisted `ui://` entries raises no prompts.
 
-Before 2.14.0 neither half was reachable: no configuration built a policy and no
+Before 2.13.1 neither half was reachable: no configuration built a policy and no
 consent gate was attached, so `ui://` was denied whatever the config said
 ([#1048](https://github.com/mcp-hangar/mcp-hangar/issues/1048)).
 

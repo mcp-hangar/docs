@@ -403,6 +403,55 @@ v2.6.0 that configuration **refuses to start**, naming the pins it found and the
 auth setting that makes them unmatchable. Use `tool_projection.pins` to pin
 without authentication; it holds every caller, including an anonymous one.
 
+## Header Exposure
+
+SEP-2243 lets a tool annotate an `inputSchema` property with `x-mcp-header`; a
+conforming client then sends that argument's value as an HTTP header. The spec's
+only defence against annotating a secret is a SHOULD NOT, so an upstream that
+annotates `api_key` obliges every client to put the key in front of every
+intermediary on the path.
+
+Since v2.14.0, `header_exposure` sits beside `tool_projection` on an MCP server
+or a group and says which parameter names you are willing to have exposed that
+way:
+
+```yaml
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: https://payments.example.com/mcp
+    header_exposure:
+      deny_annotated: ["*token*", "*secret*", "*password*", "api_key", "*_key"]
+      on_violation: withdraw          # warn (default) | withdraw | refuse_boot
+```
+
+| Key | Type | Default | Description |
+| ----- | ------ | --------- | ------------- |
+| `header_exposure.deny_annotated` | `list[str]` | `[]` | Globs matched case-insensitively against both the `x-mcp-header` token and the property path |
+| `header_exposure.on_violation` | `str` | `warn` | `warn`, `withdraw`, or `refuse_boot`. Any other value is rejected at parse |
+
+`warn` serves the tool and logs; `withdraw` withholds it from `tools/list` and
+answers `-32601` on the call; `refuse_boot` refuses to serve the catalogue at
+all. The default is `warn`, so adding the block does not change what a client
+sees until you choose otherwise.
+
+An unknown `on_violation` **refuses the configuration** rather than falling back
+to the default -- the same contract as an unknown `arguments.secretPatterns`
+group in an egress policy, and for the same reason: a control that reports as
+enforcing while its action never fires is worse than one that is off.
+
+The block is a config overlay, so deleting it and reloading restores whatever it
+withheld. A group member inherits the block declared on its group.
+
+Independently of any configuration, a tool whose `x-mcp-header` annotations are
+*syntactically* invalid is withheld from the front-door projection since v2.14.0
+-- a conforming client drops it on arrival, so advertising it handed out a tool
+nobody could call. Both controls are counted by
+`mcp_hangar_projection_withdrawals_total{reason}`.
+
+See the [front-door guide](../guides/FRONT_DOOR.md) for the full behaviour,
+including why the projected schema is never edited.
+
 ## `execution`
 
 System-wide concurrency limits.

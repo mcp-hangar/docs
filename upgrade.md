@@ -4,6 +4,100 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.13.1
+
+**One thing can stop a gateway that started yesterday**, and it is a
+configuration refusal rather than a runtime failure. Everything else here is a
+control that begins working; read it if you run groups, because things that were
+served may stop being served -- which is the point.
+
+### `approval_list` under `access:` now refuses the load
+
+A config that declares `approval_list` inside an `access.prompt` or
+`access.resource` block is refused when it is read:
+
+```text
+ConfigurationError: access.resource.approval_list on mcp_servers.docs_server asks
+for a human approval hold that no resource path performs: the gate runs on tool
+calls only …
+```
+
+2.13.0 accepted the key, registered it, and enforced nothing -- the item was
+listed and served with no hold -- while the startup reachability check read the
+same key and refused the boot over it if no approval gate was wired. One
+configuration, fail-open at request time and fail-closed at boot.
+
+Find it before you upgrade:
+
+```bash
+grep -rn -A5 "access:" /etc/mcp-hangar/ | grep -n "approval_list"
+```
+
+Replace it with `deny_list`, which hides the item from every listing and answers
+a fetch the way a nonexistent one is answered. A hold on a fetch is decided
+against in [ADR-024](adr/ADR-024-approval-hold-belongs-on-a-tool-call.md);
+`tools.approval_list` is unaffected and keeps holding tool calls.
+
+The mirrored half is a relief rather than a step: a `[prompt]` / `[resource]`
+policy no longer demands an approval gate at startup, so a deployment that set
+`approvals.enabled: false` and carried such a policy stops being refused for a
+gate it does not need.
+
+### A group's policies and withdrawals now enforce
+
+A group and its members are one logical server, and every governed lookup had
+two possible keys -- the group id and the member id -- with different surfaces
+picking different ones. Four declarations that parsed and did nothing now do
+what they say:
+
+| Declared on a group | Before | Now |
+| --- | --- | --- |
+| `access.prompt` / `access.resource` | inert | governs the group's prompts and resources |
+| `tool_projection:` | not parsed at all | withdrawals and pins, keyed under the group |
+| a member's `withdrawn_prompts` / `withdrawn_resources` | invisible to those surfaces | hides the item for the whole group |
+| a member's withdrawal or digest pin, on a group-routed call | not consulted | enforced |
+
+So after the upgrade a tenant may see fewer prompts and resources, and a
+group-routed tool call may be refused with `ToolWithdrawnError` or
+`ToolDigestMismatchError` where it previously ran. Every one of those refusals is
+a control an operator had already written. If you want the old behaviour for a
+particular item, remove the declaration rather than leaving it in place expecting
+it to be ignored.
+
+Check what a group actually enforces before upgrading by reading the same
+declarations back:
+
+```bash
+grep -rn -A10 "mode: group" /etc/mcp-hangar/ | grep -E "access:|tool_projection:|withdrawn"
+```
+
+### Human approval works again in `front_door`
+
+Every approved tool call was refused at dispatch in `front_door` mode --
+`Approval no longer valid at dispatch: tool is no longer allowed by policy` --
+because the post-hold re-check resolved policy without the caller's tenant, which
+is the fail-closed missing-identity branch. If you turned `approval_list` off to
+get past it, you can turn it back on.
+
+### New: `ui_resources:`
+
+SEP-1865 `ui://` resources can now be allowlisted and consented to instead of
+only denied. **A deployment that does not configure it sees no change** -- every
+`ui://` resource stays denied, as it has been.
+
+```yaml
+ui_resources:
+  tenants:
+    "tenant:a":
+      allowlist: ["ui://reports/"]
+```
+
+Both gates must pass: the allowlist, and a human consent on `resources/read`
+delivered through the approval gate. A deployment with no approval gate wired
+cannot deliver a `ui://` resource at all -- consent is mandated by the spec and
+cannot be switched off from the file. See
+[`ui_resources`](reference/configuration.md#ui_resources).
+
 ## Upgrade to 2.13.0
 
 No migration steps are required. Two changes are worth knowing about before
@@ -37,9 +131,9 @@ projected form below.
 
 `approval_list` is **not** among them. The human approval gate runs on tool calls
 and nowhere else, so an approval-listed prompt or resource is served immediately;
-2.13.0 said otherwise and was wrong. A later release refuses the key at load
-rather than accepting it silently -- until then, use `deny_list` for anything a
-prompt or resource surface must not hand out.
+2.13.0 said otherwise and was wrong. 2.13.1 refuses the key at load rather than
+accepting it silently -- see [Upgrade to 2.13.1](#upgrade-to-2131). Use
+`deny_list` for anything a prompt or resource surface must not hand out.
 
 ### `resource_link` uris carry the owning upstream
 

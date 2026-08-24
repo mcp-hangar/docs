@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.42](https://github.com/mcp-hangar/docs/compare/v1.1.41...v1.1.42) (2026-08-24)
+
+
+### Changed
+
+* approval_list does not work for prompts or resources ([#263](https://github.com/mcp-hangar/docs/issues/263)) ([5ce5ac6](https://github.com/mcp-hangar/docs/commit/5ce5ac6d860bd3374a4ea77284396c66db4577c4))
+* **architecture:** ADR-024 -- a human hold belongs on a tool call, not a fetch ([#266](https://github.com/mcp-hangar/docs/issues/266)) ([85fa971](https://github.com/mcp-hangar/docs/commit/85fa971c140d63e0f7274d2026fd00e68201256c))
+* **guides:** bring over upgrade notes for the latest release ([#273](https://github.com/mcp-hangar/docs/issues/273)) ([7c18ab5](https://github.com/mcp-hangar/docs/commit/7c18ab5c3e4b6de5f772c7c3379c84d424a05b98))
+* **guides:** document header exposure and the x-mcp-header controls ([#272](https://github.com/mcp-hangar/docs/issues/272)) ([d5babca](https://github.com/mcp-hangar/docs/commit/d5babca21e9a7e565e4f0782777411f6201d176a)), closes [#271](https://github.com/mcp-hangar/docs/issues/271)
+* **guides:** upgrade note for 2.13.1 ([#268](https://github.com/mcp-hangar/docs/issues/268)) ([d62f48e](https://github.com/mcp-hangar/docs/commit/d62f48e10e2a791019789377044c6840b6da40ef))
+* **reference:** document the access: and ui_resources: config blocks ([#267](https://github.com/mcp-hangar/docs/issues/267)) ([22140fa](https://github.com/mcp-hangar/docs/commit/22140fa74224900303a92e2335b1a8e7544e2b0d))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#261](https://github.com/mcp-hangar/docs/issues/261)) ([22d00ec](https://github.com/mcp-hangar/docs/commit/22d00ecd760846145c43e55eb21bce74ef4ae956))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#270](https://github.com/mcp-hangar/docs/issues/270)) ([90da218](https://github.com/mcp-hangar/docs/commit/90da2180cd3544a1b7b4e478ab53b215870ec3aa))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#274](https://github.com/mcp-hangar/docs/issues/274)) ([34d5485](https://github.com/mcp-hangar/docs/commit/34d5485a4517d1c9f03f167ae35b0daa3bb1f2de))
+
 ## [1.1.41](https://github.com/mcp-hangar/docs/compare/v1.1.40...v1.1.41) (2026-08-20)
 
 

@@ -188,6 +188,91 @@ mcp_servers:
 > `src/mcp_hangar/application/read_models/tool_projection.py`
 > (`ToolProjectionRegistry`).
 
+## Header Exposure (`x-mcp-header`)
+
+SEP-2243 lets a tool annotate an `inputSchema` property with `x-mcp-header`. A
+conforming client then sends that argument's **value as an HTTP header** rather
+than in the body, so an intermediary can route on it without parsing the
+request. Two controls sit on that, one unconditional and one you configure.
+
+### Invalid annotations withdraw the tool (no configuration)
+
+The spec makes it a client-side **MUST**: a client drops any tool whose
+`x-mcp-header` annotations are invalid — the annotation must sit on a property
+reachable through a pure `properties` chain, name an RFC 9110 token, be on an
+`integer`/`string`/`boolean` property, and be unique across the schema.
+
+Hangar forwards an upstream definition verbatim, so before v2.14.0 it advertised
+such a tool and counted it as surface delivered while every conforming client
+silently dropped it. Since v2.14.0 the tool is **withheld at the projection**:
+absent from `tools/list`, and `-32601` on the call. Shown and callable stay the
+same set.
+
+A log line names the tool and the reason, and the withdrawal is counted by
+`mcp_hangar_projection_withdrawals_total{reason="invalid_x_mcp_header"}`.
+
+### `header_exposure`: what an upstream may oblige a client to expose
+
+The spec's only defence against annotating a **secret** is a SHOULD NOT. An
+upstream that annotates `api_key` obliges every conforming client to put the key
+in an HTTP header, where every intermediary on the path can read it — and no
+client-side rule stops it. `header_exposure` is the enforcement point that
+SHOULD is missing.
+
+```yaml
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: https://payments.example.com/mcp
+    header_exposure:
+      deny_annotated: ["*token*", "*secret*", "*password*", "api_key", "*_key"]
+      on_violation: withdraw          # warn (default) | withdraw | refuse_boot
+```
+
+`deny_annotated` globs are matched **case-insensitively against two things**:
+the annotation token and the property path. An upstream can name the property
+`api_key` and send it as `X-Key`, or name it `credential` and send it as
+`X-Auth-Token`; either spelling is the same exposure, so either matches.
+
+| `on_violation` | Effect |
+| ---------------- | -------- |
+| `warn` (default) | The tool is served. A warning names it, and the metric counts it. |
+| `withdraw` | The tool is withheld, exactly as an invalid annotation is. |
+| `refuse_boot` | The catalogue is not served at all; `tools/list` fails. |
+
+An unknown `on_violation` is **refused at parse**, not defaulted — a typo that
+silently resolved to `warn` would report the control as enforcing while the
+action you asked for never happened.
+
+Withdrawals land on
+`mcp_hangar_projection_withdrawals_total{reason="header_exposure_<action>"}`.
+
+#### Three things worth being precise about
+
+**`refuse_boot` refuses to serve the catalogue, not to start the process.** The
+violation is only knowable after an upstream's tools have been discovered, so
+there is no earlier point at which it exists. Choose it when a smaller catalogue
+would be a worse outcome than an unavailable one.
+
+**It governs what leaves in a header, not what a tool accepts.** An
+*unannotated* `api_key` parameter is not an exposure and is not denied. The
+control is about the SEP-2243 header path; use the tool access policy to govern
+which tools a tenant may call at all.
+
+**The schema is never edited.** Stripping the offending annotation would change
+the `inputSchema` and therefore the JCS digest over
+`{name, description, inputSchema, outputSchema}` — it would move every pin and
+read as upstream drift. A warned tool is served byte-identical to what the
+upstream returned.
+
+A member of a group inherits the block its group declares, so a
+`header_exposure` written once on the group covers every member. Deleting the
+block and reloading restores the tools it withheld.
+
+> Source: `src/mcp_hangar/domain/policies/header_exposure.py`,
+> `src/mcp_hangar/fastmcp_server/flat_tool_projection.py`
+> (`_invalid_header_annotation`, `_denied_header_exposure`).
+
 ## Flat Per-Tenant Tool Re-Export
 
 In `egress` mode, clients see Hangar's `hangar_*` meta-API (`hangar_list`,

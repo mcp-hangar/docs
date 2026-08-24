@@ -130,6 +130,43 @@ The same block is accepted at every scope that takes an access policy — an
 `tool_access.member` block — and all four go through one parser, so a key cannot
 be honoured at one scope and dropped at another.
 
+### Prompts and resources (`access`)
+
+`tools:` governs tools. The sibling `access:` block governs the other two kinds
+with the same parser, the same value object and the same resolver — only the
+kind the policy is keyed under differs:
+
+```yaml
+mcp_servers:
+  docs_server:
+    mode: remote
+    endpoint: https://docs.example.com/mcp
+    access:
+      prompt:
+        deny_list: ["draft_*"]
+      resource:
+        allow_list: ["docs://*"]
+```
+
+A resource is matched by its **upstream** URI (`docs://guide/1`), not the
+`hangar://<upstream>/…` form the gateway projects — the upstream form is the
+stable identity, and the owning server is already the policy scope.
+
+Enforcement lands at both ends of every surface: `prompts/list` + `prompts/get`,
+`resources/list` + `resources/templates/list` + `resources/read`, and the
+handed-out `resource_link` catalogue. A denied item is absent from the listing
+**and** refused on fetch, with the refusal indistinguishable from the one a
+nonexistent item gets. An undefined block leaves that kind unrestricted, the
+same rule an undefined `tools:` block has always followed.
+
+`approval_list` is **not** accepted here, and a config carrying it is refused at
+load. The approval gate runs on tool calls and nowhere else; a hold on a fetch is
+decided against in
+[ADR-024](../adr/ADR-024-approval-hold-belongs-on-a-tool-call.md). Use
+`deny_list` to withhold a prompt or a resource. Before 2.14.0 the key parsed,
+registered, and enforced nothing while the startup check refused the boot over it
+([#1042](https://github.com/mcp-hangar/mcp-hangar/issues/1042)).
+
 ### Holding a tool for a human (`approval_list`)
 
 `approval_list` marks tools as visible but gated: the caller's `tools/call` is
@@ -212,6 +249,50 @@ gateway from the client side. That is why the startup check reports it, and why
 Note the interaction with [`startup_checks`](#startup_checks): disabling the gate
 while a policy still names `approval_list` makes the server **refuse to boot**,
 rather than start and execute those calls ungated.
+
+## `ui_resources`
+
+MCP Apps (SEP-1865) lets an upstream hand back a `ui://` resource that a client
+renders in a webview — an execution and exfiltration surface, so Hangar gates it
+separately from ordinary resources and **denies every `ui://` resource by
+default**.
+
+```yaml
+ui_resources:
+  tenants:
+    "tenant:a":
+      allowlist:
+        - "ui://reports/"          # trailing "/" grants a path prefix
+        - "ui://dash/q3"           # exact URI
+        - "ui://widgets/*"         # explicit wildcard
+      csp: "default-src 'none'; script-src 'self'"   # optional
+```
+
+| Key | Type | Default | Description |
+| ----- | ------ | --------- | ------------- |
+| `tenants.<id>.allowlist` | `list[str]` | `[]` | `ui://` URIs, path prefixes (trailing `/`) or wildcards (trailing `*`) this tenant may be served. Empty denies everything |
+| `tenants.<id>.csp` | `str` | *(restrictive default)* | Content-Security-Policy attached to an allowed `ui://` resource |
+
+Two independent gates have to pass before delivery, and both fail closed:
+
+1. **The allowlist.** A tenant with no entry — and a caller carrying no tenant —
+   keeps the empty allowlist, so the resource is absent from `resources/list` and
+   `resources/read` answers the way it does for a URI that does not exist. An
+   unparseable entry is skipped with a warning, which leaves that tenant denied.
+2. **Consent.** An allowlisted `ui://` resource is still held for a human
+   decision on `resources/read`, delivered and resolved exactly like a tool
+   approval. Consent cannot be switched off from the file: SEP-1865 mandates it,
+   and it is the one hold that belongs on a fetch
+   ([ADR-024](../adr/ADR-024-approval-hold-belongs-on-a-tool-call.md)). A
+   deployment with no approval gate wired therefore cannot deliver a `ui://`
+   resource at all.
+
+Listing does not ask for consent — only delivery does, so a `resources/list`
+carrying ten allowlisted `ui://` entries raises no prompts.
+
+Before 2.14.0 neither half was reachable: no configuration built a policy and no
+consent gate was attached, so `ui://` was denied whatever the config said
+([#1048](https://github.com/mcp-hangar/mcp-hangar/issues/1048)).
 
 ## `startup_checks`
 

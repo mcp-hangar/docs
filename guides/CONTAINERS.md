@@ -6,8 +6,7 @@ Run MCP servers in Docker or Podman containers.
 
 Nothing to build: the servers from
 [modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers)
-are published as images by Docker. Which of them to use, and when an image is
-the wrong answer, is in [The official MCP servers](OFFICIAL_SERVERS.md).
+are published as images by Docker.
 
 ```bash
 # Pull the official images

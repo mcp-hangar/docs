@@ -80,6 +80,7 @@ mcp-hangar serve --http --port 8000
 - [Architecture Overview](architecture/OVERVIEW.md)
 - [Progressive Deployment Playbook](guides/DEPLOYMENT_PLAYBOOK.md)
 - [REST API Guide](guides/REST_API.md)
+- [The official MCP servers](guides/OFFICIAL_SERVERS.md)
 - [Container Guide](guides/CONTAINERS.md)
 - [Authentication & RBAC](guides/AUTHENTICATION.md)
 - [Front-Door Mode & Per-Tenant Tool Governance](guides/FRONT_DOOR.md)

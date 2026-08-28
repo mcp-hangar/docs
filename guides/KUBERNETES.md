@@ -201,7 +201,10 @@ metadata:
   name: expensive-tool
 spec:
   mode: container
-  image: ghcr.io/my-org/expensive-tool:latest
+  # A placeholder for your own expensive provider -- deliberately not a
+  # pullable name. For a provider you can actually run today, see
+  # OFFICIAL_SERVERS.md.
+  image: registry.example.com/your-org/expensive-tool:latest
 
   # Start with 0 replicas - will start on first request
   replicas: 0

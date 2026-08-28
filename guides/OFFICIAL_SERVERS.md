@@ -97,6 +97,39 @@ No container runtime (podman or docker) found on PATH.
 Use this when Hangar runs on the host, not in a container. See
 [Container MCP servers](CONTAINERS.md).
 
+## Running the stdio six behind a bridge
+
+Six of the seven speak only stdio, and a Kubernetes Service cannot address a
+pipe. The shape that works is one `mcp-proxy` per server, in the same pod or
+compose service, spawning the child with its stdio attached and serving it as
+Streamable HTTP; Hangar then registers each as `mode: remote`.
+
+Three things that cost a day to find the first time:
+
+- **Pin `mcp-proxy` to 0.12.0 or newer.** Earlier lines are SSE-only; 0.12.0 is
+  the first that mounts Streamable HTTP at `/mcp` in server mode.
+- **Pin the SDK to `mcp==1.28.1` in that image.** The reference servers are
+  still SDK 1.x software, their own `uv.lock` files say so, and `mcp-proxy`
+  0.12.0 imports `request_ctx` from `mcp.server.lowlevel.server`, which SDK
+  2.0.0 no longer exports. Unpinned, `pip` takes 2.0.0 and every one of those
+  containers crash-loops on the `ImportError`.
+- **`mcp-proxy` does not pass its own environment to the child.** Anything the
+  server needs has to be given explicitly.
+
+One of those explicit variables matters more than it looks. `mcp-server-fetch`
+extracts content with `readabilipy`, which -- *if it can see `node` on `PATH`* --
+shells out to `npm install` on the first call. In an image that also carries the
+TypeScript servers, node is there, so `fetch` reaches for `registry.npmjs.org`
+mid-call. Behind an egress policy that does not allow it, the packets are
+dropped silently, `npm` has no timeout, and the first bound anything hits is the
+gateway's 60s `tools/call` timeout -- three of which trip the circuit breaker
+and leave the server looking dead. Give that child a `PATH` without node and
+`fetch` answers in ~200ms, with a denied host refused in 5s.
+
+**A denied egress is a silent drop, not an error.** Any upstream that dials
+out mid-call needs a timeout of its own; the policy is doing its job and the
+caller cannot tell it apart from a hang.
+
 ## Governing them
 
 Once one is registered, it is an upstream like any other:

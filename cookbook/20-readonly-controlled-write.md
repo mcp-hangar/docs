@@ -33,28 +33,29 @@ where required, and an event store that is either durable or refuses to start.
 
 mcp_servers:
 
-  # Stateless provider -- read-only, no volume, fully sandboxed.
-  # read_only defaults to true; network none is the default. Both are shown
-  # here for clarity.
+  # Stateless provider -- read-only root, no volume. It fetches, so it is the
+  # one provider here that needs a network namespace; everything else about it
+  # stays locked down.
   fetch:
     mode: container
-    image: localhost/mcp-fetch:latest
+    image: docker.io/mcp/fetch:latest
     read_only: true                        # NEW: read-only root filesystem (default)
-    network: none                          # NEW: no network namespace (default)
+    network: bridge                        # NEW: this provider needs egress
     resources:
       memory: 256m                         # NEW: memory ceiling
       cpu: "0.5"                           # NEW: CPU ceiling
     idle_ttl_s: 180
 
   # Stateful provider -- STILL read-only root, but one writable volume where
-  # the process genuinely persists data. Everything else stays locked down.
-  sqlite:
+  # the process genuinely persists data. Everything else stays locked down,
+  # including the network: a knowledge graph has nobody to talk to.
+  memory:
     mode: container
-    image: localhost/mcp-sqlite:latest
+    image: docker.io/mcp/memory:latest
     read_only: true                        # NEW: root stays read-only
     volumes:
-      - "/srv/hangar/sqlite:/data:rw"      # NEW: the ONLY writable path (absolute)
-    network: bridge                        # NEW: this provider needs egress
+      - "/srv/hangar/memory:/app/data:rw"  # NEW: the ONLY writable path (absolute)
+    network: none                          # NEW: no network namespace (default)
     idle_ttl_s: 300
 
 # Durable audit/event store. On a read-only Hangar deploy the path below MUST
@@ -72,7 +73,7 @@ event_store:
    the directory that backs the durable event store:
 
    ```bash
-   sudo mkdir -p /srv/hangar/sqlite /srv/hangar/events
+   sudo mkdir -p /srv/hangar/memory /srv/hangar/events
    ```
 
 2. Start Hangar with a read-only root filesystem, granting write access only to
@@ -172,7 +173,7 @@ non-root process can write to it while everything else stays read-only.
 | Component | Root filesystem | Writable mount | Why |
 | ----------- | ----------------- | ---------------- | ----- |
 | Stateless provider (fetch, calculators) | read-only | none | Never persists; a write is a red flag |
-| Stateful provider (sqlite, memory) | read-only | one `:rw` volume | Persists to a single audited path |
+| Stateful provider (a memory store, a database) | read-only | one `:rw` volume | Persists to a single audited path |
 | Hangar event store | read-only | `/app/data` (`:rw`) | Durable audit/event-sourcing trail |
 | Any provider's `/tmp` | read-only | tmpfs (automatic) | Scratch space, wiped on exit |
 

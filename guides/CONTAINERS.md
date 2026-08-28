@@ -4,24 +4,39 @@ Run MCP servers in Docker or Podman containers.
 
 ## Quick Start
 
+Nothing to build: the servers from
+[modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers)
+are published as images by Docker.
+
 ```bash
-# Build images
-podman build -t localhost/mcp-sqlite -f docker/Dockerfile.sqlite .
-podman build -t localhost/mcp-memory -f docker/Dockerfile.memory .
-podman build -t localhost/mcp-filesystem -f docker/Dockerfile.filesystem .
-podman build -t localhost/mcp-fetch -f docker/Dockerfile.fetch .
+# Pull the official images
+podman pull docker.io/mcp/filesystem:latest
+podman pull docker.io/mcp/memory:latest
+podman pull docker.io/mcp/fetch:latest
 
 # Create data directories
-mkdir -p data/sqlite data/memory data/filesystem
+mkdir -p data/memory data/filesystem
 ```
+
+> Hangar used to ship `docker/Dockerfile.*` for these, and this guide gave the
+> `podman build` commands. Two of them repackaged the same official npm
+> package, one repackaged a third-party fork, and nothing in the repository
+> built any of them -- so they were deleted (core#1095). There is no official
+> `sqlite` server: that one was a third-party package whose upstream is
+> archived, and it has no replacement here.
+
+For a server you drive as a **subprocess** rather than a container, prefer the
+packages over the images -- `npx -y @modelcontextprotocol/server-filesystem`,
+`uvx mcp-server-fetch`. They are released continuously, while the published
+container images for `filesystem` and `memory` were last rebuilt in 2025.
 
 ## Configuration
 
 ```yaml
 mcp_servers:
-  sqlite:
+  filesystem:
     mode: container
-    image: localhost/mcp-sqlite:latest
+    image: docker.io/mcp/filesystem:latest
     volumes:
       - "/absolute/path/to/data:/data:rw"
     network: bridge
@@ -76,33 +91,17 @@ mcp_servers:
 
 ## Available Images
 
-### SQLite
-
-```yaml
-sqlite:
-  mode: container
-  image: localhost/mcp-sqlite:latest
-  volumes:
-    - "/path/to/data:/data:rw"
-  network: bridge
-```
-
-Tools: `query`, `execute`, `list-tables`, `describe-table`, `create-table`
-
-```python
-hangar_call(calls=[{"mcp_server": "sqlite", "tool": "execute",
-                    "arguments": {"sql": "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)"}}])
-
-hangar_call(calls=[{"mcp_server": "sqlite", "tool": "query",
-                    "arguments": {"sql": "SELECT * FROM users"}}])
-```
+These are the servers from
+[modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers)
+that Docker publishes. There is **no official SQLite server** -- the upstream
+one is archived -- so this guide no longer lists one.
 
 ### Memory (Knowledge Graph)
 
 ```yaml
 memory:
   mode: container
-  image: localhost/mcp-memory:latest
+  image: docker.io/mcp/memory:latest
   volumes:
     - "/path/to/data:/app/data:rw"
 ```
@@ -121,7 +120,7 @@ hangar_call(calls=[{"mcp_server": "memory", "tool": "create_entities",
 ```yaml
 filesystem:
   mode: container
-  image: localhost/mcp-filesystem:latest
+  image: docker.io/mcp/filesystem:latest
   volumes:
     - "/path/to/sandbox:/data:rw"
 ```
@@ -133,7 +132,7 @@ Tools: `read_file`, `write_file`, `list_directory`
 ```yaml
 fetch:
   mode: container
-  image: localhost/mcp-fetch:latest
+  image: docker.io/mcp/fetch:latest
   network: bridge
 ```
 
@@ -150,11 +149,11 @@ hangar_call(calls=[{"mcp_server": "fetch", "tool": "fetch",
 
 ```bash
 # Verify image
-podman images localhost/mcp-sqlite
+podman images docker.io/mcp/filesystem
 
 # Test manually
 echo '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{}}' | \
-  podman run --rm -i -v /path/to/data:/data:rw localhost/mcp-sqlite:latest
+  podman run --rm -i -v /path/to/data:/data:rw docker.io/mcp/filesystem:latest
 ```
 
 ### Data not persisting
@@ -165,7 +164,7 @@ echo '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{}}' | \
 
    ```bash
    podman run --rm -v /path/to/data:/data:rw --entrypoint sh \
-     localhost/mcp-sqlite:latest -c "ls -la /data"
+     docker.io/mcp/filesystem:latest -c "ls -la /data"
    ```
 
 ### Permission denied

@@ -86,6 +86,8 @@ Create `~/.config/mcp-hangar/config.yaml`:
 
 ```yaml
 mcp_servers:
+  # Both are official servers from modelcontextprotocol/servers; the full list,
+  # with what each one needs, is in ../guides/OFFICIAL_SERVERS.md
   filesystem:
     mode: subprocess
     command: [npx, -y, "@modelcontextprotocol/server-filesystem"]

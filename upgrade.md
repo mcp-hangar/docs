@@ -4,6 +4,75 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.15.0
+
+### A merged tool-access policy narrows to what it always said (#1106)
+
+Merging a narrower scope onto a broader one could **widen** access. A tool
+denied at the server scope came back allowed as soon as a group scope declared
+an allow list -- for example a server-level `allow: ["*"], deny: ["drop_*"]`
+merged with a group-level `allow: ["*"]` allowed `drop_db`. `merge()` dispatched
+on which lists were populated and each branch rebuilt part of the
+deny > approval > allow > default ladder from the lists its own condition named,
+dropping the rest.
+
+**A tool that has been callable may stop being callable after this upgrade.**
+That is the correct behaviour -- the policy always said so -- and it is still a
+surprise if you have been relying on the widened set. Check the effective policy
+for each identity before upgrading:
+
+```bash
+hangar tools list --identity <principal>
+```
+
+Anything that disappears was denied by one of the scopes all along.
+
+### Deeply nested tool arguments are denied instead of crashing (#1102)
+
+`evaluate()` could propagate a `RecursionError` out of the policy plane: JSON
+nested deeper than the encoder can walk (about 992 levels on CPython 3.11, ~7 KB
+of payload) raised instead of returning a verdict. `maxPayloadBytes` was no
+defence, because the size check reads the string the serializer produces.
+
+In **Enforce** the call was refused before, but by accident of ordering rather
+than by decision -- no `EgressPolicyDeniedError`, no observation, no audit
+entry. It is now a DENY with a reason, and the refusal is recorded. In **Audit**
+the exception aborted the call before dispatch, which is the opposite of what
+ADR-013 documents as the safe adoption path; audit now records and lets the call
+through, as it always should have.
+
+If you have a legitimate caller sending deeply nested arguments, it will now see
+a denial with `arguments could not be serialized for policy inspection` rather
+than an unattributed failure. Flatten the payload or raise nothing -- there is no
+flag to restore the old behaviour, because the old behaviour was a crash.
+
+### The front door advertises two more capabilities (#1027, #1026)
+
+`front_door` now serves `subscriptions/listen` and `completion/complete` for
+prompt arguments, so clients see `resources.subscribe`, the three `listChanged`
+flags and `completions` where they previously saw nothing. This is additive --
+no configuration changes -- but a client that adapts to advertised capabilities
+will start using surfaces it skipped before.
+
+Outside `front_door` mode the `subscriptions/listen` handler is now **withdrawn**
+rather than advertised: nothing published to it, and the modern protocol derives
+all four subscription flags from its presence. A client that called it in
+registry mode and got an empty stream now gets method-not-found, which is the
+honest answer.
+
+### If you built the demo images by hand (#1095, #1097)
+
+`docker/Dockerfile.{fetch,filesystem,memory,sqlite,math}` and
+`examples/discovery/Dockerfile.test-provider` are gone. Nothing in the
+repository built them, and `scripts/containers.sh` referenced images no command
+produced while sending every failure to `/dev/null`.
+
+The replacements are the official servers from
+[modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers);
+[the guide](guides/OFFICIAL_SERVERS.md) says which to use for each of the three
+wiring shapes. There is **no official SQLite server** -- the upstream one is
+archived -- so if you ran that image, it has no direct replacement.
+
 ## Upgrade to 2.14.0
 
 ### A front-door tool can disappear, with no config change (#1056)

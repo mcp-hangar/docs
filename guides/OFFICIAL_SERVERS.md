@@ -11,7 +11,7 @@ Tool counts are from a real run through a gateway, not from the upstream
 READMEs.
 
 | Server | Package | Tools | Transport | Wants |
-|---|---|---|---|---|
+| ------ | ------- | ----- | --------- | ----- |
 | `everything` | `@modelcontextprotocol/server-everything` | many | **stdio and HTTP** | nothing |
 | `fetch` | `mcp-server-fetch` (PyPI) | 1 | stdio | network egress |
 | `filesystem` | `@modelcontextprotocol/server-filesystem` | 14 | stdio | a sandbox directory |

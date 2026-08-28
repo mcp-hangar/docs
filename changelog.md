@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.44](https://github.com/mcp-hangar/docs/compare/v1.1.43...v1.1.44) (2026-08-28)
+
+
+### Changed
+
+* **guides:** link the containers guide to the official-servers page ([#281](https://github.com/mcp-hangar/docs/issues/281)) ([5908e15](https://github.com/mcp-hangar/docs/commit/5908e15b9fbf37439f7d6de39b95327b3d2929f6))
+* **guides:** one canonical page for the official servers ([#279](https://github.com/mcp-hangar/docs/issues/279)) ([1b19166](https://github.com/mcp-hangar/docs/commit/1b191669c914ee6332c37a41cdce2786f4ab9f4f))
+* **guides:** the containers guide uses the official images ([#278](https://github.com/mcp-hangar/docs/issues/278)) ([ed13ecc](https://github.com/mcp-hangar/docs/commit/ed13eccc6369f2866c979faf00efa8f027bf998b))
+
 ## [1.1.43](https://github.com/mcp-hangar/docs/compare/v1.1.42...v1.1.43) (2026-08-24)
 
 

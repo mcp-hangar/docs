@@ -19,10 +19,11 @@ The `mcp` SDK enforces that agreement pre-dispatch for `Mcp-Param-*` headers, an
 so **fail-open by design**. `_mcp_param_rejection` resolves the called tool's schema
 through a nested `tools/list`, and `_tool_input_schema` returns `None` -- validation
 skipped, dispatch continues -- when that listing raises, when it never advertises the
-called tool, when the tool's own annotations are invalid, or when pagination does not
-terminate. The comment in the SDK is explicit that this is deliberate: header validation
-must never break a working call path. On a legacy protocol revision the ladder is not
-reached at all.
+called tool, or when pagination does not terminate. A schema that does resolve can still
+produce no rejection: `validate_mcp_param_headers` returns early when the tool's own
+`x-mcp-header` annotations are invalid. The comment in the SDK is explicit that this is
+deliberate: header validation must never break a working call path. On a legacy protocol
+revision the ladder is not entered at all.
 
 Two things changed on our side of that boundary in v2.14.0, and together they turn an
 SDK design choice into a Hangar trust decision.
@@ -54,26 +55,46 @@ selector then matches a header no component compared against the body. That is S
 own failure mode -- route on one value, execute another -- relocated from a hypothetical
 front-end proxy into Hangar's own policy engine.
 
-`_tool_input_schema` has **six** exits that return `None`, and the metric names four of
-them. They are not one class, and this matters because any remedy addresses only some:
+The skip is neither one branch nor one function. `_tool_input_schema` has **five** exits
+that return `None` -- an unresolved schema -- and `validate_mcp_param_headers`
+(`shared/inbound.py`) adds one of its own, refusing to produce a rejection when the
+tool's annotations are invalid; the caller treats both the same way, as "no rejection to
+raise". A legacy revision skips the ladder without entering either. That is **seven**
+ways a `tools/call` reaches dispatch with `Mcp-Param-*` headers nothing checked, and the
+metric names four of them. They are not one class, and this matters because any remedy
+addresses only some:
 
-| Skip exit | Metric reason | Is the call still executed? | Is it a routing gap? |
-| ---------- | -------------- | ---------------------------- | --------------------- |
-| Listing raised | `listing_failed` | Yes -- dispatch continues | **Yes.** The only live one. |
-| Listing exhausted without the tool | `tool_not_listed` | No -- dispatch answers `-32601` | No, given the same-principal assertion (`mcp-hangar#1049`). An empty listing and a `-32601` are the same decision. |
-| Tool's annotations invalid | `invalid_annotation` | Not reachable in practice | No. Since `mcp-hangar#1063` such a tool is withheld from the projection, so the lookup misses and the skip is counted as `tool_not_listed`. It could only fire for a `hangar_*` management tool, and no management schema declares `x-mcp-header`. |
-| Legacy revision (ladder not reached) | `legacy_protocol` | Yes | Already handled: `#1064` refuses to match on a pre-validation revision. |
-| Cursor cycle | **none** | Yes -- dispatch continues | Would be, exactly as `listing_failed` is. Unreachable today: the front door returns one unpaged list and the projection never emits a `nextCursor`. |
-| Pagination past the page cap | **none** | Yes -- dispatch continues | Same. Unreachable for the same reason, and for as long as that stays true. |
-| Envelope fails `tools/list` validation | **none** | No -- dispatch rejects | No. A client fault; out of scope (Decision 4). |
+| Skip condition | Where | Metric reason | Is the call still executed? | Is it a routing gap? |
+| --------------- | ------ | -------------- | ---------------------------- | --------------------- |
+| Listing raised | `_tool_input_schema` | `listing_failed` | Yes -- dispatch continues | **Yes.** The only live one. |
+| Listing exhausted without the tool | `_tool_input_schema` | `tool_not_listed` | No -- dispatch answers `-32601` | No, given the same-principal assertion (`mcp-hangar#1049`). An empty listing and a `-32601` are the same decision. |
+| Tool's annotations invalid | `validate_mcp_param_headers` | `invalid_annotation` | Yes in the SDK; not reachable through Hangar | No -- but by our own projection, not by the SDK. See below. |
+| Legacy revision (ladder not entered) | -- | `legacy_protocol` | Yes | Already handled: `#1064` refuses to match on a pre-validation revision. |
+| Cursor cycle | `_tool_input_schema` | **none** | Yes -- dispatch continues | Would be, exactly as `listing_failed` is. Unreachable today: the front door returns one unpaged list and the projection never emits a `nextCursor`. |
+| Pagination past the page cap | `_tool_input_schema` | **none** | Yes -- dispatch continues | Same. Unreachable for the same reason, and for as long as that stays true. |
+| Envelope fails `tools/list` validation | `_tool_input_schema` | **none** | No -- dispatch rejects | No. A client fault; out of scope (Decision 4). |
 
+The annotation row is two independent mechanisms that happen to agree, and it is worth
+keeping them apart. **The SDK's** is a skip: given an invalid schema,
+`validate_mcp_param_headers` returns no rejection and the call proceeds unvalidated --
+the same fail-open posture as the rest of the ladder. **Hangar's** is a withdrawal:
+since `mcp-hangar#1063` a governed tool whose `x-mcp-header` annotations are invalid is
+withheld from the projection entirely, so it is absent from `tools/list` and `-32601` on
+the call, and the SDK's skip has nothing to skip on. The two are not layers of one
+control -- ours makes theirs moot for governed tools, and only for as long as the
+withdrawal holds. What remains behind it is a `hangar_*` management tool with an invalid
+annotation, and no management schema declares `x-mcp-header` at all. Hangar's own
+`_observe_param_header_skips` re-checks the annotation for that residue, which is why
+the metric still has the label: the counter mirrors the SDK's condition, while the
+projection removes the population it could apply to.
 So the decision this ADR records is narrow in mechanism and broad in principle: one
 branch (a failed pre-dispatch listing on a modern request) is the live gap, and the
 principle that closes it is the one `evaluate_headers` already applies to the legacy era.
 The two pagination exits are the same class of gap held shut by an unrelated property of
 our projection rather than by any decision, and they have no metric label -- so the first
 change that paginates the front-door listing opens a skip nothing counts and nothing
-sees.
+sees. The annotation case is shut the same way: by a projection rule, not by the SDK
+arm the metric is named after.
 
 ## Decision
 
@@ -165,10 +186,11 @@ The `Mcp-Param-*` ladder therefore joins the pin-tracked surfaces governed by
 `_tool_input_schema` / `_mcp_param_rejection` against the mirrored branches, and the
 re-diff is part of the upgrade, not a follow-up.
 
-The re-diff is against **every** exit that returns `None`, including the two -- cursor
-cycle and page cap -- that Hangar cannot reach today and therefore does not label. A
-mirror of four branches out of six passes its own re-diff green while the SDK changes
-one of the two nobody mirrors, which is the failure the pin is supposed to prevent. Two
+The re-diff is against **every** skip condition in the table, in both functions --
+including the two, cursor cycle and page cap, that Hangar cannot reach today and
+therefore does not label. A mirror of four conditions out of seven passes its own
+re-diff green while the SDK changes one of the three nobody mirrors, which is the
+failure the pin is supposed to prevent. Two
 consequences follow: the pagination exits are named in the re-diff checklist even while
 unreachable, and any change that makes the front-door listing paginate must add their
 reason labels **before** it lands -- otherwise it opens a skip that Decision 1 cannot

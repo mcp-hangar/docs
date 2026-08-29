@@ -208,3 +208,4 @@ Unknown group names are ignored by the scanner (they are caught by CRD validatio
 - [ADR-013: Egress Policy Enforcement Model](../adr/ADR-013-egress-policy-enforcement-model.md) — the enforcement model and rejected alternatives.
 - [MCP Server Groups](MCP_SERVER_GROUPS.md) — the aggregation the group target will attach to.
 - [OWASP MCP Top 10 coverage](../security/OWASP_MCP_TOP_10_COVERAGE.md) — how this maps to MCP09 and related controls.
+- [What a verdict establishes](../security/VERDICT_LIMITS.md) — what an L7 `deny`, an Audit-mode observation and an `Mcp-Param-*` selector match do and do not prove to someone reading the record later.

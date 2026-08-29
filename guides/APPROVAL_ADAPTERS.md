@@ -332,3 +332,4 @@ Hangar's own test for the registry ([`test_delivery_registry.py`](https://github
 - [Authentication & Authorization](AUTHENTICATION.md) — minting tokens and the `approval:resolve` permission
 - [REST API](REST_API.md) — the `/approvals` endpoints
 - [Configuration](../reference/configuration.md#holding-a-tool-for-a-human-approval_list) — `approval_list`, `approval_timeout_seconds`, `approval_channel`
+- [What a verdict establishes](../security/VERDICT_LIMITS.md) — what an `approved` record proves, and what it does not

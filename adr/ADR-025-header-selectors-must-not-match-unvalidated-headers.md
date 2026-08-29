@@ -54,19 +54,26 @@ selector then matches a header no component compared against the body. That is S
 own failure mode -- route on one value, execute another -- relocated from a hypothetical
 front-end proxy into Hangar's own policy engine.
 
-The four skip reasons are not one class, and this matters because any remedy addresses
-only some of them:
+`_tool_input_schema` has **six** exits that return `None`, and the metric names four of
+them. They are not one class, and this matters because any remedy addresses only some:
 
-| Reason | Is the call still executed? | Is it a routing gap? |
-| ------- | ---------------------------- | --------------------- |
-| `listing_failed` | Yes -- dispatch continues | **Yes.** The only live one. |
-| `tool_not_listed` | No -- dispatch answers `-32601` | No, given the same-principal assertion (`mcp-hangar#1049`). An empty listing and a `-32601` are the same decision. |
-| `invalid_annotation` | Not reachable in practice | No. Since `mcp-hangar#1063` such a tool is withheld from the projection, so the lookup misses and the skip is counted as `tool_not_listed`. It could only fire for a `hangar_*` management tool, and no management schema declares `x-mcp-header`. |
-| `legacy_protocol` | Yes | Already handled: `#1064` refuses to match on a pre-validation revision. |
+| Skip exit | Metric reason | Is the call still executed? | Is it a routing gap? |
+| ---------- | -------------- | ---------------------------- | --------------------- |
+| Listing raised | `listing_failed` | Yes -- dispatch continues | **Yes.** The only live one. |
+| Listing exhausted without the tool | `tool_not_listed` | No -- dispatch answers `-32601` | No, given the same-principal assertion (`mcp-hangar#1049`). An empty listing and a `-32601` are the same decision. |
+| Tool's annotations invalid | `invalid_annotation` | Not reachable in practice | No. Since `mcp-hangar#1063` such a tool is withheld from the projection, so the lookup misses and the skip is counted as `tool_not_listed`. It could only fire for a `hangar_*` management tool, and no management schema declares `x-mcp-header`. |
+| Legacy revision (ladder not reached) | `legacy_protocol` | Yes | Already handled: `#1064` refuses to match on a pre-validation revision. |
+| Cursor cycle | **none** | Yes -- dispatch continues | Would be, exactly as `listing_failed` is. Unreachable today: the front door returns one unpaged list and the projection never emits a `nextCursor`. |
+| Pagination past the page cap | **none** | Yes -- dispatch continues | Same. Unreachable for the same reason, and for as long as that stays true. |
+| Envelope fails `tools/list` validation | **none** | No -- dispatch rejects | No. A client fault; out of scope (Decision 4). |
 
 So the decision this ADR records is narrow in mechanism and broad in principle: one
 branch (a failed pre-dispatch listing on a modern request) is the live gap, and the
 principle that closes it is the one `evaluate_headers` already applies to the legacy era.
+The two pagination exits are the same class of gap held shut by an unrelated property of
+our projection rather than by any decision, and they have no metric label -- so the first
+change that paginates the front-door listing opens a skip nothing counts and nothing
+sees.
 
 ## Decision
 
@@ -88,9 +95,27 @@ a value it believes agrees with the body, and this is what makes that belief tru
 
 Mechanically it requires the skip status to reach the evaluator. `routing_headers_var`
 carries the selectable headers and the protocol version today; it must also carry
-whether validation ran, set on the same path that increments the skip metric. The
-version check in `evaluate_headers` is then subsumed: `legacy_protocol` is a skip like
-any other.
+whether validation ran. The version check in `evaluate_headers` is then subsumed:
+`legacy_protocol` is a skip like any other.
+
+**The carrier is `request.state`, not a contextvar.** The skip is observed in the
+listing path (the `except` in `_list_projected_tools`, which counts and re-raises), and
+the evaluator reads a contextvar that `bind_routing_headers` **rebuilds from the raw
+request headers rather than merging into**. A flag set as a contextvar out in the
+listing would therefore be overwritten by the later bind. It happens to survive on the
+modern path today -- the nested listing is awaited inline and a child task copies the
+context -- but `bind_routing_headers`' own docstring exists because the SDK runs inbound
+messages in decoupled tasks, and an implementation that leans on inline execution here
+is one refactor away from a silent race. The per-POST channel that is already correct
+for exactly this is `request.state`, where `mcp-hangar#1049` keeps the projection memo:
+the `except` block sets `param_validation_ran = False` there, and
+`bind_routing_headers` reads it when it builds the mapping.
+
+**A non-match caused by a skip is recorded as such.** In the audit record and the
+decision reason, "no rule matched" and "the rules were not consulted because nothing
+validated the headers" are different verdicts. A selector that silently stops matching
+is otherwise harder to debug than a refusal, and the skip metric alone cannot tell an
+operator which request it happened on.
 
 ### 2. Refusing the call is a separate, opt-in control
 
@@ -140,6 +165,15 @@ The `Mcp-Param-*` ladder therefore joins the pin-tracked surfaces governed by
 `_tool_input_schema` / `_mcp_param_rejection` against the mirrored branches, and the
 re-diff is part of the upgrade, not a follow-up.
 
+The re-diff is against **every** exit that returns `None`, including the two -- cursor
+cycle and page cap -- that Hangar cannot reach today and therefore does not label. A
+mirror of four branches out of six passes its own re-diff green while the SDK changes
+one of the two nobody mirrors, which is the failure the pin is supposed to prevent. Two
+consequences follow: the pagination exits are named in the re-diff checklist even while
+unreachable, and any change that makes the front-door listing paginate must add their
+reason labels **before** it lands -- otherwise it opens a skip that Decision 1 cannot
+see and the metric does not count.
+
 Explicitly out of scope: the SDK arm where the envelope itself fails `tools/list`
 validation. That is a client fault which dispatch rejects on its own, and Hangar does not
 mirror it.
@@ -172,9 +206,10 @@ on v2.15.0 with `headers.*` selectors is inside the window this ADR closes.
 
 ### Negative
 
-- A selector that silently stops matching is harder to debug than a refusal. The skip
-  metric is the compensating signal, and a non-match caused by a skip must be
-  distinguishable in the audit record from a non-match caused by no rule matching.
+- A selector can stop matching for a reason the policy author did not write, which is
+  harder to reason about than a refusal. The distinct audit verdict required by
+  Decision 1 and the skip metric are the compensating signals; without both, the
+  behaviour reads as a policy that quietly does not work.
 - We are now coupled to a specific SDK's internal control flow in two places (the metric
   and the gate) rather than one. Decision 4 makes that coupling a tracked pin rather than
   a latent assumption, but it does not remove it.

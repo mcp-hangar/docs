@@ -452,6 +452,42 @@ nobody could call. Both controls are counted by
 See the [front-door guide](../guides/FRONT_DOOR.md) for the full behaviour,
 including why the projected schema is never edited.
 
+## `headers`
+
+What Hangar does with an `Mcp-Param-*` value it could not check against the
+request body. The `mcp` SDK validates that agreement before dispatch and is
+**fail-open by design**: when the called tool's schema cannot be resolved, the
+check is skipped and the call is dispatched anyway.
+
+Since v2.14.0 an `MCPEgressPolicy` can select on those headers, so this is no
+longer somebody else's problem. **Independently of any configuration**, a header
+selector does not match a request whose validation was skipped -- it falls
+through to the tool rules and the policy default. This section is the opt-in
+control above that: refuse the call outright instead of serving it.
+
+```yaml
+headers:
+  param_validation:
+    required: true      # default: false
+```
+
+| Key | Type | Default | Description |
+| ----- | ------ | --------- | ------------- |
+| `headers.param_validation.required` | `bool` | `false` | Refuse a `tools/call` whose `Mcp-Param-*` headers could not be validated, with `HEADER_MISMATCH` (`-32020`), instead of serving it. A non-boolean refuses to start |
+
+The block is global rather than per-server: the condition is a failed listing on
+*this request*, not a property of the upstream the call would reach, so it does
+not belong beside the per-server `header_exposure` block even though the two
+govern the same SEP.
+
+Turning it on converts an upstream availability problem into a client-visible
+refusal for every call carrying header parameters, whether or not a policy
+selects on them -- which is why it is opt-in while the non-match is not. Skips
+are counted by `mcp_hangar_param_header_validation_skipped_total{reason}`.
+
+See [ADR-025](../adr/ADR-025-header-selectors-must-not-match-unvalidated-headers.md)
+and the [front-door guide](../guides/FRONT_DOOR.md).
+
 ## `execution`
 
 System-wide concurrency limits.

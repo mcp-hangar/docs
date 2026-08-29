@@ -273,6 +273,69 @@ block and reloading restores the tools it withheld.
 > `src/mcp_hangar/fastmcp_server/flat_tool_projection.py`
 > (`_invalid_header_annotation`, `_denied_header_exposure`).
 
+### `Mcp-Param-*`: a header nobody validated decides nothing
+
+The two controls above govern what an upstream may *ask* a client to put in a
+header. This one governs what Hangar does with the value that comes back.
+
+SEP-2243's safety property is **header-body agreement**: the header carries the
+same value the call will execute with, so nobody can route on one value and
+execute another. The `mcp` SDK enforces it before dispatch — and does so
+**fail-open by design**. Resolving the called tool's schema means an internal
+`tools/list`; when that listing fails, validation is skipped and the call is
+dispatched anyway, because header validation must never break a working call
+path.
+
+That is an SDK decision Hangar inherits. Since v2.14.0 it is also a Hangar
+decision, because an [`MCPEgressPolicy`](../cookbook/24-egress-policy-language.md) can
+select on `Mcp-Param-*`. **We are the intermediary the SEP is talking about.**
+
+**A skipped validation is a non-match (default, no configuration).** A request
+whose `Mcp-Param-*` headers nothing checked satisfies no `allow`, `deny` or
+`requireApproval` header selector. It falls through to the tool rules and the
+policy default — the same treatment a handshake-era request already gets. It is
+deliberately *not* an implicit deny: an unearned deny is the same defect as an
+unearned allow with the sign flipped, and one caller's unvalidated header must
+not decide another caller's request. The verdict says which happened, so
+"no rule matched" and "the rules were not consulted" are distinguishable in an
+audit record.
+
+A deployment that writes no `headers.*` selectors cannot observe any of this.
+
+**Refusing the call is a separate opt-in.**
+
+```yaml
+headers:
+  param_validation:
+    required: true      # default: false
+```
+
+On, a `tools/call` whose `Mcp-Param-*` headers could not be validated is
+answered with `HEADER_MISMATCH` (`-32020`) and the message "the request's
+`Mcp-Param-*` headers could not be validated against its body", instead of being
+served. The code is a slight overstatement — we know nobody could check, not
+that the header disagrees — and it is still preferable to a Hangar-specific
+third code for one client-visible class.
+
+The block is **global**, not per-server: the condition it reacts to is a failed
+listing on *this request*, not a property of the upstream the call would reach.
+A non-boolean refuses to start, as an unrecognised `tool_access.mode` does.
+
+Turning it on converts an upstream availability problem into a client-visible
+refusal for every call carrying header parameters, whether or not any policy
+selects on them. That is the trade, and it is why the control is opt-in while
+the non-match above is not.
+
+Skips are counted by `mcp_hangar_param_header_validation_skipped_total{reason}`
+— `listing_failed` is the one that reaches either control; `tool_not_listed` is
+already a `-32601`, `legacy_protocol` is an era rather than a failure, and
+`invalid_annotation` is held shut by the withdrawal described above.
+
+> Decision: [ADR-025](../adr/ADR-025-header-selectors-must-not-match-unvalidated-headers.md).
+> Source: `src/mcp_hangar/domain/policies/egress_l7.py` (`evaluate_headers`),
+> `src/mcp_hangar/context.py` (`bind_routing_headers`),
+> `src/mcp_hangar/fastmcp_server/flat_tool_projection.py`.
+
 ## Flat Per-Tenant Tool Re-Export
 
 In `egress` mode, clients see Hangar's `hangar_*` meta-API (`hangar_list`,
@@ -380,6 +443,13 @@ auth:
 # Topology: face untrusted external agents, fail-closed per tenant.
 tool_access:
   mode: front_door
+
+# Refuse a call whose Mcp-Param-* headers could not be validated against its
+# body, rather than serving it (ADR-025). Optional; a header selector already
+# refuses to match such a request without this.
+headers:
+  param_validation:
+    required: true
 
 # Validate JWTs from your IdP. Hangar is a resource server, not an issuer.
 auth:

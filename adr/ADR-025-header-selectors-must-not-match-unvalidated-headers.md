@@ -1,6 +1,6 @@
 # ADR-025: A Header Selector Must Not Match a Header Nobody Validated
 
-**Status:** Proposed
+**Status:** Accepted -- implemented in core `#1131` (Decision 1, 4) and `#1132` (Decision 2, 3)
 **Date:** 2026-08-29
 **Authors:** MCP Hangar Team
 
@@ -209,6 +209,17 @@ beside the other activation switches.
 Neither is retroactive to a release already cut: `mcp-hangar#1053` records that the skip
 metric landed in v2.15.0 while the selector gate was still version-only, so a deployment
 on v2.15.0 with `headers.*` selectors is inside the window this ADR closes.
+
+Both landed on `main` on 2026-08-29. Decision 1 and 4 in `mcp-hangar#1131`: the skip is
+recorded on `request.state` in the listing path, `bind_routing_headers` carries it into
+the mapping under a key no selector can name, `evaluate_headers` refuses to match on it,
+and the mirrored SDK ladder is registered as a tracked pin with a re-diff checklist
+covering all seven skip conditions. Decision 2 and 3 in `mcp-hangar#1132`:
+`headers.param_validation.required` (global, default `false`, non-boolean refuses to
+start) refuses the call from inside the handler with `HEADER_MISMATCH` and a "could not
+be validated" message. The operator-facing description is in
+[Front-Door Mode](../guides/FRONT_DOOR.md) and
+[Configuration](../reference/configuration.md#headers).
 
 ## Consequences
 

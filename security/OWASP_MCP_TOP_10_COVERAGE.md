@@ -2,6 +2,9 @@
 
 How MCP Hangar maps against the [OWASP MCP Top 10 (2025)](https://owasp.org/www-project-mcp-top-10/).
 
+Read it beside [what a verdict establishes](VERDICT_LIMITS.md), which says what each
+individual record from these mechanisms does and does not prove.
+
 This page is deliberately honest about scope. Hangar is a **policy enforcement plane**: it enforces deterministic policy on the MCP call path and produces an attributable audit trail. It does **not** parse prompt or tool-argument semantics and will not pretend to — so several categories are **out of scope by design**, and a few are **partially** covered with the remaining enforcement tracked in open issues. Each row says which.
 
 | # | Category | Hangar posture | Mechanism / tracking |

@@ -85,3 +85,4 @@ Evidence generation in practice: an auditor asking "show me who could invoke too
 - [ADR-002 — Event Sourcing](../adr/ADR-002-event-sourcing.md) (audit-trail architecture).
 - [ADR-010](../adr/ADR-010-retire-agent-cloud-tier.md) (supersedes ADR-006; current enforcement architecture).
 - [operations/COMPLIANCE.md](./COMPLIANCE.md) (SIEM export formats).
+- [security/VERDICT_LIMITS.md](../security/VERDICT_LIMITS.md) — the same establishes / does not establish shape as §5 above, applied per verdict rather than per framework.

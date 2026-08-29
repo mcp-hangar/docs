@@ -292,3 +292,7 @@ Digest Pinning section of the
 If you are arriving here from an older release, recompute existing pins under the
 RFC 8785 JCS algorithm first: see
 [14 -- Upgrade: Digest Pinning](14-upgrade-1.3-digest-pinning.md).
+
+Before treating a passing pin as evidence, read
+[what a verdict establishes](../security/VERDICT_LIMITS.md): the digest covers
+four fields, and an empty-valued one is dropped before it is computed.

@@ -502,3 +502,8 @@ For the full admin and auth surface, see [REST API](REST_API.md) and
 
 Walk through a runnable end-to-end setup in the cookbook recipe
 [16 — Front-Door Multi-Tenant](../cookbook/16-front-door-multi-tenant.md).
+
+Before treating any of this mode's answers as evidence, read
+[what a verdict establishes](../security/VERDICT_LIMITS.md): an empty projection,
+a `-32601` and a header-selector verdict each prove less than they look like they
+do.

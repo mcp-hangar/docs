@@ -1,4 +1,4 @@
-<!-- verified-against: 2.15.0 -->
+<!-- verified-against: 2.16.0 -->
 
 # What a Verdict Establishes
 
@@ -17,10 +17,10 @@ establish / left to the operator**.
 Nothing here is forward-looking. Every "establishes" claim is backed by code or
 an ADR, and anything not shipped appears only in the middle column.
 
-**Reviewed against `main` after mcp-hangar#1128 / #1129 / #1130.** Those three
-fixes are merged and **not yet in a release**: the current release is 2.15.0, and
-the rows they changed are called out in [the section below](#three-rows-that-were-weaker-in-2150).
-A gateway running 2.15.0 or earlier behaves as that section describes.
+**Reviewed against 2.16.0.** Three rows read differently before that release,
+and a record is only as good as the gateway that wrote it: see
+[the section below](#three-rows-that-were-weaker-before-2160) before reading
+anything a 2.15.0 or earlier gateway produced.
 
 ## The table
 
@@ -41,12 +41,12 @@ A gateway running 2.15.0 or earlier behaves as that section describes.
 | **Capability drift** | `CapabilityViolationDetected` with `violation_type`, `violation_detail` and the `enforcement_action` taken (`alert` / `block` / `quarantine`) | that the drift was hostile | which action the mode maps to |
 | **Projection withdrawal** | a tool was withheld, and why: `mcp_hangar_projection_withdrawals_total{reason}` — `invalid_x_mcp_header` or `header_exposure_<action>` | that the upstream stopped offering it — the definition is still served byte-identical upstream, only the projection dropped it | `on_violation`, whose default `warn` serves the tool |
 
-## Three rows that were weaker in 2.15.0
+## Three rows that were weaker before 2.16.0
 
-This page was drafted against 2.15.0, where three of its rows read worse. The
-fixes are on `main` and unreleased, so this is not history yet: a reader holding
-a record from a 2.15.0 gateway is holding the older behaviour, and so is anyone
-running one today.
+This page was drafted against 2.15.0, where three of its rows read worse. They
+are kept here because a record does not improve when the code does: anyone
+holding an export from a 2.15.0 or earlier gateway -- or still running one --
+has the older behaviour, whatever this page says about the current release.
 
 **An enforced deny left almost no record.** Audit mode — the mode that by
 definition changes nothing — emitted an event, a warning and a metric, while
@@ -55,25 +55,27 @@ message, with the reason the policy computed left in `.details` where only the
 REST middleware looked. Fixed in
 [mcp-hangar#1128](https://github.com/mcp-hangar/mcp-hangar/pull/1136): a refusal
 now publishes `EgressPolicyEnforced`, increments its own counter and logs at
-warning. **A refusal by a 2.15.0 gateway is in no event stream at all** — its
-absence from an export is not evidence that nothing was refused.
+warning, **since 2.16.0**. **A refusal by an earlier gateway is in no event
+stream at all** — its absence from an export is not evidence that nothing was
+refused.
 
 **No verdict named its policy.** `PolicyEvaluationResult.policy_id` was
 documented as "the policy that made the decision (for audit)" and was never set
 by anything; the nearest answer was a timestamp join against `EgressPolicySet`,
 which is a reconstruction rather than a record. Fixed in
-[mcp-hangar#1129](https://github.com/mcp-hangar/mcp-hangar/pull/1135): every L7
-verdict carries a content hash of the rules that produced it, and the unfilled
-field is gone.
+[mcp-hangar#1129](https://github.com/mcp-hangar/mcp-hangar/pull/1135), released
+in 2.16.0: every L7 verdict carries a content hash of the rules that produced it,
+and the unfilled field is gone. **A verdict from an earlier gateway names no
+policy**, and the timestamp join is the only reconstruction available for it.
 
 **The approval copy leaked a nested secret.** Argument redaction matched
 sensitive key names at the top level only, so `{"config": {"password": …}}` — and
 the same key inside a list of records — was persisted and served verbatim to
 every `approval:read` holder. Fixed in
-[mcp-hangar#1130](https://github.com/mcp-hangar/mcp-hangar/pull/1134). **An
-approval record written by a 2.15.0 gateway may contain a secret**, and the
-integrity hash is unaffected either way: it is computed over the raw arguments by
-design.
+[mcp-hangar#1130](https://github.com/mcp-hangar/mcp-hangar/pull/1134), released
+in 2.16.0. **An approval record written by an earlier gateway may contain a
+secret**, and the integrity hash is unaffected either way: it is computed over
+the raw arguments by design.
 
 ## How to read a record you did not produce
 

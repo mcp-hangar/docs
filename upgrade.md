@@ -4,6 +4,102 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.16.0
+
+### A header selector stops matching a header nobody validated (#1053)
+
+SEP-2243's `Mcp-Param-*` check is fail-open in the SDK by design: when the
+pre-dispatch listing that resolves the called tool's schema fails, validation is
+skipped and the call is dispatched anyway. Until now an `MCPEgressPolicy`
+`headers.allow` / `deny` / `requireApproval` selector matched on such a request
+regardless, which is SEP-2243's own failure mode -- route on one value, execute
+another -- inside the policy engine.
+
+A request whose validation was skipped now satisfies **no** header selector. It
+falls through to the tool rules and the policy default, exactly as a
+handshake-era request already did, and the verdict reason says the rules were not
+consulted rather than that none matched.
+
+**This can change a verdict.** A call that a `headers.allow` selector used to
+permit against a `defaultAction: Deny` policy is now denied by that default when
+its headers could not be validated; a call a `deny` selector used to refuse now
+falls to the tool ladder. Nothing changes for a policy that writes no `headers.*`
+rules. Watch `mcp_hangar_param_header_validation_skipped_total{reason="listing_failed"}`
+-- if it is flat, no request on your gateway is affected.
+
+Optionally, refuse such a call outright instead of serving it unvalidated:
+
+```yaml
+headers:
+  param_validation:
+    required: true      # default: false
+```
+
+Off by default, because it turns an upstream listing failure into a
+client-visible refusal (`-32020`) for every call carrying header parameters. See
+[ADR-025](adr/ADR-025-header-selectors-must-not-match-unvalidated-headers.md).
+
+### An enforced egress refusal now produces an event and a metric (#1128)
+
+`Enforce` mode refused calls without recording anything: no event, no metric, and
+a `debug`-level log line carrying the generic caller-facing message. A refusal now
+publishes `EgressPolicyEnforced`, increments
+`mcp_hangar_egress_policy_enforced_total{mcp_server,action,rule_kind}` and logs at
+warning with its reasons.
+
+Two consequences worth planning for:
+
+* **A SIEM export or event consumer sees a new event type.** Its fields mirror
+  `EgressPolicyViolationObserved` plus the applied `action`, so a handler written
+  for the Audit-mode event works unchanged on this one.
+* **Log volume rises on a deployment that refuses calls routinely.** The batch
+  fault barrier now logs a refusal as `batch_call_refused` at warning; upstream
+  failures keep the debug level they always had.
+
+There is no flag to restore the silence. Alert on the new counter rather than on
+the absence of one -- and note that a refusal recorded by a **2.15.0 or earlier**
+gateway is in no event stream at all, so an export that spans the upgrade is not
+comparable across it.
+
+### Every egress verdict names the policy that produced it (#1129)
+
+`Decision`, `EgressPolicyEnforced`, `EgressPolicyViolationObserved`,
+`EgressPolicySet` and both refusals now carry `policy_id`: a content hash of the
+compiled rules (`sha256:` plus 16 hex digits), so a verdict and a policy change
+join on a value rather than on adjacent timestamps.
+`GET /api/mcp_servers/{id}/l7_policy` returns it as `policyId` beside the rules.
+
+The id covers the policy's `mode`, so flipping `Audit` to `Enforce` yields a
+different id for the same rules. That is deliberate -- two verdicts either side
+of the flip did not come from the same policy.
+
+**Breaking, for code embedding Hangar:** `PolicyEvaluationResult.policy_id` and
+the `policy_id=` argument of its `allow()` / `deny()` constructors are **removed**.
+The field was documented as an audit identifier and was never set by anything, so
+an implementation passing it was passing a value nobody read; the call now raises
+`TypeError`. Nothing in a deployment that does not implement
+`IToolAccessPolicyEnforcer` in Python is affected.
+
+### Approval records redact nested secrets (#1130)
+
+Argument redaction in the approval gate matched sensitive key names at the
+top level only, so `{"config": {"password": "..."}}` -- and the same key inside a
+list of records -- was persisted to the approval store and served to every
+`approval:read` holder verbatim. The check now applies at every level, a
+sensitive key hides its whole subtree, and anything past the walk's depth cap is
+replaced rather than passed through.
+
+The shared redactor also learned URL userinfo credentials
+(`postgres://user:pw@host/db`), which applies **everywhere it runs** -- the log
+pipeline and stderr capture included. Only the userinfo is replaced; the scheme
+and host stay readable.
+
+Two things this does not change: `arguments_hash` is still computed over the
+**raw** arguments, so the dispatch-time substitution check is unaffected; and
+**approval records written before this release are not rewritten**. A record
+persisted by an earlier gateway may still contain a secret -- treat the store's
+history accordingly.
+
 ## Upgrade to 2.15.0
 
 ### A merged tool-access policy narrows to what it always said (#1106)

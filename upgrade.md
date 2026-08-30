@@ -4,6 +4,82 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.17.0
+
+### A prompt or resource can be withdrawn at runtime, and the endpoint says which (#1137)
+
+`POST /api/admin/tools/{server}/{name}/withdraw` and `.../restore` accept a
+`kind` in the JSON body -- `tool` (default), `prompt` or `resource`. Until now
+both endpoints wrote the **tool** overlay whatever was named: withdrawing a prompt
+returned `{"withdrawn": true}`, left the prompt served, and -- if a tool shared
+the name -- silently withdrew that tool instead. Prompts and resources could be
+withdrawn from `config.yaml` and from nowhere else.
+
+Three things to check:
+
+* **A caller that sends no `kind` is unchanged**: it withdraws a tool and the
+  response carries the same keys as before, plus `kind`.
+* **An unrecognised `kind` is a `400 invalid_kind`** and writes nothing. There is
+  no fallback to `tool`, because that fallback is the bug.
+* **A resource is named by its upstream URI** (`demo://doc/1`,
+  `file:///data/x.txt`) -- the form `withdrawn_resources:` reads -- not the
+  projected `hangar://<upstream>/<uri>`. The `{name}` path segment now accepts
+  slashes so such a URI can ride it.
+
+`ToolWithdrawn` and `ToolRestored` carry `kind` at **schema version 2**. Rows
+written by an earlier gateway have no `kind` and replay as `tool`, which is all
+they could have been. An event consumer that pins schema versions should accept 2.
+
+### Unloading a server retires its per-tenant policies (#1138)
+
+Hot-unloading an mcp_server removed its own `tool_access` policies (every kind,
+since 2.13.0) and left its `tool_access.member.<tenant>` overrides behind. A
+server loaded later under the same id inherited them: a tenant its predecessor
+denied stayed denied, and a stale per-tenant `allow_list` restricted the
+successor to whatever it named.
+
+After this upgrade an id that comes back is a clean id. **If a deployment relied
+on the inherited rules** -- unload, reload under the same id, expect the old
+per-tenant scoping to persist -- that scoping must now be declared on the new
+server's own `tool_access:` block. There was never a documented way to depend on
+it; it is called out because the effect is a widening.
+
+### The handed-out `resource_link` map is bounded per tenant (#1139)
+
+The front door remembers every `resource_link` it hands out so that following
+one resolves. That memory was one process-wide map capped at 4096 entries and
+evicted oldest-first across all tenants: one tenant handing out 4096 links
+flushed everyone else's, and the victims' `resources/list` silently shrank.
+
+Each tenant now has its own 4096-link budget, evicted only by that tenant's own
+traffic, and the number of tenant maps is itself capped at 1024 (least recently
+used first). Two new surfaces:
+
+* `mcp_hangar_resource_links_evicted_total{reason}` -- `tenant_cap` or
+  `tenant_map_cap`. Until now an eviction left no record at all. No tenant label,
+  for the same cardinality reason as `mcp_hangar_empty_projection_total`.
+* `resource_links.max_per_tenant` in `config.yaml` -- default 4096, so nothing
+  changes on upgrade. Raise it when the counter climbs for tenants that
+  legitimately hand out more. A value that is not a positive integer refuses to
+  start; the key is known to `validate_config`, so a typo is reported and refused
+  under `HANGAR_CONFIG_STRICT=1`.
+
+```yaml
+resource_links:
+  max_per_tenant: 8192
+```
+
+The map is still per-replica and in-memory; restart and cross-replica behaviour
+are unchanged.
+
+### `uv.lock` now tracks the release version (#1151)
+
+Cosmetic, but it stops a recurring nuisance: the lock's own `mcp-hangar` entry
+lagged `pyproject.toml` by however many releases had happened since the last
+dependency bump, so every fresh `uv sync` dirtied the tree. From this release the
+version bump lands in the lock in the same release commit. If you carry a fork
+with your own `uv.lock`, expect a one-line conflict on `version = "2.17.0"`.
+
 ## Upgrade to 2.16.0
 
 ### A header selector stops matching a header nobody validated (#1053)

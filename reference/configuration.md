@@ -580,7 +580,26 @@ Constraints applied to every source, whatever it discovers.
 
 ## `retry`
 
-Retry policy for failed operations.
+Retry policy for failed tool invocations.
+
+**Scope: `hangar_call`.** The policy is consulted by the batch executor behind
+that tool, which serves a single call and a batch alike. It governs nothing
+else: discovery, health checks and the HTTP transport have their own settings
+(see the `http` block's `max_retries` for the transport-level one).
+
+The tool argument `max_attempts` can **lower** the attempt count for a single
+call but never raise it above what is configured here: the operator decides how
+hard this gateway leans on an upstream. With no `retry` block at all, a call is
+attempted once unless the caller asks for more.
+
+Refusals are never retried, whatever `retry_on` says -- access and egress
+denials, approval-required holds, authentication and authorization failures,
+rate limits and validation errors. Retrying a decision asks the same question
+again, and re-driving an approval gate holds a human decision open once per
+attempt.
+
+*Consulted since 2.17.1; before that the block was parsed and logged but no
+code read it back.*
 
 ```yaml
 retry:

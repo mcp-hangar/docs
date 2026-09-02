@@ -108,12 +108,28 @@ mcp_servers:
     http:
       connect_timeout: 10.0  # Connection timeout in seconds
       read_timeout: 60.0     # Read timeout in seconds
-      max_retries: 5         # Maximum retry attempts
-      retry_backoff_factor: 0.5  # Exponential backoff factor
+      max_retries: 5         # Total attempts, including the first
+      retry_backoff_factor: 0.5  # Exponential backoff factor, in seconds
+      retry_status_codes: [502, 503, 504]  # Which responses are retried
       headers:               # Additional headers
         X-Request-Source: mcp-hangar
         X-Correlation-Id: ${REQUEST_ID:-default}
 ```
+
+`max_retries` counts attempts, not extra attempts: `1` disables retrying. A
+request is retried when the upstream answers with one of `retry_status_codes`
+(default `502`, `503`, `504` -- the codes an ingress returns while an upstream
+is rolling) or when the connection cannot be established. Everything else,
+including a `500`, comes back to the caller on the first attempt: a retry is
+for a failure the upstream is expected to recover from on its own.
+
+The wait between attempts is `retry_backoff_factor * 2^attempt` seconds, so the
+default `0.5` waits 0.5s, then 1s, then 2s. A factor of `0` retries without
+waiting.
+
+*Before 2.17.1 only connection failures were retried, by the underlying HTTP
+library, on a fixed backoff; `retry_backoff_factor` and `retry_status_codes`
+were accepted and had no effect.*
 
 ## Environment Variable Interpolation
 
@@ -184,7 +200,7 @@ HTTP transport exposes the following metrics:
 | `mcp_hangar_http_requests_total` | Counter | Total HTTP requests, labeled by mcp_server, method, status_code |
 | `mcp_hangar_http_request_duration_seconds` | Histogram | Request latency |
 | `mcp_hangar_http_errors_total` | Counter | HTTP errors by type |
-| `mcp_hangar_http_retries_total` | Counter | Retry attempts |
+| `mcp_hangar_http_retries_total` | Counter | Retry attempts, labeled by mcp_server and retry_reason (the status code, or `connection_error`) |
 | `mcp_hangar_messages_sent_total` | Counter | JSON-RPC messages sent, labeled by mcp_server, method |
 | `mcp_hangar_messages_received_total` | Counter | JSON-RPC messages received, labeled by mcp_server, type (response/notification/error) |
 | `mcp_hangar_message_size_bytes` | Histogram | Message payload size, labeled by mcp_server, direction (sent/received) |

@@ -4,6 +4,103 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.17.1
+
+A patch release, but four settings that previously did nothing now do something,
+and two payloads an operator may be reading changed shape. Nothing here needs a
+configuration change; all of it is worth knowing before the upgrade.
+
+### The `retry:` block starts applying (#1162)
+
+The section was parsed, merged and logged at startup, and then no code read it
+back: every `hangar_call` used the attempt count from the tool argument alone,
+and `backoff`, `initial_delay`, `max_delay`, `retry_on` and `jitter` were always
+the built-in defaults. **If your `config.yaml` carries a `retry:` block, the
+gateway now honours it** -- a `default_policy.max_attempts: 5` means calls that
+used to be attempted once are attempted up to five times, against the upstream.
+
+Two rules that are new and worth reading if you set the block:
+
+- **The configured attempt count is a ceiling.** A caller's `max_attempts` can
+  lower it, never raise it.
+- **Refusals are never retried**, whatever `retry_on` says: access and egress
+  denials, approval-required holds, authn/authz failures, rate limits and
+  validation errors. `retry_on` is matched as a substring of both the error type
+  and its message, so a broad entry such as `Error` used to cover every denial
+  there is -- and an approval gate re-driven once per attempt holds a human
+  decision open that many times.
+
+A deployment with no `retry:` block is unchanged: one attempt unless the caller
+asks for more.
+
+### HTTP upstreams retry the statuses they always claimed to (#1163)
+
+`max_retries`, `retry_backoff_factor` and `retry_status_codes` on an `http:`
+block described behaviour that did not exist -- only connection failures were
+retried, by the underlying library, on a fixed backoff. A remote upstream
+returning `502`/`503`/`504` during a rollout is now retried under your
+configured backoff instead of failing the call. `mcp_hangar_http_retries_total`
+starts producing samples, so the Grafana panel shipped with the Helm chart draws
+for the first time.
+
+If you deliberately relied on a fast failure from a remote upstream, set
+`max_retries: 1`.
+
+### Tool arguments are redacted in the audit trail (#1168)
+
+`ToolInvocationRequested` carried the caller's arguments verbatim into the event
+store and the `/ws/events` stream, so a secret passed to a tool sat in
+SQLite/Postgres for the retention of the log and was served to every
+`audit:read` holder. Arguments are now redacted the same way the approval record
+has redacted them since 2.10 -- by key name at every depth, and by value shape.
+
+**If you query the event log for argument values, they are `[REDACTED]` from
+this release on.** The event gains `arguments_hash` (SHA-256 over the raw
+payload, taken before redaction), which is what to correlate on instead: it
+still tells you whether two calls carried the same arguments. Rows written
+before the upgrade are unchanged.
+
+### The config export no longer contains secrets (#1169)
+
+`POST /config/export` and `GET /config/diff` returned a subprocess server's
+`env` verbatim, and the `auth`, `discovery` and other pass-through sections with
+`${VAR}` references already resolved -- readable by any principal holding
+`config:read`. Both are redacted now.
+
+**An export is therefore no longer a lossless round-trip of secrets**, which was
+already true of the remote `auth` block and is now true of `env` too. If you
+feed the export back in, restore the secret-bearing values from your secret
+store; the structure and every non-sensitive value are unchanged.
+
+### A withdrawal now reaches the whole fleet (#1165)
+
+`POST /admin/tools/{server}/{name}/withdraw` wrote to the memory of the replica
+that served it. On more than one replica the withdrawn tool, prompt or resource
+stayed listed and callable everywhere else, and a rolling restart lifted the
+withdrawal entirely. It is recorded now, applied on every replica within one
+event-tail interval, and rebuilt at startup.
+
+Nothing to do, but two consequences: withdrawals made before this upgrade are
+**not** recovered (there was no record to read), so re-issue any that should
+still be in force; and a withdrawal now outlives the process, so lifting one
+means calling `.../restore` rather than restarting.
+
+### Smaller changes
+
+- `ui_resources:` is a known configuration section, so `HANGAR_CONFIG_STRICT=1`
+  no longer refuses a config that declares it (#1167). If you worked around this
+  by leaving strict mode off, you can turn it back on.
+- The first call to a pinned tool through a group after a gateway restart is no
+  longer refused as unverifiable (#1166).
+- A group member's own `tools:` policy is enforced for calls routed through the
+  group (#1164). **A `deny_list` on a member that silently did nothing now
+  denies** -- if a call starts being refused after the upgrade, that policy is
+  why, and it was doing nothing before rather than being absent.
+- `mcp_hangar_discovery_conflicts` is removed. It was registered and never
+  incremented, so it only ever exposed a `TYPE` header with no samples; nothing
+  can have been alerting on it. `mcp_hangar_build` and
+  `mcp_hangar_process_start_time_seconds` now carry values (#1163).
+
 ## Upgrade to 2.17.0
 
 ### A prompt or resource can be withdrawn at runtime, and the endpoint says which (#1137)

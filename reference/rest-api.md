@@ -1023,7 +1023,14 @@ Runtime tool withdrawal/restore. Requires admin (`mcp_servers` resource, `lifecy
 POST /admin/tools/{server}/{tool}/withdraw
 ```
 
-Withdraws a tool at runtime (survives reload). Withdrawal persists in the runtime overlay.
+Withdraws a tool at runtime. The withdrawal is recorded, so it survives a
+config reload **and** a restart, and it reaches every replica in the fleet
+rather than only the one that served this request.
+
+*Before 2.17.1 it lived in the memory of the replica that took the call: the
+other replicas kept listing and serving the tool, and a rolling restart lifted
+it entirely.* Propagation to peers is not instantaneous -- a peer applies the
+withdrawal when it reads the event, within one tail interval.
 
 **Request body (optional):**
 

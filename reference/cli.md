@@ -38,6 +38,7 @@ These options are available for all commands:
 | [`add`](#add) | Add MCP server from registry |
 | [`remove`](#remove) | Remove MCP server from configuration |
 | [`serve`](#serve) | Start the MCP server |
+| [`pin`](#pin) | Compute, write and check tool digest pins |
 | [`completion`](#completion) | Generate shell completion scripts |
 | [`auth`](#auth) | Manage authentication (bootstrap the initial admin) |
 | [`config`](#config) | Validate `config.yaml` without starting a gateway |
@@ -62,9 +63,10 @@ mcp-hangar init [OPTIONS]
 | `--bundle` | `-b` | TEXT | - | MCP Server bundle to install |
 | `--mcp_servers` | - | TEXT | - | Comma-separated list of MCP servers |
 | `--config-path` | - | PATH | - | Custom path for config file |
-| `--claude-config` | - | PATH | - | Custom path to Claude Desktop config |
-| `--skip-claude` | - | FLAG | false | Skip Claude Desktop config modification |
-| `--skip-test` | - | FLAG | false | Skip smoke test after configuration |
+| `--client` | - | TEXT | detected | Client to point at Hangar; repeatable. `claude-code`, `claude-code-project`, `cursor`, `cursor-project`, `claude-desktop`, `all` |
+| `--claude-config` | - | PATH | - | Write this exact client config file instead of the detected ones |
+| `--skip-clients` | - | FLAG | false | Do not modify any MCP client config (alias: `--skip-claude`) |
+| `--skip-test` | - | FLAG | false | Skip the smoke test. No digest pins are written either — they come from that run |
 | `--reset` | - | FLAG | false | Reset existing configuration |
 
 ### MCP Server Bundles
@@ -93,18 +95,31 @@ mcp-hangar init -y --bundle developer
 # Custom config location
 mcp-hangar init --config-path ~/my-config.yaml
 
-# Skip Claude Desktop integration
-mcp-hangar init --skip-claude
+# Point one client, or every detected one, at Hangar
+mcp-hangar init -y --client claude-code
+mcp-hangar init -y --client all
+
+# Touch no client config
+mcp-hangar init --skip-clients
 ```
 
 ### What It Does
 
-1. Detects Claude Desktop installation
-2. Presents MCP server categories for selection
-3. Collects required configuration (API keys, paths)
-4. Generates `config.yaml` file
-5. Updates Claude Desktop configuration
-6. Shows next steps
+1. Detects available runtimes (`uvx`, `npx`, container engines)
+2. Detects the MCP clients on this machine (Claude Code, Cursor, Claude Desktop)
+3. Presents MCP server categories for selection
+4. Collects required configuration (API keys, paths)
+5. Generates `config.yaml` — with `tool_access.mode: front_door`, an
+   `auth.stdio.principal` block, and `digest_enforcement: block`
+6. Starts each MCP server once to verify it, and **records a digest pin for
+   every tool it serves** while it is up
+7. Writes the Hangar entry into the selected clients, merging it into their
+   existing `mcpServers` rather than replacing them
+8. Shows what was written, what was tested and what was pinned
+
+With `--skip-test`, steps 6 writes no pins — an unverified pin would refuse every
+call to a tool nobody digested — and the summary says so instead of reporting a
+pass. Run [`pin --write`](#pin) afterwards to add them.
 
 ---
 
@@ -400,6 +415,98 @@ mcp-hangar serve --json-logs
 mcp-hangar serve --http --host 0.0.0.0 --port 8000 \
   --log-level INFO --json-logs --log-file /var/log/mcp.log
 ```
+
+---
+
+## pin
+
+Compute the digest of every tool your MCP servers serve, write those digests
+into the configuration, or check the configuration against what the servers
+serve right now.
+
+A pin is the SHA-256 of a tool's `name`, `description`, `inputSchema` and
+`outputSchema`, canonicalized per RFC 8785. When `digest_enforcement` is `block`
+(the default), a tool whose digest no longer matches its pin is refused before
+the upstream is asked:
+
+```
+Tool 'fetch' schema does not match its pinned digest
+```
+
+Because the description is part of the digest, a poisoned description that
+changes no parameter is caught.
+
+### Synopsis
+
+```bash
+mcp-hangar pin [OPTIONS]
+```
+
+### Options
+
+| Option | Short | Type | Default | Description |
+| -------- | ------- | ------ | --------- | ------------- |
+| `--config` | `-c` | PATH | `$MCP_CONFIG`, else `./config.yaml` | Configuration to read (and, with `--write`, to update) |
+| `--server` | `-s` | TEXT | every server | Only this MCP server. Repeatable |
+| `--write` | - | FLAG | false | Merge the observed digests into `mcp_servers.<id>.tool_projection.pins` |
+| `--check` | - | FLAG | false | Exit 1 when a configured pin disagrees with what the server serves |
+| `--json` | - | FLAG | false | Machine-readable output |
+
+`--write` and `--check` ask different questions; pass one or neither.
+
+### Exit Codes
+
+| Code | Meaning |
+| ------ | --------- |
+| 0 | The pins and the servers agree, or the write succeeded |
+| 1 | Drift: at least one pinned tool no longer matches (`--check` only) |
+| 2 | The question could not be answered — no such config, unreadable YAML, unknown `--server`, or a server that never started |
+
+### Examples
+
+```bash
+# What would I pin?
+mcp-hangar pin
+
+# Pin everything, in place
+mcp-hangar pin --write
+
+# Pin one server only
+mcp-hangar pin --server fetch --write
+
+# Has anything changed since? (exit 1 if yes)
+mcp-hangar pin --check
+
+# In a script
+mcp-hangar pin --check --json
+```
+
+### In CI or a pre-commit hook
+
+```yaml
+# .pre-commit-config.yaml
+- repo: local
+  hooks:
+    - id: mcp-hangar-pin-check
+      name: MCP tool schemas have not drifted
+      entry: mcp-hangar pin --check
+      language: system
+      pass_filenames: false
+```
+
+### Notes
+
+- `pin` starts the servers your configuration describes, asks each for its
+  tools, and stops it again. A tool list is what a server answers, not something
+  the configuration knows.
+- `--write` rewrites the configuration file through PyYAML, which preserves
+  values but **not comments or key order**. The previous file is kept beside it
+  as `<config>.bak`. Bare `mcp-hangar pin` prints the same digests if you would
+  rather paste them into a file you maintain by hand.
+- Only the all-tenants `tool_projection.pins` block is written and checked. Pins
+  under `tenant_overrides` are left alone.
+- A tool that is served but not pinned is not drift — `pins` is a subset by
+  design. A pinned tool that is no longer served **is**.
 
 ---
 

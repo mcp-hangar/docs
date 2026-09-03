@@ -1000,6 +1000,59 @@ rate_limit:
 | `storage` | `dict` | -- | Auth storage configuration (driver, path, host, etc.) |
 | `rate_limit` | `dict` | -- | Auth-specific rate limiting |
 | `role_assignments` | `list[dict]` | -- | Role assignment rules |
+| `stdio.principal` | `dict` | -- | The caller a stdio session is declared to be (see below). Ignored over HTTP |
+
+### `auth.stdio.principal` -- who the caller is over stdio
+
+*Since 2.18.0.*
+
+A stdio server is not listening on anything. It was **spawned** -- by Claude
+Code, Cursor, Claude Desktop or a shell -- as a child of a session the operating
+system already authenticated, and a credential kept in the same file that
+declares the principal would authenticate the file rather than the caller. So
+this block declares an identity and Hangar checks nothing:
+
+```yaml
+auth:
+  stdio:
+    principal:
+      id: local-user      # required
+      tenant_id: local    # required
+      roles: [viewer]     # optional; defaults to [viewer]
+```
+
+Why it matters: identity reaches Hangar through HTTP middleware, which a stdio
+process never enters. Without this block a stdio caller is anonymous, and
+`tool_access.mode: front_door` -- which is fail-closed on identity -- serves it
+zero tools:
+
+```text
+empty_projection reason=no_identity -- front_door served zero tools because the
+caller carried no tenant identity. Fail-closed deny, not an empty catalogue.
+```
+
+| Key | Type | Default | Description |
+| ----- | ------ | --------- | ------------- |
+| `id` | `str` | -- | Principal id. Required; a block without one is ignored entirely |
+| `tenant_id` | `str` | -- | Tenant the caller belongs to. Scopes tool-access rules and per-tenant pins. Required |
+| `roles` | `list[str]` | `[viewer]` | Roles resolved through the ordinary RBAC table. `viewer` is read-only; `[]` projects no `hangar_*` tools at all |
+
+Behaviour worth knowing:
+
+- **HTTP ignores the block.** It has a credential channel and keeps using it.
+- **Absent, nothing changes.** The caller is anonymous, exactly as before 2.18.0.
+- **The management surface follows `roles`.** With `viewer`, a client sees the
+  read-only `hangar_*` tools (`hangar_status`, `hangar_health`, `hangar_list`,
+  …) and none that can start, stop or reconfigure anything. Calling the
+  upstreams' own tools does not depend on those roles.
+- **Per-tenant pins for this tenant become matchable.** Hangar refuses at boot
+  when per-tenant pins are declared that no caller could carry; a declared stdio
+  principal is such a caller, for its own `tenant_id`.
+- **Anyone who can write this file can name any principal.** On a laptop that is
+  the same person. On a shared host, the file's permissions are the control.
+
+The decision and its trade-offs are recorded in
+[ADR-026](../adr/ADR-026-stdio-is-an-authenticated-transport.md).
 
 ## `config_reload`
 
@@ -1113,7 +1166,7 @@ Hangar reports these on load:
 ```text
 unknown_config_key  detail=auth has unknown key(s) ['enabledd']; allowed keys:
 ['allow_anonymous', 'api_key', 'enabled', 'oidc', 'opa', 'rate_limit',
-'role_assignments', 'storage']
+'role_assignments', 'stdio', 'storage']
 ```
 
 **Throughout 2.x it warns and starts. From 3.0.0 it refuses.** Set

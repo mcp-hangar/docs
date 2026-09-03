@@ -36,6 +36,7 @@ taxonomy, and formatting conventions.
 | [023](ADR-023-mcp-registry-listing.md) | The MCP Registry Entry Describes a Package, Not a Service | Accepted | 2026-08-16 |
 | [024](ADR-024-approval-hold-belongs-on-a-tool-call.md) | A Human Approval Hold Belongs on a Tool Call, Not on a Fetch | Accepted | 2026-08-23 |
 | [025](ADR-025-header-selectors-must-not-match-unvalidated-headers.md) | A Header Selector Must Not Match a Header Nobody Validated | Accepted | 2026-08-29 |
+| [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Proposed | 2026-09-03 |
 
 ## Summaries
 
@@ -196,6 +197,16 @@ models in `mcp_hangar/tasks_wire.py`, forbid `mcp_types.Task*` in any serving pa
 divergence, and gate capability advertisement on the **served wire** rather than on
 SDK symbol presence. Generalises: a capability probe is a hedge only when the
 probed module can still change.
+
+### [ADR-026](ADR-026-stdio-is-an-authenticated-transport.md): Stdio Is an Authenticated Transport, and the Config Names Its Principal
+
+Identity reaches Hangar through ASGI middleware, which a stdio process never
+enters, so a local caller has no identity and the fail-closed front door
+projects zero tools to it. Declares the spawning process the trust boundary --
+the OS user launched it -- and lets `auth.stdio.principal` name the caller it
+implies, with no credential checked because none exists to check. Absent the
+block, behavior is unchanged. Default role `viewer`: read-only, and deliberately
+without `tool:invoke`, which gates `hangar_call` rather than the flat path.
 
 ## Conventions
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.46](https://github.com/mcp-hangar/docs/compare/v1.1.45...v1.1.46) (2026-09-03)
+
+
+### Changed
+
+* **architecture:** adr-025 -- a header selector must not match a header nobody validated ([#285](https://github.com/mcp-hangar/docs/issues/285)) ([e6069b4](https://github.com/mcp-hangar/docs/commit/e6069b4c08f1ef179cdc3671a398e965cc92843b))
+* **architecture:** adr-026 -- stdio is an authenticated transport ([#297](https://github.com/mcp-hangar/docs/issues/297)) ([7bbe064](https://github.com/mcp-hangar/docs/commit/7bbe0643116ffae3afa462d4abe8abc213fd4da6))
+* **guides:** make the quickstart end in a deny, and document pin and auth.stdio ([#298](https://github.com/mcp-hangar/docs/issues/298)) ([bcd1f7c](https://github.com/mcp-hangar/docs/commit/bcd1f7c8911f2e33ed7faaff9cd868cfb07d145f))
+* **guides:** one page saying what each verdict establishes ([#289](https://github.com/mcp-hangar/docs/issues/289)) ([3ae9654](https://github.com/mcp-hangar/docs/commit/3ae96543cafe2fe526dfff1f66dada864cbbf38c)), closes [#287](https://github.com/mcp-hangar/docs/issues/287)
+* **guides:** the Mcp-Param-* validation boundary, and how to close it ([#288](https://github.com/mcp-hangar/docs/issues/288)) ([0e57556](https://github.com/mcp-hangar/docs/commit/0e57556509a2018d4e1c679692b1f620f211c726)), closes [#269](https://github.com/mcp-hangar/docs/issues/269)
+* **guides:** the verdict-limits page reads for 2.16.0 ([#290](https://github.com/mcp-hangar/docs/issues/290)) ([2d76120](https://github.com/mcp-hangar/docs/commit/2d76120ca8b4711402212b42240aeeaabaeba7c0))
+* **guides:** upgrade notes for 2.16.0 ([#291](https://github.com/mcp-hangar/docs/issues/291)) ([de0cf87](https://github.com/mcp-hangar/docs/commit/de0cf876f15836c0df445d4f00baba771576c9d4))
+* **guides:** upgrade notes for 2.17.0 ([#293](https://github.com/mcp-hangar/docs/issues/293)) ([f959075](https://github.com/mcp-hangar/docs/commit/f959075c905cd5884816c564c6dc29aa23e823cd))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#292](https://github.com/mcp-hangar/docs/issues/292)) ([34e4a96](https://github.com/mcp-hangar/docs/commit/34e4a96684ff9e5f1271bf75ff10f7651f634059))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#294](https://github.com/mcp-hangar/docs/issues/294)) ([d317b05](https://github.com/mcp-hangar/docs/commit/d317b051e3e33b7ca0c4d276a19806ab9d2ba7cf))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#296](https://github.com/mcp-hangar/docs/issues/296)) ([28e6c3a](https://github.com/mcp-hangar/docs/commit/28e6c3a2f020f386d29bfce0af6cdbf28034be9a))
+* upgrade notes for 2.17.1, and correct three claims it changes ([#295](https://github.com/mcp-hangar/docs/issues/295)) ([e7ff5d6](https://github.com/mcp-hangar/docs/commit/e7ff5d646d9be2eb89361feeab76a8824227149a))
+
 ## [1.1.45](https://github.com/mcp-hangar/docs/compare/v1.1.44...v1.1.45) (2026-08-28)
 
 

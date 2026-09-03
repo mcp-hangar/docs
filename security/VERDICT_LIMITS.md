@@ -1,4 +1,4 @@
-<!-- verified-against: 2.16.0 -->
+<!-- verified-against: 2.18.0 -->
 
 # What a Verdict Establishes
 
@@ -17,8 +17,10 @@ establish / left to the operator**.
 Nothing here is forward-looking. Every "establishes" claim is backed by code or
 an ADR, and anything not shipped appears only in the middle column.
 
-**Reviewed against 2.16.0.** Three rows read differently before that release,
-and a record is only as good as the gateway that wrote it: see
+**Reviewed against 2.18.0.** Every claim below was re-checked against the code
+that release ships; the table did not move, and 2.18.0 adds one row rather than
+correcting any. Three rows still read differently before **2.16.0**, and a record
+is only as good as the gateway that wrote it: see
 [the section below](#three-rows-that-were-weaker-before-2160) before reading
 anything a 2.15.0 or earlier gateway produced.
 
@@ -26,7 +28,8 @@ anything a 2.15.0 or earlier gateway produced.
 
 | Verdict | Establishes | Does not establish | Operator's side |
 | --- | --- | --- | --- |
-| **Digest pin passed** | the tool's `{name, description, inputSchema, outputSchema}` is byte-identical (RFC 8785 JCS) to the pinned one | the tool is safe; that `annotations`, `execution`, `icons` or `_meta` are unchanged; that the upstream *implements* the schema it declares; **that an empty-valued field is unchanged** — `None` / `""` / `{}` / `[]` are dropped before canonicalization (`digest_computation._is_meaningful`), so gaining `description: ""` or losing `outputSchema` to `{}` moves nothing | pin provenance; who approved the digest |
+| **Digest pin passed** | the tool's `{name, description, inputSchema, outputSchema}` is byte-identical (RFC 8785 JCS) to the pinned one | the tool is safe; that `annotations`, `execution`, `icons` or `_meta` are unchanged; that the upstream *implements* the schema it declares; **that an empty-valued field is unchanged** — `None` / `""` / `{}` / `[]` are dropped before canonicalization (`digest_computation._is_meaningful`), so gaining `description: ""` or losing `outputSchema` to `{}` moves nothing | pin provenance: since 2.18.0 `mcp-hangar pin --write` records what a server served at a moment nobody else witnessed, so *who ran it, and against which upstream* is the operator's to keep; who approved the digest |
+| **`pin --check` clean** *(2.18.0)* | at the moment the command ran, every tool named in `tool_projection.pins` was served with the digest the file records — computed by `compute_tool_digest`, the same function the gate compares against, so a clean check and a passing call agree by construction rather than by two implementations | that it still holds: an upstream can change between the check and the call, which is what the gate is for; anything about a tool that is served and **not** pinned — `pins` is a subset by design and an unpinned tool is not drift; that the servers behave as their schemas say | which tools are pinned at all; running the check where it can fail loudly (exit 1) rather than only before a release |
 | **Digest mismatch / unknown** | the contract moved, or was never pinned; the record carries expected, observed, `enforcement`, `correlation_id`, `tenant_id` | that the change is hostile; whether the caller was served or refused — read `enforcement`, where `DigestEnforcement.BLOCK` is the only blocking value | `block` vs `warn`; the `unknown` policy (`ALLOW_UNVERIFIED` returns valid and emits no event at all) |
 | **Approval `approved`** | one principal (`decided_by`) resolved this `approval_id` before `expires_at`; at dispatch the state, the expiry and a hash of the **raw** arguments were re-checked (`ApprovalGateService.revalidate`) | that the approver saw the raw arguments — they saw a redacted copy; that the approver was competent or authorized in any legal sense; that the call then succeeded | who may resolve; channel delivery; hold timeout |
 | **Approval `expired` / `denied`** | the call was not dispatched through this gate | anything about whether it was attempted elsewhere | — |

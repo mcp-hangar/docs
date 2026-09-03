@@ -75,6 +75,21 @@ def load_schema(source: Path) -> ModuleType:
     return module
 
 
+PROPOSED_ADR_RE = re.compile(r"^\*\*Status:\*\*\s*Proposed\s*$", re.M)
+
+
+def is_proposed_adr(doc: Path, text: str) -> bool:
+    """A Proposed ADR may name a key the shipped schema does not have yet.
+
+    That is what proposing it means: the record is written before the code, so
+    the gate would refuse every ADR that decides anything about configuration.
+    The exemption ends at Accepted -- an ADR whose decision has shipped is
+    checked like any other document, so a key that was renamed between the
+    proposal and the implementation still gets caught.
+    """
+    return doc.parent.name == "adr" and bool(PROPOSED_ADR_RE.search(text))
+
+
 def iter_docs(root: Path):
     for f in sorted(root.rglob("*.md")):
         if any(seg in {".git", "node_modules"} for seg in f.parts):
@@ -104,10 +119,14 @@ def main() -> int:
 
     problems: list[str] = []
     checked = 0
+    skipped_proposals = 0
 
     for doc in iter_docs(root):
         rel = doc.relative_to(root)
         text = doc.read_text(encoding="utf-8", errors="ignore")
+        if is_proposed_adr(doc, text):
+            skipped_proposals += 1
+            continue
         for match in BLOCK_RE.finditer(text):
             lineno = text[: match.start()].count("\n") + 1
             try:
@@ -125,7 +144,10 @@ def main() -> int:
     if not args.quiet:
         print(f"docs:   {root}")
         print(f"source: {source}")
-        print(f"config blocks checked: {checked}\n")
+        print(f"config blocks checked: {checked}")
+        if skipped_proposals:
+            print(f"proposed ADRs skipped: {skipped_proposals}")
+        print()
 
     if checked < MIN_EXPECTED_BLOCKS:
         print(f"FAIL: found only {checked} config blocks.")

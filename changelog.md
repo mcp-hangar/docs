@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.47](https://github.com/mcp-hangar/docs/compare/v1.1.46...v1.1.47) (2026-09-03)
+
+
+### Changed
+
+* **reference:** re-verify the verdict limits against 2.18.0, and add the pin check ([#301](https://github.com/mcp-hangar/docs/issues/301)) ([39d55b3](https://github.com/mcp-hangar/docs/commit/39d55b3b4ae4be4300223797ea1617597d332314))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#300](https://github.com/mcp-hangar/docs/issues/300)) ([15b5635](https://github.com/mcp-hangar/docs/commit/15b5635f54e05ab225f427e5c823e1ee0236f0d5))
+
 ## [1.1.46](https://github.com/mcp-hangar/docs/compare/v1.1.45...v1.1.46) (2026-09-03)
 
 

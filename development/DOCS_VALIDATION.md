@@ -78,6 +78,22 @@ The schema is read from the operator repository's `config/crd/bases`, never
 from a copy kept here. A copied schema drifts, and a drifted schema is a gate
 that approves the wrong thing.
 
+**It also gates the website**, which had no check of this class at all. The site
+keeps its manifests in `.astro` template literals rather than fenced blocks, so
+`--ext` selects the extractor:
+
+```bash
+python scripts/check_manifests.py --ext astro,mdx,ts \
+    --docs /path/to/mcp-hangar-website/packages/site/src \
+    --operator /path/to/mcp-hangar-operator
+```
+
+That corpus was unchecked until 2026-09-09, and both homepage `MCPEgressPolicy`
+snippets had drifted into manifests `kubectl apply` rejects — `spec.tools` with
+prefixed globs, no `targetRef` — while every manifest in *these* docs stayed
+correct. One corpus was gated and the other was not, and the ungated one is the
+page most people see. The website's CI runs this against its own tree.
+
 **Served is not the same as current.** `v1alpha1` is still served for
 conversion, so a manifest using it is valid to the API server and is still the
 wrong thing to teach -- that is the defect the product's own
@@ -185,6 +201,18 @@ keys or rejects them. Both are worse than nothing.
 `config_schema.py` imports only `os` and `typing`, so it is loaded from the
 source checkout by path -- installing the product to lint prose is a hammer this
 job does not need.
+
+**Both directions, because one of them proves nothing about the other.** The
+check above proves documented keys exist. It cannot prove existing keys are
+documented, and that asymmetry hid a whole section: `resource_links` was read by
+the product, had `mcp_hangar_resource_links_evicted` for tuning it, and appeared
+nowhere in this repository — silently, because nothing looks for an absence. So
+every section in `SECTIONS` is also checked against `reference/configuration.md`.
+
+The reverse check is deliberately loose — it asks whether the section name
+appears in the reference at all, not whether it has a heading of its own. A
+strict form would need an exception list, and an exception list is where the
+next undocumented section would go to hide.
 
 What it catches is a reader copying a block and getting a setting that silently
 does not apply. Note that `rate_limit` exists **both** at the top level (`rps`,

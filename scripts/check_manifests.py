@@ -22,8 +22,22 @@ Deliberately NOT checked: Kubernetes' own kinds (`Secret`, `ConfigMap`,
 `Deployment`, ...) that share a fence with a Hangar manifest. Those are the API
 server's schema, and `kubeconform` is the tool for that if it is ever wanted.
 
+The same check runs over the **website**, which had no gate of this class at
+all: its manifests live in `.astro` template literals rather than fenced blocks,
+so both homepage `MCPEgressPolicy` snippets had drifted into something
+`kubectl apply` rejects -- `spec.tools` with prefixed globs, no `targetRef` --
+while every documented manifest stayed correct. One corpus was checked and the
+other was not, and the unchecked one is the page most people see.
+
 Usage:
-    python scripts/check_manifests.py [--operator PATH] [--docs PATH] [--quiet]
+    python scripts/check_manifests.py [--operator PATH] [--docs PATH]
+                                      [--ext md] [--quiet]
+
+    # this repo
+    python scripts/check_manifests.py --docs . --operator ../mcp-hangar-operator
+    # the website's source tree
+    python scripts/check_manifests.py --docs ../site/packages/site/src \
+        --ext astro,mdx,ts --operator ../mcp-hangar-operator
 
 Operator path resolution: --operator, $MCP_HANGAR_OPERATOR_SRC,
 ../mcp-hangar-operator.
@@ -96,9 +110,38 @@ def yaml_blocks(text: str):
         buf.append(line)
 
 
-def iter_docs(root: Path):
-    for f in sorted(root.rglob("*.md")):
-        if any(seg in {".git", "node_modules"} for seg in f.parts):
+#: A manifest embedded in source rather than in prose: a backticked template
+#: literal whose first line opens a manifest. The website keeps its homepage
+#: snippets this way (`const policy = \`apiVersion: ...\``), which is why they
+#: were the one corpus no gate could see -- two of them had drifted into
+#: something `kubectl apply` rejects while every documented manifest stayed
+#: correct.
+TEMPLATE_LITERAL_RE = re.compile(r"`(\s*apiVersion:\s*[^`]*)`", re.S)
+
+#: Which extractor a file gets. Prose carries fenced blocks; source carries
+#: template literals.
+FENCED_SUFFIXES = {".md", ".mdx"}
+LITERAL_SUFFIXES = {".astro", ".ts", ".tsx", ".js", ".mjs"}
+
+
+def template_literal_blocks(text: str):
+    for match in TEMPLATE_LITERAL_RE.finditer(text):
+        yield text[: match.start()].count("\n") + 1, match.group(1)
+
+
+def blocks_for(path: Path, text: str):
+    """Yield (lineno, yaml) for whichever form this file keeps manifests in."""
+    if path.suffix in LITERAL_SUFFIXES:
+        yield from template_literal_blocks(text)
+    else:
+        yield from yaml_blocks(text)
+
+
+def iter_docs(root: Path, suffixes: set[str]):
+    for f in sorted(root.rglob("*")):
+        if not f.is_file() or f.suffix not in suffixes:
+            continue
+        if any(seg in {".git", "node_modules", "dist", ".astro"} for seg in f.parts):
             continue
         if f.name in EXCLUDED_DOCS:
             continue
@@ -108,12 +151,22 @@ def iter_docs(root: Path):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--operator", help="Path to the mcp-hangar-operator repo.")
-    parser.add_argument("--docs", default=".", help="Path to the docs repo root.")
+    parser.add_argument("--docs", default=".", help="Root to scan (docs repo, or a site source tree).")
+    parser.add_argument(
+        "--ext",
+        default="md",
+        help=(
+            "Comma-separated file extensions to scan. Default 'md' (this repo). "
+            "The website is scanned with 'astro,mdx,ts', where manifests live in "
+            "template literals rather than fenced blocks."
+        ),
+    )
     parser.add_argument("--quiet", action="store_true", help="Only print problems.")
     args = parser.parse_args()
 
     operator = resolve_operator(args.operator)
     docs = Path(args.docs).expanduser().resolve()
+    suffixes = {"." + e.strip().lstrip(".") for e in args.ext.split(",") if e.strip()}
     schemas, storage = load_schemas(operator)
 
     if len(schemas) < MIN_EXPECTED_KINDS:
@@ -124,9 +177,9 @@ def main() -> int:
     problems: list[str] = []
     checked = 0
 
-    for doc in iter_docs(docs):
+    for doc in iter_docs(docs, suffixes):
         rel = doc.relative_to(docs)
-        for lineno, block in yaml_blocks(doc.read_text(encoding="utf-8", errors="ignore")):
+        for lineno, block in blocks_for(doc, doc.read_text(encoding="utf-8", errors="ignore")):
             try:
                 found = list(yaml.safe_load_all(block))
             except yaml.YAMLError:

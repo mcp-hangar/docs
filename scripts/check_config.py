@@ -22,10 +22,24 @@ Only blocks that look like a Hangar configuration are checked: a mapping with a
 `mcp_servers` key, or with a known top-level section. A Kubernetes manifest is
 `check_manifests.py`'s business and a random yaml fragment is nobody's.
 
+**The other direction.** The check above proves that documented keys exist. It
+cannot prove that existing keys are documented, and that asymmetry hid a whole
+section: `resource_links` was read by the product, had a metric for tuning it,
+and appeared nowhere in this repository — silently, because nothing looks for an
+absence. So the section list is also checked the other way round, against the
+configuration reference. A section a reader cannot find is a setting they cannot
+use, which is the same defect as one that does not apply.
+
+The reverse check is deliberately loose: it asks whether the section name
+appears in the reference at all, not whether it has a heading of its own. A
+strict form would need an exception list, and an exception list is where the
+next undocumented section would go to hide.
+
 Usage:
     python scripts/check_config.py [--source PATH] [--docs PATH] [--quiet]
 
-Exit code 0 = clean, 1 = a key nothing reads, 2 = bad invocation.
+Exit code 0 = clean, 1 = a key nothing reads or a section nothing documents,
+2 = bad invocation.
 """
 
 from __future__ import annotations
@@ -105,6 +119,20 @@ def looks_like_hangar_config(doc: object, sections: set[str]) -> bool:
     return "mcp_servers" in doc or bool(sections & set(doc))
 
 
+#: Where a reader looks up a configuration section. A section missing from this
+#: page is undocumented in the only sense that matters.
+CONFIG_REFERENCE = Path("reference/configuration.md")
+
+
+def undocumented_sections(root: Path, sections: set[str]) -> list[str]:
+    """Sections the product reads that the configuration reference never names."""
+    reference = root / CONFIG_REFERENCE
+    if not reference.is_file():
+        sys.exit(f"error: {reference} not found -- this gate cannot check what it cannot read.")
+    text = reference.read_text(encoding="utf-8", errors="ignore")
+    return sorted(s for s in sections if s not in text)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", help="Path to the mcp-hangar source repo.")
@@ -154,8 +182,19 @@ def main() -> int:
         print("The docs did not lose their examples -- the extraction in this script broke.")
         return 1
 
+    missing = undocumented_sections(root, sections)
+    if missing:
+        print(f"FAIL: {len(missing)} configuration section(s) the product reads and this repo never documents:\n")
+        for section in missing:
+            print(f"  {section}")
+        print(f"\nEach is read by the product but appears nowhere in {CONFIG_REFERENCE}.")
+        print("A setting nobody can find is a setting nobody can use -- give it a")
+        print("section with its keys, defaults, and what goes wrong when it is unset.")
+        return 1
+
     if not problems:
-        print(f"OK: all {checked} config blocks use keys Hangar reads.")
+        print(f"OK: all {checked} config blocks use keys Hangar reads,")
+        print(f"    and all {len(sections)} sections the product reads are documented.")
         return 0
 
     print(f"FAIL: {len(problems)} documented key(s) that nothing reads:\n")

@@ -952,12 +952,32 @@ DELETE /auth/policies/{scope}/{target_id}
 
 ## L7 Egress Policy
 
-Attach, replace, or clear the L7 egress policy (compiled `MCPEgressPolicy`) on a
-single MCP server. The core policy engine and this REST intake are available in
-v1.6.0; end-to-end delivery from a Kubernetes `MCPEgressPolicy` custom resource
-depends on the operator's controller compiling and pushing the policy (shipping
-in a later operator release). L7 egress is the **last** gate on the invocation
-path, evaluated inside `invoke_tool` immediately before the upstream call.
+Read, attach, replace, or clear the L7 egress policy (compiled `MCPEgressPolicy`)
+on a single MCP server. The core policy engine and this REST intake are available
+in v1.6.0; end-to-end delivery from a Kubernetes `MCPEgressPolicy` custom
+resource needs the operator's controller to compile and push the policy, which
+ships in operator v0.14.0 and later. L7 egress is the **last** gate on the
+invocation path, evaluated inside `invoke_tool` immediately before the upstream
+call.
+
+These routes are gated on `policy:read` / `policy:write`, **not** on
+`mcp_servers:write`. The distinction is deliberate: `mcp_servers:write` is held
+by `developer`, and gating policy mutation on it let that role clear an egress
+policy. `policy:write` is admin-only.
+
+### Get L7 Policy
+
+```
+GET /mcp_servers/{mcp_server_id}/l7_policy
+```
+
+Returns the attached policy in the same wire form `POST` accepts. Requires
+`policy:read`.
+
+**Response 200:** the compiled policy body.
+
+**Response 404:** `{"error": "no_l7_policy", "mcp_server_id": "math"}` when the
+MCP server exists but holds no policy.
 
 ### Set L7 Policy
 
@@ -967,7 +987,7 @@ PUT  /mcp_servers/{mcp_server_id}/l7_policy
 ```
 
 Attaches or replaces the compiled L7 policy on an MCP server. `POST` and `PUT`
-behave identically. Requires `mcp_servers:write`.
+behave identically. Requires `policy:write`.
 
 **Request body:** the compiled policy the operator derives from an
 `MCPEgressPolicy`:
@@ -978,12 +998,15 @@ behave identically. Requires `mcp_servers:write`.
 | `arguments` | dict | Argument-level constraints: `secretPatterns`, `maxPayloadBytes` |
 | `defaultAction` | string | Action when no rule matches |
 
-> **`requireApproval` fails closed.** A synchronous `requireApproval` match
-> **blocks** the call — it is not an interactive prompt-and-wait approval queue.
-> That queue is a different control: the tool-access
+> **What `requireApproval` does depends on whether an approval gate is
+> configured.** With one, the match holds the call and waits for a human
+> decision or the gate's `approval_timeout_seconds` — the egress policy is the
+> second, independent source of "ask a human" beside the tool-access
 > [`approval_list`](configuration.md#holding-a-tool-for-a-human-approval_list),
-> which holds the call for a human decision. The two are configured separately
-> and an egress `requireApproval` match does not enqueue an approval.
+> and both resolve through the same gate. With no gate configured it stays
+> fail-closed: the call is blocked, indistinguishable from a deny. The two
+> controls are still declared separately — an egress `requireApproval` match
+> does not read `approval_list`.
 
 **Response 200:**
 
@@ -1003,7 +1026,7 @@ DELETE /mcp_servers/{mcp_server_id}/l7_policy
 ```
 
 Clears the L7 policy on an MCP server, disabling L7 enforcement for it. Requires
-`mcp_servers:write`.
+`policy:write`.
 
 **Response 200:**
 

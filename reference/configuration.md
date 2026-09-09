@@ -1137,6 +1137,35 @@ Each member entry supports all standard MCP server keys (`mode`, `command`, `ima
 | `priority` | `int` | -- | 1--100 | Priority for priority strategy (lower number = higher priority) |
 | `tools` | `dict` | -- | -- | Member-level tool access policy, same keys as the group-level block |
 
+## `resource_links`
+
+Bounds how many handed-out `resource_link` references the front door remembers
+per tenant. A projected link is what a caller redeems to read an upstream
+resource, so the map has to be bounded or a caller that mints links forever
+exhausts the replica.
+
+```yaml
+resource_links:
+  max_per_tenant: 4096
+```
+
+| Field | Type | Default | Description |
+| ----- | ------ | ------- | ------------- |
+| `max_per_tenant` | `int` | `4096` | Remembered links per tenant. Must be a positive integer; omit the key to keep the default. |
+
+Eviction is per tenant and oldest-first, so one tenant's traffic cannot forget
+another's links. Redeeming a link that has been evicted fails as if it never
+existed, which is the trade the cap buys.
+
+Watch `mcp_hangar_resource_links_evicted` when tuning it. Its `reason` label
+separates the two causes: `tenant_cap` (a tenant hit its own cap) from
+`tenant_map_cap` (a whole tenant was dropped because too many tenants were
+seen). Sustained `tenant_cap` means this value is too low for the workload;
+`tenant_map_cap` means identity churn, not link volume.
+
+The map is per replica and in memory, so links do not survive a restart and are
+not readable from another replica.
+
 ## Unknown keys
 
 A key Hangar does not read is **kept and ignored**. It does not fail, and it does

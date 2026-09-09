@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/mcp-hangar/docs/compare/v1.2.0...v1.2.1) (2026-09-09)
+
+
+### Changed
+
+* **ci:** describe the board automation that exists ([#312](https://github.com/mcp-hangar/docs/issues/312)) ([ad426b4](https://github.com/mcp-hangar/docs/commit/ad426b4b6dfe342623579165ef76560732558c8f))
+* **ci:** record that In Review is driven now ([#315](https://github.com/mcp-hangar/docs/issues/315)) ([0b6d331](https://github.com/mcp-hangar/docs/commit/0b6d331410075dc23c592c4317b6a401df2b7aa8))
+
 ## [1.2.0](https://github.com/mcp-hangar/docs/compare/v1.1.47...v1.2.0) (2026-09-09)
 
 

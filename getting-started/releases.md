@@ -119,9 +119,11 @@ released.
 
 ## The 2.x line
 
-The stable Python core is **2.7.0**, released 2026-08-14 — a plain `pip install
+The stable Python core is **2.18.1**, released 2026-09-09 — a plain `pip install
 mcp-hangar` lands on it. It is built on the stable SDK (`mcp==2.0.0`) and speaks
-the MCP 2026-07-28 protocol generation.
+the MCP 2026-07-28 protocol generation. What each release changed is in the
+[changelog](https://github.com/mcp-hangar/mcp-hangar/releases); the notes below
+cover the ones with a migration worth reading twice.
 
 **2.7.0 makes a replica set one server.** An MCP session used to live in one
 replica's memory, so a client that initialized against one pod and called against

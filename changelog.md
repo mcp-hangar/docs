@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0](https://github.com/mcp-hangar/docs/compare/v1.1.47...v1.2.0) (2026-09-09)
+
+
+### Added
+
+* **ci:** close the two gate blind spots that cost us today ([#308](https://github.com/mcp-hangar/docs/issues/308)) ([aaa1596](https://github.com/mcp-hangar/docs/commit/aaa15960ccda52cfa5b1138ff9b413f69a7d0653))
+
+
+### Fixed
+
+* **guides:** make the quickstart's deny something a reader can observe ([#307](https://github.com/mcp-hangar/docs/issues/307)) ([3b61944](https://github.com/mcp-hangar/docs/commit/3b6194409d0820528138f2f485b296aa9b3043fa))
+* **reference:** document the permission L7 policy routes actually require ([#305](https://github.com/mcp-hangar/docs/issues/305)) ([c138202](https://github.com/mcp-hangar/docs/commit/c138202cd186344dd8d0d824c4b695a47404a499))
+* **release:** carry the compatibility matrix through 2.18.x ([#306](https://github.com/mcp-hangar/docs/issues/306)) ([e1961cb](https://github.com/mcp-hangar/docs/commit/e1961cb31a2644ac34696d2f2d4ae2fa9dac0666))
+
+
+### Changed
+
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#303](https://github.com/mcp-hangar/docs/issues/303)) ([e76349f](https://github.com/mcp-hangar/docs/commit/e76349fbc73c1423b9a35ba338b09b6e468c0faa))
+
 ## [1.1.47](https://github.com/mcp-hangar/docs/compare/v1.1.46...v1.1.47) (2026-09-03)
 
 

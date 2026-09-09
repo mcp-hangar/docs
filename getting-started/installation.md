@@ -161,11 +161,11 @@ make setup
 ## Docker
 
 ```bash
-docker pull ghcr.io/mcp-hangar/mcp-hangar:2.7.0
+docker pull ghcr.io/mcp-hangar/mcp-hangar:2.18.1
 
 # Run with config
 docker run -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  ghcr.io/mcp-hangar/mcp-hangar:2.7.0
+  ghcr.io/mcp-hangar/mcp-hangar:2.18.1
 ```
 
 > The tag above pins the current stable release, matching what

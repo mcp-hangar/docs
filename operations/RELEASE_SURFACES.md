@@ -33,7 +33,9 @@ its PR tags the release and the tag workflow publishes.
 | Website advertised version | `mcp-hangar-website` → `packages/site/src/config.ts` → `VERSION` | Single constant; drives the hero badge, footer, quick-start and JSON-LD. **Stable releases only** — a candidate here sits beside an install command that will not produce it |
 | Chart `appVersion` | `helm-charts` → `<chart>/Chart.yaml` | Bump `appVersion` **only**; release-please owns the chart's own `version` |
 | Docs current version | this repo → `getting-started/installation.md`, `getting-started/releases.md` | Install command, `docker pull` tag, and the "stable core is X, released Y" line — the date moves too |
-| Released-artifacts matrix | this repo → `operations/RELEASE_COMPATIBILITY.md` | Generated. Do not hand-edit; see below |
+| Released-artifacts matrix | this repo → `operations/RELEASE_COMPATIBILITY.md`, the generated block | Generated. Do not hand-edit; see below |
+| Compatibility matrix | this repo → `operations/RELEASE_COMPATIBILITY.md`, the table above the generated block | **Hand-maintained, and in the same file as the generated one** — which is how it gets skipped. A release adds its row here; nothing automated will notice if it does not |
+| Website docs pin | `mcp-hangar-website` → `pnpm-lock.yaml` via the `rebuild-docs` workflow | The site consumes docs as a pinned git dep, so a merged docs change is invisible on `mcp-hangar.io` until this runs and its PR merges |
 
 ### 3 · The artifacts matrix lags on purpose
 

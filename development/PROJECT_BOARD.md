@@ -19,7 +19,7 @@ Board URL: `https://github.com/orgs/mcp-hangar/projects/<N>` (set after first ru
 
 ```mermaid
 flowchart LR
-    triage["Triage"] --> progress["In Progress"] --> done["Done"]
+    triage["Triage"] --> progress["In Progress"] --> review["In Review"] --> done["Done"]
     progress -->|status/blocked| blocked["Blocked"]
     blocked -->|label removed| progress
     blocked -->|no open PR| triage
@@ -30,7 +30,8 @@ Each transition, and what performs it:
 | Status | Written by | On |
 | --- | --- | --- |
 | Triage | built-in **Item added to project** | anything reaching the board |
-| In Progress | `project-board` reusable | a pull request declaring `Closes #N` |
+| In Progress | `project-board` reusable | a pull request declaring `Closes #N`, for the issue it closes; and a draft pull request, for itself |
+| In Review | `project-board` reusable | a pull request opening, reopening or leaving draft, for itself |
 | Blocked | `project-board` reusable | the `status/blocked` label being added |
 | Blocked → out | `project-board` reusable | the label being removed: `In Progress` if an open pull request references the issue, otherwise `Triage` |
 | Done | built-in **Item closed** and **Pull request merged** | the item closing or the pull request merging |
@@ -39,7 +40,11 @@ Triage and Done stay on the built-in workflows deliberately. They are reliable a
 
 ### Options with no mechanism
 
-`Backlog`, `Ready` and `In Review` exist on the field and nothing writes them. Either drive them or delete them; an option nobody sets is a column that lies about the state of the work.
+`Backlog` and `Ready` exist on the field and nothing writes them. Either drive them or delete them; an option nobody sets is a column that lies about the state of the work.
+
+Neither has an honest signal today. `Ready` would mean scheduled, and the signal for that is a milestone — there is one stale milestone in the whole organization and none in four of the five active repositories. `Backlog` would mean triaged but unscheduled, and the only automatic rule available is "carries the taxonomy labels", which the issue templates apply at creation, making it a synonym for `Triage`. Driving either would put a column on the board reporting a process nobody runs.
+
+`In Review` used to be listed here. It is driven now: an open pull request is under review, which is the one thing the column can mean without anybody declaring it, and pull requests are 1181 of the board's 1588 items. A draft goes to `In Progress` instead — work with a branch pushed, not work awaiting review.
 
 **Delete status options in the Projects UI only.** The `updateProjectV2Field` mutation takes the complete option list with no ids and rebuilds the field, so every option gets a new id and **every item loses its status** — including the options that were not being changed. This was measured on a scratch project on 2026-09-09: an item assigned to an option that stayed in the list came back with no value at all.
 

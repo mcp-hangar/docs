@@ -10,8 +10,10 @@ install it.
 > `install.yaml` on GHCR / GitHub Releases, and the Helm charts as OCI
 > packages. Each advances on its own cadence, so there is no single
 > "MCP Hangar version" — the current pairing lives in the
-> [compatibility matrix](../operations/RELEASE_COMPATIBILITY.md), which is
-> regenerated from the registry rather than maintained by hand.
+> [compatibility matrix](../operations/RELEASE_COMPATIBILITY.md). That page
+> holds two tables: the supported combinations are a human judgement, added by
+> hand as each release ships, while the released-artifacts block below them is
+> regenerated from the registry.
 
 ## At a glance
 

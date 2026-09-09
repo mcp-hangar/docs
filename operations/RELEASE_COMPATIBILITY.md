@@ -62,6 +62,15 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 | Core (`mcp-hangar`) | Operator image | Helm charts (core / operator) | Kubernetes |
 | --- | --- | --- | --- |
+| `2.18.x` | `0.17.1` | `0.15.16` / `0.12.13` | `1.25` -- `1.36` |
+| `2.17.x` | `0.17.1` | `0.15.14` / `0.12.13` | `1.25` -- `1.36` |
+| `2.16.x` | `0.17.1` | `0.15.12` / `0.12.13` | `1.25` -- `1.36` |
+| `2.15.x` | `0.17.1` | `0.15.11` / `0.12.13` | `1.25` -- `1.36` |
+| `2.14.x` | `0.17.1` | `0.15.10` / `0.12.13` | `1.25` -- `1.36` |
+| `2.13.x` | `0.16.0` | `0.15.8` / `0.12.11` | `1.25` -- `1.36` |
+| `2.12.x` | `0.16.0` | `0.15.6` / `0.12.11` | `1.25` -- `1.36` |
+| `2.11.x` | `0.16.0` | `0.15.5` / `0.12.11` | `1.25` -- `1.36` |
+| `2.10.x` | `0.15.2` | `0.15.4` / `0.12.8` | `1.25` -- `1.36` |
 | `2.9.x` | `0.15.2` | `0.15.2` / `0.12.8` | `1.25` -- `1.36` |
 | `2.8.x` | `0.15.2` | `0.15.1` / `0.12.8` | `1.25` -- `1.36` |
 | `2.7.x` | `0.15.2` | `0.15.0` / `0.12.7` | `1.25` -- `1.36` |
@@ -72,8 +81,13 @@ table is **not** a supported combination — it may work, but it is not covered.
 
 Each chart in the table carries the matching core as its `appVersion`, and
 `image.tag` defaults to `appVersion`, so a plain `helm install` of a chart pulls
-the core on its row: `0.15.2` carries `2.9.0`, `0.15.1` carries `2.8.0`, `0.15.0` carries `2.7.0`, `0.14.4`
-carries `2.6.0`, `0.14.1` carries `2.5.0`. The newest chart's `appVersion` is
+the core on its row: `0.15.16` carries `2.18.1`, `0.15.14` carries `2.17.1`,
+`0.15.12` carries `2.16.0`, `0.15.11` carries `2.15.0`, `0.15.10` carries
+`2.14.1`, `0.15.8` carries `2.13.1`, `0.15.6` carries `2.12.0`, `0.15.5` carries
+`2.11.0`, `0.15.4` carries `2.10.1`, `0.15.2` carries `2.9.0`, `0.15.1` carries
+`2.8.0`, `0.15.0` carries `2.7.0`, `0.14.4` carries `2.6.0`, `0.14.1` carries
+`2.5.0`. A row names the newest chart carrying that core minor, so the patch it
+pulls is that minor's latest. The newest chart's `appVersion` is
 what the generated *Released artifacts* table below reads back out of the
 registry. Older charts stay on their own lines: `0.13.7` carries
 `appVersion: 2.0.0` and `0.13.6` carries `appVersion: 1.6.2`. Charts before

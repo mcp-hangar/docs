@@ -14,6 +14,5 @@ Each critical alert links here via its `runbook_url` annotation.
 | [provider-unhealthy](provider-unhealthy.md) | `MCPHangarProviderUnhealthy`, `MCPHangarProviderDegraded` |
 | [health-failures](health-failures.md) | `MCPHangarHighConsecutiveFailures` |
 | [high-latency](high-latency.md) | `MCPHangarHighLatencyP95/P99/ByTool` |
-| [detection-match](detection-match.md) | `MCPHangarCriticalDetectionMatch` |
 
 See also: [Observability guide](../guides/OBSERVABILITY.md) · [Release runbook](RELEASE.md).

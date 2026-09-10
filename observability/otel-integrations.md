@@ -111,9 +111,10 @@ agent session against detection rules (e.g. credential exfiltration, privilege
 escalation). Partner backends such as OpenLIT, Grafana, and SIEM tools can filter
 spans by `mcp.risk.severity = critical` to surface high-risk events.
 
-`DetectionRuleMatched` and `CapabilityViolationDetected` signals are emitted today
-(enforcement is deterministic — rule- and threshold-based). The `mcp.risk.score` and
-`mcp.risk.session_anomaly_score` attributes are reserved for the aggregate
+`CapabilityViolationDetected` signals are emitted today (enforcement is
+deterministic — rule- and threshold-based). `DetectionRuleMatched` is not: the
+semantic analysis engine that would produce it is not shipped yet. The
+`mcp.risk.score` and `mcp.risk.session_anomaly_score` attributes are reserved for the aggregate
 behavioral anomaly-scoring path, which is **not yet enabled**: these session-level
 scores are not populated in the current release.
 
@@ -148,8 +149,6 @@ scores are not populated in the current release.
 | `mcp_hangar_health_checks_total` | Counter | Total health checks |
 | `mcp_hangar_circuit_breaker_state` | Gauge | Circuit breaker state per MCP server |
 | `mcp_hangar_capability_violations_total` | Counter | Total capability violations |
-| `mcp_hangar_detection_rule_matches_total` | Counter | Total detection rule matches (labels: `rule_id`, `severity`) |
-| `mcp_hangar_tool_schema_drifts_total` | Counter | Total tool schema drift detections |
 | `mcp_hangar_cost_cents_total` | Counter | Total attributed cost in hundredths of a cent (labels: `mcp_server`, `tool`, `cost_model`) |
 | `mcp_hangar_cost_attributions_total` | Counter | Total cost attribution computations (labels: `mcp_server`, `tool`) |
 

@@ -364,7 +364,6 @@ They are organized by severity:
 | `MCPHangarCircuitBreakerTripped` | CB rejections > 10/5m | 2m | MCP Server isolated |
 | `MCPHangarProviderUnhealthy` | Consecutive failures > 5 | 2m | MCP Server critically unhealthy |
 | `MCPHangarAllProvidersDown` | All MCP servers down (with servers configured) | 1m | Total outage |
-| `MCPHangarCriticalDetectionMatch` | Critical detection rule match | 0m | Security: critical detection rule match |
 
 #### Warning Alerts (Investigate)
 
@@ -388,7 +387,6 @@ They are organized by severity:
 | `MCPHangarHighRateLimitRejections` | Rejected rate-limit hits > 1/s | 5m | Clients being throttled |
 | `MCPHangarCapabilityViolations` | Capability violations > 0/5m | 5m | Security: capability breach |
 | `MCPHangarConcurrencyQueueBuildup` | Concurrency queue building > 1/5m | 5m | Backpressure / saturation |
-| `MCPHangarEnforcementActionsActive` | Enforcement actions firing | 5m | Security: enforcement active |
 
 #### Governance and Availability Alert Groups
 

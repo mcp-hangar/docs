@@ -4,6 +4,133 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.19.1
+
+### a suspended session is refused
+
+`POST /api/sessions/{id}/suspend` now blocks the session it names. Before, it
+answered 200 and replicated the suspension to every replica, and no request
+path read it, so the session went on calling tools.
+
+A request that carries a suspended session id is refused before Hangar does
+anything for it: no validation, authorization, approval, cold start or upstream
+call. A replica refuses the session once it has read the suspension from the
+shared event log. `DELETE /api/sessions/{id}/suspend` lifts it. Each refusal
+logs a `session_suspended_call_refused` warning naming the session.
+
+| Request | Refused with |
+| --- | --- |
+| `hangar_call`, every other `hangar_*` tool, a front door's flat tool call | a tool error: `Session suspended: this call was refused.` |
+| `tasks/get`, `tasks/cancel`, `tasks/update` | JSON-RPC error `-32600`, the same message, `data.reason: session_suspended` |
+| on a front door: `prompts/list`, `prompts/get`, `completion/complete`, `resources/list`, `resources/templates/list`, `resources/read`, `subscriptions/listen` | the same JSON-RPC error |
+
+**Where a caller's session id comes from.** A suspension refuses only a caller
+that carries the session id it names. Hangar reads it from one of two places,
+in this order:
+
+| Source | Honoured when |
+| --- | --- |
+| the session-id claim of an OIDC bearer token (`sid` by default) | the token is verified. A header cannot replace it. |
+| `x-session-id` request header | the connecting peer is listed in `MCP_TRUSTED_PROXIES` |
+
+If your identity provider puts the session id in another claim, name it with
+`auth.oidc.session_id_claim`, or per issuer with `session_id_claim` on an
+`auth.oidc.issuers` entry. A session id must match `[A-Za-z0-9_-]{1,128}`, the
+shape the suspend route accepts. Anything else is ignored. `Mcp-Session-Id` is
+not read.
+
+To suspend API-key callers by session, put a proxy in front of Hangar that sets
+`x-session-id` and removes any the client sent. List the proxy's address in
+`MCP_TRUSTED_PROXIES`, which defaults to `127.0.0.1,::1`.
+
+**What is not covered.**
+
+- A caller with no session id carries nothing to match, and is not refused.
+  Suspension does not cut off a principal. To do that, revoke its API key or
+  disable it at the identity provider.
+- A stdio session has no session id: a pipe carries neither source.
+- With auth disabled, nothing is refused. The suspend route is then open to
+  every caller, so it was never a control there.
+- `tools/list`, the REST API and `/ws/events` do not check suspensions. The tool
+  listing answers from Hangar's own catalogue and reaches no upstream.
+- A replica that starts after a suspension does not learn of it.
+- A suspension expires after 24 hours. Each replica holds at most 10,000.
+
+### only `MCP_TRUSTED_PROXIES` decides the forwarded client address
+
+Hangar now starts its HTTP server with uvicorn's forwarded-header handling
+turned off. Before, uvicorn rewrote the client address from `X-Forwarded-For`,
+and the scheme from `X-Forwarded-Proto`, for any peer in `FORWARDED_ALLOW_IPS`
+(default `127.0.0.1`), before Hangar saw the request. Hangar then applied its
+own `MCP_TRUSTED_PROXIES` to what was left.
+
+Now Hangar sees the address that actually connected. It believes
+`X-Forwarded-For` only when that address is in `MCP_TRUSTED_PROXIES` (default
+`127.0.0.1,::1`). The client address is the rightmost forwarded entry that is
+not itself a trusted proxy, which is the rule uvicorn applied. Before, behind a
+proxy outside `FORWARDED_ALLOW_IPS`, Hangar took the leftmost entry, which the
+client can write.
+
+| Connection | Address that rate limiting, audit and security events see |
+| --- | --- |
+| directly from a client | the client's address |
+| from a trusted proxy, with `X-Forwarded-For` | the rightmost forwarded address that is not a trusted proxy |
+| from any other peer, with `X-Forwarded-For` | the peer's address. The header is ignored. |
+
+What to do:
+
+- If you set `FORWARDED_ALLOW_IPS` for Hangar, put the same addresses in
+  `MCP_TRUSTED_PROXIES`. Hangar no longer reads `FORWARDED_ALLOW_IPS`.
+- If requests pass through more than one proxy, list every proxy in
+  `MCP_TRUSTED_PROXIES`. An unlisted hop is taken to be the client.
+- A proxy on loopback needs nothing, because loopback is trusted by default.
+  Its `x-session-id` is now honoured even when it also sends `X-Forwarded-For`.
+  Before, the rewritten address made Hangar ignore it.
+- The protected-resource metadata already read `X-Forwarded-Proto` itself, so
+  the scheme it advertises is unchanged.
+
+### traces, the security log and Langfuse carry no error text
+
+Hangar's telemetry no longer says what a failure said: a tool's error message
+can hold whatever the tool returned. A failed span ends in ERROR with an empty
+status description and a bounded `error.type`. Where an exception escaped the
+span, or a fault barrier handled one, the span has an `exception` event whose
+only attribute is `exception.type`, with no `exception.message` and no
+`exception.stacktrace`.
+
+| Where | Before | Now |
+| --- | --- | --- |
+| `batch.call.<tool>` status description | the call's error message | empty; `error.type` is the error's class, e.g. `ToolInvocationError` |
+| any other Hangar span an exception escapes | `exception` event with type, message and stacktrace; description `"<type>: <message>"` | `exception` event with `exception.type` only; empty description; `error.type` is the exception's class |
+| a failure a fault barrier handled (event store append, discovery, cold start) | `exception` event with type, message and stacktrace | `exception` event with `exception.type` only; `error.type` as before |
+| security log, failed tool call | `details.error`: the message | `details.error_type` |
+| security log, repeated health-check failures | `details.error`: the message | no error field; `details.consecutive_failures` as before |
+| `health_check_failed` warning log | `error=<message>` | `error_type=<class>` |
+| Langfuse, failed tool call | output `{"error": <message>, "type": <class>}`, status message `Tool invocation failed: <message>`, `tool_success` score comment `<message>` | output `{"type": <class>}`, status message `Tool invocation failed: <class>`, score comment `<class>` |
+| `error_type` of an upstream JSON-RPC error whose `code` is not an integer | the value sent, or `unknown` when absent | `_OTHER` |
+
+An error type that does not look like a class name or a code is recorded as
+`_OTHER`. Langfuse still receives tool arguments and results.
+
+If a dashboard or alert matched on span status descriptions, on
+`exception.message` or `exception.stacktrace`, on the security log's
+`details.error`, or on the Langfuse error output, match on `error.type` or
+`exception.type` instead. For the message itself, look up the call's
+`ToolInvocationFailed` event in the event store, or the result the caller
+received. Neither has changed.
+
+### `scrub_baggage_for_tenant` is removed, and baggage is not forwarded
+
+`scrub_baggage_for_tenant` is removed from `mcp_hangar.observability`, with no
+replacement. If you call it, delete the call. There is nothing to do instead:
+Hangar forwards no baggage.
+
+Hangar propagates `traceparent` and `tracestate` only, over HTTP and stdio
+alike, and ignores `baggage` on inbound requests. Hangar sets no baggage
+itself, so this changes something only where host instrumentation or an
+embedding application attached baggage to the context, or a request carried a
+`baggage` key in `_meta`. Those entries no longer reach upstream servers.
+
 ## Upgrade to 2.19.0
 
 ### tenant-scoped role grants are limited to their tenant

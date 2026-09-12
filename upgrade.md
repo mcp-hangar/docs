@@ -87,8 +87,15 @@ observability:
 ```
 
 or `MCP_AUDIT_EXPORT_ENABLED=false`, which wins over the file. Switched off,
-audit records go to the structured log. The in-process audit trail and the
-compliance feed selected by `MCP_COMPLIANCE_FORMAT` are unaffected either way.
+no audit records are exported and none are written to the structured log
+either: the switch selects the null exporter, so the records are never built.
+That is the same visibility 2.18.x had, since it dropped them. The structured
+log carries them only when export is *on* and there is no usable logger
+provider — no OpenTelemetry SDK installed, or a provider already shut down —
+where they appear as `audit_event` lines.
+
+The in-process audit trail and the compliance feed selected by
+`MCP_COMPLIANCE_FORMAT` are unaffected either way.
 
 ### the `domain_event` log line carries only identifiers
 

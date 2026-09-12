@@ -212,14 +212,19 @@ without `tool:invoke`, which gates `hangar_call` rather than the flat path.
 ### [ADR-027](ADR-027-egress-is-a-trust-mode-not-a-preset.md): `egress` Is a Trust Mode, Not a Preset of the Front Door
 
 Asks whether a front door with `tool_projection.flat: []` (core#1370) is just
-`egress`, which would make the two modes one mode with a parameter. The answer
-rests on every site in the 2.19.1 wheel that reads the mode, and it is no. For a
-caller with a tenant, the two modes enforce the same policies and differ only in
-surface. For a caller without one, `egress` serves the server-level policy and
-`front_door` denies it on every call path, `hangar_call` included. The mode
-therefore states how the gateway treats a caller it cannot name, and the surface
-follows from that. `flat` is a front-door key, refused under `egress` as
-contradictory. Existing `egress` deployments migrate nothing.
+`egress`, which would make the two modes one mode with a parameter. Read from the
+2.19.1 wheel, it is not. The modes differ in three ways:
+
+- A caller with no tenant gets the policy without a tenant layer under
+  `egress`, and is denied upstream tools under `front_door`.
+- `egress`'s invoke path, `hangar_call`, requires `tool:invoke`, and the flat
+  path does not.
+- The surface differs.
+
+Keeping `egress` a mode of its own is chosen over a preset, which would need
+one parameter per difference. The mode is defined by how it treats a caller with
+no tenant. `flat` is a front-door key, refused under `egress`. Existing `egress`
+deployments migrate nothing.
 
 ## Conventions
 

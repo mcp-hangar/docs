@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.2](https://github.com/mcp-hangar/docs/compare/v1.2.1...v1.2.2) (2026-09-12)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#322](https://github.com/mcp-hangar/docs/issues/322)) ([ad692a9](https://github.com/mcp-hangar/docs/commit/ad692a9b96e6cfa1d6e428f3a7edc141bb276fda))
+* **guides:** stop documenting four metrics nothing emits ([#319](https://github.com/mcp-hangar/docs/issues/319)) ([a2539d3](https://github.com/mcp-hangar/docs/commit/a2539d34c46017c5eb9b15f9a18e4c444d22a26d))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#321](https://github.com/mcp-hangar/docs/issues/321)) ([06d4188](https://github.com/mcp-hangar/docs/commit/06d4188c2134767eae2fa7e4607ca54a15be88f7))
+
 ## [1.2.1](https://github.com/mcp-hangar/docs/compare/v1.2.0...v1.2.1) (2026-09-09)
 
 

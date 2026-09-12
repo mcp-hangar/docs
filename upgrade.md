@@ -39,6 +39,81 @@ auth:
 
 Global grants, and deployments with auth disabled, behave exactly as before.
 
+### tool-call metrics are no longer counted twice
+
+Every call through `hangar_call` or a projected tool was observed once by the
+invocation handler and again by the metrics event handler.
+`mcp_hangar_tool_calls_total`, `mcp_hangar_tool_call_errors_total` and the
+count of `mcp_hangar_tool_call_duration_seconds` now move by one per call, so
+**every call-volume series halves after upgrading**. Review any alert or
+dashboard threshold tuned against the doubled series. The latency histogram now
+holds only the upstream round trip; the dropped observation also timed policy
+checks and cold starts. The `ToolInvocationError` series stops growing.
+
+Four metrics that nothing has written to since 2.10.0 are also gone:
+`mcp_hangar_behavioral_deviations_total`, `mcp_hangar_tool_schema_drifts_total`,
+`mcp_hangar_detection_rule_matches_total` and
+`mcp_hangar_enforcement_actions_total`. Each was a `# TYPE` header with no
+sample. Drop any panel or rule that reads them.
+
+### a scheme-less OTLP endpoint now uses TLS
+
+The trace exporter and the audit log exporter both honour the standard OTLP
+environment now, so an endpoint such as `collector:4317` follows the
+OpenTelemetry SDK default and connects with TLS. It used to be plaintext.
+
+```yaml
+observability:
+  tracing:
+    otlp_endpoint: http://collector:4317   # was: collector:4317
+```
+
+`OTEL_EXPORTER_OTLP_INSECURE=true` (or the per-signal
+`OTEL_EXPORTER_OTLP_TRACES_INSECURE` / `OTEL_EXPORTER_OTLP_LOGS_INSECURE`) does
+the same. `https://` always uses TLS, and the default
+`http://localhost:4317` stays plaintext.
+
+### audit records really reach the OTLP endpoint
+
+Audit records for tool calls and server state changes used to be handed to the
+OpenTelemetry API's placeholder and dropped. Hangar now registers its own
+logger provider and exports them, so a configured OTLP endpoint receives the
+**logs** signal as well as traces. Point it at a collector that accepts logs;
+one that only ingests traces will reject the batches, counted in
+`mcp_hangar_otlp_audit_export_failures_total`.
+
+To keep exporting traces but not audit records:
+
+```yaml
+observability:
+  audit:
+    enabled: false
+```
+
+or `MCP_AUDIT_EXPORT_ENABLED=false`, which wins over the file. Switched off,
+audit records go to the structured log. The in-process audit trail and the
+compliance feed selected by `MCP_COMPLIANCE_FORMAT` are unaffected either way.
+
+### the `domain_event` log line carries only identifiers
+
+`LoggingEventHandler` wrote the whole event into every line, so the structured
+log held each event's identity context and its free-text fields at INFO.
+The line now carries `event_type`, `event_id`, `mcp_server_id`, `tool_name`,
+`error_type`, `tenant_id` and `correlation_id`. The full event moved to a
+`domain_event_detail` line at DEBUG. A consumer that parses event payloads out
+of INFO or WARNING lines must enable DEBUG or read the event store.
+
+### recorded values are truncated
+
+Span attributes are cut at 256 characters, OTLP audit attributes at 256,
+structured-log strings at 2048, and a domain event's free-text fields, such as
+`error_message` and `reason`, at 4096. A cut value ends with `…[truncated N]`,
+except span attributes, which the OpenTelemetry SDK cuts without a marker. Set
+`MCP_SPAN_ATTRIBUTE_LENGTH_LIMIT`, `MCP_AUDIT_ATTRIBUTE_LENGTH_LIMIT`,
+`MCP_LOG_FIELD_LENGTH_LIMIT` or `MCP_EVENT_TEXT_LENGTH_LIMIT` to change a
+limit. A domain event is cut once, when it is constructed, so the event store,
+`/ws/events`, the audit trail and the logs all hold the same value.
+
 ## Upgrade to 2.18.0
 
 ### adopting the enforcement `init` now writes

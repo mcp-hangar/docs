@@ -50,11 +50,7 @@ dashboard threshold tuned against the doubled series. The latency histogram now
 holds only the upstream round trip; the dropped observation also timed policy
 checks and cold starts. The `ToolInvocationError` series stops growing.
 
-Four metrics that nothing has written to since 2.10.0 are also gone:
-`mcp_hangar_behavioral_deviations_total`, `mcp_hangar_tool_schema_drifts_total`,
-`mcp_hangar_detection_rule_matches_total` and
-`mcp_hangar_enforcement_actions_total`. Each was a `# TYPE` header with no
-sample. Drop any panel or rule that reads them.
+Four metrics that nothing has written to since 2.10.0 are gone as well, each a `# TYPE` header with no sample: `mcp_hangar_behavioral_deviations_total`, `mcp_hangar_tool_schema_drifts_total`, `mcp_hangar_detection_rule_matches_total` and `mcp_hangar_enforcement_actions_total` are no longer exposed. Drop any panel or rule that reads them.
 
 ### a scheme-less OTLP endpoint now uses TLS
 

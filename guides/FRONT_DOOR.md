@@ -29,9 +29,12 @@ tool_access:
 | Tool surface exposed to clients | Full `hangar_*` meta-API | Flat per-tenant backend tool names |
 | Use case | Internal control plane / proxy | Public or multi-tenant front door |
 
-If `tool_access.mode` is absent or set to an unrecognized value, Hangar
-defaults to `egress` and logs a warning — a typo never silently activates the
-stricter mode, and existing deployments are never broken by the upgrade.
+If `tool_access.mode` is absent, Hangar uses `egress`, so an upgrade never
+switches an existing deployment to the stricter mode. A value that is present
+but unrecognized — `front-door`, `frontdoor` — refuses to start. Resolving that
+typo to `egress` would give a deployment that asked for the front door the
+permissive mode instead. This changed in 2.2.0; see the
+[upgrade note](../upgrade.md#upgrade-to-220).
 
 > Source: `src/mcp_hangar/server/config.py` (`_init_topology_mode_from_config`),
 > `src/mcp_hangar/domain/services/tool_access_resolver.py` (`TopologyMode`).

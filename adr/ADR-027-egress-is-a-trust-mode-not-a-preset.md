@@ -38,11 +38,12 @@ line numbers are in that wheel.
 | 4 | `fastmcp_server/prompt_proxy.py:183`, `fastmcp_server/resource_link_read_through.py:345` -- upstream prompts and resources | not served | proxied per tenant |
 | 5 | `fastmcp_server/subscription_relay.py:249` -- `subscriptions/listen` | the SDK's handler is withdrawn (`:251`) | relayed |
 | 6 | `fastmcp_server/resource_link_read_through.py:148` -- resource URIs in tool results | passed through | namespaced by the owning upstream |
-| 7 | `server/lifecycle.py:125` -- starting upstreams | on first use | every configured upstream, at boot |
+| 7 | `server/lifecycle.py:125` -- starting upstreams | a standalone upstream on first use; a group's members when the group loads, if its `auto_start` is on (the default, `domain/model/mcp_server_group.py:376`) | every configured upstream at boot, as well |
 | 8 | `fastmcp_server/server_discover.py:88` -- `server/discover` | advertises `hangar_*` | advertises the flat projection |
 
-Rows 2 through 8 are the surface, and `flat: []` would bring only part of row 2
-closer: in both modes an upstream tool would then be reached through
+Rows 2 through 8 are the surface, together with the boot-time start that fills
+its catalogue before the first listing (row 7, `mcp-hangar#885` and `#1231`).
+`flat: []` would bring only part of row 2 closer: in both modes an upstream tool would then be reached through
 `hangar_call`, which a front door does not project today
 (`server/tools/tool_permissions.py:243` excludes it and `_flat_call_tool`
 answers `-32601` at `fastmcp_server/flat_tool_projection.py:938`).
@@ -73,7 +74,10 @@ for the second:
 
 Two deployments put callers in the second group today. An HTTP gateway with auth
 off maps every request to an anonymous principal with `tenant_id=None`
-(`fastmcp_server/asgi.py:44`-`:51`). A stdio process has no identity unless
+(`fastmcp_server/asgi.py:44`-`:51`). No header can supply a tenant instead. The
+header extractor reads user, agent, session, principal type and correlation id,
+and nothing else (`infrastructure/identity/header_extractor.py:19`-`:23`). This
+is the same fact `mcp-hangar#902` found from the pinning side. A stdio process has no identity unless
 `auth.stdio.principal` declares one
 ([ADR-026](ADR-026-stdio-is-an-authenticated-transport.md), still Proposed),
 and that block is ignored when it carries no tenant (`auth/config.py:510`).
@@ -81,9 +85,11 @@ Either deployment can be configured as `front_door`. It starts, and it serves an
 empty list: the process does not refuse a misconfiguration, this is what the mode
 means.
 
-ADR-026 has already chosen how a local caller reaches the front door: the
-caller is given an identity, and the deny is left in place. That choice treats
-the deny as part of the mode's definition, not as a setting of it.
+ADR-026 has already chosen how a local caller reaches the front door, and it
+chose by naming the caller rather than by relaxing the deny. Its boundary table
+says so: `#902` "refuses to project tools to a caller nobody can name. This
+names the caller. The refusal for an unnamed caller stays exactly as it is."
+That treats the deny as part of the mode's definition, not as a setting of it.
 
 ## Decision
 
@@ -99,7 +105,7 @@ The rule a reader applies:
 - **The gateway must serve a caller that arrives without a tenant identity**
   (stdio with no declared principal, or HTTP with auth off): it needs `egress`.
 - **Every caller carries a tenant:** it may use `front_door`, and the choice
-  between the two is then a choice of surface alone.
+  between the two is then a choice of surface alone (Context rows 2 through 8).
 
 ### 2. `tool_access.mode` states the caller's trust, and the surface follows from it
 
@@ -184,8 +190,8 @@ existing `egress` deployment runs.
 
 ### 1. One mode with an identity parameter, and `egress` as a named preset
 
-- **Rejected**: It reopens a combination ADR-026 closed a different way: a
-  caller the gateway cannot name, served a projected surface. It also leaves one
+- **Rejected**: It reopens the combination ADR-026 declined to open: a caller
+  the gateway cannot name, served a projected surface (see Context). It also leaves one
   combination undefined. With no principal, `management_tools_for` returns
   nothing while `authorize_tool` permits everything (ADR-022 made the first rule
   stricter on purpose), so a preset would have to pick between two rules that

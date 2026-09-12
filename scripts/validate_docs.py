@@ -43,6 +43,11 @@ ALLOWLIST: set[str] = {
     # learns why it is gone. Nothing registered it and no channel it referenced
     # existed, but the name has to survive here to say so.
     "hangar_approve_prompt",
+    # Proposed by core#1370 and named in ADR-027, which is itself Proposed and
+    # decides what that front-door surface is. It does not exist yet because
+    # the decision comes first. Delete this entry when core ships the tool, so
+    # the check covers it from then on.
+    "hangar_find",
     # Example container env var in cookbook/04 (belongs to the demo image,
     # not to Hangar itself).
     "MCP_PORT",

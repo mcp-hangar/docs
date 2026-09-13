@@ -40,9 +40,10 @@ its gates (`server/tools/batch/executor.py:1795`-`:1808`).
 None of those steps checks an RBAC permission.
 
 The two paths are served in different modes today, so no surface shows both.
-`mcp-hangar#1370` changes that. Its default front-door surface is `hangar_find`
-+ `hangar_call` + the management tools a caller is permitted, with
-`tool_projection.flat` as the opt-in, so one front door would carry both rules.
+`mcp-hangar#1370` changes that. Its default front-door surface is
+`hangar_find`, `hangar_call` and the management tools a caller is permitted,
+with `tool_projection.flat` as the opt-in, so one front door would carry both
+rules.
 
 An HTTP principal holding `viewer`, which lacks `tool:invoke`, could then call a
 tool by its flat name and be refused the same tool through `hangar_call`. A

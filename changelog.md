@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.5](https://github.com/mcp-hangar/docs/compare/v1.2.4...v1.2.5) (2026-09-13)
+
+
+### Changed
+
+* **architecture:** accept adr-026, which shipped in 2.18.0 ([#331](https://github.com/mcp-hangar/docs/issues/331)) ([b830ffc](https://github.com/mcp-hangar/docs/commit/b830ffcfb9e558848b1c3e3d6f8147dcfa0232f0))
+* **architecture:** adr-027 -- egress is a trust mode, not a preset of the front door ([#329](https://github.com/mcp-hangar/docs/issues/329)) ([09f6ffa](https://github.com/mcp-hangar/docs/commit/09f6ffa3c32f8e1be8af544df8193f9486f4655b))
+* **architecture:** adr-028 -- on a front door, the tool-access policy is the invoke gate ([#332](https://github.com/mcp-hangar/docs/issues/332)) ([92c4508](https://github.com/mcp-hangar/docs/commit/92c450881b235fb0695717c7f9a141683c9d5a40))
+* **guides:** an unrecognised tool_access.mode refuses to start ([#328](https://github.com/mcp-hangar/docs/issues/328)) ([e4c24f7](https://github.com/mcp-hangar/docs/commit/e4c24f762bede89d8eb9acd02cc7b0a2c33a8f65))
+
 ## [1.2.4](https://github.com/mcp-hangar/docs/compare/v1.2.3...v1.2.4) (2026-09-12)
 
 

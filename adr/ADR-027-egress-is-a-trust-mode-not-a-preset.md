@@ -180,8 +180,9 @@ existing `egress` deployment runs.
 - Once `mcp-hangar#1370` serves `hangar_call` on a front door, two invocation
   rules meet on one surface. A tool listed in `flat` needs no `tool:invoke`, and
   the same tool reached through `hangar_call` does. A principal holding `viewer`
-  could call the first and not the second. This decision changes neither rule,
-  and the epic that puts both paths on one surface inherits the disagreement.
+  could call the first and not the second. This decision changes neither rule.
+  [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md)
+  sets the one that applies on a front door.
 - Consider a deployment whose callers all carry a tenant. For it, the modes
   differ only in invocation RBAC and surface, and changing modes is how it gets
   a per-caller surface. There the key behaves as the surface switch the

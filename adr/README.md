@@ -36,7 +36,7 @@ taxonomy, and formatting conventions.
 | [023](ADR-023-mcp-registry-listing.md) | The MCP Registry Entry Describes a Package, Not a Service | Accepted | 2026-08-16 |
 | [024](ADR-024-approval-hold-belongs-on-a-tool-call.md) | A Human Approval Hold Belongs on a Tool Call, Not on a Fetch | Accepted | 2026-08-23 |
 | [025](ADR-025-header-selectors-must-not-match-unvalidated-headers.md) | A Header Selector Must Not Match a Header Nobody Validated | Accepted | 2026-08-29 |
-| [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Proposed | 2026-09-03 |
+| [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Accepted | 2026-09-03 |
 | [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Proposed | 2026-09-12 |
 | [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | On a Front Door, the Tool-Access Policy Is the Invoke Gate for Upstream Tools | Proposed | 2026-09-13 |
 

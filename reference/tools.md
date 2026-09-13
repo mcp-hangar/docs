@@ -9,14 +9,14 @@ Complete reference for all MCP protocol tools exposed by MCP Hangar. These tools
 | [`hangar_list`](#hangar_list) | Lifecycle | List all MCP servers with state and tool counts | None (read-only) |
 | [`hangar_start`](#hangar_start) | Lifecycle | Start a MCP server or group | Starts process/container |
 | [`hangar_stop`](#hangar_stop) | Lifecycle | Stop a MCP server or group | Stops process/container |
-| [`hangar_status`](#hangar_status) | Lifecycle | Human-readable health dashboard | None (read-only) |
+| [`hangar_status`](#hangar_status) | Lifecycle | Status dashboard of the replica that answers | None (read-only) |
 | [`hangar_reload_config`](#hangar_reload_config) | Lifecycle | Reload configuration from disk | Stops/starts MCP servers |
 | [`hangar_load`](#hangar_load) | Hot-Loading | Load MCP server from registry at runtime | Downloads and starts MCP server |
 | [`hangar_unload`](#hangar_unload) | Hot-Loading | Unload a hot-loaded MCP server | Stops and removes MCP server |
 | [`hangar_tools`](#hangar_tools) | MCP Server | List tools available on a MCP server | May start cold MCP server |
 | [`hangar_details`](#hangar_details) | MCP Server | Detailed MCP server or group information | None (read-only) |
 | [`hangar_warm`](#hangar_warm) | MCP Server | Pre-start MCP servers for faster first call | Starts MCP server processes |
-| [`hangar_health`](#hangar_health) | Health | System-wide health summary | None (read-only) |
+| [`hangar_health`](#hangar_health) | Health | Health summary of the replica that answers | None (read-only) |
 | [`hangar_metrics`](#hangar_metrics) | Health | MCP Server metrics in JSON or Prometheus format | None (read-only) |
 | [`hangar_discover`](#hangar_discover) | Discovery | Trigger discovery scan across all sources | Updates pending MCP server list |
 | [`hangar_discovered`](#hangar_discovered) | Discovery | List pending discovered MCP servers | None (read-only) |
@@ -155,7 +155,13 @@ Errors: `ValueError("unknown_mcp_server: <id>")`
 
 ### `hangar_status` {#hangar_status}
 
-Human-readable health dashboard with state indicators for all MCP servers and groups.
+Human-readable status dashboard of the replica that answers the call, with state indicators for its MCP servers and groups.
+
+**Scope: replica-local.** With more than one gateway replica, the answer describes the replica named in `replica.instance_id`, not the fleet. Under session affinity you do not choose which replica answers. Two calls can therefore reach two replicas and report different server states and uptimes without anything in the fleet having changed. Compare `replica.instance_id` before reading a difference as a change.
+
+- **Same snapshot as `hangar_health`.** From one replica, the two tools agree. `hangar_health.mcp_servers.total` equals `summary.total_mcp_servers`, and both count hot-loaded servers.
+- **One name per replica.** `replica.instance_id` is the identity the management lease reports as `holder`, `GET /system` reports as `instance.instance_id`, and traces carry as `service.instance.id`. See [Running more than one replica](../cookbook/25-multiple-replicas.md).
+- **No fleet view here.** Neither tool asks other replicas or reads shared state. For a fleet-wide view, query the per-replica metrics in Prometheus, which scrapes every replica.
 
 **Parameters:** None.
 
@@ -165,11 +171,14 @@ Human-readable health dashboard with state indicators for all MCP servers and gr
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `mcp_servers` | `list[object]` | MCP servers with `id`, `indicator`, `state`, `mode`, `last_used` |
+| `mcp_servers` | `list[object]` | MCP servers with `id`, `indicator`, `state`, `mode` |
 | `groups` | `list[object]` | Groups with `id`, `indicator`, `state`, `healthy_members`, `total_members` |
 | `runtime_mcp_servers` | `list[object]` | Hot-loaded MCP servers with `id`, `indicator`, `state`, `source`, `verified` |
-| `summary` | `object` | Counts: `healthy_mcp_servers`, `total_mcp_servers`, `runtime_mcp_servers`, `runtime_healthy`, `uptime`, `uptime_seconds` |
-| `formatted` | `str` | Pre-formatted text dashboard |
+| `summary` | `object` | Counts: `healthy_mcp_servers`, `total_mcp_servers`, `runtime_mcp_servers`, `runtime_healthy`, plus `uptime` and `uptime_seconds`, which are the answering replica's process uptime (the same values as `replica.*`) |
+| `replica` | `object` | The replica that answered: `instance_id`, `uptime_seconds`, `uptime` |
+| `scope` | `str` | Always `"replica"` |
+| `scope_note` | `str` | The same scope, stated in words |
+| `formatted` | `str` | Pre-formatted text dashboard, headed by the replica that answered |
 
 Indicator values: `[READY]`, `[COLD]`, `[STARTING]`, `[DEGRADED]`, `[DEAD]`.
 
@@ -187,7 +196,10 @@ Indicator values: `[READY]`, `[COLD]`, `[STARTING]`, `[DEGRADED]`, `[DEAD]`.
   "groups": [],
   "runtime_mcp_servers": [],
   "summary": {"healthy_mcp_servers": 1, "total_mcp_servers": 1, "uptime": "2h 15m"},
-  "formatted": "[READY] math (subprocess, 4 tools)"
+  "replica": {"instance_id": "hangar-0-3fa81c2e", "uptime_seconds": 8100.0, "uptime": "2h 15m"},
+  "scope": "replica",
+  "scope_note": "This describes what the replica named in replica.instance_id knows, not the fleet. ...",
+  "formatted": "Answered by replica: hangar-0-3fa81c2e\n..."
 }
 ```
 
@@ -445,7 +457,9 @@ Pre-start one or more MCP servers so the first tool call does not incur cold-sta
 
 ### `hangar_health` {#hangar_health}
 
-System-wide health summary with MCP server state counts and security information.
+Health summary of the replica that answers the call: MCP server state counts and security information.
+
+**Scope: replica-local.** This works the same way as [`hangar_status`](#hangar_status). The answer describes the replica named in `replica.instance_id`, not the fleet. It is read from the same snapshot as `hangar_status`, so from one replica the two tools agree.
 
 **Parameters:** None.
 
@@ -455,10 +469,13 @@ System-wide health summary with MCP server state counts and security information
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `status` | `str` | Overall system status |
-| `mcp_servers` | `object` | `total` and `by_state` breakdown (`cold`, `ready`, `degraded`, `dead`) |
+| `status` | `str` | Overall status |
+| `mcp_servers` | `object` | `total` and `by_state` breakdown (`cold`, `ready`, `degraded`, `dead`), counting configured and hot-loaded servers on this replica |
 | `groups` | `object` | `total`, `by_state`, `total_members`, `healthy_members` |
 | `security` | `object` | Rate limiting info: `rate_limiting.active_buckets`, `rate_limiting.config` |
+| `replica` | `object` | The replica that answered: `instance_id`, `uptime_seconds`, `uptime` |
+| `scope` | `str` | Always `"replica"` |
+| `scope_note` | `str` | The same scope, stated in words |
 
 **Example:**
 
@@ -471,7 +488,10 @@ System-wide health summary with MCP server state counts and security information
   "status": "healthy",
   "mcp_servers": {"total": 3, "by_state": {"ready": 2, "cold": 1}},
   "groups": {"total": 1, "by_state": {"healthy": 1}, "total_members": 3, "healthy_members": 3},
-  "security": {"rate_limiting": {"active_buckets": 0, "config": {"rps": 10, "burst": 20}}}
+  "security": {"rate_limiting": {"active_buckets": 0, "config": {"rps": 10, "burst": 20}}},
+  "replica": {"instance_id": "hangar-0-3fa81c2e", "uptime_seconds": 8100.0, "uptime": "2h 15m"},
+  "scope": "replica",
+  "scope_note": "This describes what the replica named in replica.instance_id knows, not the fleet. ..."
 }
 ```
 

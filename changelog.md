@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.4](https://github.com/mcp-hangar/docs/compare/v1.2.3...v1.2.4) (2026-09-12)
+
+
+### Changed
+
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#326](https://github.com/mcp-hangar/docs/issues/326)) ([d63279b](https://github.com/mcp-hangar/docs/commit/d63279b6d4a2eefcc9bf0d7808b26256da89fd05))
+
+## [1.2.3](https://github.com/mcp-hangar/docs/compare/v1.2.2...v1.2.3) (2026-09-12)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#324](https://github.com/mcp-hangar/docs/issues/324)) ([13d04fe](https://github.com/mcp-hangar/docs/commit/13d04fec239ff87e7415a43b4034249cf50fc5af))
+* **guides:** the audit switch discards records, it does not log them ([#323](https://github.com/mcp-hangar/docs/issues/323)) ([48f84bc](https://github.com/mcp-hangar/docs/commit/48f84bcfe2c83a016ab140a95f8cce9cc595a9d3))
+
 ## [1.2.2](https://github.com/mcp-hangar/docs/compare/v1.2.1...v1.2.2) (2026-09-12)
 
 

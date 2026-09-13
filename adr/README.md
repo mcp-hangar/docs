@@ -38,6 +38,7 @@ taxonomy, and formatting conventions.
 | [025](ADR-025-header-selectors-must-not-match-unvalidated-headers.md) | A Header Selector Must Not Match a Header Nobody Validated | Accepted | 2026-08-29 |
 | [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Proposed | 2026-09-03 |
 | [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Proposed | 2026-09-12 |
+| [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | On a Front Door, the Tool-Access Policy Is the Invoke Gate on Every Path | Proposed | 2026-09-13 |
 
 ## Summaries
 
@@ -225,6 +226,21 @@ Keeping `egress` a mode of its own is chosen over a preset, which would need
 one parameter per difference. The mode is defined by how it treats a caller with
 no tenant. `flat` is a front-door key, refused under `egress`. Existing `egress`
 deployments migrate nothing.
+
+### [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md): On a Front Door, the Tool-Access Policy Is the Invoke Gate on Every Path
+
+`hangar_call` requires `tool:invoke` for each call. The flat path checks only
+the tool-access policy. Once core#1370 serves both on one front door, a
+`viewer`, which is ADR-026's stdio default, could call a tool by its flat name
+and be refused it through `hangar_call`.
+
+Decided: on a front door, `hangar_call` drops `tool:invoke`, and the tool-access
+policy gates every path. `egress` keeps `tool:invoke`. The continuation tools
+stay off the front door and keep `tool:invoke`, because nothing else binds a
+continuation to its caller.
+
+The cost is that a front door enforces no per-principal tool grant. An operator
+moving from `egress` has to express that restriction as tenant policy instead.
 
 ## Conventions
 

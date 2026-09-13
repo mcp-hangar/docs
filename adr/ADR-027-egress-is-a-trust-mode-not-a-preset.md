@@ -74,7 +74,7 @@ A caller reaches the resolver with no tenant in three ways:
 - over HTTP with auth off, where there is no principal, so no identity
   (`fastmcp_server/asgi.py:139`-`:151`);
 - over stdio, unless `auth.stdio.principal` declares one
-  ([ADR-026](ADR-026-stdio-is-an-authenticated-transport.md), Proposed), and a
+  ([ADR-026](ADR-026-stdio-is-an-authenticated-transport.md)), and a
   declaration without a tenant is ignored (`auth/config.py:510`);
 - as an authenticated principal that carries no tenant, since
   `Principal.tenant_id` is optional (`domain/value_objects/security.py:77`).
@@ -119,8 +119,8 @@ Two modes are kept because a preset would need one parameter for each
 difference above: the treatment of a caller with no tenant, the management
 listing, and each of rows 3 through 6. Every combination except the two presets
 would then need a test or a load-time refusal. The one combination anyone has
-asked for is a projected surface for a caller with no tenant. ADR-026 proposes to
-reach it by giving the caller a tenant, not by relaxing the `#236` deny. Two modes
+asked for is a projected surface for a caller with no tenant. ADR-026 reaches it
+by giving the caller a tenant, not by relaxing the `#236` deny. Two modes
 keep two combinations, and both are tested.
 
 ### 2. The mode is defined by how it treats a caller with no tenant
@@ -216,12 +216,13 @@ existing `egress` deployment runs.
 
 - **Rejected**: Every deployment whose callers carry no tenant would serve them
   no upstream tool. That covers HTTP with auth off and stdio with no declared
-  principal. ADR-026 is Proposed, and it does not cover HTTP with auth off.
+  principal. ADR-026 does not cover HTTP with auth off.
 
 ### 3. Deprecate `egress` now, on the expectation that every caller will carry a tenant
 
-- **Deferred**: It depends on ADR-026 being accepted, and it still leaves HTTP
-  with auth off with no mode. Revisit it as a superseding ADR if both change.
+- **Deferred**: HTTP with auth off would be left with no mode. ADR-026 gave
+  stdio a way to carry a tenant, and nothing does that for HTTP with auth off.
+  Revisit it as a superseding ADR if that changes.
 
 ## References
 

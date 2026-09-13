@@ -1,6 +1,6 @@
 # ADR-026: Stdio Is an Authenticated Transport, and the Config Names Its Principal
 
-**Status:** Proposed
+**Status:** Accepted -- implemented in core `#1190`, released in 2.18.0
 **Date:** 2026-09-03
 **Authors:** MCP Hangar Team
 

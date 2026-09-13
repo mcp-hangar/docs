@@ -37,6 +37,7 @@ taxonomy, and formatting conventions.
 | [024](ADR-024-approval-hold-belongs-on-a-tool-call.md) | A Human Approval Hold Belongs on a Tool Call, Not on a Fetch | Accepted | 2026-08-23 |
 | [025](ADR-025-header-selectors-must-not-match-unvalidated-headers.md) | A Header Selector Must Not Match a Header Nobody Validated | Accepted | 2026-08-29 |
 | [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Proposed | 2026-09-03 |
+| [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Proposed | 2026-09-12 |
 
 ## Summaries
 
@@ -207,6 +208,23 @@ the OS user launched it -- and lets `auth.stdio.principal` name the caller it
 implies, with no credential checked because none exists to check. Absent the
 block, behavior is unchanged. Default role `viewer`: read-only, and deliberately
 without `tool:invoke`, which gates `hangar_call` rather than the flat path.
+
+### [ADR-027](ADR-027-egress-is-a-trust-mode-not-a-preset.md): `egress` Is a Trust Mode, Not a Preset of the Front Door
+
+Asks whether a front door with `tool_projection.flat: []` (core#1370) is just
+`egress`, which would make the two modes one mode with a parameter. Read from the
+2.19.1 wheel, it is not. The modes differ in three ways:
+
+- A caller with no tenant gets the policy without a tenant layer under
+  `egress`, and is denied upstream tools under `front_door`.
+- `egress`'s invoke path, `hangar_call`, requires `tool:invoke`, and the flat
+  path does not.
+- The surface differs.
+
+Keeping `egress` a mode of its own is chosen over a preset, which would need
+one parameter per difference. The mode is defined by how it treats a caller with
+no tenant. `flat` is a front-door key, refused under `egress`. Existing `egress`
+deployments migrate nothing.
 
 ## Conventions
 

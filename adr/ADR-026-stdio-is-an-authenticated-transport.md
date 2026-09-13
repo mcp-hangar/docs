@@ -92,11 +92,19 @@ already exists, is read-only by construction, and holds no permission that can
 change fleet state -- `providers:read`, `provider:read`, `provider:list`,
 `tool:list`, `metrics:read`, `group:read`, `group:list`, `discovery:read`.
 
-`viewer` deliberately does not hold `tool:invoke`. That permission gates
-`hangar_call`, whose `_authorize_calls` checks it per call; the flat front-door
-path authorizes an upstream call through the tool-access policy inside
-`BatchExecutor` instead. A local principal can therefore call its own tools
-while holding no permission to invoke anything through the management surface.
+`viewer` deliberately does not hold `tool:invoke`, but on stdio that
+permission decides nothing. Over HTTP with auth on, it gates `hangar_call`,
+whose `_authorize_calls` checks it per call, while the flat front-door path
+authorizes an upstream call through the tool-access policy inside
+`BatchExecutor` instead. On stdio `_authorize_calls` never reaches the
+permission check:
+
+- With auth off, it allows every call.
+- With auth on, it looks for the principal on an HTTP request, which a pipe
+  never carries, so it refuses a stdio caller as anonymous whatever its roles.
+
+What a local principal can call is therefore decided by the tool-access policy
+for its tenant. Its roles decide which management tools it is shown.
 
 Widening this default later requires an upgrade note, because a role is a
 grant: adding one silently would hand an existing local deployment a management

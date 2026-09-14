@@ -66,7 +66,6 @@ mcp_servers:
     min_healthy: 1
     circuit_breaker:
       failure_threshold: 3
-      reset_timeout_s: 30
     members:
       - id: my-mcp                         # NEW: added priority
         priority: 1                        # NEW: added priority (primary)
@@ -185,6 +184,8 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ```
 
    Primary recovered and back in rotation. Will reclaim traffic (priority 1 < priority 2).
+
+   If the primary was down long enough for Hangar to give up on it, it reads `dead` (`[DEAD]` in `hangar_status`). Health checks skip a dead server and the group does not route to it, so it does not come back by itself. Call `hangar_start` on `my-mcp`, and it rejoins rotation once the start succeeds.
 
 ## What Just Happened
 

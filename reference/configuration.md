@@ -1088,7 +1088,6 @@ mcp_servers:
       healthy_threshold: 1
     circuit_breaker:
       failure_threshold: 10
-      reset_timeout_s: 60.0
     tools:
       allow_list: ["generate_*"]
     canary:
@@ -1113,18 +1112,24 @@ mcp_servers:
 | ----- | ------ | --------- | ------- | ------------- |
 | `mode` | `str` | -- | `"group"` | Must be `"group"` |
 | `strategy` | `str` | `"round_robin"` | round_robin, weighted_round_robin, least_connections, random, priority | Load balancing strategy |
-| `min_healthy` | `int` | `1` | >= 1 | Minimum healthy members for group HEALTHY state |
+| `min_healthy` | `int` | `1` | >= 1 | Members in rotation, not `dead`, needed for the group `healthy` state and to close an open circuit |
 | `auto_start` | `bool` | `true` | -- | Auto-start members when the group is created |
 | `description` | `str` | -- | -- | Group description |
 | `health.unhealthy_threshold` | `int` | `2` | >= 1 | Consecutive failures before removing member from rotation |
 | `health.healthy_threshold` | `int` | `1` | >= 1 | Consecutive successes before re-adding member to rotation |
-| `circuit_breaker.failure_threshold` | `int` | `10` | >= 1 | Total group failures before the circuit opens |
-| `circuit_breaker.reset_timeout_s` | `float` | `60.0` | >= 1.0 | Seconds before the circuit auto-resets |
+| `circuit_breaker.failure_threshold` | `int` | `10` | >= 1 | Failures in a row, across the group's members, before the circuit opens |
 | `tools` | `dict` | -- | -- | Group-level tool access policy (`allow_list`, `deny_list`, `approval_list`, `approval_timeout_seconds`, `approval_channel`) -- see [`tools` dual format](#tools-dual-format) |
 | `canary.member` | `str` | -- | -- | Member that receives canary split traffic |
 | `canary.split_pct` | `int` | `0` | 0--100 | Deterministic percentage of tenants routed to `canary.member` |
 | `canary.pinned_tenants` | `dict[str, str]` | `{}` | -- | Tenant ID to member ID pins; explicit pins win over split routing |
 | `members` | `list[dict]` | `[]` | -- | Member MCP server configurations |
+
+A group's circuit closes once `min_healthy` members are back in rotation, after
+a passing health check or a completed start; it has no timer.
+`circuit_breaker.reset_timeout_s` was removed in 2.20.0 because it never had an
+effect. A config that still sets it loads and logs `unknown_config_key`;
+`HANGAR_CONFIG_STRICT=1` and `mcp-hangar config check` refuse it. See
+[MCP Server Groups → Circuit Breaker](../guides/MCP_SERVER_GROUPS.md#circuit-breaker).
 
 ### Member configuration
 

@@ -103,8 +103,8 @@ The `HangarConfig` builder provides a fluent API for programmatic configuration.
 | `HangarConfig()` | `HangarConfig` | Create an empty config builder |
 | `.add_mcp_server(name, ...)` | `self` | Add a MCP server definition |
 | `.enable_discovery(...)` | `self` | Enable discovery sources |
-| `.max_concurrency(value)` | `self` | Set thread pool size for `invoke()` |
-| `.set_intervals(...)` | `self` | Set background worker intervals |
+| `.max_concurrency(value)` | `self` | Set the size of the facade's thread pool |
+| `.set_intervals(...)` | raises | Refused: always raises `ConfigurationError` |
 | `.build()` | `HangarConfigData` | Build and validate the configuration |
 | `.to_dict()` | `dict` | Convert to YAML-compatible dict format |
 
@@ -132,14 +132,11 @@ The `HangarConfig` builder provides a fluent API for programmatic configuration.
 
 | Parameter | Type | Default | Range | Description |
 | ----------- | ------ | --------- | ------- | ------------- |
-| `value` | `int` | `20` | 1-100 | Thread pool size for concurrent `invoke()` calls |
+| `value` | `int` | `20` | 1-100 | Size of the thread pool that runs `invoke()` calls, `stop()` and `health()` |
 
-### `.set_intervals()` Parameters
+### `.set_intervals()`
 
-| Parameter | Type | Default | Description |
-| ----------- | ------ | --------- | ------------- |
-| `gc_interval_s` | `int \| None` | `30` | Garbage collection interval in seconds |
-| `health_check_interval_s` | `int \| None` | `10` | Health check interval in seconds |
+`.set_intervals()` always raises `ConfigurationError`. The gateway reads no GC or health-check interval from its configuration: the workers run on fixed intervals, listed under [Background workers](#background-workers). Remove the call.
 
 ### Complete Builder Example
 
@@ -167,7 +164,6 @@ config = (
     )
     .enable_discovery(docker=True, filesystem=["/etc/mcp/mcp_servers/"])
     .max_concurrency(50)
-    .set_intervals(gc_interval_s=60, health_check_interval_s=30)
     .build()
 )
 ```
@@ -209,6 +205,33 @@ Validation errors (empty MCP server name, invalid mode, missing mode-specific pa
         ...
     ```
 
+`start()` starts what `mcp-hangar serve` starts: the background workers, discovery when it is configured, and, depending on the configuration, coordination and the front-door warm-up.
+
+#### Background workers
+
+- The GC worker runs every 30 seconds and stops a server idle for longer than its `idle_ttl_s`. `.add_mcp_server()` defaults `idle_ttl_s` to 300. The next call starts the server again and pays its start-up time. To keep a server running for the life of the host, give it a larger `idle_ttl_s`, up to 86400.
+- The health-check worker checks every running server every 60 seconds, so a failing server is noticed, and one that recovers is returned to rotation, without a call.
+- The metrics snapshot worker records metrics history under `./data`, as it does under `serve`.
+- A facade created from a config file, with `Hangar.from_config()` or `SyncHangar.from_config()`, watches that file, and a change to it reloads the configuration. To keep the file from being reloaded, set:
+
+    ```yaml
+    config_reload:
+      enabled: false
+    ```
+
+#### Coordination and front-door warm-up
+
+- Under a `coordination:` block, `start()` starts the management lease keeper and the event tailer. The facade takes and renews the management lease, and follows the shared event log, as a served replica does.
+- In front-door mode (`tool_access.mode: front_door`), `start()` warms the catalogue. Every configured server is started on a thread of its own, so `start()` does not wait for it. With `tool_access.required_catalogue` set, the required-catalogue retry runs after it.
+
+In egress mode, and without a `coordination:` block, neither runs.
+
+#### Stopping and concurrent starts
+
+`stop()` stops the warm-up and the required-catalogue retry, discovery, the event tailer, all MCP servers and the background workers, then releases the management lease. It waits for the workers' threads to end, up to 10 seconds in total, and up to 10 seconds for a warm-up that is still starting servers.
+
+A second `start()` while started does nothing, and a second `stop()` does nothing. Concurrent `start()` calls share one bootstrap: the later calls return once the first has finished. A `stop()` made while a `start()` is in flight waits for it, then stops everything it started. `SyncHangar.start()` and `SyncHangar.stop()` are serialised across threads in the same way.
+
 ### Invocation
 
 === "Async (Hangar)"
@@ -219,6 +242,7 @@ Validation errors (empty MCP server name, invalid mode, missing mode-specific pa
         tool_name="add",
         arguments={"a": 1, "b": 2},
         timeout_s=30.0,  # default: 30.0
+        principal=caller,  # default: an anonymous caller
     )
     ```
 
@@ -230,17 +254,64 @@ Validation errors (empty MCP server name, invalid mode, missing mode-specific pa
         tool_name="add",
         arguments={"a": 1, "b": 2},
         timeout_s=30.0,
+        principal=caller,
     )
     ```
 
 | Parameter | Type | Default | Description |
 | ----------- | ------ | --------- | ------------- |
-| `mcp_server_name` | `str` | required | MCP Server to invoke |
+| `mcp_server_name` | `str` | required | MCP server or group to invoke |
 | `tool_name` | `str` | required | Tool name on the MCP server |
 | `arguments` | `dict \| None` | `None` | Tool arguments |
-| `timeout_s` | `float` | `30.0` | Invocation timeout in seconds |
+| `timeout_s` | `float` | `30.0` | Invocation timeout in seconds, keyword-only |
+| `principal` | `Principal \| None` | `None` | The caller, keyword-only. Without one, the call is an anonymous caller's. See [Calling as a principal](#calling-as-a-principal) |
 
-Cold MCP servers are auto-started on first invocation.
+`invoke` runs each call through the same executor as `hangar_call`, so every call-time control your configuration sets applies to it: tool access and withdrawals, digest pins, validators and interceptors, approval, the global and per-server concurrency limits, and tenant budgets.
+
+- Cold MCP servers are auto-started on first invocation.
+- `invoke` accepts a group id, as `hangar_call` does, and the call goes to the member the group selects.
+- `timeout_s` bounds the wait. The call itself is given `timeout_s` clamped to 1-300 seconds, as `hangar_call` clamps its `timeout`.
+- The result is returned whole. The per-call size limit (10 MB) and a `truncation:` section cut `hangar_call` results, not the results `invoke` returns, and no continuation is stored for an `invoke` call.
+- A facade call writes the `hangar_call` span and log lines, and is counted in the batch metrics.
+- A call through `invoke` has no session and no request headers. Session suspension does not apply to it, and an L7 rule that selects on `Mcp-Param-*` does not fire, as for `hangar_call` over stdio.
+
+!!! note
+    Governed `invoke`, `principal=` and `ToolCallFailedError`, and the background workers, coordination and warm-up that `start()` runs, ship in the first release after 2.20.0. For what changes for existing code, see the [Upgrade Guide](../upgrade.md) and core's [`UPGRADE.md`](https://github.com/mcp-hangar/mcp-hangar/blob/main/UPGRADE.md).
+
+#### Calling as a principal
+
+Pass the caller as `principal=`. The call is authorized for `tool:invoke` as an authenticated `hangar_call` caller is, by the roles your configuration gives that principal id and its groups. The principal's `tenant_id` is the tenant the per-tenant controls are applied for.
+
+```python
+from mcp_hangar import Hangar
+from mcp_hangar.domain.value_objects import Principal, PrincipalId, PrincipalType
+
+caller = Principal(
+    id=PrincipalId("agent-1"),
+    type=PrincipalType.SERVICE_ACCOUNT,
+    tenant_id="team-a",
+)
+
+async with Hangar.from_config("config.yaml") as hangar:
+    result = await hangar.invoke("math", "add", {"a": 1, "b": 2}, principal=caller)
+```
+
+`SyncHangar.invoke` takes the same `principal=`.
+
+Nothing verifies the principal: your application vouches for its id, groups and tenant, as an authenticator does for a request. `Principal.system()` is refused with `ValueError`.
+
+Without a principal, the call is an anonymous caller's, the same as an unauthenticated `hangar_call`:
+
+- With authentication configured, it is refused with the code `AuthorizationDenied`.
+- It carries no tenant. With `execution.tenant_limits` set, it shares the budget of callers with no tenant, built from the `"*"` entry, and is refused with `TenantQuotaExceeded` when there is no `"*"` entry.
+
+There is no way to make an unchecked call. If your configuration refuses anonymous callers, pass a principal.
+
+#### Tools that need approval
+
+- `invoke` raises `TimeoutError` at `timeout_s`, and the event loop is not blocked while the call waits. `SyncHangar.invoke` blocks the calling thread for up to `timeout_s`.
+- The call holds one of the facade's pool threads until the approval is decided or expires (`approval_timeout_seconds`, 300 seconds by default), even after `invoke` has raised `TimeoutError`. An approval given after `invoke` timed out is refused, so the tool does not run.
+- The same pool runs `stop()` and `health()`, and each pending approval takes one of its threads. Size it with `HangarConfig().max_concurrency(...)` for the approvals that can be pending at once.
 
 ### MCP Server Management
 
@@ -331,8 +402,6 @@ Dataclass holding the built configuration.
 | ------- | ------ | --------- | ------------- |
 | `mcp_servers` | `dict[str, dict]` | `{}` | MCP Server definitions |
 | `discovery` | `DiscoverySpec` | default | Discovery configuration |
-| `gc_interval_s` | `int` | `30` | Garbage collection interval |
-| `health_check_interval_s` | `int` | `10` | Health check interval |
 | `max_concurrency` | `int` | `20` | Thread pool size |
 
 ### DiscoverySpec
@@ -402,27 +471,35 @@ The Facade API raises specific exceptions for different failure modes:
 
 | Exception | When Raised |
 | ----------- | ------------- |
-| `ConfigurationError` | Invalid configuration, Hangar not started, builder already built |
-| `McpServerNotFoundError` | MCP Server name does not exist in configuration |
-| `ToolNotFoundError` | Tool name not found on the specified MCP server |
-| `ToolInvocationError` | Tool execution failed on the MCP server side |
+| `ConfigurationError` | Invalid configuration, Hangar not started, builder already built, `.set_intervals()` called |
+| `ValueError` | `principal=` is `Principal.system()`, or a `.max_concurrency()` value outside 1-100 |
+| `McpServerNotFoundError` | No MCP server or group has that name |
+| `ToolNotFoundError` | The MCP server does not have the tool |
+| `ToolCallFailedError` | A control refused the call, or the call failed, including a server that fails to start |
 | `TimeoutError` | Invocation exceeded `timeout_s` |
 
-All exceptions include descriptive messages. Catch specific exceptions for targeted error handling:
+`ToolCallFailedError` is a `ToolInvocationError`, so an `except ToolInvocationError` still catches it. Its `code` is the `error_type` that `hangar_call` reports for the same call, and its message is the text `hangar_call` reports:
+
+- A control's refusal codes include `AuthorizationDenied`, `ToolAccessDeniedError`, `ToolWithdrawnError`, `ToolDigestMismatchError`, `ValidatorDenied`, `TenantQuotaExceeded` and `CircuitBreakerOpen`.
+- A failure's code is the name of the exception it raised, for example `ToolTimeoutError` or `ClientError`.
+- A server that fails to start raises `ToolCallFailedError` with `code == "McpServerStartError"`, so an `except McpServerStartError` does not catch it.
 
 ```python
 from mcp_hangar.domain.exceptions import (
     McpServerNotFoundError,
-    ToolInvocationError,
+    ToolCallFailedError,
     ToolNotFoundError,
 )
 
 try:
-    result = await hangar.invoke("math", "divide", {"a": 10, "b": 0})
-except ToolInvocationError as e:
-    print(f"Tool failed: {e}")
-except McpServerNotFoundError as e:
-    print(f"McpServer not found: {e}")
+    result = await hangar.invoke("math", "divide", {"a": 10, "b": 0}, principal=caller)
+except ToolCallFailedError as e:
+    if e.code == "McpServerStartError":
+        print(f"Server failed to start: {e}")
+    else:
+        print(f"Call failed ({e.code}): {e}")
+except (McpServerNotFoundError, ToolNotFoundError) as e:
+    print(f"Not found: {e}")
 except TimeoutError:
     print("Invocation timed out")
 ```

@@ -66,7 +66,6 @@ mcp_servers:
     min_healthy: 1
     circuit_breaker:
       failure_threshold: 3
-      reset_timeout_s: 30
     members:
       - id: my-mcp                         # NEW: added priority
         priority: 1                        # NEW: added priority (primary)

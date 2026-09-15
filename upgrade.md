@@ -162,7 +162,7 @@ document or example described it (#1422).
 
 Delete it:
 
-```yaml
+```
 tool_access:
   mode: front_door
   rules: []   # delete this key, and anything nested under it
@@ -439,7 +439,7 @@ than honoured (#1398).
 
 Delete it from every group:
 
-```yaml
+```
 mcp_servers:
   pool:
     mode: group

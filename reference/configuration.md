@@ -1117,7 +1117,7 @@ mcp_servers:
 | `description` | `str` | -- | -- | Group description |
 | `health.unhealthy_threshold` | `int` | `2` | >= 1 | Consecutive failures before removing member from rotation |
 | `health.healthy_threshold` | `int` | `1` | >= 1 | Consecutive successes before re-adding member to rotation |
-| `circuit_breaker.failure_threshold` | `int` | `10` | >= 1 | Failures in a row, across the group's members, before the circuit opens |
+| `circuit_breaker.failure_threshold` | `int` | `10` | >= 1 | Failures in a row, across the group's members, before the circuit opens. A success ends the run. The circuit has no reset timer: it closes once `min_healthy` members are back in rotation |
 | `tools` | `dict` | -- | -- | Group-level tool access policy (`allow_list`, `deny_list`, `approval_list`, `approval_timeout_seconds`, `approval_channel`) -- see [`tools` dual format](#tools-dual-format) |
 | `canary.member` | `str` | -- | -- | Member that receives canary split traffic |
 | `canary.split_pct` | `int` | `0` | 0--100 | Deterministic percentage of tenants routed to `canary.member` |

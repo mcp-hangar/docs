@@ -138,7 +138,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    tail -5 /tmp/hangar-circuit.log
    ```
 
-   Waiting alone never closes a group's circuit: it has no timer, and it never half-opens. It closes once `min_healthy` members (1 here) are back in rotation. A member comes back through a passing health check or a completed start, so the check that finds `my-mcp` answering again closes the circuit. If Hangar gave up on `my-mcp` while it was down, `hangar_status` shows it `[DEAD]` and health checks skip it: start it with `hangar_start`.
+   Waiting alone never closes a group's circuit: it has no timer, and it never half-opens. It closes once `min_healthy` members (1 here) are back in rotation and one of them reports a success, through a passing health check or a call that succeeded. The health check that finds `my-mcp` answering again is what closes it here. If Hangar gave up on `my-mcp` while it was down, `hangar_status` shows it `[DEAD]` and health checks skip it: start it with `hangar_start`.
 
 7. Verify recovery
 
@@ -159,6 +159,8 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Call succeeded. Circuit is CLOSED. Full recovery.
 
+   A group's circuit has no reset timer. It closes once `min_healthy` members (here, 1) are back in rotation, after a passing health check or a successful call. `hangar_group_rebalance` closes it at once.
+
 ## What Just Happened
 
 Hangar introduced **MCP server groups** — a logical grouping of one or more MCP servers with shared policies. The group has a circuit breaker that tracks real tool call failures, not synthetic health probes.
@@ -167,7 +169,7 @@ Hangar introduced **MCP server groups** — a logical grouping of one or more MC
 
 **CLOSED** (normal operation): All calls pass through to group members. The circuit breaker counts consecutive failures. When `failure_count` reaches `failure_threshold` (3), the circuit opens.
 
-**OPEN** (protecting): All calls are rejected immediately with `NoAvailableMemberError`. No traffic reaches the MCP server — this is the protection. Instead of waiting 10+ seconds for connection timeout, Hangar fails in milliseconds. It stays open until `min_healthy` members are back in rotation, after a passing health check or a completed start. There is no timer and no half-open probe.
+**OPEN** (protecting): With the group's only member out of rotation, calls are rejected immediately with `NoAvailableMemberError`. No traffic reaches the MCP server — this is the protection. Instead of waiting 10+ seconds for connection timeout, Hangar fails in milliseconds. It stays open until `min_healthy` members (1) are back in rotation and one reports a success, after a passing health check or a call that succeeded. There is no timer and no half-open probe.
 
 **How this differs from health checks:**
 

@@ -271,7 +271,7 @@ The group-level circuit breaker protects against cascading failures by halting a
 
 | Parameter | Default | Description |
 | ----------- | --------- | ------------- |
-| `circuit_breaker.failure_threshold` | `10` | Failures in a row, across the group's members, before the circuit opens |
+| `circuit_breaker.failure_threshold` | `10` | Failures in a row, across the group's members, before the circuit opens. A success ends the run |
 
 ```yaml
 mcp_servers:
@@ -306,7 +306,7 @@ stateDiagram-v2
 
 - **CLOSED** -- Normal operation. Requests are routed to healthy members. Each failure reported for a member, a failed call through the group or a failed health check, adds to the run. Any success ends it.
 - **OPEN** -- All requests are rejected immediately (the group enters the `degraded` state). No member selection occurs.
-- **Closing** -- The circuit closes once `min_healthy` members are back in rotation. A member comes back through a passing health check or a completed start. There is no timer: however long the circuit has been open, waiting alone does not close it, and it never half-opens. A dead member is not health-checked, so if too few live members remain, the circuit stays open until dead ones are started deliberately or `hangar_group_rebalance` resets it.
+- **Closing** -- The circuit closes once `min_healthy` members are back in rotation and one of them reports a success, through a passing health check or a call that succeeded. A completed start puts a member back in rotation but does not close the circuit on its own. There is no timer: however long the circuit has been open, waiting alone does not close it, and it never half-opens. A dead member is not health-checked, so if too few live members remain, the circuit stays open until dead ones are started deliberately or `hangar_group_rebalance` resets it.
 
 !!! warning
     The run counts failures across all members, so a burst of errors from one member can open the circuit while other members are healthy, if nothing succeeds in between.

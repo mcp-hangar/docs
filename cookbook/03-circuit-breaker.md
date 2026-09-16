@@ -34,7 +34,6 @@ mcp_servers:
     min_healthy: 1                         # NEW: added in this recipe
     circuit_breaker:                       # NEW: added in this recipe
       failure_threshold: 3                 # NEW: added in this recipe
-      reset_timeout_s: 30                  # NEW: added in this recipe
     members:                               # NEW: added in this recipe
       - id: my-mcp                         # NEW: added in this recipe
 ```
@@ -130,17 +129,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Request rejected in ~2 seconds (no 30-second timeout). This is the protection.
 
-6. Wait for circuit to auto-reset
-
-   ```bash
-   echo "Waiting 35 seconds for circuit reset..."
-   sleep 35
-   tail -5 /tmp/hangar-circuit.log
-   ```
-
-   After `reset_timeout_s` elapses, the circuit moves from OPEN to **HALF_OPEN** and lets a probe through. That call decides it: a success closes the circuit, a failure re-opens it for another `reset_timeout_s`. It never goes straight from OPEN to CLOSED -- something has to prove the upstream is back.
-
-7. Restart MCP server and verify recovery
+6. Restart MCP server and verify recovery
 
    ```bash
    docker start mcp-math
@@ -162,6 +151,8 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Call succeeded. Circuit is CLOSED. Full recovery.
 
+   A group's circuit has no reset timer. It closes once `min_healthy` members (here, 1) are back in rotation, after a passing health check or a successful call. `hangar_group_rebalance` closes it at once.
+
 ## What Just Happened
 
 Hangar introduced **MCP server groups** — a logical grouping of one or more MCP servers with shared policies. The group has a circuit breaker that tracks real tool call failures, not synthetic health probes.
@@ -170,7 +161,7 @@ Hangar introduced **MCP server groups** — a logical grouping of one or more MC
 
 **CLOSED** (normal operation): All calls pass through to group members. The circuit breaker counts consecutive failures. When `failure_count` reaches `failure_threshold` (3), the circuit opens.
 
-**OPEN** (protecting): All calls are rejected immediately with a circuit-open error. No traffic reaches the MCP server — this is the protection. Instead of waiting 10+ seconds for connection timeout, Hangar fails in milliseconds. After `reset_timeout_s` (30 seconds) the circuit becomes HALF_OPEN and admits one probe: it closes if that call succeeds and re-opens if it fails.
+**OPEN** (protecting): All calls are rejected immediately with a circuit-open error. No traffic reaches the MCP server — this is the protection. Instead of waiting 10+ seconds for connection timeout, Hangar fails in milliseconds. It stays open until `min_healthy` members (1) are back in rotation, after a passing health check or a successful call. There is no timer and no half-open probe.
 
 **How this differs from health checks:**
 
@@ -187,7 +178,6 @@ They complement each other. Health checks catch dead MCP servers. Circuit breake
 | `mcp_servers.<name>.strategy` | string | `round_robin` | Load balancing strategy |
 | `mcp_servers.<name>.min_healthy` | int | `1` | Minimum healthy members required |
 | `mcp_servers.<name>.circuit_breaker.failure_threshold` | int | `10` | Consecutive failures before circuit opens |
-| `mcp_servers.<name>.circuit_breaker.reset_timeout_s` | float | `60.0` | Seconds before circuit auto-closes |
 | `mcp_servers.<name>.members` | list | — | List of MCP server IDs or inline definitions |
 
 ## Running More Than One Hangar

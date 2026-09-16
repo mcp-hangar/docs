@@ -241,12 +241,11 @@ The `hangar_group_rebalance` tool can be used to manually trigger a health re-ev
 
 ## Circuit Breaker
 
-The group-level circuit breaker protects against cascading failures by halting all requests when the total failure count exceeds a threshold.
+The group-level circuit breaker protects against cascading failures by halting all requests when the group's failures in a row reach a threshold.
 
 | Parameter | Default | Description |
 | ----------- | --------- | ------------- |
-| `circuit_breaker.failure_threshold` | `10` | Total group failures before the circuit opens |
-| `circuit_breaker.reset_timeout_s` | `60.0` | Seconds before the circuit auto-resets |
+| `circuit_breaker.failure_threshold` | `10` | Group failures in a row before the circuit opens. A success ends the run |
 
 ```yaml
 mcp_servers:
@@ -256,7 +255,6 @@ mcp_servers:
     min_healthy: 1
     circuit_breaker:
       failure_threshold: 5
-      reset_timeout_s: 30.0
     members:
       - id: svc-1
         mode: remote
@@ -276,18 +274,18 @@ stateDiagram-v2
     OPEN: OPEN<br/>all requests rejected
 
     [*] --> CLOSED
-    CLOSED --> OPEN: total failures ≥ failure_threshold
-    OPEN --> CLOSED: reset_timeout_s elapses
+    CLOSED --> OPEN: failures in a row ≥ failure_threshold
+    OPEN --> CLOSED: min_healthy members back in rotation
 ```
 
-- **CLOSED** -- Normal operation. Requests are routed to healthy members. Each failure increments the failure counter.
+- **CLOSED** -- Normal operation. Requests are routed to healthy members. Each failure increments the failure counter, and a success resets it.
 - **OPEN** -- All requests are rejected immediately (the group enters the `degraded` state). No member selection occurs.
-- **Auto-reset** -- After `reset_timeout_s` elapses, the next request attempt closes the circuit and resets the failure counter.
+- **Recovery** -- There is no reset timer. The circuit closes once `min_healthy` members are back in rotation, after a passing health check or a successful call.
 
 !!! warning
-    The circuit breaker tracks total group failures, not per-member failures. A burst of errors from a single member can trip the breaker even if other members are healthy.
+    The circuit breaker counts group failures in a row, not per-member failures. A burst of errors from a single member can trip the breaker even if other members are healthy.
 
-The `hangar_group_rebalance` tool resets the circuit breaker immediately, regardless of the timeout.
+The `hangar_group_rebalance` tool resets the circuit breaker immediately.
 
 ## Per-Tenant Canary Routing
 

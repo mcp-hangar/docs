@@ -48,8 +48,12 @@ List all configured MCP servers, groups, and runtime (hot-loaded) MCP servers wi
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `mcp_servers` | `list[object]` | Configured MCP servers with `mcp_server`, `state`, `mode`, `alive`, `tools_count`, `health_status`, `tools_predefined`, `description` |
-| `groups` | `list[object]` | Groups with `group_id`, `state`, `strategy`, `healthy_count`, `total_members` |
+| `groups` | `list[object]` | Groups with `group_id`, `state`, `strategy`, `healthy_count`, `members_in_rotation_count`, `total_members` |
 | `runtime_mcp_servers` | `list[object]` | Hot-loaded MCP servers with `mcp_server`, `state`, `source`, `verified`, `ephemeral`, `loaded_at`, `lifetime_seconds` |
+
+**Two state vocabularies.** A server's `state` is its lifecycle: `cold`, `initializing`, `ready`, `degraded`, `dead`. A group's `state` is its availability, computed from its members: `inactive`, `partial`, `healthy`, `degraded`. A group's `degraded` means its circuit breaker is open, not that it is failing health checks, and a group is never `cold`: its members are. The same holds wherever a group's `state` appears, in `hangar_start`, `hangar_stop`, `hangar_status`, `hangar_details` and `hangar_group_list`. See [Group States](../guides/MCP_SERVER_GROUPS.md#group-states).
+
+**Group member counts.** `healthy_count` counts the members that are `ready` and in rotation. `members_in_rotation_count` counts the members in rotation in any state, the length of the `members_in_rotation` list `hangar_group_rebalance` returns. So `healthy_count` <= `members_in_rotation_count` <= `total_members`. A group whose members are all `cold`, such as one the GC reaped for being idle, reads `healthy_count: 0` and still routes: the next call through it starts a member. To ask whether a group can take a call, read `is_available`. `hangar_status` and `hangar_health` report the same count as `healthy_members`.
 
 **Example:**
 
@@ -70,7 +74,7 @@ List all configured MCP servers, groups, and runtime (hot-loaded) MCP servers wi
 
 ### `hangar_start` {#hangar_start}
 
-Start a MCP server or group. Transitions the MCP server from COLD to READY.
+Start a MCP server or group. Transitions the MCP server from COLD to READY. A deliberate start also starts a `dead` server again, whatever made it dead, without waiting out its backoff.
 
 **Parameters:**
 
@@ -95,9 +99,10 @@ For a group:
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `group` | `str` | Group ID |
-| `state` | `str` | Group state |
+| `state` | `str` | Group availability state: `inactive`, `partial`, `healthy` or `degraded` (circuit open). Not a server lifecycle state |
 | `members_started` | `int` | Number of members started |
-| `healthy_count` | `int` | Healthy member count |
+| `healthy_count` | `int` | Members that are `ready` and in rotation |
+| `members_in_rotation_count` | `int` | Members in rotation, in any state |
 | `total_members` | `int` | Total member count |
 
 **Example:**
@@ -138,7 +143,7 @@ For a group:
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `group` | `str` | Group ID |
-| `state` | `str` | Group state |
+| `state` | `str` | Group availability state: `inactive`, `partial`, `healthy` or `degraded` (circuit open). Not a server lifecycle state |
 | `stopped` | `bool` | `true` |
 
 **Example:**
@@ -180,7 +185,10 @@ Human-readable status dashboard of the replica that answers the call, with state
 | `scope_note` | `str` | The same scope, stated in words |
 | `formatted` | `str` | Pre-formatted text dashboard, headed by the replica that answered |
 
-Indicator values: `[READY]`, `[COLD]`, `[STARTING]`, `[DEGRADED]`, `[DEAD]`.
+Indicator values come from two vocabularies, and `formatted` shows servers and groups in separate sections:
+
+- Servers (`mcp_servers`, `runtime_mcp_servers`) have a lifecycle state: `[READY]`, `[COLD]`, `[STARTING]` (state `initializing`), `[DEGRADED]`, `[DEAD]`.
+- Groups have an availability state computed from their members: `[HEALTHY]`, `[PARTIAL]`, `[INACTIVE]`, `[DEGRADED]`. A group's `[DEGRADED]` means its circuit breaker is open. Each `groups` entry also carries `circuit_open` (`bool`), which `formatted` shows in its `CIRCUIT` column, and `members_in_rotation_count` (`int`). Its `healthy_members` is the group's `healthy_count`: members that are `ready` and in rotation.
 
 **Example:**
 
@@ -327,7 +335,7 @@ List the tools available on a MCP server or group. Tool access filtering (allow_
 | ----------- | ------ | --------- | ------------- |
 | `mcp_server` | `str` | required | MCP Server ID or Group ID |
 
-**Side Effects:** May start a cold MCP server to discover its tools.
+**Side Effects:** May start a cold MCP server to discover its tools. It lists a `dead` server, or a group's dead member, without starting it.
 
 **Returns:**
 
@@ -392,10 +400,11 @@ For a group:
 | ------- | ------ | ------------- |
 | `group_id` | `str` | Group ID |
 | `description` | `str \| None` | Group description |
-| `state` | `str` | Group state |
+| `state` | `str` | Group availability state: `inactive`, `partial`, `healthy` or `degraded` (circuit open). Not a server lifecycle state |
 | `strategy` | `str` | Load balancing strategy |
 | `min_healthy` | `int` | Minimum healthy members |
-| `healthy_count` | `int` | Current healthy member count |
+| `healthy_count` | `int` | Members that are `ready` and in rotation |
+| `members_in_rotation_count` | `int` | Members in rotation, in any state |
 | `total_members` | `int` | Total member count |
 | `is_available` | `bool` | Whether the group can accept requests |
 | `circuit_open` | `bool` | Whether the circuit breaker is open |
@@ -421,7 +430,7 @@ Errors: `ValueError("unknown_mcp_server: <id>")`
 
 ### `hangar_warm` {#hangar_warm}
 
-Pre-start one or more MCP servers so the first tool call does not incur cold-start latency. Groups are skipped.
+Pre-start one or more MCP servers so the first tool call does not incur cold-start latency. Groups are skipped. Warming all MCP servers skips `dead` ones and lists them in `skipped_dead`; name a dead server to start it.
 
 **Parameters:**
 
@@ -437,6 +446,7 @@ Pre-start one or more MCP servers so the first tool call does not incur cold-sta
 | ------- | ------ | ------------- |
 | `warmed` | `list[str]` | Successfully warmed MCP server IDs |
 | `already_warm` | `list[str]` | MCP servers that were already running |
+| `skipped_dead` | `list[str]` | Dead MCP servers left alone because no names were given |
 | `failed` | `list[object]` | Failed MCP servers with `id` and `error` |
 | `summary` | `str` | Human-readable summary |
 
@@ -448,8 +458,8 @@ Pre-start one or more MCP servers so the first tool call does not incur cold-sta
 
 // Response
 {
-  "warmed": ["math"], "already_warm": ["filesystem"], "failed": [],
-  "summary": "1 warmed, 1 already warm, 0 failed"
+  "warmed": ["math"], "already_warm": ["filesystem"], "skipped_dead": [], "failed": [],
+  "summary": "Warmed 1 mcp_servers, 1 already warm, 0 failed"
 }
 ```
 
@@ -495,6 +505,8 @@ Health summary of the replica that answers the call: MCP server state counts and
 }
 ```
 
+`groups.healthy_members` sums the groups' `healthy_count`: members that are `ready` and in rotation. `groups.members_in_rotation_count` sums the members in rotation, in any state.
+
 ### `hangar_metrics` {#hangar_metrics}
 
 MCP Server metrics in JSON or Prometheus exposition format.
@@ -512,7 +524,7 @@ MCP Server metrics in JSON or Prometheus exposition format.
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `mcp_servers` | `dict[str, object]` | Per-MCP server metrics: `state`, `mode`, `tools_count`, `invocations`, `errors`, `avg_latency_ms` |
-| `groups` | `dict[str, object]` | Per-group metrics: `state`, `strategy`, `total_members`, `healthy_members` |
+| `groups` | `dict[str, object]` | Per-group metrics: `state`, `strategy`, `total_members`, `healthy_members` (members `ready` and in rotation), `members_in_rotation_count` |
 | `tool_calls` | `dict[str, object]` | Per-tool metrics keyed by `MCP server.tool`: `count`, `errors` |
 | `discovery` | `object` | Discovery metrics |
 | `errors` | `dict[str, int]` | Error counts by type |
@@ -731,7 +743,7 @@ List all MCP server groups with member details, health state, and load balancing
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `groups` | `list[object]` | Groups with `group_id`, `description`, `state`, `strategy`, `min_healthy`, `healthy_count`, `total_members`, `is_available`, `circuit_open`, `members` |
+| `groups` | `list[object]` | Groups with `group_id`, `description`, `state`, `strategy`, `min_healthy`, `healthy_count`, `members_in_rotation_count`, `total_members`, `is_available`, `circuit_open`, `members` |
 
 Each member in the `members` list contains: `id`, `state`, `in_rotation`, `weight`, `priority`, `consecutive_failures`.
 
@@ -747,7 +759,8 @@ Each member in the `members` list contains: `id`, `state`, `in_rotation`, `weigh
     {
       "group_id": "llm-group", "description": "LLM pool", "state": "healthy",
       "strategy": "round_robin", "min_healthy": 1, "healthy_count": 2,
-      "total_members": 2, "is_available": true, "circuit_open": false,
+      "members_in_rotation_count": 2, "total_members": 2, "is_available": true,
+      "circuit_open": false,
       "members": [
         {"id": "llm-1", "state": "ready", "in_rotation": true, "weight": 50,
          "priority": 1, "consecutive_failures": 0},
@@ -777,7 +790,8 @@ Rebalance a group by re-checking all members. Recovered members rejoin rotation,
 | ------- | ------ | ------------- |
 | `group_id` | `str` | Group ID |
 | `state` | `str` | Group state after rebalance |
-| `healthy_count` | `int` | Healthy member count |
+| `healthy_count` | `int` | Members that are `ready` and in rotation |
+| `members_in_rotation_count` | `int` | Members in rotation, in any state |
 | `total_members` | `int` | Total member count |
 | `members_in_rotation` | `list[str]` | Member IDs currently in rotation |
 
@@ -790,7 +804,7 @@ Rebalance a group by re-checking all members. Recovered members rejoin rotation,
 // Response
 {
   "group_id": "llm-group", "state": "healthy", "healthy_count": 2,
-  "total_members": 2, "members_in_rotation": ["llm-1", "llm-2"]
+  "members_in_rotation_count": 2, "total_members": 2, "members_in_rotation": ["llm-1", "llm-2"]
 }
 ```
 

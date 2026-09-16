@@ -129,12 +129,20 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Request rejected in ~2 seconds (no 30-second timeout). This is the protection.
 
-6. Restart MCP server and verify recovery
+6. Restart the MCP server and wait for a health check
 
    ```bash
    docker start mcp-math
-   sleep 2
+   echo "Waiting 35 seconds for the next health check..."
+   sleep 35
+   tail -5 /tmp/hangar-circuit.log
+   ```
 
+   Waiting alone never closes a group's circuit: it has no timer, and it never half-opens. It closes once `min_healthy` members (1 here) are back in rotation and one of them reports a success, through a passing health check or a call that succeeded. The health check that finds `my-mcp` answering again is what closes it here. If Hangar gave up on `my-mcp` while it was down, `hangar_status` shows it `[DEAD]` and health checks skip it: start it with `hangar_start`.
+
+7. Verify recovery
+
+   ```bash
    (
      echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
      sleep 0.5
@@ -161,7 +169,7 @@ Hangar introduced **MCP server groups** — a logical grouping of one or more MC
 
 **CLOSED** (normal operation): All calls pass through to group members. The circuit breaker counts consecutive failures. When `failure_count` reaches `failure_threshold` (3), the circuit opens.
 
-**OPEN** (protecting): All calls are rejected immediately with a circuit-open error. No traffic reaches the MCP server — this is the protection. Instead of waiting 10+ seconds for connection timeout, Hangar fails in milliseconds. It stays open until `min_healthy` members (1) are back in rotation, after a passing health check or a successful call. There is no timer and no half-open probe.
+**OPEN** (protecting): With the group's only member out of rotation, calls are rejected immediately with `NoAvailableMemberError`. No traffic reaches the MCP server — this is the protection. Instead of waiting 10+ seconds for connection timeout, Hangar fails in milliseconds. It stays open until `min_healthy` members (1) are back in rotation and one reports a success, after a passing health check or a call that succeeded. There is no timer and no half-open probe.
 
 **How this differs from health checks:**
 
@@ -189,6 +197,12 @@ must not cut a healthy server off from the rest of the fleet. The cost is that
 each replica discovers an outage independently, and that `GET /api/system` on
 one pod can report a server the others are still using. See
 [25 -- Running More Than One Replica](25-multiple-replicas.md).
+
+For a group, each replica exposes its own circuit as
+`mcp_hangar_group_circuit_open{group}`, and the scrape's `instance` label tells
+the replicas apart. [MCP Server Groups → More Than One
+Replica](../guides/MCP_SERVER_GROUPS.md#more-than-one-replica) has the queries
+that find replicas disagreeing about a group.
 
 ## What's Next
 

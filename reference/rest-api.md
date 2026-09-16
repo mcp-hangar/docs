@@ -266,14 +266,22 @@ GET /groups
   "groups": [
     {
       "group_id": "llm-pool",
+      "description": "LLM pool",
       "state": "healthy",
       "strategy": "round_robin",
-      "members": [...],
-      "circuit_breaker_state": "closed"
+      "min_healthy": 1,
+      "healthy_count": 1,
+      "members_in_rotation_count": 2,
+      "total_members": 2,
+      "is_available": true,
+      "circuit_open": false,
+      "members": [...]
     }
   ]
 }
 ```
+
+Each entry is the group's status, read at one instant. `state` is the group's availability (`inactive`, `partial`, `healthy`, `degraded`), not a server lifecycle state. `healthy_count` counts the members that are `ready` and in rotation; `members_in_rotation_count` counts the members in rotation in any state. A group whose members are all `cold` reads `healthy_count: 0` and still routes while `is_available` is `true`. See [Group States](../guides/MCP_SERVER_GROUPS.md#group-states).
 
 ### Create Group
 
@@ -302,7 +310,7 @@ POST /groups
 GET /groups/{group_id}
 ```
 
-**Response 200:** Group detail with members and circuit breaker state.
+**Response 200:** The same object as one entry of `GET /groups`; `hangar_details` returns the same for a group.
 
 ### Update Group
 

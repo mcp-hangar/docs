@@ -25,6 +25,7 @@ curl -s -H "X-API-Key: $KEY" <hangar>/api/mcp_servers/<id>/logs?lines=200
 - Container mode: check the pod/process — crashloop, bad image, missing env/secret.
 - Remote mode: check reachability/TLS/auth to the upstream endpoint (`MCPHangarRemoteProviderUnreachable`).
 - Transient → it recovers on the next successful health check and returns to READY.
+- Not transient → the recovery saga retries it. When it runs out of retries the server reads DEAD (4), `MCPHangarProviderDegraded` resolves and `MCPHangarProviderDead` fires; work [provider-dead](provider-dead.md).
 
 ## Escalate
 

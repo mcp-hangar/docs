@@ -185,6 +185,8 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Primary recovered and back in rotation. Will reclaim traffic (priority 1 < priority 2).
 
+   If the primary was down long enough for Hangar to give up on it, it reads `dead` (`[DEAD]` in `hangar_status`). Health checks skip a dead server and the group does not route to it, so it does not come back by itself. Call `hangar_start` on `my-mcp`, and it rejoins rotation once the start succeeds.
+
 ## What Just Happened
 
 You introduced **MCP server groups with priority-based routing** for automatic failover. The group contains two MCP servers: `my-mcp` (priority 1, primary) and `my-mcp-backup` (priority 2, backup).

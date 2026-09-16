@@ -12,6 +12,7 @@ Each critical alert links here via its `runbook_url` annotation.
 | [batch-failures](batch-failures.md) | `MCPHangarBatchHighFailureRate` |
 | [circuit-breaker](circuit-breaker.md) | `MCPHangarCircuitBreakerTripped` |
 | [provider-unhealthy](provider-unhealthy.md) | `MCPHangarProviderUnhealthy`, `MCPHangarProviderDegraded` |
+| [provider-dead](provider-dead.md) | `MCPHangarProviderDead`, `MCPHangarProviderNotSeenHealthy` |
 | [health-failures](health-failures.md) | `MCPHangarHighConsecutiveFailures` |
 | [high-latency](high-latency.md) | `MCPHangarHighLatencyP95/P99/ByTool` |
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.5](https://github.com/mcp-hangar/docs/compare/v1.2.4...v1.2.5) (2026-09-16)
+
+
+### Changed
+
+* **architecture:** accept adr-026, which shipped in 2.18.0 ([#331](https://github.com/mcp-hangar/docs/issues/331)) ([b830ffc](https://github.com/mcp-hangar/docs/commit/b830ffcfb9e558848b1c3e3d6f8147dcfa0232f0))
+* **architecture:** adr-027 -- egress is a trust mode, not a preset of the front door ([#329](https://github.com/mcp-hangar/docs/issues/329)) ([09f6ffa](https://github.com/mcp-hangar/docs/commit/09f6ffa3c32f8e1be8af544df8193f9486f4655b))
+* **architecture:** adr-028 -- on a front door, the tool-access policy is the invoke gate ([#332](https://github.com/mcp-hangar/docs/issues/332)) ([92c4508](https://github.com/mcp-hangar/docs/commit/92c450881b235fb0695717c7f9a141683c9d5a40))
+* **guides:** an unrecognised tool_access.mode refuses to start ([#328](https://github.com/mcp-hangar/docs/issues/328)) ([e4c24f7](https://github.com/mcp-hangar/docs/commit/e4c24f762bede89d8eb9acd02cc7b0a2c33a8f65))
+* **guides:** document dead servers, group circuit metrics and projection metrics ([#334](https://github.com/mcp-hangar/docs/issues/334)) ([7175029](https://github.com/mcp-hangar/docs/commit/7175029f8e3a91ec0a811ba2f66d64ef2a42bef6))
+* **guides:** update the facade API guide for governed invoke, workers and coordination ([#338](https://github.com/mcp-hangar/docs/issues/338)) ([313e51d](https://github.com/mcp-hangar/docs/commit/313e51d4e536607b35880617974caf3fce2da525)), closes [#337](https://github.com/mcp-hangar/docs/issues/337)
+* **reference:** hangar_status and hangar_health describe one replica, not the fleet ([#333](https://github.com/mcp-hangar/docs/issues/333)) ([8450ae3](https://github.com/mcp-hangar/docs/commit/8450ae34bf0ad31280ee16c6fcb38104999e192e))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#336](https://github.com/mcp-hangar/docs/issues/336)) ([ce86552](https://github.com/mcp-hangar/docs/commit/ce86552411a3dbc61651c5023cb60540b3157efb))
+* **repo:** make validate pass on 2.20 ([#339](https://github.com/mcp-hangar/docs/issues/339)) ([0faaefc](https://github.com/mcp-hangar/docs/commit/0faaefcfd71255d9a41a1e4af955874e30eb557e))
+
 ## [1.2.4](https://github.com/mcp-hangar/docs/compare/v1.2.3...v1.2.4) (2026-09-12)
 
 

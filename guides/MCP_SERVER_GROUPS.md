@@ -17,10 +17,27 @@ MCP Server Groups allow you to treat multiple MCP servers as a single logical un
 
 | State | Condition | Accepts Requests |
 | ------- | ----------- | ------------------ |
-| inactive | 0 healthy members | No |
-| partial | healthy members < `min_healthy` | Yes (if circuit closed and healthy >= 1) |
-| healthy | healthy members >= `min_healthy` | Yes |
+| inactive | No member in rotation that is not `dead` | No |
+| partial | Members in rotation that are not `dead` < `min_healthy` | Yes |
+| healthy | Members in rotation that are not `dead` >= `min_healthy` | Yes |
 | degraded | Circuit breaker open | No |
+
+A `cold` member in rotation counts toward the state: a group starts its members
+lazily, and the next call through it starts one. `healthy_count` is a separate,
+reported number: the members that are `ready` and in rotation. So a group whose
+members the GC reaped for being idle reads `healthy_count: 0` while it is
+`healthy` and `is_available` is `true`. `members_in_rotation_count` counts the
+members in rotation in any state, so `healthy_count` <= `members_in_rotation_count`
+<= `total_members`. To ask whether a group can take a call, read `is_available`.
+
+A group's state is its availability, computed from its members. It is a
+separate vocabulary from a server's lifecycle state (`cold`, `initializing`,
+`ready`, `degraded`, `dead`): a group is never `cold`, its members are. A
+group's `degraded` means its circuit breaker is open. It is not the server
+`degraded`, which is a server with failures, waiting out a backoff before it
+is retried. `hangar_status` shows groups in their own section, apart from
+servers, with the indicators `[HEALTHY]`, `[PARTIAL]`, `[INACTIVE]` and
+`[DEGRADED]` and a `CIRCUIT` column.
 
 ## Configuration
 
@@ -47,7 +64,7 @@ mcp_servers:
 | ----- | ------ | --------- | ------------- |
 | `mode` | `str` | -- | Must be `"group"` |
 | `strategy` | `str` | `"round_robin"` | Load balancing strategy |
-| `min_healthy` | `int` | `1` | Minimum healthy members for `healthy` state |
+| `min_healthy` | `int` | `1` | Members in rotation, not `dead`, needed for the `healthy` state and to close an open circuit |
 | `auto_start` | `bool` | `true` | Auto-start members when the group is added |
 | `description` | `str` | -- | Human-readable description |
 | `members` | `list[dict]` | `[]` | Member MCP server configurations |
@@ -239,13 +256,22 @@ mcp_servers:
 
 The `hangar_group_rebalance` tool can be used to manually trigger a health re-evaluation of all members, re-adding recovered members and removing failed ones.
 
+### Dead Members
+
+A dead member is not health-checked, so steps 4 to 6 do not bring it back. What does depends on why it died:
+
+- **Hangar gave up on it, or a capability block stopped it.** It leaves rotation, and the group never routes a call to it. A deliberate start, such as `hangar_start` on the member or on the group, puts it back, subject to `healthy_threshold`.
+- **Its process crashed, or its start failed.** It stays in rotation, so the next call through the group restarts it once its backoff has passed. A restart that fails, or a call refused inside the backoff, counts as the member's failure, so a member whose restart keeps failing leaves rotation at `unhealthy_threshold` and the group fails over.
+
+A dead member never counts as healthy. See the [dead server runbook](../runbooks/provider-dead.md).
+
 ## Circuit Breaker
 
-The group-level circuit breaker protects against cascading failures by halting all requests when the group's failures in a row reach a threshold.
+The group-level circuit breaker protects against cascading failures by halting all requests once the group's failures in a row reach a threshold.
 
 | Parameter | Default | Description |
 | ----------- | --------- | ------------- |
-| `circuit_breaker.failure_threshold` | `10` | Group failures in a row before the circuit opens. A success ends the run |
+| `circuit_breaker.failure_threshold` | `10` | Failures in a row, across the group's members, before the circuit opens. A success ends the run |
 
 ```yaml
 mcp_servers:
@@ -278,14 +304,38 @@ stateDiagram-v2
     OPEN --> CLOSED: min_healthy members back in rotation
 ```
 
-- **CLOSED** -- Normal operation. Requests are routed to healthy members. Each failure increments the failure counter, and a success resets it.
+- **CLOSED** -- Normal operation. Requests are routed to healthy members. Each failure reported for a member, a failed call through the group or a failed health check, adds to the run. Any success ends it.
 - **OPEN** -- All requests are rejected immediately (the group enters the `degraded` state). No member selection occurs.
-- **Recovery** -- There is no reset timer. The circuit closes once `min_healthy` members are back in rotation, after a passing health check or a successful call.
+- **Closing** -- The circuit closes once `min_healthy` members are back in rotation and one of them reports a success, through a passing health check or a call that succeeded. A completed start puts a member back in rotation but does not close the circuit on its own. There is no timer: however long the circuit has been open, waiting alone does not close it, and it never half-opens. A dead member is not health-checked, so if too few live members remain, the circuit stays open until dead ones are started deliberately or `hangar_group_rebalance` resets it.
 
 !!! warning
-    The circuit breaker counts group failures in a row, not per-member failures. A burst of errors from a single member can trip the breaker even if other members are healthy.
+    The run counts failures across all members, so a burst of errors from one member can open the circuit while other members are healthy, if nothing succeeds in between.
 
 The `hangar_group_rebalance` tool resets the circuit breaker immediately.
+
+!!! note
+    `circuit_breaker.reset_timeout_s` was removed in 2.20.0. It never had an effect: an open group circuit did not half-open once the timeout passed, because a group never asks its breaker whether to let a request through. A config that still sets it loads and logs `unknown_config_key` naming the group and the key. `HANGAR_CONFIG_STRICT=1` and `mcp-hangar config check` refuse it, so under strict mode a gateway whose config still sets it does not start. Delete the key.
+
+### More Than One Replica
+
+Each replica keeps its own circuit breaker for a group, so replicas can disagree. A replica whose circuit is open refuses calls to the group with `NoAvailableMemberError`, while the others serve them. `circuit_open` in `hangar_group_list` and `hangar_status` answers for the replica that served the call. `mcp_hangar_group_circuit_open` is scraped from every replica, and the scrape's `instance` label tells them apart. Alert on disagreement, not only on an open circuit.
+
+```promql
+# Groups the replicas disagree about: open on at least one, closed on another.
+max by (group) (mcp_hangar_group_circuit_open) - min by (group) (mcp_hangar_group_circuit_open) > 0
+
+# Groups whose circuit is open on at least one replica.
+max by (group) (mcp_hangar_group_circuit_open) == 1
+
+# Which replicas have a group's circuit open.
+mcp_hangar_group_circuit_open == 1
+```
+
+- If several Hangar deployments share one Prometheus, add the label that separates them (for example `job` or `namespace`) to each `by (...)`.
+- A replica that has not loaded the group has no series and does not count. A replica that is down drops out once its series go stale.
+- For an alert, give the disagreement query a `for:` clause, for example `for: 5m`, so a transition that one scrape catches mid-flight does not page.
+
+See [Observability → Group Circuit Breaker](OBSERVABILITY.md#group-circuit-breaker).
 
 ## Per-Tenant Canary Routing
 

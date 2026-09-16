@@ -201,11 +201,84 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 | Metric | Type | Labels | Description |
 | -------- | ------ | -------- | ------------- |
 | `mcp_hangar_mcp_server_state` | Gauge | mcp_server | Current state (0=cold, 1=initializing, 2=ready, 3=degraded, 4=dead) |
-| `mcp_hangar_mcp_server_up` | Gauge | mcp_server | 1 if MCP server is reachable |
+| `mcp_hangar_mcp_server_up` | Gauge | mcp_server | 1 while the MCP server is `ready`, 0 in every other state |
 | `mcp_hangar_mcp_server_starts_total` | Counter | mcp_server | MCP server start attempts |
-| `mcp_hangar_mcp_server_initialized` | Gauge | mcp_server | 1 if MCP server has been initialized |
+| `mcp_hangar_mcp_server_initialized` | Gauge | mcp_server | 0 while the MCP server is `cold`, 1 in every other state, `dead` included |
+| `mcp_hangar_mcp_server_last_healthy_timestamp_seconds` | Gauge | mcp_server | When Hangar last saw the MCP server working: a passing health check, a completed start or a successful tool call. Kept when it goes cold or dead |
 | `mcp_hangar_mcp_server_cold_start_seconds` | Histogram | mcp_server | Cold start latency |
 | `mcp_hangar_mcp_server_cold_start_in_progress` | Gauge | mcp_server | 1 if cold start is in progress |
+
+*`mcp_hangar_mcp_server_last_healthy_timestamp_seconds` since 2.20.0.*
+
+`dead` (4) is a server that failed and is not running, and nothing restarts it
+on its own: health checks skip it, and the recovery saga has cancelled its
+restarts. The recovery saga gave up on it, its process crashed, its start
+failed, or a capability block stopped it. Since 2.20.0 all four read `4`. `0`
+means only that the server is not running and is not failing: never started,
+stopped, or reaped for being idle. So do not alert on `state == 0`. Because
+health checks skip a dead server, its `mcp_hangar_health_checks_total` stops
+moving. `dead` is not terminal: the [dead server
+runbook](../runbooks/provider-dead.md) says what starts one again.
+
+**Example queries:**
+
+```promql
+# Dead MCP servers: given up on, crashed, failed to start, or stopped by a capability block
+mcp_hangar_mcp_server_state == 4
+
+# Not seen working for 15 minutes, leaving out servers that are cold
+time() - mcp_hangar_mcp_server_last_healthy_timestamp_seconds > 900
+  unless mcp_hangar_mcp_server_state == 0
+```
+
+Keep the `unless`, and keep its default matching. A cold server is not probed,
+so its value ages, and without the `unless` the rule fires for every server
+reaped for being idle more than 15 minutes ago. `unless on(mcp_server)` would
+drop the `instance` label, so with more than one replica a server that is cold
+on one replica would hide it being dead on another. A server that was never
+healthy has no series, so pair the rule with `state == 4`.
+
+`sum(mcp_hangar_mcp_server_up) == 0` can fire where it did not before 2.20.0: a
+crashed server reads `up` 0, where it used to keep reading 1.
+
+#### Group Circuit Breaker
+
+*Since 2.20.0.*
+
+| Metric | Type | Labels | Description |
+| -------- | ------ | -------- | ------------- |
+| `mcp_hangar_group_circuit_open` | Gauge | group | 1 while this replica has the group's circuit breaker open, 0 otherwise |
+
+Each replica keeps its own circuit breaker for a group, so replicas can
+disagree. A replica whose circuit is open refuses calls to the group with
+`NoAvailableMemberError`, while the others serve them.
+`mcp_hangar_group_circuit_open` is scraped from every replica, and the scrape's
+`instance` label tells them apart. Alert on disagreement, not only on an open
+circuit.
+
+**Example queries:**
+
+```promql
+# Groups the replicas disagree about: open on at least one, closed on another.
+max by (group) (mcp_hangar_group_circuit_open) - min by (group) (mcp_hangar_group_circuit_open) > 0
+
+# Groups whose circuit is open on at least one replica.
+max by (group) (mcp_hangar_group_circuit_open) == 1
+
+# Which replicas have a group's circuit open.
+mcp_hangar_group_circuit_open == 1
+```
+
+- If several Hangar deployments share one Prometheus, add the label that
+  separates them (for example `job` or `namespace`) to each `by (...)`.
+- A replica that has not loaded the group has no series and does not count. A
+  replica that is down drops out once its series go stale.
+- For an alert, give the disagreement query a `for:` clause, for example
+  `for: 5m`, so a transition that one scrape catches mid-flight does not page.
+
+The gauge is 0 or 1, not a closed/half-open/open enum, because a group never
+half-opens its circuit. On one replica it agrees with `circuit_open` in
+`hangar_group_list`. See [MCP Server Groups](MCP_SERVER_GROUPS.md#circuit-breaker).
 
 #### Discovery
 
@@ -268,6 +341,59 @@ still expire closed and stay resolvable over REST — but every gated call waits
 out its timeout first, which from the client side looks like a broken gateway.
 The startup check reports the same condition at boot; see
 [Configuration → `approvals`](../reference/configuration.md#notification-channels-approvals).
+
+#### Front Door Projection
+
+*`mcp_hangar_projected_surface_bytes`, `mcp_hangar_projected_upstream_bytes` and
+`mcp_hangar_projection_changes_total` since 2.20.0.*
+
+What a `front_door` gateway hands a client in `tools/list`, which sits in the
+client's context on every turn. Only listings the client received are measured:
+the SDK's own listing before a `tools/call` is not. None of these carries a tenant
+label: a public front door has unbounded tenant cardinality.
+
+| Metric | Type | Labels | Description |
+| -------- | ------ | -------- | ------------- |
+| `mcp_hangar_projected_tools` | Histogram | kind | Tools per listing: `governed` (upstream) or `management` (`hangar_*`) |
+| `mcp_hangar_projected_surface_bytes` | Histogram | kind | Bytes of tool definitions per listing, as compact JSON |
+| `mcp_hangar_projected_upstream_bytes` | Histogram | mcp_server | Bytes one upstream adds to a listing that includes it; a group reads as its group id |
+| `mcp_hangar_projection_changes_total` | Counter | - | Listings whose projection differed from the one the same caller was last served on this replica |
+
+**Example queries:**
+
+```promql
+# Did the projection served to any caller change on this replica in the last hour?
+increase(mcp_hangar_projection_changes_total[1h]) > 0
+
+# Tools a client is handed per listing, by kind
+sum(rate(mcp_hangar_projected_tools_sum[5m])) by (kind) / sum(rate(mcp_hangar_projected_tools_count[5m])) by (kind)
+
+# Bytes of tool definitions a client is handed per listing, by kind
+sum(rate(mcp_hangar_projected_surface_bytes_sum[5m])) by (kind) / sum(rate(mcp_hangar_projected_surface_bytes_count[5m])) by (kind)
+
+# 95th percentile of the governed surface one listing carries
+histogram_quantile(0.95, sum(rate(mcp_hangar_projected_surface_bytes_bucket{kind="governed"}[5m])) by (le))
+
+# What the surface is made of: bytes each upstream adds to a listing that includes it
+sum(rate(mcp_hangar_projected_upstream_bytes_sum[5m])) by (mcp_server) / sum(rate(mcp_hangar_projected_upstream_bytes_count[5m])) by (mcp_server)
+```
+
+A change is counted when a caller lists again and is served something different
+from what it was served before. The caller is the same tenant and principal,
+and the same session when there is one. It covers a tool added, removed, routed
+elsewhere or redefined, and the first listing after the warm-up lands. The
+count is per replica and per caller. A caller's first listing on a replica is
+not a change, and neither is the first listing of a caller the replica stopped
+remembering. The memory holds 1024 callers, least recently served forgotten
+first. So the counter can miss a change, but it never counts one that did not
+happen. A client behind a load balancer without affinity may see a change
+that no replica counted.
+
+Keep `/metrics` off a public front door. It answers on the same port as `/mcp`,
+it is exempt from authentication by default, and these series name every
+upstream the gateway serves. Route only `/mcp` through the public edge and
+scrape `/metrics` from inside the network; see
+[Harden a public gateway](../cookbook/23-harden-public-gateway.md).
 
 #### GC (Garbage Collection)
 
@@ -364,6 +490,7 @@ They are organized by severity:
 | `MCPHangarCircuitBreakerTripped` | CB rejections > 10/5m | 2m | MCP Server isolated |
 | `MCPHangarProviderUnhealthy` | Consecutive failures > 5 | 2m | MCP Server critically unhealthy |
 | `MCPHangarAllProvidersDown` | All MCP servers down (with servers configured) | 1m | Total outage |
+| `MCPHangarProviderDead` | MCP server state = DEAD (4) | 1m | MCP server failed and nothing restarts it on its own; see [provider-dead](../runbooks/provider-dead.md) |
 
 #### Warning Alerts (Investigate)
 
@@ -382,11 +509,18 @@ They are organized by severity:
 | `MCPHangarHighMemoryUsage` | Memory > 2GB | 10m | Memory pressure |
 | `MCPHangarHighCPUUsage` | CPU > 80% | 10m | CPU saturation |
 | `MCPHangarProviderDegraded` | MCP server state = DEGRADED | 5m | MCP Server degraded |
+| `MCPHangarProviderNotSeenHealthy` | Not seen working for 15m, and not cold | 5m | MCP server not working; see [provider-dead](../runbooks/provider-dead.md) |
 | `MCPHangarRemoteProviderUnreachable` | Connection-refused errors > 10/5m | 5m | Remote MCP server unreachable |
 | `MCPHangarDiscoverySourceUnhealthy` | No healthy discovery sources | 5m | Discovery sources down |
 | `MCPHangarHighRateLimitRejections` | Rejected rate-limit hits > 1/s | 5m | Clients being throttled |
 | `MCPHangarCapabilityViolations` | Capability violations > 0/5m | 5m | Security: capability breach |
 | `MCPHangarConcurrencyQueueBuildup` | Concurrency queue building > 1/5m | 5m | Backpressure / saturation |
+
+`MCPHangarProviderDead` and `MCPHangarProviderNotSeenHealthy` need Hangar 2.20.0
+or later. Before it, a server Hangar gave up on read `cold`, and the last-healthy
+gauge did not exist. When the recovery saga gives up, the server moves from
+DEGRADED to DEAD, so `MCPHangarProviderDegraded` resolves as
+`MCPHangarProviderDead` fires.
 
 #### Governance and Availability Alert Groups
 

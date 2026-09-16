@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.6](https://github.com/mcp-hangar/docs/compare/v1.2.5...v1.2.6) (2026-09-16)
+
+
+### Fixed
+
+* **ci:** keep the upgrade-guide sync from failing check_config on removed-key examples ([#342](https://github.com/mcp-hangar/docs/issues/342)) ([ae2d141](https://github.com/mcp-hangar/docs/commit/ae2d141d86b691c7772d940af59ade0e92defa08)), closes [#340](https://github.com/mcp-hangar/docs/issues/340)
+
+
+### Changed
+
+* **guides:** an open group circuit refuses a call only when no member is in rotation ([#344](https://github.com/mcp-hangar/docs/issues/344)) ([87a7c73](https://github.com/mcp-hangar/docs/commit/87a7c73328ecf47e29e92ef28c195c45719e5c31))
+
 ## [1.2.5](https://github.com/mcp-hangar/docs/compare/v1.2.4...v1.2.5) (2026-09-16)
 
 

@@ -206,7 +206,7 @@ The `priority` load balancing strategy always routes traffic to the lowest-numbe
 **Layer cake architecture:**
 
 - **Recipe 02 (Health Checks)**: Per-MCP server health monitoring detects failures
-- **Recipe 03 (Circuit Breaker)**: Per-group fast-fail protection
+- **Recipe 03 (Circuit Breaker)**: Per-group failure tracking; a failing member leaves rotation
 - **Recipe 04 (Failover)**: Inter-MCP server routing changes based on health
 
 Both MCP servers have their own health checks and circuit breakers. The group orchestrates between them. When the primary fails, its circuit may open AND health checks fail AND the group removes it from rotation. Multiple layers of protection working together.

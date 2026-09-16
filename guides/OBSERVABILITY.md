@@ -250,8 +250,10 @@ crashed server reads `up` 0, where it used to keep reading 1.
 | `mcp_hangar_group_circuit_open` | Gauge | group | 1 while this replica has the group's circuit breaker open, 0 otherwise |
 
 Each replica keeps its own circuit breaker for a group, so replicas can
-disagree. A replica whose circuit is open refuses calls to the group with
-`NoAvailableMemberError`, while the others serve them.
+disagree. A replica whose circuit is open reports the group `degraded` while
+the others report it healthy; it keeps serving calls from the members it still
+has in rotation, and refuses with `NoAvailableMemberError` only when it has
+none.
 `mcp_hangar_group_circuit_open` is scraped from every replica, and the scrape's
 `instance` label tells them apart. Alert on disagreement, not only on an open
 circuit.

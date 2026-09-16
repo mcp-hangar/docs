@@ -15,8 +15,8 @@ MCP Server Groups allow you to treat multiple MCP servers as a single logical un
 
 ### Group States
 
-| State | Condition | Accepts Requests |
-| ------- | ----------- | ------------------ |
+| State | Condition | `is_available` |
+| ------- | ----------- | ---------------- |
 | inactive | No member in rotation that is not `dead` | No |
 | partial | Members in rotation that are not `dead` < `min_healthy` | Yes |
 | healthy | Members in rotation that are not `dead` >= `min_healthy` | Yes |
@@ -28,7 +28,15 @@ reported number: the members that are `ready` and in rotation. So a group whose
 members the GC reaped for being idle reads `healthy_count: 0` while it is
 `healthy` and `is_available` is `true`. `members_in_rotation_count` counts the
 members in rotation in any state, so `healthy_count` <= `members_in_rotation_count`
-<= `total_members`. To ask whether a group can take a call, read `is_available`.
+<= `total_members`.
+
+`is_available` folds two conditions into one flag: the circuit is closed, and
+at least one member is in rotation. It is not the same as a call being
+accepted. A call through the group is refused only when no member is in
+rotation; an open circuit on its own does not refuse it, and a group reading
+`is_available: false` because its circuit is open still serves calls from the
+members it has left (`select_member_for()` in
+`src/mcp_hangar/domain/model/mcp_server_group.py`).
 
 A group's state is its availability, computed from its members. It is a
 separate vocabulary from a server's lifecycle state (`cold`, `initializing`,
@@ -267,7 +275,7 @@ A dead member never counts as healthy. See the [dead server runbook](../runbooks
 
 ## Circuit Breaker
 
-The group-level circuit breaker protects against cascading failures by halting all requests once the group's failures in a row reach a threshold.
+The group-level circuit breaker marks a group as failing once its failures in a row reach a threshold. Opening it changes what Hangar reports -- the group's state, `circuit_open`, `is_available` and `mcp_hangar_group_circuit_open` -- and sets the `min_healthy` bar the group has to clear again before it closes. It does not halt requests: nothing on the call path asks the breaker, so a member still in rotation is still selected and still serves calls.
 
 | Parameter | Default | Description |
 | ----------- | --------- | ------------- |
@@ -297,15 +305,15 @@ mcp_servers:
 ```mermaid
 stateDiagram-v2
     CLOSED: CLOSED<br/>normal operation
-    OPEN: OPEN<br/>all requests rejected
+    OPEN: OPEN<br/>group reported degraded
 
     [*] --> CLOSED
     CLOSED --> OPEN: failures in a row ≥ failure_threshold
-    OPEN --> CLOSED: min_healthy members back in rotation
+    OPEN --> CLOSED: min_healthy members in rotation, then a success
 ```
 
 - **CLOSED** -- Normal operation. Requests are routed to healthy members. Each failure reported for a member, a failed call through the group or a failed health check, adds to the run. Any success ends it.
-- **OPEN** -- All requests are rejected immediately (the group enters the `degraded` state). No member selection occurs.
+- **OPEN** -- The group enters the `degraded` state, `circuit_open` reads `true`, `is_available` reads `false`, and `mcp_hangar_group_circuit_open` reads 1 for this replica. Member selection still occurs, and calls are still served: the breaker never vetoes a member that is in rotation, so a primary whose failures opened the circuit does not take a healthy backup down with it. A call is refused, with `NoAvailableMemberError`, only when no member is left in rotation -- which is when the group is genuinely down.
 - **Closing** -- The circuit closes once `min_healthy` members are back in rotation and one of them reports a success, through a passing health check or a call that succeeded. A completed start puts a member back in rotation but does not close the circuit on its own. There is no timer: however long the circuit has been open, waiting alone does not close it, and it never half-opens. A dead member is not health-checked, so if too few live members remain, the circuit stays open until dead ones are started deliberately or `hangar_group_rebalance` resets it.
 
 !!! warning
@@ -318,7 +326,7 @@ The `hangar_group_rebalance` tool resets the circuit breaker immediately.
 
 ### More Than One Replica
 
-Each replica keeps its own circuit breaker for a group, so replicas can disagree. A replica whose circuit is open refuses calls to the group with `NoAvailableMemberError`, while the others serve them. `circuit_open` in `hangar_group_list` and `hangar_status` answers for the replica that served the call. `mcp_hangar_group_circuit_open` is scraped from every replica, and the scrape's `instance` label tells them apart. Alert on disagreement, not only on an open circuit.
+Each replica keeps its own circuit breaker for a group, so replicas can disagree. A replica whose circuit is open reports the group `degraded` while the others report it healthy; it keeps serving calls from the members it still has in rotation, and refuses with `NoAvailableMemberError` only when it has none. `circuit_open` in `hangar_group_list` and `hangar_status` answers for the replica that served the call. `mcp_hangar_group_circuit_open` is scraped from every replica, and the scrape's `instance` label tells them apart. Alert on disagreement, not only on an open circuit.
 
 ```promql
 # Groups the replicas disagree about: open on at least one, closed on another.

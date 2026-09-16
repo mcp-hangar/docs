@@ -14,6 +14,12 @@
 # The upgrade-coverage gate in `check_freshness.py` is the backstop: if this
 # workflow stops delivering, the docs build fails on the next release rather
 # than going quietly stale.
+#
+# A note that shows a key the release removes must mark its fence
+# `<!-- config-check: skip -->`. `check_config.py` otherwise reads the fence as
+# configuration and fails `validate` on the key the note says to delete, which
+# is what #339 had to undo by hand. The marker is written in core's `upgrade.d/`
+# fragment, because this copies the note verbatim.
 name: sync-upgrade-guide
 
 on:
@@ -89,3 +95,9 @@ jobs:
             **Read the prose before merging.** These notes were written per-PR
             against the product, and drafts written against different PRs can
             contradict each other once they land in one release.
+
+            If `validate` fails here on a key a note tells you to delete, the
+            note's fence is missing its `<!-- config-check: skip -->` marker.
+            Fix that in the product's `upgrade.d/` fragment rather than here --
+            this branch is regenerated, and the next release removing a key
+            would fail the same way.

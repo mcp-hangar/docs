@@ -223,6 +223,37 @@ Depth matches the schema: section names, each section's own keys, and
 `mcp_servers.<id>` spec keys. Deeper keys are not checked, because below that
 level there is no single reader in the product to enumerate from.
 
+**A note that tells an operator to delete a key has to show the key.**
+`upgrade.md` is synced from the product's `UPGRADE.md` by
+`scripts/sync_upgrade_guide.py`, and a release that removes a key says so with
+the key in a fence -- 2.20.0 removed `tool_access.rules` and a group's
+`circuit_breaker.reset_timeout_s`, and showed both. Read as configuration, those
+blocks fail this gate on the very keys they tell the reader to delete, which is
+what turned the sync PR, and every docs PR behind it, red until the fences were
+changed by hand (#339).
+
+So a fence that illustrates a key being removed carries a marker on the line
+above it:
+
+```markdown
+<!-- config-check: skip -->
+```
+
+One blank line may sit between the marker and the fence, because `MD031` wants a
+fence surrounded by blank lines. The marker covers **the one fence beneath it**
+and nothing else, so it cannot be put at the top of a page to quiet the rest;
+and a marked block is not counted towards the minimum block count, so marking
+enough of the corpus fails this gate rather than silencing it.
+
+The marker belongs in the note itself, in the product's `upgrade.d/` fragment,
+because the sync copies the note verbatim and adds nothing. An **unmarked**
+`yaml` fence that uses a removed key is still rejected, and `--selftest` pins
+both directions -- it runs in CI ahead of the check it guards:
+
+```bash
+python scripts/check_config.py --selftest
+```
+
 ### Symbol drift
 
 `scripts/validate_docs.py` extracts high-signal identifiers from every Markdown

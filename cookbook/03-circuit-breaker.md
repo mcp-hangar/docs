@@ -3,7 +3,7 @@
 > **Prerequisite:** [02 — Health Checks](02-health-checks.md)
 > **You will need:** Working setup from recipe 02
 > **Time:** 15 minutes
-> **Adds:** MCP Server groups with circuit breaker for fast-fail protection
+> **Adds:** MCP Server groups with a circuit breaker that reports a failing group and takes failing members out of rotation
 
 ## The Problem
 
@@ -81,64 +81,99 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    MCP Server is now dead.
 
-4. Call the tool 3 times to trip the circuit
+4. Watch a call be refused — the key demonstration
+
+   The refusal comes from rotation, not from the circuit. Keep the whole thing
+   in one session: each `serve` pipeline is a new Hangar process, and a group's
+   breaker and its members' failure counts live in the process that saw them.
 
    ```bash
-   for i in 1 2 3; do
-     echo "Attempt $i..."
-     (
-       echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
-       sleep 0.5
-       echo '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
-       sleep 0.5
-       echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}},"id":2}'
-       sleep 3
-     ) | mcp-hangar --config ~/.config/mcp-hangar/config.yaml serve 2>&1 | grep -E 'error|circuit' | head -2
-   done
-   ```
-
-   ```
-   Attempt 1...
-   (error output — connection refused or timeout)
-   Attempt 2...
-   (error output — connection refused or timeout)
-   Attempt 3...
-   (error output — circuit breaker opened after 3 failures)
-   ```
-
-   After 3 failures, circuit opens.
-
-5. Verify fast-fail behavior — the key demonstration
-
-   ```bash
-   time (
+   (
      echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
      sleep 0.5
      echo '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
      sleep 0.5
-     echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}},"id":2}'
-     sleep 1
-   ) | mcp-hangar --config ~/.config/mcp-hangar/config.yaml serve 2>&1 | grep -E 'circuit_open|rejected'
+     for i in 2 3 4; do
+       echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}},"id":'"$i"'}'
+       sleep 2
+     done
+     echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_group_list","arguments":{}},"id":9}'
+     sleep 2
+   ) | mcp-hangar --config ~/.config/mcp-hangar/config.yaml serve 2>&1 \
+     | grep -E 'NoAvailableMemberError|"id":9'
    ```
 
    ```
-   (error output — request rejected immediately, circuit is open)
-
-   real    0m2.1s
+   (error output — NoAvailableMemberError: No available member in group 'my-mcp-group')
    ```
 
-   Request rejected in ~2 seconds (no 30-second timeout). This is the protection.
+   ```json
+   {"group_id": "my-mcp-group", "state": "inactive", "min_healthy": 1,
+    "healthy_count": 0, "members_in_rotation_count": 0, "total_members": 1,
+    "is_available": false, "circuit_open": false, "members": [...]}
+   ```
 
-6. Restart the MCP server and wait for a health check
+   Calls 2 and 3 reached the MCP server and failed, which is two failures, so
+   the member left rotation at `health.unhealthy_threshold` (2 by default).
+   Call 4 never reached a member at all: `select_member_for()` had nothing in
+   rotation to select, so Hangar refused it with `NoAvailableMemberError` in
+   milliseconds instead of waiting out a connection timeout.
+
+   Read the last line again: `circuit_open` is `false`. The call was refused
+   with the circuit still closed. What refuses a call to a group is an empty
+   rotation — never the breaker, which nothing on the call path asks.
+
+5. What opening the circuit does change
+
+   The circuit opens when the group's failures in a row reach
+   `failure_threshold` (3 here). Three failed calls will not get there in this
+   group: the member leaves rotation after two, and the refusals that follow
+   are Hangar's own, not the member's, so they are not counted against it. A
+   member out of rotation is still health-checked, and it is the next failing
+   health check that brings the run to 3 and opens the circuit. How long that
+   takes is `health_check_interval_s`.
+
+   Once it opens, `hangar_group_list` reports the same group like this:
+
+   ```json
+   {"group_id": "my-mcp-group", "state": "degraded", "min_healthy": 1,
+    "healthy_count": 0, "members_in_rotation_count": 0, "total_members": 1,
+    "is_available": false, "circuit_open": true, "members": [...]}
+   ```
+
+   `hangar_status` shows the group `[DEGRADED]` with `CIRCUIT open`, and
+   `mcp_hangar_group_circuit_open{group="my-mcp-group"}` reads 1. That is the
+   whole of it: what opening the circuit changes is what Hangar reports about
+   the group, plus the `min_healthy` bar it now has to clear again to close.
+   Which calls get refused does not change. In a group that still had a second
+   member in rotation, the same open circuit would keep selecting it and keep
+   serving calls — which is what stops a failing primary from taking a healthy
+   backup down with it. Recipe 04 builds that group.
+
+6. Restart the MCP server and wait for the retry
 
    ```bash
    docker start mcp-math
-   echo "Waiting 35 seconds for the next health check..."
+   echo "Waiting 35 seconds for Hangar to retry the server..."
    sleep 35
    tail -5 /tmp/hangar-circuit.log
    ```
 
-   Waiting alone never closes a group's circuit: it has no timer, and it never half-opens. It closes once `min_healthy` members (1 here) are back in rotation and one of them reports a success, through a passing health check or a call that succeeded. The health check that finds `my-mcp` answering again is what closes it here. If Hangar gave up on `my-mcp` while it was down, `hangar_status` shows it `[DEAD]` and health checks skip it: start it with `hangar_start`.
+   Waiting alone never closes a group's circuit: it has no timer, and it
+   never half-opens. It closes once `min_healthy` members (1 here) are back in
+   rotation and one of them reports a success -- a passing health check, a call
+   that succeeded, or a completed start.
+
+   Here it is the completed start, not the health check. The failing health
+   check that opened the circuit also left `my-mcp` `degraded`, and a degraded
+   server is not health-checked at all: `health_check()` returns immediately
+   unless the server is `ready`. So nothing is left to find `my-mcp` answering
+   again. What recovers it is the restart Hangar armed when the server
+   degraded and retries on a backoff; the retry that succeeds records
+   `McpServerStarted`, which the group hears as the member's success, puts it
+   back in rotation and closes the circuit. If Hangar ran out of retries and
+   gave up on `my-mcp`, `hangar_status` shows it `[DEAD]`, and neither a health
+   check nor a call brings it back: start it with `hangar_start`.
 
 7. Verify recovery
 
@@ -159,7 +194,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Call succeeded. Circuit is CLOSED. Full recovery.
 
-   A group's circuit has no reset timer. It closes once `min_healthy` members (here, 1) are back in rotation, after a passing health check or a successful call. `hangar_group_rebalance` closes it at once.
+   A group's circuit has no reset timer. It closes once `min_healthy` members (here, 1) are back in rotation, after a passing health check, a successful call, or a completed start. `hangar_group_rebalance` closes it at once.
 
 ## What Just Happened
 
@@ -169,7 +204,7 @@ Hangar introduced **MCP server groups** — a logical grouping of one or more MC
 
 **CLOSED** (normal operation): All calls pass through to group members. The circuit breaker counts consecutive failures. When `failure_count` reaches `failure_threshold` (3), the circuit opens.
 
-**OPEN** (protecting): With the group's only member out of rotation, calls are rejected immediately with `NoAvailableMemberError`. No traffic reaches the MCP server — this is the protection. Instead of waiting 10+ seconds for connection timeout, Hangar fails in milliseconds. It stays open until `min_healthy` members (1) are back in rotation and one reports a success, after a passing health check or a call that succeeded. There is no timer and no half-open probe.
+**OPEN** (the group reported failing): The group's state becomes `degraded`, `circuit_open` reads `true` and `is_available` reads `false` in `hangar_group_list` and `hangar_status`, and `mcp_hangar_group_circuit_open` reads 1. The open circuit does not reject calls on its own — nothing on the call path asks it. What rejects them here is that the group's only member is out of rotation, so `select_member_for()` has nothing to select and the call comes back `NoAvailableMemberError` in milliseconds instead of waiting 10+ seconds for a connection timeout. A group whose other members are still in rotation keeps serving calls with the same circuit open. It stays open until `min_healthy` members (1) are back in rotation and one reports a success, after a passing health check or a call that succeeded. There is no timer and no half-open probe.
 
 **How this differs from health checks:**
 

@@ -162,7 +162,9 @@ document or example described it (#1422).
 
 Delete it:
 
-```
+<!-- config-check: skip -->
+
+```yaml
 tool_access:
   mode: front_door
   rules: []   # delete this key, and anything nested under it
@@ -439,7 +441,9 @@ than honoured (#1398).
 
 Delete it from every group:
 
-```
+<!-- config-check: skip -->
+
+```yaml
 mcp_servers:
   pool:
     mode: group

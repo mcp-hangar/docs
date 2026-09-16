@@ -83,6 +83,12 @@ jobs:
       - name: Check version-currency claims and freshness tokens
         run: python docs/scripts/check_freshness.py --docs docs --source source
 
+      # The marker decides which fences this gate reads as configuration, and a
+      # marker that stops being recognised fails open. Runs before the check it
+      # guards, the same way the freshness selftest does.
+      - name: Check the config gate's own fence marking
+        run: python docs/scripts/check_config.py --selftest
+
       - name: Check config blocks against the product's config schema
         run: python docs/scripts/check_config.py --docs docs --source source
 

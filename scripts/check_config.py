@@ -35,8 +35,20 @@ appears in the reference at all, not whether it has a heading of its own. A
 strict form would need an exception list, and an exception list is where the
 next undocumented section would go to hide.
 
+**Removed-key examples.** An upgrade note that tells an operator to delete a key
+has to show the key, and a `yaml` fence showing it is the one thing this gate
+rejects -- 2.20.0 removed `tool_access.rules` and a group's
+`circuit_breaker.reset_timeout_s` and showed both, which turned the sync PR and
+every docs PR behind it red. A fence marked `<!-- config-check: skip -->` on the
+line above it is read as an illustration instead. The marker covers the one
+fence beneath it, so it cannot quiet a page, and a marked block does not count
+towards MIN_EXPECTED_BLOCKS, so marking enough of the corpus fails this gate
+rather than silencing it. `sync_upgrade_guide.py` copies core's notes verbatim,
+so the marker is written in the note, in core's `upgrade.d/`.
+
 Usage:
     python scripts/check_config.py [--source PATH] [--docs PATH] [--quiet]
+    python scripts/check_config.py --selftest
 
 Exit code 0 = clean, 1 = a key nothing reads or a section nothing documents,
 2 = bad invocation.
@@ -60,6 +72,79 @@ BLOCK_RE = re.compile(r"^```ya?ml\n(.*?)^```", re.S | re.M)
 # Fewer than this means the extraction broke, not that the docs lost their
 # configuration examples. There are ~70 blocks today across guides and cookbook.
 MIN_EXPECTED_BLOCKS = 40
+
+#: Marks the fence below it as an illustration -- a key being removed -- rather
+#: than as configuration a reader should copy.
+SKIP_RE = re.compile(r"^\s*<!--\s*config-check:\s*skip\s*-->\s*$")
+
+
+def is_skipped(text: str, start: int) -> bool:
+    """Is the fence at `start` marked as an illustration rather than config?
+
+    The marker sits on its own line above the fence. One blank line may sit
+    between the two, because markdownlint's MD031 wants a fence surrounded by
+    blank lines. Nothing further up counts: the marker covers the one fence
+    beneath it, so it cannot be put at the top of a page to quiet the rest.
+    """
+    for line in reversed(text[:start].splitlines()[-2:]):
+        if SKIP_RE.match(line):
+            return True
+        if line.strip():
+            return False
+    return False
+
+
+def iter_blocks(text: str):
+    """Yield `(lineno, body, skipped)` for every yaml fence in a document."""
+    for match in BLOCK_RE.finditer(text):
+        lineno = text[: match.start()].count("\n") + 1
+        yield lineno, match.group(1), is_skipped(text, match.start())
+
+
+def selftest() -> int:
+    """Pin which fences this gate reads as configuration.
+
+    Every regression here is silent, and one direction fails open: a marker
+    that stops being recognised turns a removed-key illustration back into a
+    block this gate rejects, and a marker recognised too widely quietly stops
+    checking real configuration examples.
+    """
+    doc = (
+        "# Upgrade\n"
+        "\n"
+        "Delete it:\n"
+        "\n"
+        "<!-- config-check: skip -->\n"
+        "\n"
+        "```yaml\n"
+        "tool_access:\n"
+        "  rules: []   # delete this key\n"
+        "```\n"
+        "\n"
+        "The replacement:\n"
+        "\n"
+        "```yaml\n"
+        "tool_access:\n"
+        "  mode: front_door\n"
+        "```\n"
+    )
+    blocks = list(iter_blocks(doc))
+    assert len(blocks) == 2, f"expected 2 yaml fences, extracted {len(blocks)}"
+    assert blocks[0][2], "a fence under the marker must not be read as configuration"
+    assert "rules: []" in blocks[0][1], "the marked fence is still the one extracted"
+    assert not blocks[1][2], "the marker covers one fence, not the rest of the page"
+
+    tight = "<!-- config-check: skip -->\n```yaml\na: 1\n```\n"
+    assert next(iter_blocks(tight))[2], "the marker may sit directly above the fence"
+
+    far = "<!-- config-check: skip -->\n\nProse.\n\n```yaml\ntool_access:\n  rules: []\n```\n"
+    assert not next(iter_blocks(far))[2], "prose between the marker and the fence ends it"
+
+    unmarked = "```yaml\ntool_access:\n  rules: []\n```\n"
+    assert not next(iter_blocks(unmarked))[2], "an unmarked fence is still checked"
+
+    print("selftest: ok")
+    return 0
 
 
 def resolve_source(arg: str | None) -> Path:
@@ -138,7 +223,13 @@ def main() -> int:
     parser.add_argument("--source", help="Path to the mcp-hangar source repo.")
     parser.add_argument("--docs", default=".", help="Path to the docs repo root.")
     parser.add_argument("--quiet", action="store_true", help="Only print problems.")
+    parser.add_argument(
+        "--selftest", action="store_true", help="Check which fences count as configuration."
+    )
     args = parser.parse_args()
+
+    if args.selftest:
+        return selftest()
 
     source = resolve_source(args.source)
     schema = load_schema(source)
@@ -146,6 +237,7 @@ def main() -> int:
     root = Path(args.docs).expanduser().resolve()
 
     problems: list[str] = []
+    marked: list[str] = []
     checked = 0
     skipped_proposals = 0
 
@@ -155,10 +247,12 @@ def main() -> int:
         if is_proposed_adr(doc, text):
             skipped_proposals += 1
             continue
-        for match in BLOCK_RE.finditer(text):
-            lineno = text[: match.start()].count("\n") + 1
+        for lineno, body, skipped in iter_blocks(text):
+            if skipped:
+                marked.append(f"{rel}:{lineno}")
+                continue
             try:
-                block = yaml.safe_load(match.group(1))
+                block = yaml.safe_load(body)
             except yaml.YAMLError:
                 # A deliberate fragment, or a block with `...` in it. Not this
                 # gate's business; `check_manifests.py` makes the same call.
@@ -175,6 +269,10 @@ def main() -> int:
         print(f"config blocks checked: {checked}")
         if skipped_proposals:
             print(f"proposed ADRs skipped: {skipped_proposals}")
+        if marked:
+            print(f"fences marked as removed-key examples, not checked: {len(marked)}")
+            for where in marked:
+                print(f"  {where}")
         print()
 
     if checked < MIN_EXPECTED_BLOCKS:

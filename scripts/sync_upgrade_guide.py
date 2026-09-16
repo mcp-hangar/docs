@@ -17,6 +17,13 @@ versions the product's file never had -- 1.3.0 through 2.6.0, written before the
 including a section this repo has since edited. The product's copy is the
 *source for new sections*, not the authority over old ones.
 
+**Removed-key fences.** A note for a release that removes a key shows the key,
+and `check_config.py` reads a `yaml` fence as configuration -- so an unmarked one
+fails the docs build on the very key the note says to delete, which is what #339
+had to undo by hand. The note marks such a fence `<!-- config-check: skip -->`.
+This script copies the text verbatim and does not add the marker, so it is
+written in core's `upgrade.d/` fragment. See development/DOCS_VALIDATION.md.
+
 Usage:
     python scripts/sync_upgrade_guide.py [--source PATH] [--docs PATH] [--check]
 

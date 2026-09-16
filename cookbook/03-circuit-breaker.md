@@ -150,16 +150,30 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    serving calls — which is what stops a failing primary from taking a healthy
    backup down with it. Recipe 04 builds that group.
 
-6. Restart the MCP server and wait for a health check
+6. Restart the MCP server and wait for the retry
 
    ```bash
    docker start mcp-math
-   echo "Waiting 35 seconds for the next health check..."
+   echo "Waiting 35 seconds for Hangar to retry the server..."
    sleep 35
    tail -5 /tmp/hangar-circuit.log
    ```
 
-   Waiting alone never closes a group's circuit: it has no timer, and it never half-opens. It closes once `min_healthy` members (1 here) are back in rotation and one of them reports a success, through a passing health check or a call that succeeded. The health check that finds `my-mcp` answering again is what closes it here. If Hangar gave up on `my-mcp` while it was down, `hangar_status` shows it `[DEAD]` and health checks skip it: start it with `hangar_start`.
+   Waiting alone never closes a group's circuit: it has no timer, and it
+   never half-opens. It closes once `min_healthy` members (1 here) are back in
+   rotation and one of them reports a success -- a passing health check, a call
+   that succeeded, or a completed start.
+
+   Here it is the completed start, not the health check. The failing health
+   check that opened the circuit also left `my-mcp` `degraded`, and a degraded
+   server is not health-checked at all: `health_check()` returns immediately
+   unless the server is `ready`. So nothing is left to find `my-mcp` answering
+   again. What recovers it is the restart Hangar armed when the server
+   degraded and retries on a backoff; the retry that succeeds records
+   `McpServerStarted`, which the group hears as the member's success, puts it
+   back in rotation and closes the circuit. If Hangar ran out of retries and
+   gave up on `my-mcp`, `hangar_status` shows it `[DEAD]`, and neither a health
+   check nor a call brings it back: start it with `hangar_start`.
 
 7. Verify recovery
 
@@ -180,7 +194,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Call succeeded. Circuit is CLOSED. Full recovery.
 
-   A group's circuit has no reset timer. It closes once `min_healthy` members (here, 1) are back in rotation, after a passing health check or a successful call. `hangar_group_rebalance` closes it at once.
+   A group's circuit has no reset timer. It closes once `min_healthy` members (here, 1) are back in rotation, after a passing health check, a successful call, or a completed start. `hangar_group_rebalance` closes it at once.
 
 ## What Just Happened
 

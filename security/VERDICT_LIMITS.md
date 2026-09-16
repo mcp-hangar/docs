@@ -1,4 +1,4 @@
-<!-- verified-against: 2.18.0 -->
+<!-- verified-against: 2.20.0 -->
 
 # What a Verdict Establishes
 
@@ -17,10 +17,11 @@ establish / left to the operator**.
 Nothing here is forward-looking. Every "establishes" claim is backed by code or
 an ADR, and anything not shipped appears only in the middle column.
 
-**Reviewed against 2.18.0.** Every claim below was re-checked against the code
-that release ships; the table did not move, and 2.18.0 adds one row rather than
-correcting any. Three rows still read differently before **2.16.0**, and a record
-is only as good as the gateway that wrote it: see
+**Reviewed against 2.20.0.** Every claim below was re-checked against the code
+that release ships. Four rows were corrected: the Audit row, the empty
+projection, the SSRF check and the projection withdrawal. Three rows still read
+differently before **2.16.0**, and a record is only as good as the gateway that
+wrote it: see
 [the section below](#three-rows-that-were-weaker-before-2160) before reading
 anything a 2.15.0 or earlier gateway produced.
 
@@ -34,15 +35,15 @@ anything a 2.15.0 or earlier gateway produced.
 | **Approval `approved`** | one principal (`decided_by`) resolved this `approval_id` before `expires_at`; at dispatch the state, the expiry and a hash of the **raw** arguments were re-checked (`ApprovalGateService.revalidate`) | that the approver saw the raw arguments — they saw a redacted copy; that the approver was competent or authorized in any legal sense; that the call then succeeded | who may resolve; channel delivery; hold timeout |
 | **Approval `expired` / `denied`** | the call was not dispatched through this gate | anything about whether it was attempted elsewhere | — |
 | **L7 egress `deny` (Enforce)** | the call was refused before reaching the upstream, and the refusal is recorded: `EgressPolicyEnforced` carries tool, server, `action`, reasons, `rule_kind`, `policy_id`, `correlation_id`, `identity_context`; `mcp_hangar_egress_policy_enforced_total{action,rule_kind}` counts it; a warning names the reason | that traffic did not reach the destination by another path; that established connections were cut — they are not (conntrack, see [EGRESS_POLICY](../guides/EGRESS_POLICY.md)) | backstop flavour; pod restart after switching to `Enforce` |
-| **L7 `deny` observed (Audit)** | the policy *would* have refused: `EgressPolicyViolationObserved` carries the same fields, and `mcp_hangar_egress_policy_violations_observed_total` counts it | that anything was blocked — Audit falls through and the call proceeds | the decision to switch to `Enforce` |
+| **L7 `deny` observed (Audit)** | the policy *would* have refused: `EgressPolicyViolationObserved` carries the same fields, with `would_be_action` in place of `action` and no `rule_kind`, and `mcp_hangar_egress_policy_violations_observed_total` counts it | that anything was blocked — Audit falls through and the call proceeds | the decision to switch to `Enforce` |
 | **Any L7 verdict** | which policy produced it: `policy_id` is a content hash of the compiled rules, carried by the verdict, by the refusals and by `EgressPolicySet`, so a record and a policy change join on a value rather than on adjacent timestamps | that the *rules* are visible in the record — the id resolves to them only against a gateway still holding that policy (`GET /api/mcp_servers/{id}/l7_policy` returns `policyId`) | keeping the policy documents that ids were computed from |
 | **L7 verdict by `Mcp-Param-*` selector** | the header matched a rule **and** the header was validated against the request body | anything on a request where validation was skipped — such a request matches no selector at all and falls through to the tool rules and the policy default ([ADR-025](../adr/ADR-025-header-selectors-must-not-match-unvalidated-headers.md)); the fall-through is visible in the verdict reason, not in the absence of one | `headers.param_validation.required`, which refuses an unvalidated call rather than serving it |
 | **Tool access `denied`** | this caller cannot call this tool | that the tool does not exist — **at the front door**, withdrawn, denied and unknown are all `-32601`, deliberately (shown equals callable, [ADR-022](../adr/ADR-022-the-management-surface-is-what-the-caller-may-call.md)). On the batch surface the answer differs: `ToolAccessDeniedError`, "Tool not available for this mcp_server" | reading the operator-side log, which carries the reason the client is not given |
-| **Empty projection (`{"tools": []}`)** | nothing about whether the caller is allowed anything | which of `no_identity` (a fail-closed deny), `nothing_discovered` (a replica whose warm-up has not finished or did not succeed) or `filtered` (the honest empty) produced it — indistinguishable from outside, classified only in the operator-side log | reading that log line before treating `[]` as a policy result |
-| **SSRF check passed** | the endpoint resolved to a permitted range at registration and, for an API-registered `remote` server, again at connect — `_SsrfGuardedTransport` re-resolves and pins per request | anything about `remote` endpoints declared in `config.yaml` ([ADR-021](../adr/ADR-021-config-file-endpoints-outside-the-ssrf-policy.md)) — and the boot warning does not enumerate them, because `endpoint_is_a_literal_the_strict_policy_refuses` answers `False` for **any** hostname, so a file-declared `http://internal.corp/mcp` is outside the policy and silent | knowing that moving an upstream into the config file drops both halves |
+| **Empty projection (`{"tools": []}`)** | nothing about whether the caller is allowed anything | which of `no_identity` (a fail-closed deny), `nothing_discovered` (a replica whose warm-up has not finished or did not succeed) or `filtered` (the honest empty) produced it — indistinguishable from outside, classified only on the operator's side: in the log line and in the `reason` label of `mcp_hangar_empty_projection_total` | reading that log line before treating `[]` as a policy result |
+| **SSRF check passed** | the endpoint resolved to a permitted range at registration and, for an API-registered `remote` server, again at connect — `_SsrfGuardedTransport` re-resolves and pins per request | anything about `remote` endpoints declared in `config.yaml` ([ADR-021](../adr/ADR-021-config-file-endpoints-outside-the-ssrf-policy.md)) — the boot warning names each one, a hostname included (`ssrf_policy_not_applied_to_config_file_endpoint`), but it warns and does not refuse | knowing that moving an upstream into the config file drops both halves |
 | **Auth `401` / `403`** | the credential was not accepted, or the principal lacks the permission | — | role mapping |
 | **Capability drift** | `CapabilityViolationDetected` with `violation_type`, `violation_detail` and the `enforcement_action` taken (`alert` / `block` / `quarantine`) | that the drift was hostile | which action the mode maps to |
-| **Projection withdrawal** | a tool was withheld, and why: `mcp_hangar_projection_withdrawals_total{reason}` — `invalid_x_mcp_header` or `header_exposure_<action>` | that the upstream stopped offering it — the definition is still served byte-identical upstream, only the projection dropped it | `on_violation`, whose default `warn` serves the tool |
+| **Projection withdrawal** | a tool was withheld, and why: `mcp_hangar_projection_withdrawals_total{reason}` — `invalid_x_mcp_header` or `header_exposure_withdraw` | that the upstream stopped offering it — the definition is still served byte-identical upstream, only the projection dropped it; that a `header_exposure_warn` sample was withheld — `warn` counts the tool and still serves it | `on_violation`, whose default `warn` serves the tool |
 
 ## Three rows that were weaker before 2.16.0
 

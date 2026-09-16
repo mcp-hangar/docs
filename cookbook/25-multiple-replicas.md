@@ -176,6 +176,16 @@ inferring from what has stopped happening.
 `coordinates_with_peers: false` on a deployment you believe is a cluster means
 the storage is not shared -- each pod is its own gateway.
 
+The same holds for the MCP tools. `hangar_status` and `hangar_health` describe
+the replica that answered the call, not the fleet: each response names that
+replica in `replica.instance_id` (the same id as `instance_id` above) and says
+`scope: "replica"`. Under session affinity a client does not choose that
+replica. Two calls that report different server states or uptimes may have
+reached two pods, while nothing in the fleet changed. Compare
+`replica.instance_id` before reading the difference as a change. For a
+fleet-wide view, query the per-replica metrics in Prometheus, which scrapes
+every pod. See [`hangar_status`](../reference/tools.md#hangar_status).
+
 ## What it costs
 
 **Rate limits are counted per instance.** Three replicas admit three times the

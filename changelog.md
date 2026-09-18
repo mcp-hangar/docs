@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.10](https://github.com/mcp-hangar/docs/compare/v1.2.9...v1.2.10) (2026-09-18)
+
+
+### Changed
+
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#352](https://github.com/mcp-hangar/docs/issues/352)) ([64f3a8e](https://github.com/mcp-hangar/docs/commit/64f3a8e77b74639a16644cee28dd71223cb7fa76))
+
 ## [1.2.9](https://github.com/mcp-hangar/docs/compare/v1.2.8...v1.2.9) (2026-09-17)
 
 

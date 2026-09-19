@@ -65,7 +65,7 @@ tool invocation, just before any bytes leave for the upstream:
 | 2 | **Tool-access authz** | Tenant/member scope check — is this caller allowed this tool? | v1.6.0 |
 | 3 | **Tool-withdrawal check** | Per-tenant withdrawal of a previously exposed tool | v1.6.0 |
 | 4 | **Tool-schema digest-pin verify** | SHA-256 pin over the tool's canonical schema; audit/warn/block, fails closed under block | v1.6.0 (opt-in) |
-| 5 | **Circuit-breaker / health** | Rejects calls to unhealthy servers/groups | v1.6.0 |
+| 5 | **Circuit-breaker / health** | Two different things. A server's own breaker refuses the call. A group's breaker does not: nothing on the call path asks it, so a member still in rotation is still selected and still served, and the call is refused with `NoAvailableMemberError` only when no member is left in rotation | v1.6.0 |
 | 6 | **Interceptor validators** | Empty/no-op unless explicitly configured | v1.6.0 (experimental, **off by default**) |
 | 7 | **Approval gate (HITL)** | A tool matched by `tools.approval_list` is **held** for a human decision (`approval_timeout_seconds`, default 300); denial or expiry refuses the call. Fails closed | 2.1.0 (reachable) |
 | 8 | **Concurrency / backpressure** | Global + per-server semaphores | v1.6.0 |

@@ -255,7 +255,7 @@ mcp_servers:
 1. A member starts in rotation (healthy)
 2. Each failed health check or invocation error increments `consecutive_failures`
 3. When `consecutive_failures >= unhealthy_threshold`, the member is removed from rotation
-4. While removed, the member continues to receive health checks
+4. While removed, the member keeps receiving health checks only while its server is still `READY` — the case where the group dropped it on invocation errors. Once the server itself degrades, `health_check()` returns before it probes anything, so steps 5 and 6 cannot bring that member back; what does is the restart the recovery saga arms
 5. Each successful health check increments `consecutive_successes` and resets `consecutive_failures`
 6. When `consecutive_successes >= healthy_threshold` AND the MCP server state is `READY`, the member re-enters rotation
 

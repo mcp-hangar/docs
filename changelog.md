@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.11](https://github.com/mcp-hangar/docs/compare/v1.2.10...v1.2.11) (2026-09-19)
+
+
+### Changed
+
+* **guides:** the group breaker is fed by health checks, and does not reject calls ([#354](https://github.com/mcp-hangar/docs/issues/354)) ([4ba1910](https://github.com/mcp-hangar/docs/commit/4ba1910b2c7fe957c94465cf0f5b96f60d9a8646)), closes [#345](https://github.com/mcp-hangar/docs/issues/345)
+
 ## [1.2.10](https://github.com/mcp-hangar/docs/compare/v1.2.9...v1.2.10) (2026-09-18)
 
 

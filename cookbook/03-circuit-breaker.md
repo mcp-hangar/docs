@@ -50,9 +50,14 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ```
 
    ```
-   INFO     group_loaded group_id=my-mcp-group member_count=2 strategy=round_robin
+   INFO     group_loaded group_id=my-mcp-group member_count=1 strategy=round_robin
    INFO     background_worker_started task=health_check interval_s=60
    ```
+
+   The worker's `interval_s=60` is not the `health_check_interval_s: 30` set
+   above, and neither number is wrong. One health-check worker ticks for the
+   whole process on a fixed 60 second interval; `health_check_interval_s` is
+   how often that worker probes *this* server, which it tracks per server.
 
 2. Call a tool successfully through the group
 
@@ -198,7 +203,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
 ## What Just Happened
 
-Hangar introduced **MCP server groups** — a logical grouping of one or more MCP servers with shared policies. The group has a circuit breaker that tracks real tool call failures, not synthetic health probes.
+Hangar introduced **MCP server groups** — a logical grouping of one or more MCP servers with shared policies. The group has a circuit breaker that counts the group's failures in a row: a failed call through the group counts, and so does a failed health check. That is how the circuit opens in this recipe — step 5 above turns on the third failure, and it is a health check that raises it.
 
 **Circuit breaker states:**
 
@@ -208,10 +213,10 @@ Hangar introduced **MCP server groups** — a logical grouping of one or more MC
 
 **How this differs from health checks:**
 
-- **Health checks** (recipe 02): Periodic synthetic probe (`tools/list` every 30s). Detects "is the MCP server alive?"
-- **Circuit breaker** (recipe 03): Tracks real tool call failures in real-time. Detects "is the MCP server working?"
+- **Health checks** (recipe 02): a periodic probe (`tools/list`) of one server. Detects "is the MCP server alive?"
+- **Circuit breaker** (recipe 03): a count of the group's failures in a row, across its members. Detects "is this group failing?"
 
-They complement each other. Health checks catch dead MCP servers. Circuit breakers catch flaky MCP servers that pass health checks but fail real requests. The circuit breaker trips instantly on the Nth failure — no waiting for the next health check cycle.
+They are not independent: a health check that fails is reported to every group the server belongs to, as a failure against that member, so health checks feed the breaker rather than bypassing it. What the breaker adds is that a failed call counts too, without waiting for the next probe — so a server that answers `tools/list` and still fails real work is caught.
 
 ## Key Config Reference
 

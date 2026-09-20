@@ -244,6 +244,22 @@ nothing else binds a continuation to its caller.
 The cost is that a front door enforces no per-principal tool grant. An operator
 moving from `egress` has to express that restriction as tenant policy instead.
 
+### [ADR-029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md): One Enrichment Boundary and a Bounded Decision Vocabulary for Traces
+
+Traces became structurally correct in 2.19 but still cannot explain decisions:
+why a gate refused, which backend was chosen, what an L7 policy said. Nine tasks
+needed the same answers, and without one contract each would have invented its
+own. Governance enrichment was dead-wired, a refusal carried the same ERROR
+status as an upstream failure, and `mcp.server.id` meant two different things
+within one trace.
+
+Decided: the SDK's SERVER span is the request root and Hangar never opens a
+parallel one; `batch.call.<tool>` is the single governance enrichment point;
+parent means synchronous work within the request and everything else is a link;
+outcomes and reasons live in a bounded `hangar.*` vocabulary; a refusal leaves
+span status UNSET on every span it passes through, because ERROR is for
+operational failures; the domain stays SDK-free behind a narrow port.
+
 ## Conventions
 
 ADR files follow the pattern `ADR-NNN-kebab-name.md` with three-digit

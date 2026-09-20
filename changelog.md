@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.12](https://github.com/mcp-hangar/docs/compare/v1.2.11...v1.2.12) (2026-09-20)
+
+
+### Changed
+
+* **architecture:** add ADR-029 on the trace enrichment boundary and decision vocabulary ([#356](https://github.com/mcp-hangar/docs/issues/356)) ([d55086a](https://github.com/mcp-hangar/docs/commit/d55086aa4f1408111444080e6df470bee23c28c9))
+
 ## [1.2.11](https://github.com/mcp-hangar/docs/compare/v1.2.10...v1.2.11) (2026-09-19)
 
 

@@ -39,6 +39,7 @@ taxonomy, and formatting conventions.
 | [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Accepted | 2026-09-03 |
 | [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Proposed | 2026-09-12 |
 | [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | On a Front Door, the Tool-Access Policy Is the Invoke Gate for Upstream Tools | Proposed | 2026-09-13 |
+| [029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md) | One Enrichment Boundary and a Bounded Decision Vocabulary for Traces | Proposed | 2026-09-19 |
 
 ## Summaries
 

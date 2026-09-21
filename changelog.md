@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.14](https://github.com/mcp-hangar/docs/compare/v1.2.13...v1.2.14) (2026-09-21)
+
+
+### Changed
+
+* **guides:** the egress guide claimed NodeLocal DNSCache was covered; it is not ([#360](https://github.com/mcp-hangar/docs/issues/360)) ([c114747](https://github.com/mcp-hangar/docs/commit/c1147472afc6a46c02f127dfb80bcb71817dd384))
+* **reference:** add the 2.19, 2.20 and 2.21 rows to the compatibility matrix ([#363](https://github.com/mcp-hangar/docs/issues/363)) ([ddee0d4](https://github.com/mcp-hangar/docs/commit/ddee0d4b57ae12fe2c4fe7237e29d8f218bb7f44))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#362](https://github.com/mcp-hangar/docs/issues/362)) ([c62feed](https://github.com/mcp-hangar/docs/commit/c62feedafd515caf8cc03ca81188cdbb0280a5c5))
+
 ## [1.2.13](https://github.com/mcp-hangar/docs/compare/v1.2.12...v1.2.13) (2026-09-20)
 
 

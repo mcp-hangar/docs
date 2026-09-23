@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.16](https://github.com/mcp-hangar/docs/compare/v1.2.15...v1.2.16) (2026-09-23)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#370](https://github.com/mcp-hangar/docs/issues/370)) ([a703eb7](https://github.com/mcp-hangar/docs/commit/a703eb70ff6511b13b553589a918c0a3c189abc4))
+* **guides:** say when a pushed L7 policy survives a gateway restart ([#369](https://github.com/mcp-hangar/docs/issues/369)) ([44dbd37](https://github.com/mcp-hangar/docs/commit/44dbd3749909b365666ff1d909c950dee772366c))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#368](https://github.com/mcp-hangar/docs/issues/368)) ([0103b5b](https://github.com/mcp-hangar/docs/commit/0103b5b228ce32b07637c87175682254288de272))
+
 ## [1.2.15](https://github.com/mcp-hangar/docs/compare/v1.2.14...v1.2.15) (2026-09-22)
 
 

@@ -185,6 +185,50 @@ Globs are case-sensitive for determinism (`get_*` does not match `GET_user`).
 
 Unknown group names are ignored by the scanner (they are caught by CRD validation).
 
+## Surviving a gateway restart
+
+The operator delivers the L7 policy when it reconciles the `MCPEgressPolicy`,
+and not again until its next reconcile. Nothing about a gateway restart
+triggers one: a restart changes neither the CR nor the NetworkPolicy the
+operator watches. So whatever the gateway does not keep across a restart is
+**not enforced from the restart until that reconcile**, which can be hours, and
+the CR goes on reporting `Compiled` throughout. The L3/L4 backstop is not
+affected; it lives in the cluster, not in the gateway.
+
+Whether the gateway keeps the policy depends only on how it stores its fleet
+(core 2.22.1 and later):
+
+| Deployment | After a gateway restart | `persisted` in the push response |
+| ---------- | ----------------------- | -------------------------------- |
+| No persistence backend -- the chart default, `persistence.backend: ""` | lost until the operator delivers it again | `false`; the gateway logs `l7_policy_not_persisted` at warning |
+| `sqlite` on the chart's default `emptyDir` | kept across a container restart, lost when the pod is replaced -- that is, on every rollout | `true` -- the gateway cannot see what its volume is |
+| `sqlite` with `persistence.sqlite.persistentVolume.enabled: true` | kept | `true` |
+| `postgresql` | kept; each replica reads it back when it starts | `true` |
+| `MCP_PERSISTENCE_ENABLED=true` with `MCP_AUTO_RECOVER=false` | lost: written, never read back | `false`, reason `auto_recover_off` |
+
+This holds for servers declared in `config.yaml` and servers registered over the
+REST API alike. Clearing a policy is kept the same way, so a restart does not
+bring back a policy the operator deleted. Core releases before 2.22.1 lost the
+policy of every server `config.yaml` declares on every restart, whatever the
+backend ([mcp-hangar#1306](https://github.com/mcp-hangar/mcp-hangar/issues/1306)).
+
+`persisted` answers for the gateway's configuration, not for its storage: a
+SQLite file on an `emptyDir` reports `true` and is still gone after a rollout.
+To keep the policy, choose a durable backend in the chart values -- PostgreSQL,
+which multiple replicas need anyway, or SQLite on a persistent volume:
+
+```yaml
+persistence:
+  backend: sqlite
+  sqlite:
+    persistentVolume:
+      enabled: true
+```
+
+To find a deployment that does not keep it, search the gateway log for
+`l7_policy_not_persisted`. It is logged on every push, so a deployment that
+drops the policy on restart shows it on every reconcile.
+
 ## Status conditions
 
 | Condition | Meaning |
@@ -196,6 +240,7 @@ Unknown group names are ignored by the scanner (they are caught by CRD validatio
 ## Limitations and notes
 
 - **L7 needs core integration.** The tool-call / argument rules are enforced only when the operator runs with `--hangar-url`; otherwise a policy applies its L3/L4 backstop but its L7 rules are not delivered.
+- **The CR does not report whether the gateway still holds the L7 policy.** `Compiled` means the operator compiled and delivered it, not that the gateway kept it. A gateway without durable storage drops it on restart until the next reconcile; see [Surviving a gateway restart](#surviving-a-gateway-restart). To see what a gateway holds right now, `GET /api/mcp_servers/{id}/l7_policy`.
 - **FQDN enforcement requires Cilium.** Under other CNIs, list upstreams as CIDRs, or accept that hostname upstreams are denied (fail closed) and surfaced via `Degraded`.
 - **L7 rules are merged per server.** Because the core enforces one policy per server (not per upstream connection), a policy's upstream `tools`/`arguments` rules are flattened together (see [above](#l7-semantics)). Scope host-specific tool rules with separate policies if you need them kept apart.
 - **`requireApproval` needs an approval channel to be interactive** — since core 2.11.0 a gated call blocks on the approval gate (typed pending approval, `approval:resolve` chokepoint, dispatch-time revalidation); on a deployment with no approval channel configured it fails closed, as it always did. `Audit` mode records the would-be verdict and never asks a human.

@@ -212,6 +212,16 @@ bring back a policy the operator deleted. Core releases before 2.22.1 lost the
 policy of every server `config.yaml` declares on every restart, whatever the
 backend ([mcp-hangar#1306](https://github.com/mcp-hangar/mcp-hangar/issues/1306)).
 
+Two failures at start are not covered by the table:
+
+- **A stored policy that no longer parses fails closed.** The server denies
+  every tool until the operator delivers its policy again, and the gateway logs
+  `l7_policy_unreadable_denying_all` at error.
+- **A database that cannot be read at start fails open.** The gateway starts
+  anyway, so that the servers `config.yaml` declares keep serving, logs the
+  failure at error, and serves them without their stored policies until the
+  operator delivers them again.
+
 `persisted` answers for the gateway's configuration, not for its storage: a
 SQLite file on an `emptyDir` reports `true` and is still gone after a rollout.
 To keep the policy, choose a durable backend in the chart values -- PostgreSQL,

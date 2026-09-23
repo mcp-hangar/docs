@@ -1019,8 +1019,16 @@ behave identically. Requires `policy:write`.
 **Response 200:**
 
 ```json
-{"mcp_server_id": "math", "l7_policy_set": true}
+{"mcp_server_id": "math", "l7_policy_set": true, "persisted": true}
 ```
+
+`persisted` (*since core 2.22.1*) says whether a restart of this gateway gives
+the policy back. It is `false` when the gateway has no durable persistence
+backend, or keeps one but does not read it back at start
+(`MCP_AUTO_RECOVER=false`); each such push also logs `l7_policy_not_persisted`
+at warning. It reports the configuration, not the storage: SQLite on a volume
+that does not outlive the pod reports `true`. See
+[Surviving a gateway restart](../guides/EGRESS_POLICY.md#surviving-a-gateway-restart).
 
 **Response 400:** `{"error": "invalid_l7_policy", "detail": "..."}` when the body
 is not a valid compiled policy.
@@ -1039,8 +1047,11 @@ Clears the L7 policy on an MCP server, disabling L7 enforcement for it. Requires
 **Response 200:**
 
 ```json
-{"mcp_server_id": "math", "l7_policy_set": false}
+{"mcp_server_id": "math", "l7_policy_set": false, "persisted": true}
 ```
+
+`persisted` is always `true` here: a gateway that keeps nothing starts with no
+policy, so a restart keeps the policy cleared either way.
 
 ---
 

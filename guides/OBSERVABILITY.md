@@ -274,13 +274,19 @@ mcp_hangar_group_circuit_open == 1
 - If several Hangar deployments share one Prometheus, add the label that
   separates them (for example `job` or `namespace`) to each `by (...)`.
 - A replica that has not loaded the group has no series and does not count. A
-  replica that is down drops out once its series go stale.
+  replica that is down drops out once its series go stale. From the first
+  release after 2.22.1, a configuration reload that removes a group drops that
+  group's series, so a group removed with its circuit open no longer reads as
+  open for good.
 - For an alert, give the disagreement query a `for:` clause, for example
   `for: 5m`, so a transition that one scrape catches mid-flight does not page.
 
 The gauge is 0 or 1, not a closed/half-open/open enum, because a group never
 half-opens its circuit. On one replica it agrees with `circuit_open` in
-`hangar_group_list`. See [MCP Server Groups](MCP_SERVER_GROUPS.md#circuit-breaker).
+`hangar_group_list`. This gauge is the supported way to see replicas diverge:
+the breaker threshold counts failures per replica, and every group read
+answers for one replica. See
+[MCP Server Groups](MCP_SERVER_GROUPS.md#more-than-one-replica).
 
 #### Discovery
 

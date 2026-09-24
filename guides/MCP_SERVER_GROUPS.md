@@ -262,13 +262,13 @@ mcp_servers:
 !!! note
     A member must reach the `READY` MCP server state to re-enter rotation. Health check successes alone are not sufficient -- the underlying MCP server process must be fully initialized.
 
-The `hangar_group_rebalance` tool can be used to manually trigger a health re-evaluation of all members, re-adding recovered members and removing failed ones.
+The `hangar_group_rebalance` tool re-evaluates every member's rotation at once, without waiting for health checks or calls, and resets the group's circuit breaker. It starts nothing. A member rejoins or stays in rotation when it is `ready`, or when it is `cold` or DEAD because its process crashed or its start failed and it was in rotation or left it on a failure: the call that selects such a member starts it. A member Hangar gave up on, a degraded one, one blocked for a capability violation, one never started and one stopped with its group leave rotation or stay out. From the first release after 2.22.1, a rebalance no longer takes `cold` members out of rotation, so on a group whose members were all reaped for idling it leaves members a call can select and start. Like every group operation, it acts on the replica that serves the call.
 
 ### Dead Members
 
 A dead member is not health-checked, so steps 4 to 6 do not bring it back. What does depends on why it died:
 
-- **Hangar gave up on it, or a capability block stopped it.** It leaves rotation, and the group never routes a call to it. A deliberate start, such as `hangar_start` on the member or on the group, puts it back, subject to `healthy_threshold`.
+- **Hangar gave up on it, or a capability block stopped it.** It leaves rotation, and the group never routes a call to it. A deliberate start, such as `hangar_start` on the member or on the group, puts it back, subject to `healthy_threshold`. A member Hangar gave up on is also started by the group recovery worker once its group has no member left to select; see [How a replica heals a group](#how-a-replica-heals-a-group). A capability-blocked member is never started by it.
 - **Its process crashed, or its start failed.** It stays in rotation, so the next call through the group restarts it once its backoff has passed. A restart that fails, or a call refused inside the backoff, counts as the member's failure, so a member whose restart keeps failing leaves rotation at `unhealthy_threshold` and the group fails over.
 
 A dead member never counts as healthy. See the [dead server runbook](../runbooks/provider-dead.md).
@@ -324,7 +324,22 @@ The `hangar_group_rebalance` tool resets the circuit breaker immediately.
 !!! note
     `circuit_breaker.reset_timeout_s` was removed in 2.20.0. It never had an effect: an open group circuit did not half-open once the timeout passed, because a group never asks its breaker whether to let a request through. A config that still sets it loads and logs `unknown_config_key` naming the group and the key. `HANGAR_CONFIG_STRICT=1` and `mcp-hangar config check` refuse it, so under strict mode a gateway whose config still sets it does not start. Delete the key.
 
+### How a Replica Heals a Group
+
+A group's rotation and circuit breaker change only on a success or a failure reported on this replica. Two paths bring members back without an operator:
+
+- **A passing health check.** The health worker checks every `ready` member, in rotation or not, so a member that left rotation on call errors while its server stayed `ready` rejoins after `healthy_threshold` passing checks (steps 4 to 6 above). The health worker skips `cold` and DEAD servers.
+- **The group recovery worker** (`group_recovery`), for the case the health worker cannot reach. Every 30 s it looks for groups with no member left to select, and starts their members that left rotation on a failure and are now `cold` (reaped for idling) or DEAD for any reason but a capability block. A start that succeeds records `McpServerStarted`, which the group counts as a success, so the member rejoins rotation and the circuit closes by the rules above. A start that fails backs that member off: 30 s, doubling on each further failure, capped at 600 s, so a member whose upstream stays down is tried about ten times an hour. It logs `group_recovery_probe_started`, `group_recovery_probe_succeeded` and `group_recovery_probe_failed`. A group that still has a selectable member gets no starts from it, and it leaves alone a member never started in an `auto_start: false` group, one stopped on purpose (`hangar_stop` on it or on its group) and one blocked for a capability violation.
+
+Both run on every replica, not only on the one holding the management lease: each replica starts its own processes and connections. So once the upstream is back, each replica heals within a bounded time, at most one recovery pass plus that member's current backoff, without a restart and without `hangar_start`.
+
 ### More Than One Replica
+
+A group's rotation and its circuit breaker are **per replica**. Each replica keeps its own copy of both, fed only by the calls, health checks and starts it runs itself. `circuit_breaker.failure_threshold` counts the failures one replica sees in a row, not the fleet's: with three replicas behind a load balancer, a failing upstream opens the circuit on each replica separately, once that replica alone has seen `failure_threshold` failures in a row, and a replica that happened to see a success in between keeps its circuit closed. In the same way, a member can be out of rotation on one replica and in rotation on another.
+
+Every read of a group answers for the replica that served it: `hangar_status`, `hangar_group_list`, `hangar_details` on a group and `GET /api/groups/{id}`. `hangar_status` names that replica in `replica.instance_id` and says so in `scope: "replica"`. Two reads a minute apart can land on different replicas and disagree, and both are right. Actions are replica-local too: `hangar_group_rebalance` and `POST /api/groups/{id}/rebalance` change rotation and reset the circuit only on the replica that serves the call.
+
+Fleet-wide breaker and rotation state was considered and not adopted. Shared state would not start a single member, so it would have left a stuck replica stuck; the real defect was recovery, which each replica now does itself (above).
 
 Each replica keeps its own circuit breaker for a group, so replicas can disagree. A replica whose circuit is open reports the group `degraded` while the others report it healthy; it keeps serving calls from the members it still has in rotation, and refuses with `NoAvailableMemberError` only when it has none. `circuit_open` in `hangar_group_list` and `hangar_status` answers for the replica that served the call. `mcp_hangar_group_circuit_open` is scraped from every replica, and the scrape's `instance` label tells them apart. Alert on disagreement, not only on an open circuit.
 
@@ -340,7 +355,7 @@ mcp_hangar_group_circuit_open == 1
 ```
 
 - If several Hangar deployments share one Prometheus, add the label that separates them (for example `job` or `namespace`) to each `by (...)`.
-- A replica that has not loaded the group has no series and does not count. A replica that is down drops out once its series go stale.
+- A replica that has not loaded the group has no series and does not count. A replica that is down drops out once its series go stale. A configuration reload that removes a group drops that group's series on the replica that reloaded (from the first release after 2.22.1), so a group removed with its circuit open no longer reads as open for good.
 - For an alert, give the disagreement query a `for:` clause, for example `for: 5m`, so a transition that one scrape catches mid-flight does not page.
 
 See [Observability → Group Circuit Breaker](OBSERVABILITY.md#group-circuit-breaker).

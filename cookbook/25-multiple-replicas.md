@@ -212,7 +212,10 @@ over in seconds rather than waiting out the TTL.
 **Circuit breakers and lifecycle state stay local.** Each replica decides for
 itself whether it can reach an upstream, because a single replica with a network
 problem must not cut a healthy server off from the other two. The cost is that
-each discovers an outage independently.
+each discovers an outage independently. A group's rotation and circuit
+breaker are per replica too, and each replica starts its own stuck group's
+members again -- see
+[MCP Server Groups](../guides/MCP_SERVER_GROUPS.md#more-than-one-replica).
 
 **If you enable `truncation`, you need a Redis every replica shares.** The
 continuation cache defaults to `cache_driver: memory`, which is per-replica: a

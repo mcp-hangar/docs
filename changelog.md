@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.17](https://github.com/mcp-hangar/docs/compare/v1.2.16...v1.2.17) (2026-09-24)
+
+
+### Changed
+
+* **guides:** say a group's breaker and rotation are per replica ([#373](https://github.com/mcp-hangar/docs/issues/373)) ([8942f15](https://github.com/mcp-hangar/docs/commit/8942f15c5e42b7a57760aa537c731fe983e93773))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#372](https://github.com/mcp-hangar/docs/issues/372)) ([37de1d7](https://github.com/mcp-hangar/docs/commit/37de1d768a50cf8c62a56df8429fb2ff02953971))
+
 ## [1.2.16](https://github.com/mcp-hangar/docs/compare/v1.2.15...v1.2.16) (2026-09-23)
 
 

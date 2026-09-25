@@ -16,4 +16,8 @@ Each critical alert links here via its `runbook_url` annotation.
 | [health-failures](health-failures.md) | `MCPHangarHighConsecutiveFailures` |
 | [high-latency](high-latency.md) | `MCPHangarHighLatencyP95/P99/ByTool` |
 
+Not tied to one alert: [tracing-diagnosis](tracing-diagnosis.md) finds a request in a
+trace backend, explains a gate decision, and separates sampling from dropped or
+missing export. Start there when `MCPHangarTelemetryExportFailing` fires.
+
 See also: [Observability guide](../guides/OBSERVABILITY.md) · [Release runbook](RELEASE.md).

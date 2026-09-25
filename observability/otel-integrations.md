@@ -188,17 +188,93 @@ This starts:
 | Prometheus | 9090 | Metrics storage and query |
 
 The collector config (`otel-collector-config.yaml`) receives OTLP on both gRPC
-and HTTP, exports metrics to Prometheus, and prints spans and logs to console for
-debugging. Replace the `logging` exporter with your production backend.
+and HTTP. It writes spans and audit records to stdout (the `debug` exporter) and
+to a JSON-lines file (the `file` exporter). Hangar exports no OTLP metrics, and
+Prometheus scrapes its `/metrics` endpoint directly. Replace the `debug` exporter
+with your production backend.
 
 ### What flows through the collector
 
-- **Traces:** Tool invocation spans carrying `mcp.server.id`, `gen_ai.tool.name`,
-  `mcp.tool.status`, and enforcement attributes.
-- **Logs:** Audit log records for tool invocation events and MCP server state
-  transitions, exported by `OTLPAuditExporter`.
-- **Metrics:** Prometheus metrics scraped from Hangar's `/metrics` endpoint or
-  forwarded through the collector's Prometheus exporter.
+- **Traces:** one trace per request. The governance span `batch.call.<tool>`
+  carries `mcp.server.id`, `gen_ai.tool.name`, the caller attributes the bound
+  identity has, one `hangar.gate.decision` event per gate, and
+  `hangar.call.outcome`. The upstream call is the CLIENT span `execute_tool <tool>`.
+  The [tracing diagnosis runbook](../runbooks/tracing-diagnosis.md) shows the full
+  span tree.
+- **Logs:** audit records under scope `mcp_hangar.audit`, for tool invocations
+  (`mcp.tool.status`, `mcp.tool.duration_ms`) and MCP server state transitions.
+- **Metrics:** not sent over OTLP. Prometheus scrapes Hangar's `/metrics` endpoint.
+
+### Effective tracing configuration
+
+Hangar builds its tracer provider itself, so it resolves the standard variables
+in its own code. For each setting, the first source that is set wins:
+
+| Setting | Precedence |
+| --- | --- |
+| Protocol | `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`, `OTEL_EXPORTER_OTLP_PROTOCOL`, then `grpc`. `http/protobuf` is the only other protocol accepted. Any other value adds no OTLP exporter and logs `tracing_otlp_exporter_unavailable`. |
+| Endpoint | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `observability.tracing.otlp_endpoint` in `config.yaml`, then the SDK default: `http://localhost:4317` for gRPC, `http://localhost:4318/v1/traces` for HTTP. An empty `OTEL_EXPORTER_OTLP_ENDPOINT` adds no OTLP exporter. |
+| TLS | `https://` always uses TLS. For gRPC, otherwise `OTEL_EXPORTER_OTLP_TRACES_INSECURE`, `OTEL_EXPORTER_OTLP_INSECURE`, then the scheme: `http://` is plaintext and an endpoint with no scheme uses TLS. For HTTP, the scheme alone decides. Headers such as `OTEL_EXPORTER_OTLP_HEADERS` are read by the SDK. |
+| `service.name` | `OTEL_SERVICE_NAME`, `service.name` in `OTEL_RESOURCE_ATTRIBUTES`, `observability.tracing.service_name`, then `mcp-hangar`. |
+| Resource | `OTEL_RESOURCE_ATTRIBUTES` wins for every key. `deployment.environment` falls back to `MCP_ENVIRONMENT`, then `development`. `service.instance.id` falls back to the instance id that Hangar also stamps on domain events. |
+| Sampler | `OTEL_TRACES_SAMPLER`: `always_on`, `always_off`, `traceidratio`, `parentbased_always_on` (the default), `parentbased_always_off` or `parentbased_traceidratio`. Any other name logs `tracing_unknown_sampler` and uses the default. A ratio outside [0, 1] in `OTEL_TRACES_SAMPLER_ARG` logs `tracing_sampler_arg_invalid` and uses 1.0. |
+| On or off | `MCP_TRACING_ENABLED`, then `observability.tracing.enabled`, default `true`. |
+
+Current limitations:
+
+- Hangar does not read `OTEL_TRACES_EXPORTER` or `OTEL_PROPAGATORS`. It adds the
+  OTLP exporter itself, and it propagates W3C `traceparent` and `tracestate` only,
+  never baggage.
+- Audit records are exported only when an endpoint is set explicitly, in
+  `OTEL_EXPORTER_OTLP_ENDPOINT` or `observability.tracing.otlp_endpoint`. The
+  signal-specific `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` and
+  `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` do not turn audit export on by themselves.
+  `MCP_AUDIT_EXPORT_ENABLED=false` turns it off.
+- No semantic-convention schema version is declared or pinned. The request-entry
+  SERVER span, with `mcp.method.name`, `gen_ai.operation.name` and
+  `gen_ai.tool.name`, is emitted by the pinned MCP SDK (`mcp==2.0.0`), not by
+  Hangar.
+
+**Supported versions.** The `mcp-hangar[opentelemetry]` extra requires
+`opentelemetry-api`, `opentelemetry-sdk` and `opentelemetry-exporter-otlp` at
+1.35.0 or later, the lowest release that installs beside the core dependencies.
+The lockfile and CI test 1.44.0. The container image installs these packages
+unpinned when it is built, so check the installed versions on a live install.
+
+**Without a collector.** Tracing is on by default and exports to
+`localhost:4317`. With nothing listening, export fails in the background and never
+blocks a call, but every failed batch is logged and counted. Set
+`MCP_TRACING_ENABLED=false` to turn Hangar's tracing off. To read spans locally
+instead, set `MCP_TRACING_CONSOLE=true`, which adds an exporter that prints to
+stderr, and set `OTEL_EXPORTER_OTLP_ENDPOINT` to an empty value so that no OTLP
+exporter is added. Stderr is used because stdout carries the protocol on the
+stdio transport.
+
+### Tracer provider ownership
+
+Hangar registers its own tracer provider only if no other provider was
+registered first. If a host application or an instrumentation agent registered
+one, including through `OTEL_PYTHON_TRACER_PROVIDER`, Hangar uses it and builds
+nothing. It logs `tracing_external_provider_in_use`, and never replaces, flushes
+or shuts that provider down. Hangar's sampler, length limits, resource, OTLP
+exporter and `mcp_hangar_otlp_export_failures_total` counter then do not apply:
+the owner's configuration does. `MCP_TRACING_ENABLED=false` still keeps Hangar's
+spans out of a provider that someone else registered. Audit records follow the
+same rule for the logger provider (`audit_log_external_provider_in_use`).
+
+### Correlating logs and audit records with traces
+
+- **Structured logs.** A line written inside a span carries `trace_id` and
+  `span_id`. `batch_call_refused` is one such line, so a refusal found in the
+  log leads to its trace.
+- **OTLP audit records.** A record emitted inside a span carries that span's
+  trace and span IDs, even when the span is not sampled. A record emitted
+  outside any span, such as some server state changes, carries none. The core
+  live test checks that the `tool_invocation` record arrives, but not that its
+  trace ID matches the call's trace. Treat the audit-to-trace join as
+  best-effort, not as guaranteed navigation.
+- Both signals share the resource attributes `service.name` and
+  `service.instance.id`, so a replica's records and spans can be matched.
 
 ---
 

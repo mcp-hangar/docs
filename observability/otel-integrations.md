@@ -24,13 +24,24 @@ stable contract that partner backends consume without Hangar-specific plugins.
 
 | Attribute | Type | Description |
 | ----------- | ------ | ------------- |
-| `mcp.server.id` | string | Unique MCP server identifier (e.g. `math-server`) |
+| `mcp.server.id` | string | Unique MCP server identifier (e.g. `math-server`). On the spans of a call, the logical target the caller named: for a group call, the group |
+| `hangar.route.backend` | string | The server the call was dispatched to: the selected group member, or on a standalone call the server itself. On `batch.call.<tool>`, `mcp_server.cold_start` and each `command.send.InvokeToolCommand`. Absent when no member was available |
+| `hangar.route.reason` | string | Why that backend, on `batch.call.<tool>`: `standalone`, `load_balanced`, `pinned`, `canary`, `canary_fallback`, `no_available_member` |
 | `mcp.server.mode` | string | Operational mode: `subprocess`, `docker`, `remote` |
 | `mcp.server.state` | string | Lifecycle state: `COLD`, `INITIALIZING`, `READY`, `DEGRADED`, `DEAD` |
 | `mcp.server.group_id` | string | MCP Server group membership |
 | `mcp.server.image` | string | Container image reference (docker mode) |
 | `mcp.server.has_capabilities` | string | Whether MCP server declares capabilities (`true`/`false`) |
 | `mcp.server.enforcement_mode` | string | Declared enforcement mode: `alert`, `block`, `quarantine` |
+
+The `hangar.route.*` attributes above and the `hangar.l7.*` attributes under
+[Enforcement attributes](#enforcement-attributes) are on `main`, unreleased after 2.23.0. In 2.23.0 and
+earlier, `mcp_server.cold_start` and `command.send.InvokeToolCommand` carried the
+selected group member in `mcp.server.id`; they now carry the group, and the member
+is `hangar.route.backend`. The lifecycle spans `mcp_server.launch` and
+`mcp_server.startup_wait` still name the member they start. The
+[tracing diagnosis runbook](../runbooks/tracing-diagnosis.md#which-member-served-a-group-call)
+shows how to read both.
 
 ### Tool invocation attributes
 
@@ -57,6 +68,10 @@ stable contract that partner backends consume without Hangar-specific plugins.
 | `mcp.enforcement.violation_type` | string | Violation category: `egress_undeclared`, `tool_schema_drift`, `resource_limit_exceeded` |
 | `mcp.enforcement.egress_destination` | string | Destination involved in egress violation (host:port) |
 | `mcp.enforcement.violation_count` | int | Accumulated violations for this MCP server in this session |
+| `hangar.l7.verdict` | string | L7 egress policy verdict on `batch.call.<tool>`: `allow`, `audit_observed`, `deny`, `require_approval`, `approval_honored` |
+| `hangar.l7.mode` | string | L7 policy mode: `audit`, `enforce` |
+| `hangar.l7.rule_kind` | string | The part of the policy the verdict rests on: `tool`, `argument`, `header`. A default-action verdict reads `tool` |
+| `hangar.l7.policy_id` | string | The policy's content hash (`sha256:` and hex digits); omitted when the id has another shape |
 
 ### Audit attributes
 
@@ -203,7 +218,8 @@ with your production backend.
 - **Traces:** one trace per request. The governance span `batch.call.<tool>`
   carries `mcp.server.id`, `gen_ai.tool.name`, the caller attributes the bound
   identity has, one `hangar.gate.decision` event per gate, and
-  `hangar.call.outcome`. The upstream call is the CLIENT span `execute_tool <tool>`.
+  `hangar.call.outcome`. On `main`, it also carries the route
+  (`hangar.route.*`) and any L7 verdict (`hangar.l7.*`). The upstream call is the CLIENT span `execute_tool <tool>`.
   The [tracing diagnosis runbook](../runbooks/tracing-diagnosis.md) shows the full
   span tree.
 - **Logs:** audit records under scope `mcp_hangar.audit`, for tool invocations

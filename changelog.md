@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.20](https://github.com/mcp-hangar/docs/compare/v1.2.19...v1.2.20) (2026-09-26)
+
+
+### Changed
+
+* **architecture:** adr-029 -- scope the logical-target rule to call spans and correct the retry claim ([#381](https://github.com/mcp-hangar/docs/issues/381)) ([30d4012](https://github.com/mcp-hangar/docs/commit/30d4012a53e7f9e97761248566b9bec4a1a573f0))
+* **guides:** trace target selection and l7 verdicts in the tracing runbook ([#383](https://github.com/mcp-hangar/docs/issues/383)) ([619f657](https://github.com/mcp-hangar/docs/commit/619f657834d6e391011163b58044f6f71645aca6))
+
 ## [1.2.19](https://github.com/mcp-hangar/docs/compare/v1.2.18...v1.2.19) (2026-09-26)
 
 

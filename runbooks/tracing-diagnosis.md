@@ -4,7 +4,7 @@ Use this page to find one request in your trace backend, read why Hangar allowed
 
 How to configure the exporter, who owns the tracer provider, and how logs join traces are covered in [OpenTelemetry integrations](../observability/otel-integrations.md#effective-tracing-configuration).
 
-The span trees and attribute values below were captured from a real `mcp-hangar serve --http` process, run from core `main` at `d9766bd4`. It exported over OTLP/gRPC to an OpenTelemetry Collector 0.96.0 with the file exporter from `examples/otel-collector/`. Retry examples come from the assertions of the core unit tests, not from a capture.
+The span trees and attribute values below were captured from a real `mcp-hangar serve --http` process, run from core `main` at `d9766bd4`. It exported over OTLP/gRPC to an OpenTelemetry Collector 0.96.0 with the file exporter from `examples/otel-collector/`. Retry examples come from the assertions of the core unit tests, not from a capture. The route and L7 examples were captured at the in-process OTLP receiver of core's T3 live tests `test_t3_route_decisions.py` and `test_t3_l7_verdicts.py`, run from core `main` at `f08ac564`. The `canary_fallback`, `no_available_member`, Audit-mode and evaluator-failure cases come from the assertions of the core unit tests.
 
 Attribute keys are the constants in core's `observability/conventions.py`, with two groups of exceptions. `error.type`, `exception.type` and the resource keys belong to OpenTelemetry. `hangar.startup.role`, `hangar.startup.mechanism`, `cold_start.result` and the audit record's `mcp.event.name` are exported as shown, but are defined next to the code that writes them rather than in that registry.
 
@@ -50,7 +50,7 @@ Ways to get to the trace:
 
 - **From a log line.** Structured log lines written inside a span carry `trace_id` and `span_id`. The `batch_call_refused` line for a refused call is one of them.
 - **From the caller's trace.** If the client sends a valid W3C `traceparent` in the request's `params._meta`, the SDK's SERVER span becomes a child of the caller's span, and the whole request sits in the caller's trace. Without a carrier, the SERVER span is the root of a new trace. Hangar's own propagation reads and writes `traceparent` and `tracestate` only, and it never forwards baggage upstream.
-- **By server and tool.** `batch.call.<tool>` carries `mcp.server.id` and `gen_ai.tool.name`. If the bound identity has them, it also carries `mcp.caller.type`, `mcp.caller.tenant_id` and `mcp.correlation_id`. The caller's identifiers (`mcp.caller.id`, `mcp.user.id`, `mcp.agent.id`, `mcp.session.id`) are added only when the operator opts in with `MCP_TRACING_CALLER_IDS=true` or `observability.tracing.caller_ids`; to find one caller's calls without it, use the audit records, which always carry the caller. Unknown values are left out, never exported empty.
+- **By server and tool.** `batch.call.<tool>` carries `mcp.server.id` and `gen_ai.tool.name`. For a call to a group, `mcp.server.id` is the group, and the member is `hangar.route.backend`. If the bound identity has them, it also carries `mcp.caller.type`, `mcp.caller.tenant_id` and `mcp.correlation_id`. The caller's identifiers (`mcp.caller.id`, `mcp.user.id`, `mcp.agent.id`, `mcp.session.id`) are added only when the operator opts in with `MCP_TRACING_CALLER_IDS=true` or `observability.tracing.caller_ids`; to find one caller's calls without it, use the audit records, which always carry the caller. Unknown values are left out, never exported empty.
 
 Every span shares the resource of the process that emitted it, so `service.instance.id` picks out one replica.
 
@@ -98,6 +98,72 @@ jq -c '.resourceSpans[]?.scopeSpans[].spans[]
 Since 2.22.0, an expected refusal leaves the Hangar-owned spans UNSET. This covers a gate `deny`, an L7 deny or approval requirement raised at dispatch, and a command-bus rate limit. The refusing exception's class is still recorded as `error.type`. A failure ends ERROR with a bounded `error.type` and an `exception` event that carries only `exception.type`. The status never has a description, and no exception message or stack trace is exported. The core T3 live test asserts this for a tool that fails upstream: `batch.call.divide` is ERROR with `error.type=ToolInvocationError`, and the upstream's error text appears in no exported span.
 
 Count errors on `batch.call.<tool>` or on the `execute_tool <tool>` CLIENT span, not on the SDK's SERVER span. On the flat-tool path, the mcp SDK sets its own SERVER span to ERROR for a `CallToolResult(isError=true)`, even when the call was a governance refusal. Hangar does not own that span and does not change it.
+
+### Which member served a group call
+
+This is on `main`, unreleased after 2.23.0. `batch.call.<tool>` carries `hangar.route.backend`, the server the call was dispatched to, and `hangar.route.reason`, why. `hangar.route.backend` is also on `mcp_server.cold_start` and on each `command.send.InvokeToolCommand`. The reasons are:
+
+| `hangar.route.reason` | Meaning |
+| --- | --- |
+| `standalone` | The caller named a server directly, a group member included. No group selected anything, and `hangar.route.backend` equals `mcp.server.id`. |
+| `load_balanced` | The group's load balancer picked the member. |
+| `pinned` | The caller's tenant is pinned to the member by the group's canary policy. |
+| `canary` | The tenant falls in the canary split. |
+| `canary_fallback` | The pinned or canary member was out of rotation, so the load balancer picked another. The gateway also logs `canary_target_unavailable_fallback_lb`. |
+| `no_available_member` | No member was in rotation. `hangar.route.backend` is absent, and the call is refused with `hangar.refusal.gate=resolve_target` and `hangar.refusal.reason=no_available_member`. |
+
+Three tenants calling the same group, from the capture:
+
+```
+batch.call.whoami  mcp.server.id=llm-group  hangar.route.reason=pinned         hangar.route.backend=member-b
+batch.call.whoami  mcp.server.id=llm-group  hangar.route.reason=canary         hangar.route.backend=member-b
+batch.call.whoami  mcp.server.id=llm-group  hangar.route.reason=load_balanced  hangar.route.backend=member-a
+  command.send.InvokeToolCommand  mcp.server.id=llm-group  hangar.route.backend=member-a
+```
+
+`mcp.server.id` means the logical target the caller named, for a group the group, on every span the executor opens for the call: `batch.call.<tool>`, `policy.check_access`, `approval_gate.check`, `concurrency.acquire`, `mcp_server.cold_start`, `invoke_with_retry` and `command.send.InvokeToolCommand`. The member a group selected is `hangar.route.backend`. On `main`, unreleased after 2.23.0; in 2.23.0 and earlier, `mcp_server.cold_start` and `command.send.InvokeToolCommand` carried the member in `mcp.server.id`. The lifecycle spans `mcp_server.launch` and `mcp_server.startup_wait` are not opened by the call and still name the member they start.
+
+To find the calls one member served, query `hangar.route.backend`, not `mcp.server.id`:
+
+```bash
+jq -c '.resourceSpans[]?.scopeSpans[].spans[]
+  | (.attributes // [] | map({(.key): (.value | to_entries[0].value)}) | add) as $a
+  | select(.name | startswith("batch.call.")) | select($a["hangar.route.backend"] == "member-a")
+  | {traceId, name, target: $a["mcp.server.id"], reason: $a["hangar.route.reason"]}' telemetry.jsonl
+```
+
+### L7 egress verdicts
+
+This is on `main`, unreleased after 2.23.0. When a server has an L7 egress policy, `batch.call.<tool>` carries the verdict of the call's last attempt:
+
+- `hangar.l7.verdict`: `allow`, `audit_observed`, `deny`, `require_approval` or `approval_honored`.
+- `hangar.l7.mode`: `audit` or `enforce`.
+- `hangar.l7.rule_kind`: `tool`, `argument` or `header`. A verdict from the policy's default action reads `tool`.
+- `hangar.l7.policy_id`: the policy's content hash, `sha256:` followed by hex digits. It is omitted when the id has another shape.
+
+The policy's reasons, argument values and header names or values are never exported. Header rules apply to validated headers (ADR-025). An L7 verdict is not a gate: a `deny` or `require_approval` sets `hangar.call.outcome=deny`, keeps the spans UNSET and sets no `hangar.refusal.*`. This is the header deny from the capture:
+
+```
+batch.call.lookup   status UNSET
+  mcp.server.id=region  hangar.route.reason=standalone  hangar.route.backend=region
+  hangar.l7.verdict=deny  hangar.l7.mode=enforce  hangar.l7.rule_kind=header
+  hangar.l7.policy_id=sha256:87783011bb11d9c9
+  hangar.call.outcome=deny  error.type=EgressPolicyDeniedError
+```
+
+The refusal is logged at warning with bounded fields in place of `reason`:
+
+```
+batch_call_refused  error_type=EgressPolicyDeniedError  l7_verdict=deny  l7_mode=enforce
+  l7_rule_kind=header  l7_inspection_failed=False  policy_id=sha256:87783011bb11d9c9
+  mcp_server=region  tool=lookup  trace_id=... span_id=...
+```
+
+The policy's reasons are in the `egress_policy_enforced` warning and the `EgressPolicyEnforced` event, not on the span or the refusal line.
+
+In Audit mode, a call the policy would have refused reads `hangar.l7.verdict=audit_observed` and `hangar.l7.mode=audit`, and nothing else about the call changes: `hangar.call.outcome=allow`, UNSET status, no `hangar.refusal.*` and no `batch_call_refused` line. The would-be action is in the `egress_policy_violation_observed` warning.
+
+An evaluator failure is not a deny. When the policy refuses a call because it could not inspect the arguments, the span reads `hangar.l7.verdict=deny`, but `hangar.call.outcome` is `error` and, in Enforce mode, `batch.call.<tool>` ends ERROR. The log line is `batch_call_failed` at warning with `l7_inspection_failed=true`, not `batch_call_refused`. The spans inside the call stay UNSET, and the caller is refused as for any deny.
 
 ### Dispatch and rate limits
 
@@ -149,12 +215,8 @@ Do not build queries or alerts on these. The task that will add each one is name
 
 | Question | State |
 | --- | --- |
-| Which group member was selected, and why | Not yet traced (#1286). |
-| What an L7 egress policy decided, in which mode, and under which policy revision | Not yet traced (#1295). The refusal itself is visible: the spans stay UNSET and the call's `hangar.call.outcome` is `deny`. |
 | Payload mutation, the per-call size limit and batch truncation | Not yet traced (#1298, not merged). |
 | Exemplars from metrics to traces, and diagnosis by scenario | Out of scope here (#1305). |
-
-`mcp.server.id` means the logical target the caller named on `batch.call.<tool>`, `policy.check_access`, `approval_gate.check` and `concurrency.acquire`. On `mcp_server.cold_start` and `command.send.InvokeToolCommand`, it is the group member that was selected. For a server that is not in a group, the two are the same. #1286 will change this so that `mcp.server.id` always means the logical target.
 
 ## Sampling, dropped spans and missing export
 

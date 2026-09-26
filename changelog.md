@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.19](https://github.com/mcp-hangar/docs/compare/v1.2.18...v1.2.19) (2026-09-26)
+
+
+### Changed
+
+* **guides:** add a tracing diagnosis runbook and the effective telemetry contract ([#380](https://github.com/mcp-hangar/docs/issues/380)) ([01dc5b0](https://github.com/mcp-hangar/docs/commit/01dc5b0f1011de99a30f3c5dd9c9309446ae987b))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#378](https://github.com/mcp-hangar/docs/issues/378)) ([f390840](https://github.com/mcp-hangar/docs/commit/f390840c883f17edb21f17224e97e0586ee558d5))
+
 ## [1.2.18](https://github.com/mcp-hangar/docs/compare/v1.2.17...v1.2.18) (2026-09-24)
 
 

@@ -50,7 +50,7 @@ Ways to get to the trace:
 
 - **From a log line.** Structured log lines written inside a span carry `trace_id` and `span_id`. The `batch_call_refused` line for a refused call is one of them.
 - **From the caller's trace.** If the client sends a valid W3C `traceparent` in the request's `params._meta`, the SDK's SERVER span becomes a child of the caller's span, and the whole request sits in the caller's trace. Without a carrier, the SERVER span is the root of a new trace. Hangar's own propagation reads and writes `traceparent` and `tracestate` only, and it never forwards baggage upstream.
-- **By server and tool.** `batch.call.<tool>` carries `mcp.server.id` and `gen_ai.tool.name`. If the bound identity has them, it also carries `mcp.caller.type`, `mcp.caller.id`, `mcp.caller.tenant_id`, `mcp.user.id`, `mcp.agent.id`, `mcp.session.id` and `mcp.correlation_id`. Unknown values are left out, never exported empty.
+- **By server and tool.** `batch.call.<tool>` carries `mcp.server.id` and `gen_ai.tool.name`. If the bound identity has them, it also carries `mcp.caller.type`, `mcp.caller.tenant_id` and `mcp.correlation_id`. The caller's identifiers (`mcp.caller.id`, `mcp.user.id`, `mcp.agent.id`, `mcp.session.id`) are added only when the operator opts in with `MCP_TRACING_CALLER_IDS=true` or `observability.tracing.caller_ids`; to find one caller's calls without it, use the audit records, which always carry the caller. Unknown values are left out, never exported empty.
 
 Every span shares the resource of the process that emitted it, so `service.instance.id` picks out one replica.
 

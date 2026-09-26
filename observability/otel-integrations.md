@@ -93,6 +93,11 @@ stable contract that partner backends consume without Hangar-specific plugins.
 | `mcp.caller.id` | string | Caller identifier (user ID, service account, API key ID) |
 | `mcp.caller.roles` | string | Roles held at invocation time (comma-separated) |
 
+The identifiers in this taxonomy (`mcp.caller.id`, `mcp.user.id`, `mcp.agent.id`,
+`mcp.session.id`) are off spans by default and need the opt-in described under
+[Effective tracing configuration](#effective-tracing-configuration). Audit records
+carry the caller regardless.
+
 ### Cost attributes (FinOps)
 
 | Attribute | Type | Description |
@@ -219,6 +224,7 @@ in its own code. For each setting, the first source that is set wins:
 | Resource | `OTEL_RESOURCE_ATTRIBUTES` wins for every key. `deployment.environment` falls back to `MCP_ENVIRONMENT`, then `development`. `service.instance.id` falls back to the instance id that Hangar also stamps on domain events. |
 | Sampler | `OTEL_TRACES_SAMPLER`: `always_on`, `always_off`, `traceidratio`, `parentbased_always_on` (the default), `parentbased_always_off` or `parentbased_traceidratio`. Any other name logs `tracing_unknown_sampler` and uses the default. A ratio outside [0, 1] in `OTEL_TRACES_SAMPLER_ARG` logs `tracing_sampler_arg_invalid` and uses 1.0. |
 | On or off | `MCP_TRACING_ENABLED`, then `observability.tracing.enabled`, default `true`. |
+| Caller ids on spans | `MCP_TRACING_CALLER_IDS`, then `observability.tracing.caller_ids`, default `false`. Only when it is on does `batch.call.<tool>` carry `mcp.caller.id`, `mcp.user.id`, `mcp.agent.id` and `mcp.session.id`; caller type, tenant and correlation id are always there. On `main`, unreleased after 2.23.0; earlier releases set them unconditionally. |
 
 Current limitations:
 
@@ -310,7 +316,7 @@ In the OpenLIT trace explorer, filter on MCP governance attributes:
 
 - **By MCP server:** `mcp.server.id = "math-server"`
 - **By tool:** `gen_ai.tool.name = "add"`
-- **By user:** `mcp.user.id = "alice"`
+- **By user:** `mcp.user.id = "alice"` (only with `MCP_TRACING_CALLER_IDS=true`)
 - **By enforcement action:** `mcp.enforcement.action = "block"`
 - **By violation type:** `mcp.enforcement.violation_type = "egress_undeclared"`
 

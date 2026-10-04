@@ -57,7 +57,7 @@ mcp_servers:
 | `volumes` | Mount points (`host:container:mode`) | `[]` |
 | `env` | Environment variables | `{}` |
 | `network` | Network mode: `none`, `bridge`, `host` | `none` |
-| `network_mode` | Alias for `network` (Docker Compose compatibility) | `none` |
+| `network_mode` | Read as an alias for `network`, but the config schema does not list it: it logs `unknown_config_key`, and strict mode refuses it. Use `network` | `none` |
 | `read_only` | Read-only root filesystem | `true` |
 | `resources.memory` | Memory limit | `512m` |
 | `resources.cpu` | CPU limit | `1.0` |
@@ -73,7 +73,7 @@ mcp_servers:
 prometheus:
   mode: docker
   image: ghcr.io/pab1it0/prometheus-mcp-server:latest
-  network_mode: host  # or network: host
+  network: host
   env:
     PROMETHEUS_URL: "https://victoriametrics.example.com"
 ```
@@ -171,14 +171,15 @@ echo '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{}}' | \
 ### Permission denied
 
 ```bash
-chmod 777 data/sqlite
+chmod 775 /absolute/path/to/data
 ```
 
-Or set `MCP_CI_RELAX_VOLUME_PERMS=true`.
+Or set `MCP_CI_RELAX_VOLUME_PERMS=true`, which does the same to every writable
+(`rw`) bind-mounted directory before the container starts.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 | ---------- | --------- | ------------- |
 | `MCP_CONTAINER_RUNTIME` | auto | Force `podman` or `docker` |
-| `MCP_CI_RELAX_VOLUME_PERMS` | `false` | Chmod 777 on volumes (CI) |
+| `MCP_CI_RELAX_VOLUME_PERMS` | `false` | Chmod 775 on writable volume directories (CI) |

@@ -82,7 +82,7 @@ kubectl get crds | grep mcp-hangar.io
 helm install mcp-hangar-operator oci://ghcr.io/mcp-hangar/charts/mcp-hangar-operator \
   --namespace mcp-hangar \
   --create-namespace \
-  --set hangar.url=http://mcp-hangar-core:8080
+  --set hangar.url=http://mcp-hangar:8080  # the core chart's Service, release "mcp-hangar"
 
 # Verify
 kubectl get pods -n mcp-hangar
@@ -95,13 +95,12 @@ kubectl get pods -n mcp-hangar
 operator:
   logLevel: info
   metrics:
-    enabled: true
     port: 8080
   leaderElection:
     enabled: true
 
 hangar:
-  url: "http://mcp-hangar-core.mcp-hangar.svc.cluster.local:8080"
+  url: "http://mcp-hangar.mcp-hangar.svc.cluster.local:8080"
   existingSecret: "mcp-hangar-credentials"
   secretKey: "api-key"
 
@@ -122,11 +121,13 @@ resources:
 apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
-  name: sqlite-tools
+  name: db-tools
   namespace: mcp-servers
 spec:
   mode: container
-  image: ghcr.io/modelcontextprotocol/mcp-sqlite:latest
+  # A placeholder for your own image; see OFFICIAL_SERVERS.md for servers
+  # you can run today.
+  image: registry.example.com/your-org/db-tools:latest
   replicas: 1
 
   startupTimeout: "60s"
@@ -140,7 +141,7 @@ spec:
       cpu: "500m"
 
   env:
-    - name: SQLITE_DB_PATH
+    - name: DB_PATH
       value: /data/database.db
 ```
 
@@ -154,17 +155,17 @@ per-server interval to set.
 apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
-  name: github-tools
+  name: api-tools
   namespace: mcp-servers
 spec:
   mode: container
-  image: ghcr.io/modelcontextprotocol/mcp-github:latest
+  image: registry.example.com/your-org/api-tools:latest
 
   env:
-    - name: GITHUB_TOKEN
+    - name: API_TOKEN
       valueFrom:
         secretKeyRef:
-          name: github-credentials
+          name: api-credentials
           key: token
 ```
 
@@ -206,9 +207,12 @@ spec:
   # OFFICIAL_SERVERS.md.
   image: registry.example.com/your-org/expensive-tool:latest
 
-  # Start with 0 replicas - will start on first request
+  # 0 replicas: the operator creates no pod and reports the server Cold
   replicas: 0
 ```
+
+Nothing scales a `Cold` server up on a request: neither the operator nor core
+changes `replicas`. Set `replicas: 1` to start it.
 
 **Idle shutdown is core's, not the CR's.** Hangar stops an idle backend on
 `idle_ttl_s`; a server it discovers in the cluster takes core's create default
@@ -251,24 +255,24 @@ not call that API.
 apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
-  name: sqlite-primary
+  name: db-primary
   labels:
     mcp-hangar.io/category: database
     mcp-hangar.io/tier: primary
 spec:
   mode: container
-  image: ghcr.io/modelcontextprotocol/mcp-sqlite:latest
+  image: registry.example.com/your-org/db-tools:latest
 ---
 apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPServer
 metadata:
-  name: sqlite-replica
+  name: db-replica
   labels:
     mcp-hangar.io/category: database
     mcp-hangar.io/tier: replica
 spec:
   mode: container
-  image: ghcr.io/modelcontextprotocol/mcp-sqlite:latest
+  image: registry.example.com/your-org/db-tools:latest
 ```
 
 ## MCPDiscoverySource
@@ -355,20 +359,27 @@ spec:
 
 ### RBAC
 
-The operator requires cluster-level permissions:
+The operator requires cluster-level permissions. An excerpt of what the Helm
+chart creates (`rbac.create`, on by default; the chart's
+`templates/clusterrole.yaml` has the full list):
 
 ```yaml
-# Automatically created by Helm chart
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: mcp-hangar-operator
 rules:
   - apiGroups: [mcp-hangar.io]
-    resources: [mcpservers, mcpservergroups, mcpdiscoverysources]
+    resources: [mcpservers, mcpservergroups, mcpdiscoverysources, mcpegresspolicies]
     verbs: [get, list, watch, create, update, patch, delete]
   - apiGroups: [""]
-    resources: [pods, secrets, configmaps]
+    resources: [pods]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [secrets, configmaps]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
     verbs: [get, list, watch, create, update, patch, delete]
 ```
 
@@ -385,7 +396,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      mcp-hangar.io/mcp_server: "true"
+      app.kubernetes.io/component: provider  # set on every pod the operator creates
   policyTypes:
     - Ingress
     - Egress
@@ -409,13 +420,16 @@ The operator exposes metrics at `:8080/metrics`:
 
 | Metric | Type | Description |
 | -------- | ------ | ------------- |
-| `mcp_operator_reconcile_total` | Counter | Total reconciliations |
-| `mcp_operator_reconcile_duration_seconds` | Histogram | Reconciliation duration |
+| `controller_runtime_reconcile_total` | Counter | Total reconciliations (controller-runtime built-in) |
+| `controller_runtime_reconcile_time_seconds` | Histogram | Reconciliation duration (controller-runtime built-in) |
 | `mcp_operator_provider_state` | Gauge | MCP server state (1 = active) |
 | `mcp_operator_provider_tools_count` | Gauge | Tools per MCP server |
 | `mcp_operator_provider_health_check_failures_total` | Counter | Health check failures |
 
 ### ServiceMonitor
+
+The chart creates one with `serviceMonitor.enabled=true`, and the alert rules
+below with `prometheusRule.enabled=true`. By hand:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -449,7 +463,7 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "MCP MCP Server {{ $labels.name }} is degraded"
+            summary: "MCP server {{ $labels.name }} is degraded"
 
         - alert: MCPServerDead
           expr: mcp_operator_provider_state{state="Dead"} == 1
@@ -457,7 +471,7 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "MCP MCP Server {{ $labels.name }} is dead"
+            summary: "MCP server {{ $labels.name }} is dead"
 ```
 
 ## Troubleshooting
@@ -485,7 +499,7 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 
 **MCP Server stuck in Initializing:**
 
-- Check pod logs: `kubectl logs mcp-MCP server-<name> -n <namespace>`
+- Check pod logs: `kubectl logs mcp-provider-<name> -n <namespace>`
 - Verify image exists and is pullable
 - Check resource limits
 
@@ -522,7 +536,7 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 | `image` | string | For container | - | Container image |
 | `endpoint` | string | For remote | - | HTTP endpoint URL |
 | `replicas` | int | No | `1` | Desired replicas (0 = cold) |
-| `startupTimeout` | duration | No | `30s` | Startup timeout |
+| `startupTimeout` | duration | No | - | Startup timeout. Validated (not negative), but the operator does not act on it yet |
 | `shutdownGracePeriod` | duration | No | `30s` | Pod termination grace period |
 | `resources` | object | No | - | Resource requirements |
 | `env` | array | No | - | Environment variables |
@@ -535,7 +549,7 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 | `tolerations` | array | No | - | Tolerations |
 | `capabilities.network` | object | No | - | Declared egress; feeds the generated `NetworkPolicy` |
 | `capabilities.tools` | object | No | - | `maxCount` / `expectedTools`; drives violation events |
-| `capabilities.enforcementMode` | string | No | - | `audit` or `block` |
+| `capabilities.enforcementMode` | string | No | `alert` | `alert`, `block` or `quarantine` |
 
 ### MCPServer Status
 
@@ -553,4 +567,4 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 
 ## Examples
 
-See [examples/kubernetes/](https://mcp-hangar.io/examples/kubernetes/) for complete examples.
+See [config/samples/](https://github.com/mcp-hangar/mcp-hangar-operator/tree/main/config/samples) in the operator repository for complete examples.

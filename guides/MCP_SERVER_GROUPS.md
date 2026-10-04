@@ -44,8 +44,9 @@ separate vocabulary from a server's lifecycle state (`cold`, `initializing`,
 group's `degraded` means its circuit breaker is open. It is not the server
 `degraded`, which is a server with failures, waiting out a backoff before it
 is retried. `hangar_status` shows groups in their own section, apart from
-servers, with the indicators `[HEALTHY]`, `[PARTIAL]`, `[INACTIVE]` and
-`[DEGRADED]` and a `CIRCUIT` column.
+servers, with a `STATE` and a `CIRCUIT` column; each entry in its `groups`
+list carries the indicator `[HEALTHY]`, `[PARTIAL]`, `[INACTIVE]` or
+`[DEGRADED]`.
 
 ## Configuration
 
@@ -82,8 +83,8 @@ Each member entry accepts the same keys as a regular MCP server (`mode`, `comman
 | Key | Type | Default | Range | Description |
 | ----- | ------ | --------- | ------- | ------------- |
 | `id` | `str` | required | -- | Unique member identifier |
-| `weight` | `int` | `50` | 1-100 | Weight for weighted strategies |
-| `priority` | `int` | `50` | 1-100 | Priority for priority strategy (lower = higher priority) |
+| `weight` | `int` | `1` | 1-100 | Weight for weighted strategies |
+| `priority` | `int` | `1` | 1-100 | Priority for priority strategy (lower = higher priority) |
 
 For the full YAML schema, see the [Configuration Reference](../reference/configuration.md).
 
@@ -262,7 +263,7 @@ mcp_servers:
 !!! note
     A member must reach the `READY` MCP server state to re-enter rotation. Health check successes alone are not sufficient -- the underlying MCP server process must be fully initialized.
 
-The `hangar_group_rebalance` tool re-evaluates every member's rotation at once, without waiting for health checks or calls, and resets the group's circuit breaker. It starts nothing. A member rejoins or stays in rotation when it is `ready`, or when it is `cold` or DEAD because its process crashed or its start failed and it was in rotation or left it on a failure: the call that selects such a member starts it. A member Hangar gave up on, a degraded one, one blocked for a capability violation, one never started and one stopped with its group leave rotation or stay out. From the first release after 2.22.1, a rebalance no longer takes `cold` members out of rotation, so on a group whose members were all reaped for idling it leaves members a call can select and start. Like every group operation, it acts on the replica that serves the call.
+The `hangar_group_rebalance` tool re-evaluates every member's rotation at once, without waiting for health checks or calls, and resets the group's circuit breaker. It starts nothing. A member rejoins or stays in rotation when it is `ready`, or when it is `cold` or DEAD because its process crashed or its start failed and it was in rotation or left it on a failure: the call that selects such a member starts it. A member Hangar gave up on, a degraded one, one blocked for a capability violation, one never started and one stopped with its group leave rotation or stay out. Since 2.23.0, a rebalance no longer takes `cold` members out of rotation, so on a group whose members were all reaped for idling it leaves members a call can select and start. Like every group operation, it acts on the replica that serves the call.
 
 ### Dead Members
 
@@ -355,7 +356,7 @@ mcp_hangar_group_circuit_open == 1
 ```
 
 - If several Hangar deployments share one Prometheus, add the label that separates them (for example `job` or `namespace`) to each `by (...)`.
-- A replica that has not loaded the group has no series and does not count. A replica that is down drops out once its series go stale. A configuration reload that removes a group drops that group's series on the replica that reloaded (from the first release after 2.22.1), so a group removed with its circuit open no longer reads as open for good.
+- A replica that has not loaded the group has no series and does not count. A replica that is down drops out once its series go stale. A configuration reload that removes a group drops that group's series on the replica that reloaded (since 2.23.0), so a group removed with its circuit open no longer reads as open for good.
 - For an alert, give the disagreement query a `for:` clause, for example `for: 5m`, so a transition that one scrape catches mid-flight does not page.
 
 See [Observability → Group Circuit Breaker](OBSERVABILITY.md#group-circuit-breaker).
@@ -416,6 +417,9 @@ Tool access filtering controls which tools are visible when invoking a group or 
 2. **Group-level** -- Applied to the group as a whole
 3. **Member-level** -- Applied per member within the group
 
+A narrower level can only remove tools, never add back one a broader level
+removed: deny patterns add up across levels, and allow lists intersect.
+
 ### Configuration
 
 ```yaml
@@ -460,7 +464,7 @@ mcp_servers:
 | `allow_list` is set (non-empty) | Only tools matching an allow pattern are visible |
 | `allow_list` is empty, `deny_list` is set | All tools visible except those matching a deny pattern |
 | Both empty | All tools visible |
-| Both set | `allow_list` takes precedence; `deny_list` is ignored |
+| Both set | Only tools matching an allow pattern are visible, and a tool matching a deny pattern is hidden even when it matches an allow pattern: `deny_list` wins |
 
 Patterns use Python's `fnmatch` module:
 

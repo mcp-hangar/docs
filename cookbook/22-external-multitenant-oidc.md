@@ -45,6 +45,9 @@ auth:                                        # validate JWTs; Hangar does not is
     resource_uri: http://localhost:8000                # advertised (RFC 9728) AND enforced as aud
     audience: http://localhost:8000                    # inert while resource_uri is set; kept explicit
     tenant_claim: tenant_id                            # JWT claim -> CallerIdentity.tenant_id
+  role_assignments:                          # a validated token grants no permission by itself
+    - principal: "group:agents"              # matched against the token's `groups` claim
+      role: service-account                  # invoke tools; no hangar_* management tools
 
 mcp_servers:
   payments:
@@ -66,11 +69,23 @@ mcp_servers:
 
     tool_access:
       member:
+        "tenant:acme":
+          deny_list: [invoice]              # acme must be named to be kept out
         "tenant:globex":
-          allow_list: [invoice]             # only globex sees the billing tool
+          allow_list: [invoice]             # globex may invoice
 ```
 
 Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
+
+A member entry only narrows what one tenant gets; it never widens it, and a
+tenant with **no** entry on a server is not restricted there at all. Without
+the `tenant:acme` entry on `billing`, acme would see and call `invoice`. Name
+every tenant you mean to keep out; a server-level `tools:` deny cannot do it,
+because globex's member entry could not add the tool back.
+
+The role matters as much: a caller with no role is refused every call
+(`tool:invoke permission required`), and a broader role such as `developer`
+also lists the `hangar_*` management tools in this tenant's `tools/list`.
 
 Because `resource_uri` is set, every accepted token's `aud` claim is validated
 against `http://localhost:8000` (RFC 8707 resource indicators): the value Hangar
@@ -85,7 +100,7 @@ your shell first so nothing sensitive is written to disk:
 export KC_BOOTSTRAP_ADMIN_USERNAME=admin
 export KC_BOOTSTRAP_ADMIN_PASSWORD=dev-only-change-me   # local throwaway, not for prod
 
-docker run --rm -p 8080:8080 \
+docker run --rm --name keycloak -p 8080:8080 \
   -e KC_BOOTSTRAP_ADMIN_USERNAME \
   -e KC_BOOTSTRAP_ADMIN_PASSWORD \
   quay.io/keycloak/keycloak:26.0 start-dev
@@ -127,6 +142,10 @@ Two things make the tokens usable by Hangar:
 1. **The `aud` claim.** Add an audience mapper (client scope `hangar-audience`
    above) that sets `aud` to `http://localhost:8000` -- the same value as
    `auth.oidc.resource_uri`. A token minted for any other audience is rejected.
+
+1. **The `groups` claim.** Add a mapper that puts `agents` into a `groups`
+   claim on both clients, so the `role_assignments` entry above grants them
+   `service-account`.
 
 Create the two demo users (throwaway passwords, test realm only):
 
@@ -186,7 +205,7 @@ docker exec -i keycloak /opt/keycloak/bin/kcadm.sh set-password -r hangar-dev \
 
    ```text
    HTTP/1.1 401 Unauthorized
-   WWW-Authenticate: Bearer resource_metadata="http://localhost:8000/.well-known/oauth-protected-resource", ApiKey
+   www-authenticate: Bearer resource_metadata="http://localhost:8000/.well-known/oauth-protected-resource", ApiKey
    ```
 
    The `WWW-Authenticate` challenge points the agent back at the discovery
@@ -211,14 +230,15 @@ docker exec -i keycloak /opt/keycloak/bin/kcadm.sh set-password -r hangar-dev \
 1. Each tenant sees a different, flat tool surface
 
    In front-door mode external agents see flat back-end tool names, not the
-   `hangar_*` control-plane API. List tools as acme:
+   `hangar_*` control-plane API. The answer is a Server-Sent Events stream, so
+   strip the `data:` prefix before `jq`. List tools as acme:
 
    ```bash
    curl -s http://localhost:8000/mcp \
      -H "Authorization: Bearer $ACME_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' \
-     | jq -S '.result.tools[].name'
+     | sed -n 's/^data: //p' | jq '.result.tools[].name' | sort
    ```
 
    Expected for `tenant:acme` (allow_list of `charge` on `payments` only):
@@ -234,7 +254,7 @@ docker exec -i keycloak /opt/keycloak/bin/kcadm.sh set-password -r hangar-dev \
      -H "Authorization: Bearer $GLOBEX_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' \
-     | jq -S '.result.tools[].name'
+     | sed -n 's/^data: //p' | jq '.result.tools[].name' | sort
    ```
 
    Expected for `tenant:globex` (`charge`, `refund` on `payments`; `invoice` on
@@ -256,8 +276,10 @@ docker exec -i keycloak /opt/keycloak/bin/kcadm.sh set-password -r hangar-dev \
      -H "Authorization: Bearer $ACME_JWT" | jq '.tools[].name'
    ```
 
-   acme sees only `charge` here too -- one round-trip advertises the tenant's
-   allowed tools without a separate `tools/list`.
+   It is meant to show acme only `charge` -- one round-trip advertising the
+   tenant's allowed tools without a separate `tools/list`. On 2.24.0 it answers
+   `"tools": []` for every authenticated front-door caller, so use `tools/list`
+   for the surface until that is fixed.
 
 1. Prove tenants cannot observe or invoke each other's tools
 
@@ -269,7 +291,7 @@ docker exec -i keycloak /opt/keycloak/bin/kcadm.sh set-password -r hangar-dev \
      -H "Authorization: Bearer $ACME_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"refund","arguments":{}},"id":1}' \
-     | jq '.error.code // .result.isError'
+     | sed -n 's/^data: //p' | jq '.error.code // .result.isError'
    ```
 
    Expected output:
@@ -323,7 +345,7 @@ docker exec -i keycloak /opt/keycloak/bin/kcadm.sh set-password -r hangar-dev \
    Expected output:
 
    ```json
-   {"withdrawn": true, "mcp_server": "payments", "tool": "refund", "tenant_id": null}
+   {"withdrawn": true, "mcp_server": "payments", "tool": "refund", "kind": "tool", "tenant_id": null}
    ```
 
    Sending `{}` (no `tenant_id`) withdraws globally; globex's `tools/list` no
@@ -375,7 +397,7 @@ tokens; Hangar only validates them.
 | `401`, message `Invalid JWT audience` | token `aud` does not equal `auth.oidc.resource_uri` | add/repair the Keycloak audience mapper so `aud` is `http://localhost:8000` |
 | `401`, message `Untrusted JWT issuer` | token `iss` is not the configured issuer | align `auth.oidc.issuer` with the realm URL in the token's `iss` |
 | `401`, message `JWT token has expired` | clock skew or long-lived token | shorten `accessTokenLifespan`; mint a fresh token |
-| `401` even with a valid-looking token, log `oidc_config_incomplete` | `issuer`/`audience` missing at startup | set both (or `resource_uri`) before enabling OIDC |
+| `401` even with a valid-looking token, log `oidc_config_incomplete` | no `auth.oidc.issuer` (and no `issuers` list) at startup | set the issuer before enabling OIDC |
 | Token accepted but tenant is empty / denied everywhere | `tenant_id` claim absent from the token | add the hardcoded-claim mapper; confirm the claim name matches `tenant_claim` |
 
 Token lifetime is also capped server-side: Hangar rejects a token whose
@@ -397,10 +419,12 @@ Every decision is observable, which is what makes the two-tenant proof auditable
   `CallToolResult` with `isError: true` (denied at the enforcement path). No
   denied call reaches a back end.
 - **Structured logs** record the wiring and the per-request surface: startup
-  emits `oidc_auth_enabled` and `standalone_member_tool_access_policy_set` (one
-  per tenant policy loaded); each `server/discover` call logs `server_discover`
-  with the resolved `tenant_id` and tool count. Correlate these to show that
-  acme and globex resolved to different surfaces from the same server.
+  emits `oidc_auth_enabled`; each flat tool call logs `front_door_tool_call`
+  with the `tenant_id`, tool and outcome, and a refusal logs
+  `batch_call_refused` with its reason. At `DEBUG`, startup also logs
+  `standalone_member_tool_access_policy_set` (one per tenant policy loaded).
+  Correlate these to show that acme and globex resolved to different surfaces
+  from the same server.
 
 Run the two-tenant walkthrough, capture the `tools/list` output for each token
 plus the matching log lines, and you have a reproducible demonstration that the

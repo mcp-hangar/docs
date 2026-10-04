@@ -29,7 +29,8 @@ No config changes needed -- metrics are always available at `/metrics` on the HT
 1. Start Hangar in HTTP mode:
 
    ```bash
-   mcp-hangar serve --http --host 127.0.0.1 --port 8000
+   mcp-hangar serve --config ~/.config/mcp-hangar/config.yaml \
+     --http --host 127.0.0.1 --port 8000
    ```
 
 2. Check Prometheus metrics are exposed:
@@ -39,12 +40,17 @@ No config changes needed -- metrics are always available at `/metrics` on the HT
    ```
 
    ```
-   # HELP mcp_hangar_tool_calls_total Total tool invocations
-   # TYPE mcp_hangar_tool_calls_total counter
-   mcp_hangar_tool_calls_total{mcp_server="my-mcp",tool="my-tool"} 0
-   # HELP mcp_hangar_mcp_server_state Current mcp_server state
+   # HELP mcp_hangar_build_info Build and version information for MCP Hangar
+   # TYPE mcp_hangar_build_info gauge
+   mcp_hangar_build_info{python="...",version="..."} 1
+   ...
+   # HELP mcp_hangar_mcp_server_state Current mcp_server state (0=cold, 1=initializing, 2=ready, 3=degraded, 4=dead)
    # TYPE mcp_hangar_mcp_server_state gauge
+   mcp_hangar_mcp_server_state{mcp_server="my-mcp"} 0
    ```
+
+   A series with labels appears once something has set it: there is no
+   `mcp_hangar_tool_calls_total` line until the first tool call.
 
 3. Point your own Prometheus at that endpoint:
 
@@ -64,11 +70,22 @@ No config changes needed -- metrics are always available at `/metrics` on the HT
    [`mcp-hangar/files/dashboards/`](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files/dashboards)
    (`overview.json` is the one to start with).
 
-5. Make some tool calls and watch the metrics update in real time:
+5. Make a tool call and watch the metrics update:
 
    ```bash
-   curl -X POST http://localhost:8000/api/mcp_servers/my-mcp/start
+   curl -s http://localhost:8000/mcp \
+     -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp","tool":"add","arguments":{"a":1,"b":2}}]}}}' > /dev/null
+   curl -s http://localhost:8000/metrics | grep '^mcp_hangar_tool_calls_total'
    ```
+
+   ```
+   mcp_hangar_tool_calls_total{mcp_server="my-mcp",status="success",tool="add"} 1.0
+   ```
+
+   The call starts the cold server first, so
+   `mcp_hangar_mcp_server_state{mcp_server="my-mcp"}` now reads 2 and
+   `mcp_hangar_mcp_server_cold_start_seconds` has its first observation.
 
 ## What Just Happened
 
@@ -76,12 +93,12 @@ Hangar exposes Prometheus-format metrics at `/metrics`; scraping them and render
 
 | Metric | Type | What it tells you |
 | -------- | ------ | ------------------- |
-| `mcp_hangar_tool_calls_total` | Counter | Total tool invocations per MCP server/tool |
+| `mcp_hangar_tool_calls_total` | Counter | Total tool invocations per MCP server, tool and `status` (`success`, `error`) |
 | `mcp_hangar_tool_call_duration_seconds` | Histogram | Latency distribution per MCP server/tool |
 | `mcp_hangar_mcp_server_state` | Gauge | Current state per MCP server (0=cold, 1=initializing, 2=ready, 3=degraded, 4=dead) |
 | `mcp_hangar_mcp_server_cold_start_seconds` | Histogram | Cold start latency per MCP server |
 | `mcp_hangar_health_checks_total` | Counter | Health check results per MCP server |
-| `mcp_hangar_circuit_breaker_state` | Gauge | Circuit breaker state per MCP server |
+| `mcp_hangar_circuit_breaker_state` | Gauge | Circuit breaker state per group, one series per `state` (1 for the current one). Only groups have a breaker; the group id is in the `mcp_server` label |
 
 ## Key Config Reference
 

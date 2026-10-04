@@ -19,6 +19,16 @@ If you upgrade across the v1.2.1 boundary with strict digest enforcement, valid
 tools can look like drift because their old pins were computed with the previous
 algorithm. You need to refresh pins without creating a production outage.
 
+Check first whether you have such pins at all. Up to v1.3.0 the digest code
+was a library -- `compute_tool_digest`, `DigestPolicy` and a standalone
+`DigestValidator` -- and nothing in `config.yaml` pinned a digest or enforced
+one. Configured pins arrived in v1.4.0, per tenant under
+`tool_projection.tenant_overrides.<tenant>.pins` (all-tenant
+`tool_projection.pins` followed in 2.6.0), and were computed with JCS from the
+start. So the json.dumps-era digests this recipe migrates exist only where your
+own code called `compute_tool_digest` on v1.2.0 or earlier and stored the
+result.
+
 ## The Config
 
 Keep your existing `config.yaml`. This recipe changes the rollout posture, not
@@ -32,16 +42,32 @@ for path in ~/.config/mcp-hangar ./config.yaml ./configs; do
 done
 ```
 
-If any policy still uses `allow_degraded`, change it to `allow_unverified`
-(the rename also shipped in v1.2.1):
+`allow_degraded` and `allow_unverified` are values of the Python
+`DigestUnknownPolicy` type, not settings: no `config.yaml` key has ever read
+either. If your own code still passes `allow_degraded`, change it to
+`allow_unverified` (the rename also shipped in v1.2.1):
 
 ```diff
 - allow_degraded
 + allow_unverified
 ```
 
-During the migration window, run digest enforcement in `audit` or `warn` mode.
-Do not use `block` until every pin has been recomputed under the JCS algorithm.
+Since v1.4.0, digest enforcement is set per server with
+`tool_projection.digest_enforcement` (a group can carry one too in 2.24.0),
+and it defaults to `block`. During the
+migration window, run it in `audit` or `warn` mode. Do not use `block` until
+every pin has been recomputed under the JCS algorithm.
+
+```yaml
+mcp_servers:
+  math:
+    mode: remote
+    endpoint: http://localhost:8080/mcp
+    tool_projection:
+      digest_enforcement: audit      # audit | warn | block (default)
+      pins:                          # tool name -> 64 lowercase hex characters, no prefix
+        add: a30ea916b7cc20436fde225e668af33d9a972ee082717dc6332220d015bf5a5e
+```
 
 For the Docker smoke test below, create a minimal config:
 
@@ -57,11 +83,13 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
    ```bash
    : > /tmp/hangar-digests-before.txt
    for path in ~/.config/mcp-hangar ./config.yaml ./configs; do
-     [ -e "$path" ] && grep -R "sha256:" "$path" >> /tmp/hangar-digests-before.txt
+     [ -e "$path" ] && grep -R -A50 "pins:" "$path" >> /tmp/hangar-digests-before.txt
    done
    ```
 
-   Keep this file until the migration is complete. It is your rollback map.
+   Keep this file until the migration is complete. It is your rollback map. A
+   configured pin is a bare 64-character hex value under `pins:`; add whatever
+   store your own code kept its digests in.
 
 1. Verify the package in Docker
 
@@ -78,8 +106,11 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
    Expected output:
 
    ```text
-   mcp-hangar 1.6.0
+   mcp-hangar 2.24.0
    ```
+
+   The version is whichever release pip resolves; the output above is from the
+   run this page was checked with.
 
 1. Start Hangar in HTTP mode
 
@@ -119,9 +150,12 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
    Expected output:
 
    ```text
-   "mcp-hangar-validator"
-   "mcp-hangar-mutator"
+   "io.mcp-hangar.validator"
+   "io.mcp-hangar.mutator"
    ```
+
+   *Since 2.0.0* the default response uses these reverse-DNS names; v1.2.1 to
+   v1.6.x answered `mcp-hangar-validator` and `mcp-hangar-mutator`.
 
 1. Exercise every pinned MCP server
 
@@ -205,9 +239,17 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
    the JCS digest emitted by v1.2.1 and later.
 
    ```diff
-   - sha256:old-json-dumps-digest
-   + sha256:new-rfc8785-jcs-digest
+   -        add: <old-json-dumps-digest>
+   +        add: <new-rfc8785-jcs-digest>
    ```
+
+   For pins in `config.yaml`, `mcp-hangar pin --check --config config.yaml`
+   connects to each server and lists every pin that disagrees with what the
+   server serves (`drift math.add`, with the pinned and the serving digest), and
+   exits 1 if any does. Once you have reviewed them, `mcp-hangar pin --write`
+   writes the serving digests into the file and keeps the previous one as
+   `config.yaml.bak`. It writes every observed digest, so review before you run
+   it.
 
 1. Fix malformed tool entries before returning to `block`
 
@@ -226,7 +268,7 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
 1. Re-enable `block`
 
    After all reviewed pins are updated and malformed schemas are fixed, switch
-   enforcement back to `block`.
+   `digest_enforcement` back to `block`.
 
    Restart Hangar and repeat the same tool calls. There should be no digest
    mismatch events in the log.
@@ -265,25 +307,29 @@ as absent during digest computation:
 This prevents two otherwise equivalent servers from producing different digests
 only because one omits an optional field while another sends it empty.
 
-The `allow_degraded` name was also retired in v1.2.1. Use `allow_unverified` for
-unknown tools that are allowed to run without a verified digest. Hangar still
-accepts the old string with a `DeprecationWarning` in v1.6.0, but new
-configuration should use only `allow_unverified`.
+The `allow_degraded` name was also retired in v1.2.1, in the
+`DigestUnknownPolicy` type. The helper that maps the old string to
+`allow_unverified` with a `DeprecationWarning` is still in the package, but no
+configuration reaches it: a configured pin is enforced in its server's
+`digest_enforcement` mode, and a tool with no pin is not digest-checked at all.
 
 ## Key Config Reference
 
-| Setting | Use (v1.2.1+) |
-| ------- | ------------- |
-| `audit` | Allow calls and record digest drift during migration |
-| `warn` | Allow calls and emit warnings during migration |
-| `block` | Reject unapproved digest drift after migration |
-| `allow_unverified` | Allow unknown tools without a verified digest |
-| `allow_degraded` | Deprecated alias; replace with `allow_unverified` |
+| Setting | Use |
+| ------- | --- |
+| `tool_projection.digest_enforcement: audit` | Allow calls and record digest drift during migration |
+| `tool_projection.digest_enforcement: warn` | Allow calls and emit warnings during migration |
+| `tool_projection.digest_enforcement: block` | Reject unapproved digest drift after migration. The default |
+| `tool_projection.pins` | `{tool name: digest}`; the digest is 64 lowercase hex characters |
+| `allow_unverified` | Python API only (`DigestUnknownPolicy`); not a config key |
+| `allow_degraded` | Deprecated alias of `allow_unverified` in the Python API; not a config key |
 
 ## What's Next
 
 Keep `/interceptors/list` clients up to date. Since v1.2.1, Hangar returns two
-explicit interceptor names: `mcp-hangar-validator` and `mcp-hangar-mutator`.
+distinct interceptor names; since 2.0.0 they are `io.mcp-hangar.validator` and
+`io.mcp-hangar.mutator`. See
+[15 -- Interceptor Discovery](15-interceptor-discovery.md).
 
 For the full background, see
 [Interceptor Framework](../architecture/INTERCEPTOR_FRAMEWORK.md) and

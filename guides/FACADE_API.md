@@ -113,12 +113,14 @@ The `HangarConfig` builder provides a fluent API for programmatic configuration.
 | Parameter | Type | Default | Description |
 | ----------- | ------ | --------- | ------------- |
 | `name` | `str` | required | Unique MCP server identifier |
-| `mode` | `str` | `"subprocess"` | MCP Server mode: `subprocess`, `docker`, or `remote` |
-| `command` | `list[str] \| None` | `None` | Command for subprocess mode (required for subprocess) |
-| `image` | `str \| None` | `None` | Docker image for docker mode (required for docker) |
-| `url` | `str \| None` | `None` | HTTP endpoint for remote mode (required for remote) |
-| `env` | `dict \| None` | `None` | Environment variables for the MCP server process |
+| `mode` | `str` | `"subprocess"` | MCP Server mode: `subprocess`, `docker`, `container` or `remote`. A group cannot be built here: declare it in a config file |
+| `command` | `list[str] \| None` | `None` | Command for subprocess mode (required for subprocess), or the container command for docker and container mode |
+| `image` | `str \| None` | `None` | Container image for docker and container mode (required for both) |
+| `url` | `str \| None` | `None` | HTTP endpoint for remote mode (required for remote), written as the server's `endpoint` |
+| `env` | `dict \| None` | `None` | Environment variables for a subprocess, docker or container server. A remote server does not read it |
 | `idle_ttl_s` | `int` | `300` | Seconds before auto-shutdown when idle |
+
+An option the mode does not read, such as `env=` on a remote server, raises `ConfigurationError` rather than being stored and ignored.
 
 ### `.enable_discovery()` Parameters
 
@@ -126,7 +128,9 @@ The `HangarConfig` builder provides a fluent API for programmatic configuration.
 | ----------- | ------ | --------- | ------------- |
 | `docker` | `bool` | `False` | Enable Docker label discovery |
 | `kubernetes` | `bool` | `False` | Enable Kubernetes annotation discovery |
-| `filesystem` | `list[str] \| None` | `None` | Filesystem paths to scan for MCP server YAML files |
+| `filesystem` | `list[str] \| None` | `None` | One directory to scan for MCP server YAML files, as a one-element list. A second path raises `ConfigurationError` |
+
+Each requested source is added in `additive` mode: a discovered server is added, and one a source stops reporting is left alone. A call with no source raises `ConfigurationError`.
 
 ### `.max_concurrency()` Parameter
 
@@ -150,12 +154,12 @@ config = (
         mode="subprocess",
         command=["python", "-m", "math_server"],
         idle_ttl_s=600,
+        env={"LOG_LEVEL": "info"},
     )
     .add_mcp_server(
         "llm",
         mode="remote",
         url="https://llm-api.example.com/mcp",
-        env={"API_KEY": "${LLM_API_KEY}"},
     )
     .add_mcp_server(
         "sandbox",
@@ -169,9 +173,9 @@ config = (
 ```
 
 !!! warning
-    Calling `.build()` freezes the configuration. Subsequent calls to `.add_mcp_server()` or other builder methods raise `ConfigurationError`. Calling `.build()` again also raises `ConfigurationError`.
+    Calling `.build()` freezes the configuration. Subsequent calls to `.add_mcp_server()` or other builder methods raise `ConfigurationError`. `.build()` itself can be called again and returns the same data.
 
-Validation errors (empty MCP server name, invalid mode, missing mode-specific parameters) raise `ConfigurationError` with a descriptive message.
+Validation errors (empty MCP server name, invalid mode, missing mode-specific parameters, an option the mode does not read) raise `ConfigurationError` with a descriptive message. `.build()` also checks the result against the gateway's config schema, and a key the gateway does not read raises `ConfigurationError` there rather than at boot.
 
 ## API Reference
 
@@ -271,12 +275,12 @@ A second `start()` while started does nothing, and a second `stop()` does nothin
 - Cold MCP servers are auto-started on first invocation.
 - `invoke` accepts a group id, as `hangar_call` does, and the call goes to the member the group selects.
 - `timeout_s` bounds the wait. The call itself is given `timeout_s` clamped to 1-300 seconds, as `hangar_call` clamps its `timeout`.
-- The result is returned whole. The per-call size limit (10 MB) and a `truncation:` section cut `hangar_call` results, not the results `invoke` returns, and no continuation is stored for an `invoke` call.
+- The result is returned whole: a `truncation:` section cuts `hangar_call` results, not the results `invoke` returns, and no continuation is stored for an `invoke` call. The upstream read limit does apply: a response larger than `execution.max_response_bytes` (32 MiB by default) or the server's own `max_response_bytes` fails the call with `ToolCallFailedError`, code `ResponseTooLarge`, as it fails `hangar_call`.
 - A facade call writes the `hangar_call` span and log lines, and is counted in the batch metrics.
 - A call through `invoke` has no session and no request headers. Session suspension does not apply to it, and an L7 rule that selects on `Mcp-Param-*` does not fire, as for `hangar_call` over stdio.
 
 !!! note
-    Governed `invoke`, `principal=` and `ToolCallFailedError`, and the background workers, coordination and warm-up that `start()` runs, ship in the first release after 2.20.0. For what changes for existing code, see the [Upgrade Guide](../upgrade.md) and core's [`UPGRADE.md`](https://github.com/mcp-hangar/mcp-hangar/blob/main/UPGRADE.md).
+    Governed `invoke`, `principal=` and `ToolCallFailedError`, and the background workers, coordination and warm-up that `start()` runs, ship in 2.21.0. For what changes for existing code, see the [Upgrade Guide](../upgrade.md) and core's [`UPGRADE.md`](https://github.com/mcp-hangar/mcp-hangar/blob/main/UPGRADE.md).
 
 #### Calling as a principal
 
@@ -368,11 +372,11 @@ Frozen dataclass representing a MCP server state snapshot.
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `name` | `str` | MCP Server name |
-| `state` | `str` | Current state: `cold`, `ready`, `degraded`, `dead` |
+| `state` | `str` | Current state: `cold`, `initializing`, `ready`, `degraded`, `dead`; `unknown` when the snapshot could not be read |
 | `mode` | `str` | MCP Server mode: `subprocess`, `docker`, `remote` |
 | `tools` | `list[str]` | Available tool names |
-| `last_used` | `float \| None` | Last invocation timestamp (epoch seconds) |
-| `error` | `str \| None` | Error message if MCP server is in error state |
+| `last_used` | `float \| None` | Last invocation timestamp (epoch seconds), `0.0` before the first call |
+| `error` | `str \| None` | Set only by `list_mcp_servers()` when a server's snapshot could not be read (`state` is then `unknown`). A dead server has `error=None`: read its `state` |
 
 | Property | Type | Description |
 | ---------- | ------ | ------------- |
@@ -412,7 +416,7 @@ Dataclass for discovery source configuration.
 | ------- | ------ | --------- | ------------- |
 | `docker` | `bool` | `False` | Enable Docker discovery |
 | `kubernetes` | `bool` | `False` | Enable Kubernetes discovery |
-| `filesystem` | `list[str]` | `[]` | Filesystem paths to scan |
+| `filesystem` | `list[str]` | `[]` | Directory to scan: at most one |
 
 ## Framework Integration
 
@@ -471,7 +475,7 @@ The Facade API raises specific exceptions for different failure modes:
 
 | Exception | When Raised |
 | ----------- | ------------- |
-| `ConfigurationError` | Invalid configuration, Hangar not started, builder already built, `.set_intervals()` called |
+| `ConfigurationError` | Invalid configuration, Hangar not started, builder modified after `.build()`, `.set_intervals()` called |
 | `ValueError` | `principal=` is `Principal.system()`, or a `.max_concurrency()` value outside 1-100 |
 | `McpServerNotFoundError` | No MCP server or group has that name |
 | `ToolNotFoundError` | The MCP server does not have the tool |

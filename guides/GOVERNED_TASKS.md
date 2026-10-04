@@ -46,6 +46,8 @@ Once a task is relayed, a client follows up through the three `tasks/*` methods 
 
 `tasks/result` and `tasks/list` are **not served** -- SEP-2663 removes both. They are simply not registered, which is how they answer `-32601`; there is no separate rejection.
 
+Every `tasks/*` request Hangar relays upstream, the `tasks/result` fetch below included, names the task as `taskId`, the SEP-2663 wire name. Before 2.24.0 it sent `task_id`, which an upstream reading only the SEP-2663 name did not find.
+
 Removing `tasks/result` downstream does not mean Hangar stops *calling* it upstream. SEP-2663 inlines a completed task's payload on `tasks/get`, but an upstream on the older design still keeps it behind `tasks/result`, so Hangar fetches it on the client's behalf. Bridging the two generations is the relay's job; dropping both at once made every such payload unreachable until it was caught.
 
 ### Who is served, and what everyone else gets
@@ -66,7 +68,7 @@ A modern client can fix its declaration and retry, so it is told *what* to decla
 
 **Discovery.** The extension is advertised under `capabilities.extensions`, not `capabilities.tasks`. The 2026-07-28 `ServerCapabilities` has no `tasks` field -- SEP-2663 moved Tasks out of the core set -- so a server advertising it there has the entry sieved out of its own `server/discover` and becomes undiscoverable to exactly the clients it serves.
 
-A client sends only a bare `task_id`. The handler resolves it to the composite key via `find_owned_key`, which is ownership-fail-closed: a `task_id` the caller does not own is indistinguishable from one that does not exist -- both raise the same `INVALID_PARAMS` "Task not found". No existence leak.
+A client sends only a bare task id (`taskId` on the wire), with no server. The handler resolves it to the composite key via `find_owned_key`, which is ownership-fail-closed: a `task_id` the caller does not own is indistinguishable from one that does not exist -- both raise the same `INVALID_PARAMS` "Task not found". No existence leak.
 
 **Identity bridging.** On streamable-HTTP the transport runs the low-level request handler in a per-session task decoupled from the ASGI auth wrapper, so the ambient identity is not propagated in. Each handler bridges the authenticated principal off the FastMCP request context into `identity_context_var` for the duration -- exactly as the `hangar_call` batch path does (`#387`) -- and `asyncio.to_thread` copies that context into the worker thread where the (threading-locked) ledger runs. An absent principal leaves the caller unattributed, which is fail-closed downstream: an unattributed caller can only ever reach unattributed tasks.
 
@@ -95,7 +97,7 @@ This is the ADR-008 "zombie" closed for the async case: a task can never complet
 | `TaskConsentDecided` | A mid-flight consent decision resolves -- granted or denied -- carrying the `input_key` and the `principal_id` that was prompted. |
 | `DigestMismatchInTask` | Pinned-digest re-verification finds drift (paired with the `TaskFailed`). |
 
-The full lifecycle of any relayed task is reconstructable from the event stream. This is the forensic non-repudiation the product thesis already sold for synchronous calls -- now extended to cover the async call-shape that was the last one left dark. (ADR-014 Decision 3 names `TaskInputRequired` in the lifecycle set as well; the emitted provenance on the v2-preview code path is the six events above.)
+The full lifecycle of any relayed task is reconstructable from the event stream. This is the forensic non-repudiation the product thesis already sold for synchronous calls -- now extended to cover the async call-shape that was the last one left dark. (ADR-014 Decision 3 names `TaskInputRequired` in the lifecycle set as well; nothing emits it; the emitted provenance is the six events above.)
 
 ## The mid-flight consent gate (`#322`)
 
@@ -117,7 +119,7 @@ The acknowledgement is empty; the client polls `tasks/get` for the resulting sta
 
 Two distinctions the code enforces and the positioning depends on. Keep them exact.
 
-**Neither gate prompts a human.** The egress policy's `requireApproval` (see [Egress Policy](EGRESS_POLICY.md#l7-semantics)) **fails closed**: a gated synchronous `tools/call` is *blocked* pending an out-of-band approval. The async gate here is fail-closed too, on a decision the client volunteers by driving `tasks/update`. Hangar used to be the interactive one -- it elicited a live decision mid-poll -- and on the SEP-2663 wire it no longer does. Do not describe either as an interactive approval queue.
+**The two gates ask different parties.** The egress policy's `requireApproval` (see [Egress Policy](EGRESS_POLICY.md#l7-semantics)) holds a synchronous `tools/call` on the approval gate: a pending approval is created and delivered on its channel, an approver holding `approval:resolve` decides it (over REST or `hangar_approve`), and an approval that never comes fails closed at its timeout. The async gate here asks no approver: it is fail-closed on a decision the *client* volunteers by driving `tasks/update`. Hangar used to elicit that decision itself, mid-poll, and on the SEP-2663 wire it no longer does. Do not describe the task gate as an approval queue.
 
 **Hangar relays and governs; it does not execute.** No scheduler, no result store, no GC/TTL correctness, no cancellation-race ownership, no worker → main-loop context bridge. Governance binds at the proxy/store seam on the request path -- the same seam that governs synchronous `tools/call` -- so the "one bug and governance silently does not bind" failure mode a background execution thread would introduce simply does not exist to break.
 

@@ -428,8 +428,9 @@ The operator exposes metrics at `:8080/metrics`:
 
 ### ServiceMonitor
 
-The chart creates one with `serviceMonitor.enabled=true`, and the alert rules
-below with `prometheusRule.enabled=true`. By hand:
+The chart creates one with `serviceMonitor.enabled=true` (and, with
+`prometheusRule.enabled=true`, a PrometheusRule of its own for reconcile errors
+and a down operator). By hand:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -536,7 +537,7 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 | `image` | string | For container | - | Container image |
 | `endpoint` | string | For remote | - | HTTP endpoint URL |
 | `replicas` | int | No | `1` | Desired replicas (0 = cold) |
-| `startupTimeout` | duration | No | - | Startup timeout. Validated (not negative), but the operator does not act on it yet |
+| `startupTimeout` | duration | No | - | Startup timeout. Accepted but not acted on; the optional validating webhook (`webhook.enabled`, off by default) rejects a negative value |
 | `shutdownGracePeriod` | duration | No | `30s` | Pod termination grace period |
 | `resources` | object | No | - | Resource requirements |
 | `env` | array | No | - | Environment variables |

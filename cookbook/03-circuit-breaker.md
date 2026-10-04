@@ -129,7 +129,8 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Call 2 reached the frozen server and waited out the 60-second call timeout.
    While it waited, the once-a-minute health check -- which gives up after 5
-   seconds -- failed too. That is two failures in a row, so the member left
+   seconds -- almost always failed too (if no check fell inside that minute,
+   call 3 times out the same way). That is two failures in a row, so the member left
    rotation at `health.unhealthy_threshold` (2 by default). Calls 3 and 4
    never reached a member at all: `select_member_for()` had nothing in
    rotation to select, so Hangar refused them with `NoAvailableMemberError` in

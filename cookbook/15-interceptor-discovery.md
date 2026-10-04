@@ -12,10 +12,12 @@ MCP Hangar exposes its validator and mutator capabilities through
 validate or mutate before sending traffic through it.
 
 The interceptor framework shipped in v1.2.0, and since v1.2.1 the two interceptor
-entries have distinct names:
+entries have distinct names. *Since 2.0.0* they are reverse-DNS identifiers:
 
-- `mcp-hangar-validator`
-- `mcp-hangar-mutator`
+- `io.mcp-hangar.validator`
+- `io.mcp-hangar.mutator`
+
+From v1.2.1 to v1.6.x they were `mcp-hangar-validator` and `mcp-hangar-mutator`.
 
 If your client still assumes one shared `mcp-hangar` name, it can overwrite one
 entry with the other or fail uniqueness validation.
@@ -73,16 +75,16 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
    {
      "interceptors": [
        {
-         "name": "mcp-hangar-validator",
-         "version": "1.6.0",
+         "name": "io.mcp-hangar.validator",
+         "version": "2.24.0",
          "type": "validator",
          "supportedEvents": ["tools/call", "tools/list"],
          "modes": ["audit", "enforce"],
          "trustBoundary": "host"
        },
        {
-         "name": "mcp-hangar-mutator",
-         "version": "1.6.0",
+         "name": "io.mcp-hangar.mutator",
+         "version": "2.24.0",
          "type": "mutator",
          "supportedEvents": ["tools/call"],
          "modes": ["enforce"],
@@ -119,8 +121,8 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
 
    ```json
    [
-     "mcp-hangar-mutator",
-     "mcp-hangar-validator"
+     "io.mcp-hangar.mutator",
+     "io.mcp-hangar.validator"
    ]
    ```
 
@@ -129,7 +131,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
    ```bash
    curl -s http://localhost:8000/interceptors/list | jq -e '
      any(.interceptors[];
-       .name == "mcp-hangar-validator" and
+       .name == "io.mcp-hangar.validator" and
        .type == "validator" and
        (.supportedEvents | index("tools/list")) and
        (.modes | index("audit"))
@@ -158,6 +160,16 @@ treat them as separate capabilities.
 The important client rule is: key interceptors by `name`, then validate the
 fields you care about (`type`, `supportedEvents`, and `modes`). Do not collapse
 all Hangar entries into a single hard-coded `mcp-hangar` record.
+
+The response above is the default shape. A client that negotiates the
+interceptor extension -- the header
+`MCP-Interceptor-Ext: io.modelcontextprotocol/interceptors`, or
+`?ext=io.modelcontextprotocol/interceptors` on the GET -- receives the newer
+shape instead: `type` is `validation` or `mutation`, events move into a
+`hooks` array with a `phase`, and `modes` becomes a single `mode`. In 2.24.0
+that shape still names the entries `mcp-hangar-validator` and
+`mcp-hangar-mutator`, so a client that reads both shapes must not assume one
+name per interceptor.
 
 ## Key Config Reference
 

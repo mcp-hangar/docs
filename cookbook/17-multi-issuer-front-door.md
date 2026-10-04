@@ -1,7 +1,7 @@
 # 17 -- Multi-Issuer Front Door
 
 > **Prerequisite:** [16 -- Front-Door Multi-Tenant](16-front-door-multi-tenant.md)
-> **You will need:** MCP Hangar 1.6.0, two OIDC issuers that mint JWTs with a `tenant_id` claim and `aud` set to your resource URI
+> **You will need:** MCP Hangar 1.6.0 or later, two OIDC issuers that mint JWTs with a `tenant_id` claim and `aud` set to your resource URI
 > **Time:** ~15 minutes
 > **Adds:** Multi-issuer OAuth trust, RFC 8707 resource-bound audience, RFC 9728 multi-issuer discovery
 
@@ -130,8 +130,9 @@ documented above but are inert until you remove `resource_uri`.
    curl -s http://localhost:8000/mcp \
      -H "Authorization: Bearer $ISSUER_A_JWT" \
      -H "Content-Type: application/json" \
+     -H "Accept: application/json, text/event-stream" \
      -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' \
-     | jq '.result.tools[].name'
+     | sed -n 's/^data: //p' | jq '.result.tools[].name'
    ```
 
    Expected output for `tenant:a` (allow_list of `charge`):
@@ -150,8 +151,9 @@ documented above but are inert until you remove `resource_uri`.
    curl -s http://localhost:8000/mcp \
      -H "Authorization: Bearer $ISSUER_B_JWT" \
      -H "Content-Type: application/json" \
+     -H "Accept: application/json, text/event-stream" \
      -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' \
-     | jq '.result.tools[].name'
+     | sed -n 's/^data: //p' | jq '.result.tools[].name'
    ```
 
    Expected output for `tenant:b` (allow_list of `charge`, `refund`):
@@ -181,6 +183,7 @@ documented above but are inert until you remove `resource_uri`.
 
    ```text
    HTTP/1.1 401 Unauthorized
+   {"error":"authentication_failed","message":"Untrusted JWT issuer","details":{"auth_method":"jwt"}}
    ```
 
    The request is rejected with a `401` (never a `500`) before the token reaches

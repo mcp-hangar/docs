@@ -18,79 +18,120 @@ Two environment variables control the compliance pipeline:
 | `MCP_COMPLIANCE_OUTPUT` | No | stderr | File path to write output. When unset, lines go to stderr for container log collection. |
 
 When `MCP_COMPLIANCE_FORMAT` is set, Hangar registers a second audit event
-handler that forwards `ToolInvocationCompleted`, `ToolInvocationFailed`, and
-`McpServerStateChanged` events to the chosen exporter. This handler runs
-independently of the OTLP audit exporter.
+handler that forwards `ToolInvocationCompleted`, `ToolInvocationFailed`,
+`ToolCallRefused`, and `McpServerStateChanged` events to the chosen exporter.
+This handler runs independently of the OTLP audit exporter. The records are
+typed `ToolInvocationCompleted`, `ToolInvocationFailed`, `ToolInvocationDenied`
+(a call a gate refused before it reached the upstream: tool access, approval,
+digest pin, L7), and `ProviderStateChanged`.
 
-Compliance exporters are included in the main `mcp_hangar` package since
-v1.3.0; no separate module or license key is required.
+Compliance exporters ship in the main `mcp_hangar` package; no separate module
+or license key is required.
+
+### Delivery failures
+
+The SIEM feed does not fail closed. Check for these at boot and in your log
+pipeline:
+
+- An unrecognised `MCP_COMPLIANCE_FORMAT` logs `unknown_compliance_format` at
+  warning and the gateway starts with no compliance export at all.
+- A record the exporter cannot write (for example, the directory in
+  `MCP_COMPLIANCE_OUTPUT` does not exist) is logged as `Failed to write ... line`
+  at error and dropped; the tool call is still served.
+
+A successful start logs `compliance_exporter_registered` with the format and
+output.
 
 ## Format reference
 
+The examples below are records written by core 2.24.0 for a call to `add` on a
+server named `math` by an API-key principal `user:developer`.
+
 ### CEF (Common Event Format)
 
+```text
+CEF:0|MCP Hangar|MCP Hangar|0.15.0|101|Tool Invocation Completed|1|rt=1791142564436 dvchost=mcp-hangar act=ToolInvocationCompleted cs1=math cs1Label=ProviderID suser=user:developer spriv=developer flexString1=math flexString1Label=RouteBackend cs5=add cs5Label=ToolName cn1=0.34 cn1Label=DurationMs
 ```
-CEF:0|MCP Hangar|MCP Hangar|1.6.0|100|ToolInvocationCompleted|5|...extensions...
-```
+
+Signature IDs: `101` completed, `102` failed, `103` denied, `202` state change.
+The device-version field is a fixed `0.15.0`, not the running release. A CEF
+state-change record names the server (`cs1`) but not the old and new state;
+the other three formats carry both.
 
 Compatible with ArcSight, Splunk, QRadar, and any CEF-aware SIEM.
 
 ### LEEF 2.0 (IBM QRadar)
 
-```
-LEEF:2.0|MCP Hangar|MCP Hangar|1.6.0|101|\tproto=tool\taction=add\t...
+```text
+LEEF:2.0|MCP Hangar|MCP Hangar|0.15.0|101|\tdevTime=Oct 04 2026 19:38:29\tproto=tool\tusrName=user:developer\trole=developer\taction=add\tduration=0.31\tsrc=math\trouteBackend=math
 ```
 
-Tab-delimited extensions following the LEEF 2.0 specification.
+Tab-delimited extensions following the LEEF 2.0 specification (`\t` above
+stands for a tab). Event IDs match the CEF signature IDs.
 
 ### JSON-lines
 
 ```json
-{"timestamp":"2026-05-10T12:00:00+00:00","event_type":"ToolInvocationCompleted","provider_id":"math","tool_name":"add",...}
+{"timestamp": "2026-10-04T19:38:33.384109+00:00", "event_type": "ToolInvocationCompleted", "provider_id": "math", "route_backend": "math", "tool_name": "add", "status": "success", "duration_ms": 0.31, "user_id": "user:developer", "caller_roles": "developer"}
 ```
 
-One JSON object per line. Fields include `event_type`, `provider_id`
-(legacy name for `mcp_server_id`), `tool_name`, `status`, `duration_ms`,
-and optional `caller_*` / `cost_*` fields.
+One JSON object per line; a field with no value is left out. Fields are listed
+under [Exported fields](#exported-fields).
 
 ### RFC 5424 syslog
 
-```
-<134>1 2026-05-10T12:00:00+00:00 mcp-hangar mcp-hangar - - - ToolInvocationCompleted ...
+```text
+<134>1 2026-10-04T19:38:37.282099Z gateway-host mcp-hangar 92463 101 [mcp@49152 provider="math" routeBackend="math" tool="add" status="success" duration="0.46" user="user:developer" roles="developer"] Tool add on provider math success
 ```
 
-Structured data follows RFC 5424. Suitable for rsyslog, syslog-ng, and
-Fluentd syslog inputs.
+Facility `local0`; severity informational for a completed call, error for a
+failed one, warning for a refusal or a state change. HOSTNAME is the gateway's
+host name, PROCID its process id, and MSGID the CEF signature ID. Suitable for
+rsyslog, syslog-ng, and Fluentd syslog inputs.
 
 ## Examples
+
+`serve --http` binds `0.0.0.0` by default, which refuses to start without
+authentication; the examples bind loopback for a local run with auth off.
+Create the output directory first (see [Delivery failures](#delivery-failures)).
 
 Start Hangar with CEF output to a file:
 
 ```bash
 MCP_COMPLIANCE_FORMAT=cef MCP_COMPLIANCE_OUTPUT=/var/log/mcp-hangar/cef.log \
-  mcp-hangar serve --http --port 8000
+  mcp-hangar serve --http --host 127.0.0.1 --port 8000 --config config.yaml
 ```
 
 JSON-lines to stderr (for Docker log drivers):
 
 ```bash
-MCP_COMPLIANCE_FORMAT=jsonlines mcp-hangar serve --http --port 8000
+MCP_COMPLIANCE_FORMAT=jsonlines mcp-hangar serve --http --host 127.0.0.1 --port 8000 --config config.yaml
 ```
 
 ## Exported fields
 
-Each tool invocation record includes:
+What each format writes for a tool-call record, by key. A field with no value is
+omitted.
 
-| Field | Source | Notes |
-| ------- | -------- | ------- |
-| `mcp_server_id` | Event | MCP server that handled the call |
-| `tool_name` | Event | Tool name |
-| `status` | Event | `success` or `error` |
-| `duration_ms` | Event | Call duration |
-| `caller_type` | Identity context | `human`, `agent`, `service`, `anonymous` |
-| `caller_id` | Identity context | Principal identifier |
-| `caller_roles` | Identity context | Comma-separated roles |
-| `cost_cents` | Cost attributor | Cost in hundredths of a cent (when configured) |
-| `cost_model` | Cost attributor | Pricing model: `token`, `duration`, `fixed`, `composite` |
-| `cost_input_tokens` | Cost attributor | Input tokens consumed |
-| `cost_output_tokens` | Cost attributor | Output tokens produced |
+| Field | JSON-lines | CEF | LEEF | syslog |
+| ------- | -------- | ------- | ------- | ------- |
+| MCP server the caller named | `provider_id` | `cs1` | `src` | `provider` |
+| Server the call was routed to (a group's member) | `route_backend` | `flexString1` | `routeBackend` | `routeBackend` |
+| Tool name | `tool_name` | `cs5` | `action` | `tool` |
+| Outcome: `success`, `error`, `denied` | `status` | `act` (event type) | event ID | `status` |
+| Call duration (ms) | `duration_ms` | `cn1` | `duration` | `duration` |
+| Caller principal | `user_id` | `suser` | `usrName` | `user` |
+| Role that authorized the call | `caller_roles` | `spriv` | `role` | `roles` |
+| Session | `session_id` | `cs3` | `sessID` | `session` |
+| Tenant | `tenant_id` | `cs6` | `tenantID` | `tenant` |
+| Upstream error | `error_type` | `reason` | `reason` | `error` |
+| Refusing gate and its reason code | `gate`, `gate_reason` | `gate`, `gateReason` | `gate`, `gateReason` | `gate`, `gateReason` |
+| L7 verdict, mode, rule kind, policy id | `l7_verdict`, `l7_mode`, `l7_rule_kind`, `l7_policy_id` | `l7Verdict`, `l7Mode`, `l7RuleKind`, `l7PolicyId` | same as CEF | same as CEF |
+
+State-change records carry `from_state` / `to_state` (JSON-lines), `oldState` /
+`newState` (LEEF), and `fromState` / `toState` (syslog).
+
+Not written by any of the four formats in 2.24.0, although the exporters accept
+them: caller type (`human`, `agent`, `service`, `anonymous`), caller id, and the
+cost-attribution fields (`cost_cents`, `cost_model`, `cost_input_tokens`,
+`cost_output_tokens`).

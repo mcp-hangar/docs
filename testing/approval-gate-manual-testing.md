@@ -12,7 +12,14 @@
 - Core **2.1.0+** (the routing and startup-check scenarios need **2.7.0+**)
 - Python 3.11+ with `uv` installed
 - `websocat` or any WebSocket client, for watching the notification stream
-- mcp-hangar checked out on `main`
+- mcp-hangar checked out at the release you are testing
+- On a `pip`/`uv` install, a WebSocket library for the gateway
+  (`uv pip install websockets`): without one, `/api/ws/events` is never
+  upgraded ([mcp-hangar#1676](https://github.com/mcp-hangar/mcp-hangar/issues/1676)).
+  The container image ships it.
+- With auth on, an API key per role you test, sent as `X-API-Key: $KEY`
+  (`Authorization: Bearer` carries an OIDC token, not an API key). The steps
+  below write `$KEY`; omit the header with auth off.
 - Optional: a delivery adapter, if you are testing a channel other than
   `event_stream`/`noop`
 
@@ -108,19 +115,25 @@ A tool on `deny_list` is always blocked -- even if also on `approval_list`.
 1. Start mcp-hangar:
 
    ```bash
-   cd mcp-hangar && uv run mcp-hangar
+   cd mcp-hangar && uv run mcp-hangar serve --http --host 127.0.0.1 --port 8000 --config config.yaml
    ```
+
+   A bare `uv run mcp-hangar` serves stdio, not HTTP, and ignores
+   `MCP_HTTP_HOST` ([mcp-hangar#1651](https://github.com/mcp-hangar/mcp-hangar/issues/1651)).
 
 2. In a second terminal, watch the notification stream — this is what the
    `event_stream` channel delivers on, and what a UI would subscribe to:
 
    ```bash
-   websocat ws://localhost:8080/api/ws/events \
-     -H "Authorization: Bearer $TOKEN"        # omit with auth off
+   websocat ws://localhost:8000/api/ws/events \
+     -H "X-API-Key: $KEY"        # omit with auth off
    ```
 
-   Send `{"type":"subscribe","event_types":["ToolApproval*"]}` on connect to
-   filter to approvals only.
+   Send `{"type":"subscribe","event_types":["ToolApprovalRequested","ToolApprovalGranted","ToolApprovalDenied","ToolApprovalExpired"]}`
+   on connect to filter to approvals only. Name the events exactly: a wildcard
+   is accepted only as a whole `/`-separated segment, so `ToolApproval*` is
+   dropped and the socket then delivers nothing. Send the message promptly --
+   the server waits up to five seconds for it before it starts streaming.
 
 3. From an MCP client (e.g. Claude Code), invoke a tool matching the
    `approval_list` pattern:
@@ -142,9 +155,10 @@ A tool on `deny_list` is always blocked -- even if also on `approval_list`.
 5. Approve it over REST, using the `approval_id` from the event:
 
    ```bash
-   curl -sX POST localhost:8080/api/approvals/0f2c…/resolve \
+   curl -sX POST localhost:8000/api/approvals/0f2c…/resolve \
      -H 'Content-Type: application/json' \
-     -d '{"approved": true}' | jq
+     -H "X-API-Key: $KEY" \
+     -d '{"decision": "approve"}' | jq
    ```
 
 6. Observe:
@@ -160,12 +174,14 @@ A tool on `deny_list` is always blocked -- even if also on `approval_list`.
 2. Resolve it with a reason:
 
    ```bash
-   curl -sX POST localhost:8080/api/approvals/<id>/resolve \
+   curl -sX POST localhost:8000/api/approvals/<id>/resolve \
      -H 'Content-Type: application/json' \
-     -d '{"approved": false, "reason": "not during freeze"}'
+     -H "X-API-Key: $KEY" \
+     -d '{"decision": "deny", "reason": "not during freeze"}'
    ```
 
-**Expected Result:** MCP client receives an error response with `error_code: "approval_denied"` and the deny reason.
+**Expected Result:** the call's result in the MCP client carries
+`error_type: "approval_denied"` and the deny reason as its `error`.
 
 ### 3.2b Armed and Unmanned (2.7.0+)
 
@@ -206,7 +222,7 @@ channel, and `channel` on the `ToolApprovalRequested` event matches. Before
 2. Invoke a tool matching `approval_list`
 3. Do NOT approve or deny -- wait for timeout
 
-**Expected Result:** After 10 seconds, MCP client receives error with `error_code: "approval_timeout"`, message "No response within timeout".
+**Expected Result:** After 10 seconds, the call's result carries `error_type: "approval_timeout"` and the error "No response within timeout". Resolving it afterwards answers `409` with `state: "expired"`.
 
 ### 3.4 Deny-List Override
 
@@ -231,7 +247,7 @@ channel, and `channel` on the `ToolApprovalRequested` event matches. Before
    connect_database(host="localhost", password="secret123", api_token="tok_abc")
    ```
 
-2. Read the record back: `curl -s localhost:8080/api/approvals/<id> | jq .arguments`
+2. Read the record back: `curl -s localhost:8000/api/approvals/<id> -H "X-API-Key: $KEY" | jq .arguments`
 
 **Expected Result:** Arguments show `password: "[REDACTED]"` and `api_token: "[REDACTED]"`, while `host` shows the actual value.
 
@@ -242,13 +258,13 @@ channel, and `channel` on the `ToolApprovalRequested` event matches. Before
 ### 4.1 List Pending Approvals
 
 ```bash
-curl -s http://localhost:8080/api/approvals?state=pending | jq
+curl -s http://localhost:8000/api/approvals?state=pending -H "X-API-Key: $KEY" | jq
 ```
 
 ### 4.2 Get Single Approval
 
 ```bash
-curl -s http://localhost:8080/api/approvals/{approval_id} | jq
+curl -s http://localhost:8000/api/approvals/{approval_id} -H "X-API-Key: $KEY" | jq
 ```
 
 ### 4.3 Approve via API
@@ -257,24 +273,24 @@ curl -s http://localhost:8080/api/approvals/{approval_id} | jq
 > principal holds `approval:resolve`. The `x-principal-id` header these steps
 > used to send no longer sets identity — it was never authentication, and a
 > client-supplied value landing in the provenance chain is what 2.0.0 removed.
-> Export `TOKEN` before running the calls below. On a gateway started with
-> `--unsafe-no-auth` the header is unnecessary and the decision is attributed
-> to the system principal.
+> Export `KEY` (an API key; send an OIDC token as `Authorization: Bearer`
+> instead) before running the calls below. On a gateway with auth off the
+> header is unnecessary and the decision is attributed to the system principal.
 
 
 ```bash
-curl -X POST http://localhost:8080/api/approvals/{approval_id}/resolve \
+curl -X POST http://localhost:8000/api/approvals/{approval_id}/resolve \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "X-API-Key: $KEY" \
   -d '{"decision": "approve"}'
 ```
 
 ### 4.4 Deny via API
 
 ```bash
-curl -X POST http://localhost:8080/api/approvals/{approval_id}/resolve \
+curl -X POST http://localhost:8000/api/approvals/{approval_id}/resolve \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "X-API-Key: $KEY" \
   -d '{"decision": "deny", "reason": "Not authorized for production"}'
 ```
 
@@ -285,12 +301,16 @@ After resolving once, send the same request again:
 ```bash
 # Should return 409 Conflict
 curl -s -o /dev/null -w "%{http_code}" -X POST \
-  http://localhost:8080/api/approvals/{approval_id}/resolve \
+  http://localhost:8000/api/approvals/{approval_id}/resolve \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: $KEY" \
   -d '{"decision": "approve"}'
 ```
 
-**Expected:** HTTP 409
+**Expected:** HTTP 409, body `{"error": "Approval already resolved", "state": "approved"}`.
+An unknown id answers `404`, a body without `decision: approve|deny` answers
+`400`, a missing credential `401`, and a principal without `approval:resolve`
+`403`.
 
 ---
 
@@ -345,21 +365,20 @@ intended behaviour, not a failure to debug.
 
 ### 6.1 Roles
 
-| Role | Can view approvals | Can resolve |
+| Role | Can view approvals (`approval:read`) | Can resolve (`approval:resolve`) |
 | ----------------- | ------------------- | ------------- |
-| mcp_server_admin | Yes | Yes |
+| admin | Yes | Yes |
+| provider-admin | Yes | Yes |
 | auditor | Yes | No |
 | viewer | No | No |
+| developer | No | No |
 
 ### 6.2 Test Steps
 
-1. Log in as `auditor` role
-2. Navigate to Approvals page -- should see pending requests
-3. Try to approve -- should be blocked (no `approval:resolve` permission)
-
-4. Log in as `mcp_server_admin`
-5. Navigate to Approvals page
-6. Approve/Deny -- should succeed
+1. With an `auditor` key, `GET /api/approvals?state=pending` -- returns the pending requests.
+2. With the same key, `POST /api/approvals/{id}/resolve` -- `403`, `no_matching_permission` on `approval:resolve`.
+3. With a `viewer` key, `GET /api/approvals` -- `403`.
+4. With a `provider-admin` key, approve or deny -- `200`, and `decided_by` on the record and on the `ToolApprovalGranted` / `ToolApprovalDenied` event names that principal.
 
 ---
 
@@ -374,14 +393,9 @@ After each approval action, verify events in the event store/log:
 | Deny | `ToolApprovalDenied` |
 | Timeout | `ToolApprovalExpired` |
 
-Check via:
-
-```bash
-# If event store exposed via API:
-curl -s http://localhost:8080/api/events?type=ToolApprovalRequested | jq
-```
-
-Or check server logs for `approval_id` entries.
+Check via the `/api/ws/events` socket from §3.1, or the server log, which
+records each one as a `domain_event` line with its `event_type`. There is no
+REST endpoint for reading the event store.
 
 ---
 
@@ -392,9 +406,9 @@ Run all approval-related tests:
 ```bash
 cd mcp-hangar
 
-# Unit tests (106 tests)
+# Unit tests (113 tests)
 uv run pytest tests/unit/domain/value_objects/test_tool_access_policy_approval.py \
-  tests/unit/enterprise/approvals/ -v
+  tests/unit/components/approvals/ -v
 
 # Integration tests (14 tests)
 uv run pytest tests/integration/test_approval_flow.py \
@@ -403,8 +417,8 @@ uv run pytest tests/integration/test_approval_flow.py \
 # Fuzz tests (serialization round-trip)
 uv run pytest tests/unit/test_event_serialization_fuzz.py -v
 
-# Enterprise boundary check
-bash scripts/check_enterprise_boundary.sh
+# Optional-component boundary check
+uv run pytest tests/unit/test_bootstrap_components_boundary.py -v
 ```
 
 ---
@@ -416,13 +430,13 @@ bash scripts/check_enterprise_boundary.sh
 - [ ] Timeout expires correctly
 - [ ] deny_list overrides approval_list
 - [ ] Sensitive args are redacted
-- [ ] REST API returns correct status codes (200, 400, 404, 409)
+- [ ] REST API returns correct status codes (200, 400, 401, 403, 404, 409)
 - [ ] Double resolve returns 409
 - [ ] A silent channel is reported at boot, and refuses it under `delivery.required`
 - [ ] Two policies with different `approval_channel` values route separately
 - [ ] Adapter notifications arrive (if one is installed)
-- [ ] The adapter's inbound half resolves through `POST /approvals/{id}/resolve`
-- [ ] mcp_server_admin can resolve, auditor can only view
+- [ ] The adapter's inbound half resolves through `POST /api/approvals/{id}/resolve`
+- [ ] provider-admin can resolve, auditor can only view, viewer cannot view
 - [ ] Domain events published for all transitions
 - [ ] Concurrent approvals do not interfere
 - [ ] All automated tests pass (unit + 14 integration)

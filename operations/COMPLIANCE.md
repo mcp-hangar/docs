@@ -124,7 +124,7 @@ omitted.
 | Role that authorized the call | `caller_roles` | `spriv` | `role` | `roles` |
 | Session | `session_id` | `cs3` | `sessID` | `session` |
 | Tenant | `tenant_id` | `cs6` | `tenantID` | `tenant` |
-| Upstream error | `error_type` | `reason` | `reason` | `error` |
+| Upstream error (the upstream JSON-RPC error code, e.g. `-1`) | `error_type` | `reason` | `reason` | `error` |
 | Refusing gate and its reason code | `gate`, `gate_reason` | `gate`, `gateReason` | `gate`, `gateReason` | `gate`, `gateReason` |
 | L7 verdict, mode, rule kind, policy id | `l7_verdict`, `l7_mode`, `l7_rule_kind`, `l7_policy_id` | `l7Verdict`, `l7Mode`, `l7RuleKind`, `l7PolicyId` | same as CEF | same as CEF |
 

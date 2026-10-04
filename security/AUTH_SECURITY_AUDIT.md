@@ -75,7 +75,7 @@ and approvals are in-core packages (`mcp_hangar.auth`, `mcp_hangar.approvals`).
 | Item | Status | Notes |
 | ------ | -------- | ------- |
 | API key hash-only storage | Pass | Raw keys are not persisted |
-| JWT algorithm-family validation | Pass | Mixed HS*/RS*/ES*/PS* families rejected |
+| JWT algorithm-family validation | Pass | The OIDC/JWKS validator accepts only `RS256` and `ES256`; `HS256` is accepted only by the static-secret validator, so families never mix |
 | Trusted proxy validation | Pass | Only configured proxies may influence forwarded source identity |
 | WebSocket origin validation | Pass | Performed before accept |
 | Shared auth logic across protocols | Pass | One core implementation reduces drift |

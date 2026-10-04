@@ -93,6 +93,12 @@ mcp_servers:
       approval_channel: event_stream    # optional; defaults to approvals.channel
 ```
 
+Give `hangar_call` a `timeout` longer than `approval_timeout_seconds` (its
+default is 60 s, its maximum 300 s). In 2.24.0 a batch timeout that fires during
+the hold cancels the call (`error_type: "CancellationError"`) once the hold
+ends, while the approval stays pending and can still be approved -- the tool
+then does not run.
+
 ### Policy Precedence
 
 | List | Effect |

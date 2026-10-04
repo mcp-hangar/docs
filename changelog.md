@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.2.22](https://github.com/mcp-hangar/docs/compare/v1.2.21...v1.2.22) (2026-10-04)
+
+
+### Changed
+
+* **architecture:** verify the architecture pages against 2.24.0 ([#407](https://github.com/mcp-hangar/docs/issues/407)) ([f43ca9e](https://github.com/mcp-hangar/docs/commit/f43ca9e76608f6313b476455c462f4212446f628))
+* **guides:** correct the startupTimeout and PrometheusRule notes ([#396](https://github.com/mcp-hangar/docs/issues/396)) ([fc802c8](https://github.com/mcp-hangar/docs/commit/fc802c8e03d5295a83559ddf32f0814071ab0eaa))
+* **guides:** re-run cookbook 18-21 against 2.24.0 ([#400](https://github.com/mcp-hangar/docs/issues/400)) ([d74d06d](https://github.com/mcp-hangar/docs/commit/d74d06d5d831dcfff023e429333910ace177addb))
+* **guides:** re-run cookbook 22-25 against 2.24.0 ([#402](https://github.com/mcp-hangar/docs/issues/402)) ([0abd0ff](https://github.com/mcp-hangar/docs/commit/0abd0ffc7a4dcb9021f947a8848dd83367c38b76))
+* **guides:** re-verify the governance guides against 2.24.0 ([#394](https://github.com/mcp-hangar/docs/issues/394)) ([724cda6](https://github.com/mcp-hangar/docs/commit/724cda6bb916191a458f49220d1a630198beec2b))
+* **guides:** record what cookbook 04 and 05 failover and balancing print ([#403](https://github.com/mcp-hangar/docs/issues/403)) ([1132b60](https://github.com/mcp-hangar/docs/commit/1132b6033b86ff7b8f6c96278023326adca6a846))
+* **guides:** run cookbook 02 and 03 drills on one background gateway ([#401](https://github.com/mcp-hangar/docs/issues/401)) ([4d6ffde](https://github.com/mcp-hangar/docs/commit/4d6ffde3f59b3f6cc07cac63976f5036786dc68a))
+* **guides:** verify cookbook 01 and 06-08 against 2.24.0 ([#399](https://github.com/mcp-hangar/docs/issues/399)) ([c4e194e](https://github.com/mcp-hangar/docs/commit/c4e194edc51edfe08ae09ffb92b36623156c7e66))
+* **guides:** verify cookbook recipes 09-17 against 2.24.0 ([#398](https://github.com/mcp-hangar/docs/issues/398)) ([202f94f](https://github.com/mcp-hangar/docs/commit/202f94f4db3dc4bf476e249d1da2c3dbf24ced44))
+* **guides:** verify getting-started pages against 2.24.0 ([#388](https://github.com/mcp-hangar/docs/issues/388)) ([bf2b2d8](https://github.com/mcp-hangar/docs/commit/bf2b2d887a617a25527ca60ec34a82d723a411b1))
+* **guides:** verify six guides against 2.24.0 ([#397](https://github.com/mcp-hangar/docs/issues/397)) ([9d1767b](https://github.com/mcp-hangar/docs/commit/9d1767b0e66d26e268b50b6fd23f300f1ba746bb))
+* **guides:** verify the alert and release runbooks against 2.24.0 ([#404](https://github.com/mcp-hangar/docs/issues/404)) ([7442524](https://github.com/mcp-hangar/docs/commit/74425245c8bc0af21d38fdbb60264884500a4650))
+* **guides:** verify the deployment and fleet guides against 2.24.0 ([#395](https://github.com/mcp-hangar/docs/issues/395)) ([96d6988](https://github.com/mcp-hangar/docs/commit/96d6988f0632524ce21f0d04ffc99edf8bb3803c))
+* **guides:** verify tracing diagnosis and OTel integrations against 2.24.0 ([#405](https://github.com/mcp-hangar/docs/issues/405)) ([4428b52](https://github.com/mcp-hangar/docs/commit/4428b52ea21b23889263de5fc65b979d8040e769))
+* **reference:** verify security and compliance pages against 2.24.0 ([#406](https://github.com/mcp-hangar/docs/issues/406)) ([7939742](https://github.com/mcp-hangar/docs/commit/79397426d383eb6262787132365ac840d4541edd))
+* **reference:** verify the CLI and hot-reload pages against 2.24.0 ([#389](https://github.com/mcp-hangar/docs/issues/389)) ([fe94fac](https://github.com/mcp-hangar/docs/commit/fe94fac11c75740a0347d3381369697b181b63f5))
+* **reference:** verify the configuration reference against 2.24.0 ([#390](https://github.com/mcp-hangar/docs/issues/390)) ([fa3c7b4](https://github.com/mcp-hangar/docs/commit/fa3c7b40e54dfbaf7bc9a96eaeb7e82198085e3d))
+* **reference:** verify the MCP tools reference against 2.24.0 ([#391](https://github.com/mcp-hangar/docs/issues/391)) ([48f77d0](https://github.com/mcp-hangar/docs/commit/48f77d08b9db48810d95979b982dc9769b82125f))
+* **reference:** verify the REST API pages against 2.24.0 ([#392](https://github.com/mcp-hangar/docs/issues/392)) ([b8914c4](https://github.com/mcp-hangar/docs/commit/b8914c4ce8cba58f41d9ac87bc8188494b7d3cc4))
+* **repo:** stop sending readers to the stale branch protection script ([#409](https://github.com/mcp-hangar/docs/issues/409)) ([37c3ccc](https://github.com/mcp-hangar/docs/commit/37c3ccc07564729c7056ec131721706f0dda9c0d))
+* **repo:** verify the contributor pages against the live repo settings ([#408](https://github.com/mcp-hangar/docs/issues/408)) ([89b30e8](https://github.com/mcp-hangar/docs/commit/89b30e8c221ef8ef3743527390a91a211ed391e1))
+
 ## [1.2.21](https://github.com/mcp-hangar/docs/compare/v1.2.20...v1.2.21) (2026-10-04)
 
 

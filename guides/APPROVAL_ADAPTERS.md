@@ -76,9 +76,7 @@ waiting, and `/api/ws/events` streams every domain event to any client holding
 ```
 
 So a UI that holds a socket open sees held calls in real time and resolves them
-over REST, with no adapter installed. The socket needs a WebSocket library in
-the gateway's environment: the container image installs `websockets`, a plain
-`pip install mcp-hangar` does not, and without one the upgrade is answered `404`. What `event_stream` does not do is reach
+over REST, with no adapter installed. What `event_stream` does not do is reach
 anywhere a socket cannot: a room, a phone, a queue. That is what an adapter is
 for.
 

@@ -42,9 +42,11 @@ permissive mode instead. This changed in 2.2.0; see the
 ## Fail-Closed Default
 
 The defining behavior of front-door mode is that a caller with **no tenant
-identity is denied every tool**, regardless of target. This check fires before
+identity is denied every back-end tool**, regardless of target. This check fires before
 any server-, group-, or member-level policy is evaluated, so an unauthenticated
-external caller can never reach a tool — not even through a group path.
+external caller can never reach a back-end tool — not even through a group path.
+The `hangar_*` management tools its role permits are still listed; they are
+authorized by role, not by tenant.
 
 Concretely, when the resolver is in `front_door` mode and the caller has no
 member/tenant (`member_id is None`), it returns a deny-all policy
@@ -317,8 +319,11 @@ headers:
     required: true      # default: false
 ```
 
-On, a `tools/call` on a modern protocol revision whose `Mcp-Param-*` headers
-could not be validated is answered with `HEADER_MISMATCH` (`-32020`) and the message "the request's
+On, a `tools/call` on a modern protocol revision carrying an `Mcp-Param-*`
+header that did not reach the selector as checked -- a skipped validation after
+a failed listing, a header the tool does not declare, a malformed sentinel, or
+any `Mcp-Param-*` header on `hangar_call`, which declares none -- is answered
+with `HEADER_MISMATCH` (`-32020`) and the message "the request's
 `Mcp-Param-*` headers could not be validated against its body", instead of being
 served. The code is a slight overstatement — we know nobody could check, not
 that the header disagrees — and it is still preferable to a Hangar-specific

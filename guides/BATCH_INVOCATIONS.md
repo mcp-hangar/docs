@@ -67,7 +67,7 @@ hangar_call(
 | `max_concurrency` | `int` | 10 | Maximum parallel workers (1-50) |
 | `timeout` | `float` | 60.0 | Global timeout for entire batch (1-300s) |
 | `fail_fast` | `bool` | False | If True, abort remaining calls on first error |
-| `max_attempts` | `int` | 1 | Total attempts per call including retries (1-10, default 1 = no retry) |
+| `max_attempts` | `int` | 1 | Total attempts per call including retries (1-10; the default 1 means no retry unless a `retry:` block is configured) |
 
 **Call specification:**
 
@@ -245,9 +245,10 @@ hangar_call(calls=[
 When `max_attempts > 1`:
 
 - Retries use exponential backoff
-- A `retry:` block in the configuration caps the attempts: a caller's
-  `max_attempts` can lower the configured count, never raise it (see
-  [Configuration](../reference/configuration.md#retry))
+- A `retry:` block in the configuration sets the attempts, and applies even
+  when the caller leaves `max_attempts` at its default of 1. A caller's
+  `max_attempts` of 2 or more can lower the configured count, never raise it
+  (see [Configuration](../reference/configuration.md#retry))
 - Only transient errors trigger retry (timeout, network errors, malformed JSON)
 - Permanent errors (validation, MCP server not found) do not retry
 - Each call retries independently within the batch

@@ -15,8 +15,7 @@ one shared config every time you switch. You also need a clear line for where
 
 This recipe gives you two complete, copy-pasteable profiles and the exact
 command to run each. Every config field, env var, command, and endpoint below
-is verified against MCP Hangar core **1.6.0** (last run on `1.6.2`); nothing it
-uses changed in 2.0.0, but it has not been re-run there.
+was last run end to end against MCP Hangar core 2.24.0.
 
 > **Neither profile is production-ready.** The dev profile has no auth. The
 > staging profile turns auth on but stops short of the production trust
@@ -84,10 +83,18 @@ curl -s http://127.0.0.1:8000/api/mcp_servers/math/tools
 
 The REST API starts, stops and inspects servers; it does not invoke tools.
 There is no `POST /api/mcp_servers/<id>/tools/<name>` route -- tool calls go
-through the MCP surface at `/mcp`, which needs the `initialize` handshake and
-the `Mcp-Session-Id` it returns, so drive those with an MCP client rather than
-a bare `curl`. The `/start` response lists the tools it found, which is the
-reproducible check at this stage. Confirm local event persistence survived the call:
+through the MCP surface at `/mcp`. The gateway keeps no MCP session, so a bare
+`curl` works without an `initialize` handshake; the answer is a Server-Sent
+Events stream, and the batch result is the text of its first content block:
+
+```bash
+curl -s http://127.0.0.1:8000/mcp -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"hangar_call",
+       "arguments":{"calls":[{"mcp_server":"math","tool":"add","arguments":{"a":2,"b":3}}]}}}' \
+  | sed -n 's/^data: //p' | jq -r '.result.content[0].text' | jq '.succeeded'   # -> 1
+```
+
+Confirm local event persistence survived the call:
 
 ```bash
 ls -l data/dev-events.db          # SQLite file exists and grows
@@ -171,7 +178,7 @@ production credential:
 
 ```bash
 # 1. Unauthenticated request is rejected
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/mcp_servers   # -> 401
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/mcp_servers/   # -> 401
 
 # 2. Mint the first key with the gateway stopped. `/api/auth/**` is admin-only
 #    with no carve-out, so an unauthenticated POST here answers 401.
@@ -181,7 +188,7 @@ mcp-hangar auth bootstrap-admin --config config.staging.yaml \
   --principal service:staging-smoke --key-name "Staging Smoke" --show-key
 
 # 3. Authenticated request succeeds
-curl -s -H "X-API-Key: <raw_key>" http://localhost:8000/api/mcp_servers   # -> 200
+curl -s -H "X-API-Key: <raw_key>" http://localhost:8000/api/mcp_servers/   # -> 200 (without the slash: 307)
 
 # 4. Reversible operation: start then stop a provider, no state left behind
 curl -s -H "X-API-Key: <raw_key>" -X POST http://localhost:8000/api/mcp_servers/math/start
@@ -234,11 +241,12 @@ profile, not the workload.
 ## Teardown & Secret Cleanup
 
 ```bash
-# Stop any running providers, then Ctrl-C the server
-curl -s -X POST http://localhost:8000/api/mcp_servers/math/stop
+# Stop any running providers, then Ctrl-C the server (staging needs the key)
+curl -s -H "X-API-Key: <raw_key>" -X POST http://localhost:8000/api/mcp_servers/math/stop
 
 # Revoke every API key you minted for the smoke test
-curl -s -H "X-API-Key: <raw_key>" http://localhost:8000/api/auth/keys        # list key_ids
+curl -s -H "X-API-Key: <raw_key>" \
+  "http://localhost:8000/api/auth/keys?principal_id=service:staging-smoke"   # list key_ids
 curl -s -H "X-API-Key: <raw_key>" -X DELETE http://localhost:8000/api/auth/keys/<key_id>
 
 # Clear the local event stores and unset any exported secrets

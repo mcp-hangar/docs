@@ -16,9 +16,20 @@ governance data flows through.
 
 ## MCP Attribute Taxonomy
 
-Every span, metric, and audit log emitted by Hangar carries MCP-specific attributes
-defined in `src/mcp_hangar/observability/conventions.py`. These attributes form a
-stable contract that partner backends consume without Hangar-specific plugins.
+Hangar's spans and audit records carry MCP-specific attributes defined in
+`src/mcp_hangar/observability/conventions.py`. These attributes form a stable
+contract that partner backends consume without Hangar-specific plugins.
+
+Not every key in the tables below is emitted. In 2.24.0 nothing sets
+`mcp.server.group_id`, `mcp.server.image`, `mcp.server.has_capabilities`,
+`mcp.server.enforcement_mode`, `mcp.tool.cold_start`, `mcp.tool.args_hash`,
+`mcp.tool.response_tokens`, `mcp.cost.currency`, `mcp.health.result`,
+`mcp.health.duration_ms`, or any `mcp.enforcement.*`, `mcp.audit.*`,
+`mcp.risk.*` or `mcp.behavioral.*` key: they are reserved names. `mcp.server.state`,
+`mcp.tool.status`, `mcp.tool.duration_ms`, `mcp.caller.roles`, `mcp.cost.*` and
+`gen_ai.usage.*` appear on audit records only. Refusals are described by
+`hangar.call.outcome`, `hangar.refusal.*` and `hangar.l7.*` instead: see the
+[tracing diagnosis runbook](../runbooks/tracing-diagnosis.md#explain-a-decision).
 
 ### MCP Server attributes
 
@@ -28,16 +39,16 @@ stable contract that partner backends consume without Hangar-specific plugins.
 | `hangar.route.backend` | string | The server the call was dispatched to: the selected group member, or on a standalone call the server itself. On `batch.call.<tool>`, `mcp_server.cold_start` and each `command.send.InvokeToolCommand`. Absent when no member was available |
 | `hangar.route.reason` | string | Why that backend, on `batch.call.<tool>`: `standalone`, `load_balanced`, `pinned`, `canary`, `canary_fallback`, `no_available_member` |
 | `mcp.server.mode` | string | Operational mode: `subprocess`, `docker`, `remote` |
-| `mcp.server.state` | string | Lifecycle state: `COLD`, `INITIALIZING`, `READY`, `DEGRADED`, `DEAD` |
+| `mcp.server.state` | string | Lifecycle state: `cold`, `initializing`, `ready`, `degraded`, `dead` |
 | `mcp.server.group_id` | string | MCP Server group membership |
 | `mcp.server.image` | string | Container image reference (docker mode) |
 | `mcp.server.has_capabilities` | string | Whether MCP server declares capabilities (`true`/`false`) |
 | `mcp.server.enforcement_mode` | string | Declared enforcement mode: `alert`, `block`, `quarantine` |
 
 The `hangar.route.*` attributes above and the `hangar.l7.*` attributes under
-[Enforcement attributes](#enforcement-attributes) are on `main`, unreleased after 2.23.0. In 2.23.0 and
+[Enforcement attributes](#enforcement-attributes) were added in 2.24.0. In 2.23.0 and
 earlier, `mcp_server.cold_start` and `command.send.InvokeToolCommand` carried the
-selected group member in `mcp.server.id`; they now carry the group, and the member
+selected group member in `mcp.server.id`; since 2.24.0 they carry the group, and the member
 is `hangar.route.backend`. The lifecycle spans `mcp_server.launch` and
 `mcp_server.startup_wait` still name the member they start. The
 [tracing diagnosis runbook](../runbooks/tracing-diagnosis.md#which-member-served-a-group-call)
@@ -49,7 +60,7 @@ shows how to read both.
 | ----------- | ------ | ------------- |
 | `gen_ai.tool.name` | string | Tool name as advertised by the MCP server |
 | `mcp.tool.duration_ms` | float | Call duration in milliseconds |
-| `mcp.tool.status` | string | Result: `success`, `error`, `timeout`, `blocked` |
+| `mcp.tool.status` | string | Result: `success`, `error`, or `denied` for a refused call (since 2.24.0) |
 | `mcp.tool.cold_start` | string | Whether this call triggered a cold start (`true`/`false`) |
 | `mcp.tool.args_hash` | string | Argument hash for audit (raw arguments are never exported) |
 | `mcp.tool.response_tokens` | int | Approximate token count of tool response |
@@ -167,7 +178,7 @@ scores are not populated in the current release.
 | `mcp_hangar_mcp_server_cold_start_seconds` | Histogram | Cold start duration (labels: `mcp_server`, `mode`) |
 | `mcp_hangar_mcp_server_cold_start_in_progress` | Gauge | Cold starts currently in progress (labels: `mcp_server`) |
 | `mcp_hangar_health_checks_total` | Counter | Total health checks |
-| `mcp_hangar_circuit_breaker_state` | Gauge | Circuit breaker state per MCP server |
+| `mcp_hangar_circuit_breaker_state` | Gauge | A group's circuit breaker state (labels: `mcp_server`, the group id; `state`: `closed`, `open`, `half_open`; 1 marks the current state) |
 | `mcp_hangar_capability_violations_total` | Counter | Total capability violations |
 | `mcp_hangar_cost_cents_total` | Counter | Total attributed cost in hundredths of a cent (labels: `mcp_server`, `tool`, `cost_model`) |
 | `mcp_hangar_cost_attributions_total` | Counter | Total cost attribution computations (labels: `mcp_server`, `tool`) |
@@ -218,12 +229,13 @@ with your production backend.
 - **Traces:** one trace per request. The governance span `batch.call.<tool>`
   carries `mcp.server.id`, `gen_ai.tool.name`, the caller attributes the bound
   identity has, one `hangar.gate.decision` event per gate, and
-  `hangar.call.outcome`. On `main`, it also carries the route
+  `hangar.call.outcome`. Since 2.24.0, it also carries the route
   (`hangar.route.*`) and any L7 verdict (`hangar.l7.*`). The upstream call is the CLIENT span `execute_tool <tool>`.
   The [tracing diagnosis runbook](../runbooks/tracing-diagnosis.md) shows the full
   span tree.
 - **Logs:** audit records under scope `mcp_hangar.audit`, for tool invocations
-  (`mcp.tool.status`, `mcp.tool.duration_ms`) and MCP server state transitions.
+  (`mcp.tool.status`, `mcp.tool.duration_ms`), refused calls included since 2.24.0,
+  and MCP server state transitions.
 - **Metrics:** not sent over OTLP. Prometheus scrapes Hangar's `/metrics` endpoint.
 
 ### Effective tracing configuration
@@ -240,7 +252,7 @@ in its own code. For each setting, the first source that is set wins:
 | Resource | `OTEL_RESOURCE_ATTRIBUTES` wins for every key. `deployment.environment` falls back to `MCP_ENVIRONMENT`, then `development`. `service.instance.id` falls back to the instance id that Hangar also stamps on domain events. |
 | Sampler | `OTEL_TRACES_SAMPLER`: `always_on`, `always_off`, `traceidratio`, `parentbased_always_on` (the default), `parentbased_always_off` or `parentbased_traceidratio`. Any other name logs `tracing_unknown_sampler` and uses the default. A ratio outside [0, 1] in `OTEL_TRACES_SAMPLER_ARG` logs `tracing_sampler_arg_invalid` and uses 1.0. |
 | On or off | `MCP_TRACING_ENABLED`, then `observability.tracing.enabled`, default `true`. |
-| Caller ids on spans | `MCP_TRACING_CALLER_IDS`, then `observability.tracing.caller_ids`, default `false`. Only when it is on does `batch.call.<tool>` carry `mcp.caller.id`, `mcp.user.id`, `mcp.agent.id` and `mcp.session.id`; caller type, tenant and correlation id are always there. On `main`, unreleased after 2.23.0; earlier releases set them unconditionally. |
+| Caller ids on spans | `MCP_TRACING_CALLER_IDS`, then `observability.tracing.caller_ids`, default `false`. Only when it is on does `batch.call.<tool>` carry `mcp.caller.id`, `mcp.user.id`, `mcp.agent.id` and `mcp.session.id`; caller type, tenant and correlation id are always there. Since 2.24.0; earlier releases set them unconditionally. |
 
 Current limitations:
 
@@ -260,7 +272,7 @@ Current limitations:
 **Supported versions.** The `mcp-hangar[opentelemetry]` extra requires
 `opentelemetry-api`, `opentelemetry-sdk` and `opentelemetry-exporter-otlp` at
 1.35.0 or later, the lowest release that installs beside the core dependencies.
-The lockfile and CI test 1.44.0. The container image installs these packages
+The lockfile pins 1.45.0; CI installs with pip, unpinned, so it tests the newest release. The container image installs these packages
 unpinned when it is built, so check the installed versions on a live install.
 
 **Without a collector.** Tracing is on by default and exports to
@@ -333,10 +345,10 @@ In the OpenLIT trace explorer, filter on MCP governance attributes:
 - **By MCP server:** `mcp.server.id = "math-server"`
 - **By tool:** `gen_ai.tool.name = "add"`
 - **By user:** `mcp.user.id = "alice"` (only with `MCP_TRACING_CALLER_IDS=true`)
-- **By enforcement action:** `mcp.enforcement.action = "block"`
-- **By violation type:** `mcp.enforcement.violation_type = "egress_undeclared"`
+- **By refusal:** `hangar.call.outcome = "deny"`, and the refusing gate in `hangar.refusal.gate`
+- **By L7 verdict:** `hangar.l7.verdict = "deny"`
 
-MCP Server lifecycle events (COLD, INITIALIZING, READY, DEGRADED, DEAD) appear as
+MCP Server lifecycle events (`cold`, `initializing`, `ready`, `degraded`, `dead`) appear as
 audit log records with `mcp.server.state` attributes.
 
 ---
@@ -350,8 +362,12 @@ handles governance observability.
 
 - **OTEL path:** Enforcement decisions, capability violations, MCP server lifecycle,
   audit trails. Exported via OTLP to any OTEL-compatible backend.
-- **Langfuse path:** Tool call input/output, token counts, user session traces.
-  Exported via the `LangfuseObservabilityAdapter`.
+- **Langfuse path:** in 2.24.0, enabling Langfuse builds the
+  `LangfuseObservabilityAdapter`, but nothing calls it (#1683): Hangar sends no
+  Langfuse traces, generations or scores of its own. What reaches Langfuse arrives
+  through the Langfuse SDK's own OpenTelemetry span processor, which the SDK may
+  attach to the tracer provider when its client is created. Which of Hangar's spans
+  it forwards is decided by the SDK and its version.
 
 **Example:** [`examples/langfuse/`](https://github.com/mcp-hangar/mcp-hangar/tree/main/examples/langfuse)
 
@@ -384,16 +400,12 @@ observability:
 
 ### How Hangar maps to Langfuse concepts
 
-| Langfuse concept | Hangar mapping |
-| ------------------ | ---------------- |
-| Trace | One MCP session (`mcp.session.id`) |
-| Span | MCP Server tool invocation |
-| Generation | Tool call with input/output |
-| User | `mcp.user.id` from identity propagation |
-
-When Hangar propagates caller identity, Langfuse traces carry the same `user_id`
-and `session_id` as the MCP OTEL spans. This enables cross-referencing Langfuse
-traces with governance enforcement events in OTEL backends.
+The adapter maps a tool invocation to a Langfuse span with its input and output
+(scrubbed to their keys by default), the caller to `user_id` and the MCP session
+to `session_id`. None of that is
+emitted in 2.24.0, because the adapter is not called (#1683). Spans that reach
+Langfuse through the SDK's OpenTelemetry processor carry the attributes described
+on this page, with caller identifiers only when `MCP_TRACING_CALLER_IDS` is on.
 
 ---
 
@@ -418,10 +430,11 @@ Prometheus and Grafana are yours to run — Hangar ships no stack. On Kubernetes
 `dashboards.enabled=true` renders the four as ConfigMaps for the Grafana
 sidecar to auto-import; elsewhere, import the JSON by hand from the link above.
 
-Start Hangar in HTTP mode so the `/metrics` endpoint is available:
+Start Hangar in HTTP mode so the `/metrics` endpoint is available. Without
+authentication, Hangar binds only to a loopback address:
 
 ```bash
-mcp-hangar serve --http --port 8000
+mcp-hangar serve --http --host 127.0.0.1 --port 8000
 ```
 
 ### Key Prometheus queries
@@ -436,8 +449,8 @@ histogram_quantile(0.95, rate(mcp_hangar_tool_call_duration_seconds_bucket[5m]))
 # MCP servers currently in DEGRADED state (3=degraded)
 mcp_hangar_mcp_server_state == 3
 
-# Circuit breaker open count
-mcp_hangar_circuit_breaker_state == 1
+# Groups whose circuit is open (one series per state; 1 marks the current one)
+mcp_hangar_circuit_breaker_state{state="open"} == 1
 ```
 
 ---

@@ -16,7 +16,7 @@ This runbook covers operational procedures for releasing MCP Hangar.
 ### Prerequisites
 
 - [ ] All CI checks passing on `main` branch
-- [ ] CHANGELOG.md updated with release notes
+- [ ] Every non-trivial PR merged since the last release added its fragment in `changelog.d/` (`CHANGELOG.md` is never edited by hand)
 - [ ] No blocking issues in milestone
 
 ### Procedure
@@ -30,12 +30,14 @@ git status  # Should be clean
 
 # Run full test suite
 uv run pytest tests/ -v
-uv run pre-commit run --all-files
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+uv run mypy src/
 ```
 
 #### Step 2: Initiate Release (Automated via release-please)
 
-Releases are driven by [release-please](https://github.com/googleapis/release-please). When Conventional Commit PRs merge to `main`, release-please opens a release PR that bumps the version and updates the changelog. Merging that PR triggers the release pipeline.
+Releases are driven by [release-please](https://github.com/googleapis/release-please) (`.github/workflows/release-please.yml`). When Conventional Commit PRs merge to `main`, release-please opens a release PR, `chore(release): release X.Y.Z`, that bumps `pyproject.toml`, `server.json` and `uv.lock`. The same workflow folds the `changelog.d/` fragments into a `CHANGELOG.md` section on that PR. Merging it makes release-please push the `vX.Y.Z` tag and create the GitHub Release, and the tag triggers the release pipeline.
 
 #### Step 3: Monitor Release Pipeline
 
@@ -43,9 +45,12 @@ After version tag is pushed, the Release workflow triggers automatically:
 
 1. **Validate** — Checks tag matches pyproject.toml
 2. **Test** — Runs full test matrix (Python 3.11-3.14)
-3. **Publish PyPI** — Builds and uploads to PyPI
-4. **Publish Docker** — Builds multi-arch images, pushes to GHCR
-5. **Create Release** — Creates GitHub Release with changelog
+3. **Smoke the wheel** — Builds the wheel, installs it in a clean venv and drives a real tool call, before anything is published
+4. **Publish PyPI** — Builds, attests and uploads to PyPI
+5. **Publish to MCP Registry** — Stable releases only; checks that `server.json` matches the tag
+6. **Publish Docker** — Builds multi-arch images (amd64, arm64), pushes to GHCR, signs them with cosign
+7. **Create Release** — Updates the GitHub Release with the changelog section, the wheel, the sdist and the provenance bundle
+8. **Smoke published** — Installs what PyPI serves and drives a tool call again
 
 Monitor at: `https://github.com/mcp-hangar/mcp-hangar/actions`
 
@@ -104,18 +109,15 @@ uv run pytest tests/ -v
 #### Step 3: Update Version and Changelog
 
 ```bash
-# Update pyproject.toml
-sed -i 's/version = ".*"/version = "X.Y.Z"/' pyproject.toml
+# Update the version everywhere the pipeline checks it. Anchored: an
+# unanchored pattern also rewrites ruff's target-version and mypy's python_version.
+perl -pi -e 's/^version = ".*"/version = "X.Y.Z"/' pyproject.toml
+perl -pi -e 's/"version": "[^"]*"/"version": "X.Y.Z"/' server.json   # both fields
+uv lock                                                                # mcp-hangar's own entry
 
-# Add hotfix entry to CHANGELOG.md
-cat >> CHANGELOG_HOTFIX.md << 'EOF'
-## [X.Y.Z] - YYYY-MM-DD
-
-### Fixed
-- Description of critical fix (#issue)
-EOF
-
-# Prepend to CHANGELOG.md after header
+# Add a `## [X.Y.Z] - YYYY-MM-DD` section, with a `### Fixed` entry, at the top
+# of the version sections in CHANGELOG.md: the release job copies that section
+# into the GitHub Release.
 ```
 
 #### Step 4: Tag and Push
@@ -154,12 +156,13 @@ PyPI doesn't allow re-uploading deleted versions. Instead:
 
 ### Docker Rollback
 
-1. **Update `latest` tag** to previous stable version:
+1. **Update `latest` tag** to previous stable version. Retag the multi-arch
+   manifest in the registry; `docker pull`, `tag` and `push` would republish
+   `latest` for one architecture only:
 
    ```bash
-   docker pull ghcr.io/mcp-hangar/mcp-hangar:X.Y.Z-1
-   docker tag ghcr.io/mcp-hangar/mcp-hangar:X.Y.Z-1 ghcr.io/mcp-hangar/mcp-hangar:latest
-   docker push ghcr.io/mcp-hangar/mcp-hangar:latest
+   docker buildx imagetools create -t ghcr.io/mcp-hangar/mcp-hangar:latest \
+     ghcr.io/mcp-hangar/mcp-hangar:X.Y.Z-1
    ```
 
 2. **Document the issue** in GitHub Release notes.
@@ -188,9 +191,10 @@ Error: Tests failed on Python 3.X
 
 1. Check test logs in Actions
 2. Reproduce locally: `uv run pytest tests/ -v --tb=long`
-3. Fix and push to main
-4. Delete failed tag: `git push origin :refs/tags/vX.Y.Z`
-5. Re-run Version Bump workflow
+3. A flaky failure: re-run the failed jobs of the Release run. PyPI publishing
+   uses `skip-existing`, so a re-run never fails on an upload that already happened.
+4. A real defect: fix it on `main` and release the next patch. Do not move the
+   tag: release-please has already created the GitHub Release for it.
 
 #### PyPI Publish Failure
 
@@ -219,8 +223,10 @@ Error: buildx failed for linux/arm64
 
 ### Version Mismatch
 
-```
-Error: Version mismatch! pyproject.toml: X.Y.Z, Git tag: X.Y.W
+```text
+Version mismatch!
+   pyproject.toml: X.Y.Z
+   Git tag: X.Y.W
 ```
 
 **Resolution:**

@@ -3,7 +3,8 @@
 Operational runbooks for the alerts shipped with MCP Hangar
 (`helm-charts` → `prometheusRule.enabled`, source in
 [`mcp-hangar/files/prometheus-alerts.yaml`](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/files/prometheus-alerts.yaml)).
-Each critical alert links here via its `runbook_url` annotation.
+Most alerts link here through their `runbook_url` annotation. `MCPHangarHighLatencyP99`
+and `MCPHangarHighLatencyByTool` carry none; their runbook is high-latency.
 
 | Runbook | Alerts |
 | --------- | -------- |
@@ -11,8 +12,8 @@ Each critical alert links here via its `runbook_url` annotation.
 | [high-error-rate](high-error-rate.md) | `MCPHangarHighErrorRate` |
 | [batch-failures](batch-failures.md) | `MCPHangarBatchHighFailureRate` |
 | [circuit-breaker](circuit-breaker.md) | `MCPHangarCircuitBreakerTripped` |
-| [provider-unhealthy](provider-unhealthy.md) | `MCPHangarProviderUnhealthy`, `MCPHangarProviderDegraded` |
-| [provider-dead](provider-dead.md) | `MCPHangarProviderDead`, `MCPHangarProviderNotSeenHealthy` |
+| [provider-unhealthy](provider-unhealthy.md) | `MCPHangarProviderDegraded` |
+| [provider-dead](provider-dead.md) | `MCPHangarProviderDead`, `MCPHangarProviderNotSeenHealthy` (its `runbook_url` points to provider-unhealthy) |
 | [health-failures](health-failures.md) | `MCPHangarHighConsecutiveFailures` |
 | [high-latency](high-latency.md) | `MCPHangarHighLatencyP95/P99/ByTool` |
 

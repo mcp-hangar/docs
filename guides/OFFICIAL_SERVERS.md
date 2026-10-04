@@ -50,8 +50,7 @@ The simplest, and the right default when Hangar runs on a host with `npx` or
 mcp_servers:
   filesystem:
     mode: subprocess
-    command: [npx, -y, "@modelcontextprotocol/server-filesystem"]
-    args: ["/absolute/path/to/sandbox"]
+    command: [npx, -y, "@modelcontextprotocol/server-filesystem", "/absolute/path/to/sandbox"]
     idle_ttl_s: 300
 
   time:
@@ -62,6 +61,9 @@ mcp_servers:
 
 Not available inside the published Hangar image: it is `python:3.14-slim` plus
 the wheel, with no node and no `uv`.
+
+A subprocess server takes its arguments in `command`; `args:` is read only for
+container servers.
 
 ### Remote -- something else runs it
 

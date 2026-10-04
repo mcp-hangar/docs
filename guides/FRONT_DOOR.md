@@ -26,7 +26,7 @@ tool_access:
 | --- | --- | --- |
 | Caller trust | Trusted internal callers | Untrusted external agents |
 | Caller without a tenant identity | Allowed (server-level policy applies) | **Denied** (fail-closed) |
-| Tool surface exposed to clients | Full `hangar_*` meta-API | Flat per-tenant backend tool names |
+| Tool surface exposed to clients | Full `hangar_*` meta-API | Flat per-tenant backend tool names, beside the `hangar_*` tools the caller's role permits |
 | Use case | Internal control plane / proxy | Public or multi-tenant front door |
 
 If `tool_access.mode` is absent, Hangar uses `egress`, so an upgrade never
@@ -69,6 +69,7 @@ class CallerIdentity:
     session_id: str | None
     principal_type: PrincipalType = "anonymous"
     tenant_id: str | None = None
+    roles: tuple[str, ...] = ()
 ```
 
 The JWT claim that maps to `tenant_id` is configurable and defaults to
@@ -135,9 +136,9 @@ withdrawn if either says so.
 
 ### Runtime withdrawal (REST API)
 
-Two admin endpoints withdraw and restore a tool at runtime. Both require the
-admin permission (the `lifecycle` action on the `mcp_servers` resource) and
-publish a domain event (`ToolWithdrawn` / `ToolRestored`).
+Two endpoints withdraw and restore a tool at runtime. Both require
+`mcp_servers:lifecycle`, which the built-in `admin` and `developer` roles hold,
+and publish a domain event (`ToolWithdrawn` / `ToolRestored`).
 
 | Method | Path | Description |
 | -------- | ------ | ------------- |
@@ -146,7 +147,10 @@ publish a domain event (`ToolWithdrawn` / `ToolRestored`).
 
 Both accept an optional JSON body with a `tenant_id`. Omitting it (or sending
 `null`) withdraws/restores **globally for all tenants**; providing one scopes
-the action to that tenant.
+the action to that tenant. A caller whose grant is tenant-scoped acts on its own
+tenant only: omitting `tenant_id` means that tenant, and naming another is a
+`403`. The body may also carry `kind` -- `tool` (the default), `prompt` or
+`resource`.
 
 ```bash
 # Withdraw "refund" from the "payments" server for one tenant
@@ -157,7 +161,7 @@ curl -X POST http://localhost:8000/api/admin/tools/payments/refund/withdraw \
 ```
 
 ```json
-{"withdrawn": true, "mcp_server": "payments", "tool": "refund", "tenant_id": "tenant:a"}
+{"withdrawn": true, "mcp_server": "payments", "tool": "refund", "kind": "tool", "tenant_id": "tenant:a"}
 ```
 
 `restore` affects only the runtime overlay. A config-declared withdrawal
@@ -313,12 +317,15 @@ headers:
     required: true      # default: false
 ```
 
-On, a `tools/call` whose `Mcp-Param-*` headers could not be validated is
-answered with `HEADER_MISMATCH` (`-32020`) and the message "the request's
+On, a `tools/call` on a modern protocol revision whose `Mcp-Param-*` headers
+could not be validated is answered with `HEADER_MISMATCH` (`-32020`) and the message "the request's
 `Mcp-Param-*` headers could not be validated against its body", instead of being
 served. The code is a slight overstatement — we know nobody could check, not
 that the header disagrees — and it is still preferable to a Hangar-specific
 third code for one client-visible class.
+
+A handshake-era request (protocol `2025-11-25` and earlier) is not refused: it is
+served, and its `Mcp-Param-*` headers are ignored, so they decide no verdict.
 
 The block is **global**, not per-server: the condition it reacts to is a failed
 listing on *this request*, not a property of the upstream the call would reach.
@@ -343,9 +350,10 @@ already a `-32601`, `legacy_protocol` is an era rather than a failure, and
 
 In `egress` mode, clients see Hangar's `hangar_*` meta-API (`hangar_list`,
 `hangar_status`, etc.) and call back-end tools through it. In `front_door`
-mode, external agents instead see **only the flat back-end tool names** (for
-example `read_item`) — the clean tool surface they expect, with the meta-API
-hidden.
+mode, external agents see the **flat back-end tool names** (for example
+`read_item`) and call them directly. The `hangar_*` tools stay listed beside
+them, filtered to what the caller's role may call: a `viewer` sees fewer than a
+`developer`, and a `developer` fewer than an `admin`.
 
 This is done by re-registering the low-level `tools/list` and `tools/call`
 handlers when the topology mode is `front_door`. Each request builds a
@@ -353,6 +361,12 @@ per-tenant `flat_name → (mcp_server, tool)` map, filtered to tools that are:
 
 1. active (not withdrawn) for the caller's tenant, and
 2. allowed for that tenant by the member-scope policy.
+
+A flat `tools/call` checks the caller's `tool:invoke` permission, as
+`hangar_call` does. A caller without it -- one holding only `viewer`, for
+example -- still sees the flat names its tenant may use, and calling one is a
+tool error reading `Not authorized to invoke tool '<tool>': tool:invoke
+permission required`.
 
 If two different back-end servers expose the same flat tool name, **both are
 dropped** and a `flat_tool_name_collision` warning is logged — Hangar will not

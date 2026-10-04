@@ -76,7 +76,9 @@ waiting, and `/api/ws/events` streams every domain event to any client holding
 ```
 
 So a UI that holds a socket open sees held calls in real time and resolves them
-over REST, with no adapter installed. What `event_stream` does not do is reach
+over REST, with no adapter installed. The socket needs a WebSocket library in
+the gateway's environment: the container image installs `websockets`, a plain
+`pip install mcp-hangar` does not, and without one the upgrade is answered `404`. What `event_stream` does not do is reach
 anywhere a socket cannot: a room, a phone, a queue. That is what an adapter is
 for.
 
@@ -318,13 +320,13 @@ async def handle_slack_callback(
         response.raise_for_status()
 ```
 
-`mint_hangar_token_for` is yours to implement, and it is where the security of this integration actually lives. It must establish that this Slack user corresponds to a Hangar principal holding `approval:resolve` — an OIDC exchange, a mapping table, whatever your identity story is. **Do not mint a single shared service token for every approver**: the audit trail would then record one identity for every decision, which is exactly the attribution problem this design removes.
+`mint_hangar_token_for` is yours to implement, and it is where the security of this integration actually lives. The `Bearer` header above carries a JWT from an issuer Hangar trusts; if the approver's credential is a Hangar API key instead, send it as `X-API-Key`, because an API key in `Authorization: Bearer` is refused with `401`. It must establish that this Slack user corresponds to a Hangar principal holding `approval:resolve` — an OIDC exchange, a mapping table, whatever your identity story is. **Do not mint a single shared service token for every approver**: the audit trail would then record one identity for every decision, which is exactly the attribution problem this design removes.
 
 ## Testing an adapter
 
 Test the signature verification against known-good and tampered payloads, including a stale timestamp — that is the part core no longer checks for you.
 
-Hangar's own test for the registry ([`test_delivery_registry.py`](https://github.com/mcp-hangar/mcp-hangar/blob/mcp2/tests/unit/components/approvals/test_delivery_registry.py)) shows how a channel is resolved and what happens when one fails to load; it is a useful template for asserting that your entry point is discovered.
+Hangar's own test for the registry ([`test_delivery_registry.py`](https://github.com/mcp-hangar/mcp-hangar/blob/main/tests/unit/components/approvals/test_delivery_registry.py)) shows how a channel is resolved and what happens when one fails to load; it is a useful template for asserting that your entry point is discovered.
 
 ## See also
 

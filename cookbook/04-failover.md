@@ -7,7 +7,7 @@
 
 ## The Problem
 
-Circuit breaker from recipe 03 saved you from wasting 30 seconds per failed call. But the agent still got nothing. Zero results. The circuit opened, requests failed fast, and your agent couldn't complete its task. Protection is great, but errors are still errors.
+Recipe 03 took the failing server out of rotation and saved you from waiting out a timeout on every call. But the agent still got nothing. Zero results. Requests were refused fast, and your agent couldn't complete its task. Protection is great, but errors are still errors.
 
 Your single MCP server is one crash away from downtime. What if there was a second MCP server ready to answer while the primary recovers?
 
@@ -19,6 +19,9 @@ ports:
 ```bash
 # Build the test MCP server (skip if already built in recipe 01)
 docker build -t mcp-math:latest examples/provider_math/
+
+# The recipe 01-03 container holds port 8080; remove it first
+docker rm -f mcp-math
 
 # Terminal 1: Primary server on port 8080
 # Both upstreams serve streamable-http on 8080. On an image built before
@@ -77,49 +80,56 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
 ## Try It
 
-1. Start Hangar with the new config
+1. Restart the background Hangar on the new config
 
    ```bash
+   kill %1    # the Hangar from recipe 03, if it still runs
    mcp-hangar --config ~/.config/mcp-hangar/config.yaml serve \
-     --log-file /tmp/hangar-failover.log &
+     --http --host 127.0.0.1 --port 8000 --log-file /tmp/hangar-failover.log &
+   sleep 5
+   grep -E 'group_loaded|Added member' /tmp/hangar-failover.log
    ```
 
    ```
-   INFO     group_loaded group_id=my-mcp-group member_count=2 strategy=priority
-   INFO     Added member my-mcp to group my-mcp-group (weight=1, priority=1)
-   INFO     Added member my-mcp-backup to group my-mcp-group (weight=1, priority=2)
+   {"event": "Added member my-mcp to group my-mcp-group (weight=1, priority=1)", ...}
+   {"event": "Added member my-mcp-backup to group my-mcp-group (weight=1, priority=2)", ...}
+   {"group_id": "my-mcp-group", "member_count": 2, "strategy": "priority", "event": "group_loaded", ...}
    ```
 
 2. Check group status - both members healthy
 
    ```bash
-   tail -20 /tmp/hangar-failover.log | grep -E "member|health|rotation"
+   /tmp/hangar-call.sh hangar_group_list | grep -E '"id"|"state"|in_rotation'
    ```
 
    ```
-   (log output showing both members initialized and group ready)
+         "state": "healthy",
+         "members_in_rotation_count": 2,
+             "id": "my-mcp",
+             "state": "ready",
+             "in_rotation": true,
+             "id": "my-mcp-backup",
+             "state": "ready",
+             "in_rotation": true,
    ```
 
-   Both MCP servers in rotation. Primary (priority 1) will handle requests.
+   Both MCP servers in rotation; the group started them when it loaded.
+   Primary (priority 1) will handle requests.
 
 3. Call a tool through the group - succeeds via primary
 
    ```bash
-   (
-     echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
-     sleep 0.5
-     echo '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
-     sleep 0.5
-     echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}},"id":2}'
-     sleep 3
-   ) | mcp-hangar --config ~/.config/mcp-hangar/config.yaml serve 2>&1 | grep -E '"id":2|selected_member'
+   /tmp/hangar-call.sh hangar_call '{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}' | grep '"success"' | head -1
+   curl -s http://localhost:8000/metrics | grep '^mcp_hangar_tool_calls_total'
    ```
 
-   ```json
-   {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"..."}]}}
+   ```
+     "success": true,
+   mcp_hangar_tool_calls_total{mcp_server="my-mcp",status="success",tool="add"} 1.0
    ```
 
-   Call succeeded. Traffic routed to primary (priority 1).
+   Call succeeded. Traffic routed to primary (priority 1): each call is
+   counted against the member that served it.
 
 4. Kill the primary server
 
@@ -129,61 +139,75 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Primary is now dead. Backup still running.
 
-5. Wait for health check to detect failure
+5. Call the same tool four times
 
    ```bash
-   echo "Waiting 40 seconds for health detection..."
-   sleep 40
-   tail -10 /tmp/hangar-failover.log | grep -E "health|rotation|degraded"
+   for i in 1 2 3 4; do
+     /tmp/hangar-call.sh hangar_call '{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}' | grep '"error"' | head -1
+   done
    ```
 
    ```
-   WARNING  health_check_failed: my-mcp, error=Connection refused
-   WARNING  health_check_failed: my-mcp, error=Connection refused
-   WARNING  health_check_failed: my-mcp, error=Connection refused
-   (primary removed from rotation after max consecutive failures)
+         "error": "connection_failed: [Errno 61] Connection refused",
+         "error": "connection_failed: [Errno 61] Connection refused",
+         "error": null,
+         "error": null,
    ```
 
-   Primary out of rotation. Backup takes over.
+   The first two calls still went to the primary and failed: a call is not
+   retried on another member. Two failures in a row
+   (`health.unhealthy_threshold`, 2 by default) took the primary out of
+   rotation, and the next two calls were served by the backup.
 
-6. Call the same tool - succeeds via backup
+   Health checks do not speed this up for a stopped server on 2.24.0: the
+   refused connection is logged as `background_task_failed` instead of
+   counting as a failed check (recipe 02, step 5). A hung primary is caught by
+   either: calls that time out, or three failed health checks.
+
+6. Confirm where traffic goes now
 
    ```bash
-   (
-     echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
-     sleep 0.5
-     echo '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
-     sleep 0.5
-     echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}},"id":2}'
-     sleep 3
-   ) | mcp-hangar --config ~/.config/mcp-hangar/config.yaml serve 2>&1 | grep -E '"id":2|selected_member'
+   /tmp/hangar-call.sh hangar_group_list | grep -E '"id"|in_rotation|consecutive'
+   curl -s http://localhost:8000/metrics | grep '^mcp_hangar_tool_calls_total'
    ```
 
-   ```json
-   {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"..."}]}}
+   ```
+         "members_in_rotation_count": 1,
+             "id": "my-mcp",
+             "in_rotation": false,
+             "consecutive_failures": 2
+             "id": "my-mcp-backup",
+             "in_rotation": true,
+             "consecutive_failures": 0
+   mcp_hangar_tool_calls_total{mcp_server="my-mcp",status="success",tool="add"} 1.0
+   mcp_hangar_tool_calls_total{mcp_server="my-mcp",status="error",tool="add"} 2.0
+   mcp_hangar_tool_calls_total{mcp_server="my-mcp-backup",status="success",tool="add"} 2.0
    ```
 
-   Call succeeded. Same request, same result, different MCP server. Zero downtime.
+   Same request, same result, different MCP server.
 
 7. Restart primary and verify failback
 
    ```bash
-   # Restart primary
    docker start mcp-primary
 
-   # Wait for recovery
-   echo "Waiting 40 seconds for primary recovery..."
-   sleep 40
+   echo "Waiting about three minutes for primary recovery..."
+   sleep 200
 
-   # Check logs
-   tail -10 /tmp/hangar-failover.log | grep -E "health|rotation|ready"
+   grep -E 'degraded_by_health_check|added back to rotation|recovered successfully' /tmp/hangar-failover.log
    ```
 
    ```
-   (log output showing primary health check passed and MCP server returning to ready state)
+   {"event": "mcp_server_degraded_by_health_check: my-mcp", ...}
+   {"event": "Member my-mcp added back to rotation", ...}
+   {"event": "McpServer my-mcp recovered successfully after 1 retries", ...}
    ```
 
-   Primary recovered and back in rotation. Will reclaim traffic (priority 1 < priority 2).
+   The restarted primary does not know Hangar's MCP session any more, so the
+   health checks that reach it now fail with a JSON-RPC error (`error_type=-32600`, `-32000`, ...).
+   The third failure degrades it, Hangar retries the start, the retry
+   reconnects with a new session, and the member is back in rotation. Primary
+   recovered and back in rotation. Will reclaim traffic (priority 1 < priority 2).
 
    If the primary was down long enough for Hangar to give up on it, it reads `dead` (`[DEAD]` in `hangar_status`). Health checks skip a dead server and the group does not route to it, so it does not come back by itself. Call `hangar_start` on `my-mcp`, and it rejoins rotation once the start succeeds.
 
@@ -198,9 +222,9 @@ The `priority` load balancing strategy always routes traffic to the lowest-numbe
 **Failover flow:**
 
 1. **Normal operation**: Primary (priority 1) handles all requests. Backup is healthy but idle.
-2. **Primary fails**: Health checks detect failure after 3 consecutive misses (~90 seconds).
+2. **Primary fails**: Two failed calls in a row (`health.unhealthy_threshold`), or a failed health check, mark the member unhealthy. The calls that fail are not retried on the backup.
 3. **Failover**: Primary removed from rotation. Group selects next lowest priority → backup (priority 2) takes over.
-4. **Recovery**: Primary health checks succeed. Primary added back to rotation.
+4. **Recovery**: A success from the primary -- a completed start, a passing health check -- adds it back to rotation.
 5. **Failback**: Group selects lowest priority again → primary (priority 1) reclaims traffic.
 
 **Layer cake architecture:**
@@ -209,7 +233,7 @@ The `priority` load balancing strategy always routes traffic to the lowest-numbe
 - **Recipe 03 (Circuit Breaker)**: Per-group failure tracking; a failing member leaves rotation
 - **Recipe 04 (Failover)**: Inter-MCP server routing changes based on health
 
-Both MCP servers have their own health checks and circuit breakers. The group orchestrates between them. When the primary fails, its circuit may open AND health checks fail AND the group removes it from rotation. Multiple layers of protection working together.
+Both MCP servers have their own health checks; the circuit breaker belongs to the group, not to either server. The group orchestrates between them. When the primary fails, the group removes it from rotation, its failures count toward the group's circuit, and its health checks keep watching it. Multiple layers of protection working together.
 
 **min_healthy: 1** means the group requires at least 1 healthy member to stay operational. If both fail, the group itself becomes unavailable.
 
@@ -217,7 +241,7 @@ Both MCP servers have their own health checks and circuit breakers. The group or
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
-| `mcp_servers.<name>.strategy` | string | — | Routing strategy. Use `priority` for failover |
+| `mcp_servers.<name>.strategy` | string | `round_robin` | Routing strategy. Use `priority` for failover |
 | `mcp_servers.<name>.members[].id` | string | — | MCP Server ID (must exist in `mcp_servers:` section) |
 | `mcp_servers.<name>.members[].priority` | int | `1` | Routing priority (lower number = higher priority) |
 | `mcp_servers.<name>.members[].weight` | int | `1` | Weight for weighted strategies (not used with priority) |

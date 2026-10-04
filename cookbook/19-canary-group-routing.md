@@ -44,6 +44,9 @@ auth:                                     # from recipe 16: validate JWTs, set t
     audience: mcp-hangar
     resource_uri: https://hangar.example.com
     tenant_claim: tenant_id              # JWT claim -> CallerIdentity.tenant_id
+  role_assignments:                       # a validated JWT grants no permission by itself
+    - principal: "group:agents"           # matched against the token's `groups` claim
+      role: service-account               # may invoke tools; without a role every call is refused
 
 mcp_servers:
   search:
@@ -87,16 +90,19 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
 
 1. Call as a pinned tenant (`tenant:beta` -> search-v2)
 
-   Obtain a JWT from your IdP whose `tenant_id` claim is `tenant:beta`, then call
-   a tool on the `search` group. `tenant:beta` is pinned to `search-v2`, so the
-   call always lands on the new version regardless of `split_pct` or weights.
+   Obtain a JWT from your IdP whose `tenant_id` claim is `tenant:beta` (and
+   whose `groups` claim includes `agents`), then call a tool on the `search`
+   group. `tenant:beta` is pinned to `search-v2`, so the call always lands on
+   the new version regardless of `split_pct` or weights. The response is a
+   Server-Sent Events stream, so strip the `data:` prefix before `jq`; the tool's
+   own output is the text of the first content block:
 
    ```bash
    curl -s http://localhost:8000/mcp \
      -H "Authorization: Bearer $TENANT_BETA_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"version","arguments":{}},"id":1}' \
-     | jq '.result'
+     | sed -n 's/^data: //p' | jq -r '.result.content[0].text'
    ```
 
    The cleanest way to observe which member served the call is to have the tool
@@ -104,7 +110,9 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
    backend):
 
    ```json
-   {"version": "search-v2"}
+   {
+     "version": "search-v2"
+   }
    ```
 
    If your backends do not expose a version tool, watch the Hangar logs instead.
@@ -127,13 +135,15 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
      -H "Authorization: Bearer $TENANT_LEGACY_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"version","arguments":{}},"id":1}' \
-     | jq '.result'
+     | sed -n 's/^data: //p' | jq -r '.result.content[0].text'
    ```
 
    Expected output:
 
    ```json
-   {"version": "search-v1"}
+   {
+     "version": "search-v1"
+   }
    ```
 
    Explicit pins always win, in either direction -- use them to opt a partner
@@ -147,30 +157,35 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
    each lands.
 
    ```bash
-   for t in tenant:001 tenant:002 tenant:003 tenant:004 tenant:005; do
+   for t in tenant:004 tenant:005 tenant:006 tenant:007 tenant:008; do
      jwt=$(mint-jwt --tenant "$t")        # your IdP / test helper
      ver=$(curl -s http://localhost:8000/mcp \
        -H "Authorization: Bearer $jwt" \
        -H "Content-Type: application/json" \
        -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"version","arguments":{}},"id":1}' \
-       | jq -r '.result.version')
+       | sed -n 's/^data: //p' | jq -r '.result.content[0].text | fromjson | .version')
      echo "$t -> $ver"
    done
    ```
 
    Expected output (which specific tenants land on the canary depends on their
-   IDs, not on call order):
+   IDs, not on call order -- `tenant:006` hashes to bucket `6`, the others to
+   `21`, `71`, `79` and `66`):
 
    ```text
-   tenant:001 -> search-v1
-   tenant:002 -> search-v2
-   tenant:003 -> search-v1
    tenant:004 -> search-v1
    tenant:005 -> search-v1
+   tenant:006 -> search-v2
+   tenant:007 -> search-v1
+   tenant:008 -> search-v1
    ```
 
-   The key property is **determinism**: rerun the loop and every tenant lands on
-   the same version as before. Hangar buckets a tenant with
+   The key property is **determinism for the canary slice**: rerun the loop and
+   `tenant:006` lands on `search-v2` every time. The other four are not sticky.
+   They go to the load balancer on every call, and `weighted_round_robin` gives
+   `search-v2` its weight of `10` there too, so roughly one call in ten from a
+   tenant outside the split also reaches the canary, and a rerun can show one of
+   them on `search-v2`. Hangar buckets a tenant with
    `SHA-256(tenant_id) % 100` and routes to the canary when the bucket is less
    than `split_pct` (so `split_pct: 10` means buckets `0`--`9`). Because it uses a
    stable hash rather than the process-local `hash()`, the same tenant lands in
@@ -187,23 +202,29 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
      -H "Authorization: Bearer $TENANT_BETA_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"version","arguments":{}},"id":1}' \
-     | jq '.result'
+     | sed -n 's/^data: //p' | jq -r '.result.content[0].text'
    ```
 
-   Even though `tenant:beta` is pinned to `search-v2`, the call is now served by
-   the load balancer -- which picks the only healthy member, `search-v1`:
+   The first calls after `search-v2` goes away still reach it and fail
+   (`connection_failed: [Errno 61] Connection refused`, as a tool error), because
+   a member leaves rotation only once its failures are counted. After that, even
+   though `tenant:beta` is pinned to `search-v2`, the call is served by the load
+   balancer -- which picks the only healthy member, `search-v1`:
 
    ```json
-   {"version": "search-v1"}
+   {
+     "version": "search-v1"
+   }
    ```
 
-   Hangar emits an illustrative fallback warning:
+   Hangar logs the fallback as a warning:
 
    ```text
-   WARNING canary target search-v2 not in rotation; falling back to load balancer
+   {"group_id": "search", "tenant_id": "tenant:beta", "target": "search-v2",
+    "event": "canary_target_unavailable_fallback_lb", "level": "warning", ...}
    ```
 
-   (Message text is illustrative.) When `search-v2` recovers and re-enters
+   When `search-v2` recovers and re-enters
    rotation, `tenant:beta` is pinned back to it automatically -- no config change
    or restart required.
 

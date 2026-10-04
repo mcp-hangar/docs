@@ -86,7 +86,7 @@ spec:
       tools:
         allow: ["get_*", "list_*"]        # glob allow-list
         deny: ["*_admin"]                 # deny wins over everything
-        requireApproval: ["create_*"]     # FAIL-CLOSED (see below)
+        requireApproval: ["create_*"]     # held for a human decision (see below)
       arguments:
         deny:
           secretPatterns: [aws-keys, jwt, github-tokens]  # reject calls carrying these
@@ -118,18 +118,20 @@ spec:
 A tool name is resolved by glob in **precedence order** -- the first match wins:
 
 1. `deny` — reject.
-2. `requireApproval` — **fail closed** (blocked pending out-of-band approval).
+2. `requireApproval` — **held** until a human approves it (refused if denied or expired).
 3. `allow` — permit.
 4. otherwise — the policy's `defaultAction` (`Deny` by default).
 
 Globs are **case-sensitive** for determinism (`get_*` does not match `GET_user`).
 
-> **`requireApproval` fails closed -- it is not an approval queue.** A
-> `requireApproval` match today **blocks** the call pending out-of-band
-> approval. It is a hard gate, not an interactive/HITL approval workflow --
-> wiring a gated call into an interactive approval queue is an explicit
-> follow-up. Treat `requireApproval` as "deny unless separately approved," never
-> as "prompt an operator to approve inline."
+> **`requireApproval` holds the call in Hangar's approval queue.** Under
+> `mode: Enforce` a match does not reach the upstream: the call waits as a
+> pending approval (`GET /api/approvals`, logged `egress_policy_approval_routing`)
+> until someone resolves it with `POST /api/approvals/{id}/resolve` and
+> `{"decision": "approve"}` or `"deny"`. Approved, it proceeds; denied or
+> expired, it is refused. Under `mode: Audit` nothing is held. Nobody watching
+> the queue means every such call waits and then fails, so wire an approval
+> channel before you rely on it.
 
 ### Argument scanning
 
@@ -176,11 +178,13 @@ what a policy refuses on the way in:
      -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
    ```
 
-   Expected -- compiled, backstop in place, not degraded:
+   Expected -- compiled, backstop in place and observed to be enforced, not
+   degraded (the order of the lines may differ):
 
    ```text
    Compiled=True (Compiled)
    BackstopApplied=True (BackstopApplied)
+   BackstopEnforceable=True (EnforcerObserved)
    Degraded=False (NotDegraded)
    ```
 
@@ -197,7 +201,9 @@ what a policy refuses on the way in:
 3. Prove the L7 half (requires the operator running with `--hangar-url`). A
    tool call that is *allowed by name* but carries a secret in its arguments is
    still refused at the invocation chokepoint, before it reaches the upstream --
-   deny wins over allow.
+   deny wins over allow. The call fails with `EgressPolicyDeniedError`, `Tool
+   call denied by egress policy`; so does an argument payload over
+   `maxPayloadBytes`.
 
 ## What Just Happened
 
@@ -233,7 +239,7 @@ the L7 rules from the core.
 | `spec.targetRef.kind` | `MCPServer` \| `MCPServerGroup` | — | What the policy attaches to (a group covers every member) |
 | `spec.defaultAction` | `Deny` \| `Allow` | `Deny` | Outcome for a tool name no `upstreams[].tools` rule matches |
 | `spec.upstreams[].match.host` | string | — | FQDN (needs Cilium) or literal IP/CIDR (any CNI) |
-| `spec.upstreams[].tools.allow/deny/requireApproval` | list of globs | — | Precedence: **deny > requireApproval (fail-closed) > allow > defaultAction** |
+| `spec.upstreams[].tools.allow/deny/requireApproval` | list of globs | — | Precedence: **deny > requireApproval (held for approval) > allow > defaultAction** |
 | `spec.upstreams[].arguments.deny.secretPatterns` | list | — | Named secret-pattern groups to reject |
 | `spec.upstreams[].arguments.deny.maxPayloadBytes` | integer | — | Reject argument payloads larger than this |
 | `spec.networkBackstop.generate` | bool | `true` | Emit the L3/L4 backstop |

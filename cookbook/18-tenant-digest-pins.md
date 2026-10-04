@@ -32,6 +32,12 @@ The new surface is `tool_projection.tenant_overrides.<tenant>.pins`: a map of
 tool name to a 64-character lowercase hex SHA-256 digest. We start enforcement
 in `audit` so the call passes while we capture the observed digest.
 
+The `role_assignments` entry is what lets the tenants call anything at all: a
+token Hangar accepts identifies the caller but grants no permission, and a
+caller with no role gets `Not authorized to invoke tool 'refund': tool:invoke
+permission required`. Grant the role to a group your IdP puts in the token's
+`groups` claim (the default `groups_claim`), or to the token's `sub`.
+
 ```yaml
 # config.yaml -- Recipe 18: Per-Tenant Digest Pins
 
@@ -47,6 +53,9 @@ auth:                                     # validate JWTs; Hangar does not issue
     audience: mcp-hangar
     resource_uri: https://hangar.example.com
     tenant_claim: tenant_id               # JWT claim -> CallerIdentity.tenant_id
+  role_assignments:                       # a validated JWT carries no permissions of its own
+    - principal: "group:agents"           # matched against the token's `groups` claim
+      role: service-account               # tool:invoke + tool:list, no hangar_* management tools
 
 mcp_servers:
   payments:
@@ -95,38 +104,39 @@ recipe is about pins.
 
 1. Call `refund` as `tenant:a` and observe the audited digest
 
-   Obtain a JWT from your IdP whose `tenant_id` claim is `tenant:a`, then invoke
-   the tool. In front-door mode external agents see the flat back-end tool name
-   `refund`, not the `hangar_*` meta-API.
+   Obtain a JWT from your IdP whose `tenant_id` claim is `tenant:a` and whose
+   `groups` claim includes `agents`, then invoke the tool. In front-door mode
+   external agents see the flat back-end tool name `refund`, not the `hangar_*`
+   meta-API. The gateway answers as a Server-Sent Events stream (`event: message`
+   / `data: {...}`), so strip the `data:` prefix before `jq`:
 
    ```bash
    curl -s http://localhost:8000/mcp \
      -H "Authorization: Bearer $TENANT_A_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"refund","arguments":{}},"id":1}' \
-     | jq '.result // .error'
+     | sed -n 's/^data: //p' | jq '.result // .error'
    ```
 
    In `audit` the call succeeds. Because the placeholder pin almost certainly
    does not match the live schema, Hangar records a mismatch for review. A
    `DigestMismatchEvent` carrying `tenant_id: tenant:a` is emitted whenever the
-   computed schema digest differs from the pin. Inspect your log/metrics sink
-   for that event to read the observed digest, for example (illustrative only --
-   exact log strings vary by sink):
+   computed schema digest differs from the pin. With `--json-logs` it is logged
+   as a `domain_event` line:
 
    ```text
-   # illustrative -- format depends on your logging backend
-   DigestMismatchEvent mcp_server=payments tool=refund tenant_id=tenant:a \
-     pinned=0123...cdef observed=9f2b...a17c enforcement=audit
+   {"event_type": "DigestMismatchEvent", "mcp_server_id": "payments", "tool_name": "refund",
+    "tenant_id": "tenant:a", "correlation_id": "...", "event": "domain_event", ...}
    ```
 
-   The `observed` value is the canonical digest of the tool's current schema
-   (RFC 8785 JCS + SHA-256, with `None`, `{}`, `[]`, and `""` treated as
-   absent). That is the value you pin.
-
-   If you prefer to compute the digest directly from the backend's advertised
-   schema instead of reading it off an event, hash the tool entry with the same
-   canonicalization Hangar uses:
+   The event object also carries `expected_digest` and `observed_digest`, but
+   the log line does not print them, so the log tells you *that* the pin is
+   wrong, not what to replace it with. The value to pin is the canonical digest
+   of the tool's current schema (RFC 8785 JCS + SHA-256, with `None`, `{}`, `[]`,
+   and `""` treated as absent). `mcp-hangar pin --config <file>` prints it for
+   every tool the configured servers serve (it does not read per-tenant pins,
+   so it reports the digest without comparing it). Or hash the tool entry
+   yourself with the same canonicalization Hangar uses:
 
    ```bash
    python - <<'PY'
@@ -183,7 +193,7 @@ recipe is about pins.
      -H "Authorization: Bearer $TENANT_A_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"refund","arguments":{}},"id":2}' \
-     | jq '.result // .error'
+     | sed -n 's/^data: //p' | jq '.result // .error'
    ```
 
    Expected: the call succeeds. The live schema digest matches the pin, so even
@@ -192,23 +202,36 @@ recipe is about pins.
 1. Simulate schema drift and confirm `tenant:a` is blocked
 
    Change the `refund` schema on the backend (add a required field, rename a
-   property, change a type -- anything that alters the canonical schema). Then
-   call `refund` again as `tenant:a` with enforcement still set to `block`:
+   property, change a type -- anything that alters the canonical schema). The
+   pin is checked against the schema Hangar holds in its catalogue, which it
+   reads when it starts the server or when the backend sends
+   `notifications/tools/list_changed`. A backend that changes its schema in
+   place without notifying keeps being served under the old entry until Hangar
+   starts the server again, so restart the gateway (or stop and start
+   `payments`) to make it re-read. Then call `refund` again as `tenant:a` with
+   enforcement still set to `block`:
 
    ```bash
    curl -s http://localhost:8000/mcp \
      -H "Authorization: Bearer $TENANT_A_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"refund","arguments":{}},"id":3}' \
-     | jq '.result // .error'
+     | sed -n 's/^data: //p' | jq '.result // .error'
    ```
 
    Expected: the call is rejected. The new schema digest no longer matches the
-   pin, so under `block` Hangar refuses the invocation and emits a
-   `DigestMismatchEvent` carrying `tenant_id: tenant:a`. The response surfaces as
-   a call error rather than a tool result (the exact error envelope depends on
-   your transport; the key fact is that the call is blocked before it reaches the
-   backend).
+   pin, so under `block` Hangar refuses the invocation before it reaches the
+   backend and emits a `DigestMismatchEvent` carrying `tenant_id: tenant:a`:
+
+   ```json
+   {
+     "content": [{"type": "text", "text": "Tool 'refund' schema does not match its pinned digest"}],
+     "isError": true
+   }
+   ```
+
+   The refusal is logged as `batch_call_refused` with `gate: digest_pin` and
+   `reason: digest_mismatch`.
 
 1. Call `refund` as `tenant:b` and confirm it is unaffected
 
@@ -221,7 +244,7 @@ recipe is about pins.
      -H "Authorization: Bearer $TENANT_B_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"refund","arguments":{}},"id":4}' \
-     | jq '.result // .error'
+     | sed -n 's/^data: //p' | jq '.result // .error'
    ```
 
    Expected: the call succeeds, drift or no drift. A pin only constrains the
@@ -259,13 +282,13 @@ When unset, a server defaults to `block`. Because it is per server, turning on
 `block` for `payments` does not change enforcement for any other backend. Every
 mismatch -- in any mode -- emits a `DigestMismatchEvent` that includes the
 `tenant_id`, which is what made the audit-first rollout possible: we ran in
-`audit` to capture the real `observed` digest, pinned it, and only then switched
-to `block`.
+`audit` to see the mismatch without refusing anyone, computed the real digest,
+pinned it, and only then switched to `block`.
 
 The audit -> block sequence is the whole point. Pinning straight to `block`
 against a digest you have not verified will reject the first legitimate call.
-Observing in `audit`, copying the emitted digest into the pin, then flipping to
-`block` gives you strict per-tenant integrity with zero guesswork.
+Observing in `audit`, pinning the digest you computed, then flipping to `block`
+gives you strict per-tenant integrity with zero guesswork.
 
 ## Key Config Reference
 

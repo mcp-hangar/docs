@@ -13,9 +13,10 @@ mcp-hangar serve --http --host 127.0.0.1 --port 8000
 The REST API is available at `http://localhost:8000/api/`.
 
 **Collection endpoints carry a trailing slash.** `/api/mcp_servers` answers a
-`307` to `/api/mcp_servers/`; `curl` does not follow it without `-L`, and a
-`POST` that follows a 307 without `--post301` arrives with no body. The same
-holds for `/api/groups/`, `/api/tools/`, `/api/config/` and `/api/system/`.
+`307` to `/api/mcp_servers/`; `curl` does not follow it without `-L` (a `307`
+keeps the method and body, so a `POST` followed with `-L` arrives intact). Use
+the trailing slash to skip the redirect. The same holds for `/api/groups/`,
+`/api/tools/`, `/api/config/` and `/api/system/`.
 
 ```bash
 # List all mcp_servers
@@ -40,15 +41,21 @@ See the [Authentication guide](AUTHENTICATION.md) for setup instructions.
 
 ## Endpoints Overview
 
-All endpoints return JSON. Error responses follow the envelope format:
+All endpoints return JSON. Domain errors use a nested envelope; the status is
+in the HTTP status line, not the body:
 
 ```json
 {
-  "error": "McpServerNotFoundError",
-  "message": "MCP Server 'unknown' not found",
-  "status_code": 404
+  "error": {
+    "code": "McpServerNotFoundError",
+    "message": "McpServer not found: unknown",
+    "details": null
+  }
 }
 ```
+
+Every route requires a permission when authentication is enabled; the
+[reference](../reference/rest-api.md#required-permissions) lists which.
 
 ### MCP servers
 
@@ -108,8 +115,8 @@ All endpoints return JSON. Error responses follow the envelope format:
 | `PUT` | `/api/discovery/sources/{id}/enable` | Enable/disable a source |
 | `GET` | `/api/discovery/pending` | List MCP servers pending approval |
 | `GET` | `/api/discovery/quarantined` | List quarantined MCP servers |
-| `POST` | `/api/discovery/approve/{name}` | Approve a pending MCP server |
-| `POST` | `/api/discovery/reject/{name}` | Reject a pending MCP server |
+| `POST` | `/api/discovery/approve/{name}` | Approve a quarantined MCP server |
+| `POST` | `/api/discovery/reject/{name}` | Reject a quarantined MCP server |
 
 ### Configuration
 
@@ -132,7 +139,9 @@ All endpoints return JSON. Error responses follow the envelope format:
 
 | Method | Path | Description |
 | -------- | ------ | ------------- |
-| `POST` | `/api/mcp_servers/{id}/l7_policy` | Push a compiled L7 egress policy for a server (operator → core) |
+| `GET` | `/api/mcp_servers/{id}/l7_policy` | Read the attached L7 egress policy |
+| `POST`/`PUT` | `/api/mcp_servers/{id}/l7_policy` | Push a compiled L7 egress policy for a server (operator → core) |
+| `DELETE` | `/api/mcp_servers/{id}/l7_policy` | Clear the L7 egress policy |
 
 ### Admin Tools
 
@@ -182,12 +191,13 @@ These endpoints are outside the `/api/` prefix and skip authentication:
 | `GET` | `/health/ready` | Readiness probe |
 | `GET` | `/health/startup` | Startup probe |
 | `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/.well-known/oauth-protected-resource` | OAuth protected-resource metadata (`404` without an OIDC issuer) |
 
 ### WebSockets
 
 | Path | Description |
 | ------ | ------------- |
-| `/api/ws/events` | Real-time domain event stream (filterable) |
+| `/api/ws/events` | Real-time domain event stream (filterable); requires `audit:read` and a WebSocket library such as `websockets` installed |
 
 See the [WebSockets guide](WEBSOCKETS.md) for connection details.
 
@@ -269,17 +279,13 @@ export MCP_CORS_ORIGINS="https://dashboard.example.com"
 
 ## Error Handling
 
-All domain exceptions are mapped to HTTP status codes:
-
-| Exception | Status Code |
-| ----------- | ------------- |
-| `McpServerNotFoundError` | 404 |
-| `ValidationError` | 422 |
-| `RateLimitExceeded` | 429 |
-| `CompactionError` | 500 |
-| Other `MCPError` | 500 |
-
-The error envelope always contains `error` (exception class name), `message`, and `status_code`.
+Domain exceptions map to HTTP status codes -- for example
+`McpServerNotFoundError` is `404`, `ValidationError` `422`, `AccessDeniedError`
+`403` and `RateLimitExceeded` `429`; anything unmapped is `500`. The nested
+envelope carries `error.code` (the exception class name), `error.message` and
+`error.details`. Authentication failures and request-body checks use flat
+shapes instead. The [reference](../reference/rest-api.md) has the full status
+map and every shape.
 
 ## Full Reference
 

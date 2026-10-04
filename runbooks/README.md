@@ -3,7 +3,7 @@
 Operational runbooks for the alerts shipped with MCP Hangar
 (`helm-charts` → `prometheusRule.enabled`, source in
 [`mcp-hangar/files/prometheus-alerts.yaml`](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/files/prometheus-alerts.yaml)).
-Most alerts link here through their `runbook_url` annotation. `MCPHangarHighLatencyP99`
+The alerts in this table link here through their `runbook_url` annotation. `MCPHangarHighLatencyP99`
 and `MCPHangarHighLatencyByTool` carry none; their runbook is high-latency.
 
 | Runbook | Alerts |

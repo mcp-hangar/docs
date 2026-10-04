@@ -104,6 +104,9 @@ git checkout -b hotfix/X.Y.Z vX.Y.Z-1  # e.g., hotfix/1.0.1 from v1.0.0
 
 # Run tests
 uv run pytest tests/ -v
+
+git add -A
+git commit -m "fix(<scope>): description of fix"
 ```
 
 #### Step 3: Update Version and Changelog
@@ -123,19 +126,24 @@ uv lock                                                                # mcp-han
 #### Step 4: Tag and Push
 
 ```bash
-git add -A
-git commit -m "fix: [CRITICAL] description of fix"
+git add pyproject.toml server.json uv.lock CHANGELOG.md
+git commit -m "chore(release): release X.Y.Z"
 git tag -a vX.Y.Z -m "Hotfix: description"
 git push origin hotfix/X.Y.Z
 git push origin vX.Y.Z
 ```
 
-#### Step 5: Cherry-pick to Main
+#### Step 5: Bring the Fix to Main
+
+Open a PR to `main` with the fix commit only, so commit the fix and the version
+bump separately on the hotfix branch. The version files on `main` belong
+to release-please, so do not carry the bump over, and do not push to `main`
+directly: the PR runs the required checks.
 
 ```bash
-git checkout main
-git cherry-pick <commit-hash>
-git push origin main
+git checkout -b fix/<scope>-<slug> origin/main
+git cherry-pick <fix-commit-hash>
+git push origin fix/<scope>-<slug>
 ```
 
 ---

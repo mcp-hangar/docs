@@ -11,8 +11,9 @@ gauge holds its value until a check passes. The alert therefore keeps firing
 next to `MCPHangarProviderDegraded` and `MCPHangarProviderDead`; on its own, it
 is the early warning before them.
 
-Health checks run every 60 seconds; a per-server `health_check_interval_s` is
-not applied in 2.24.0 (#1686).
+Health checks run every 60 seconds while a server is READY, and on a growing
+backoff while it is DEGRADED; a per-server `health_check_interval_s` is not
+applied in 2.24.0 (#1686).
 
 ## Diagnose
 

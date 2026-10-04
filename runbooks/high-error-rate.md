@@ -26,7 +26,9 @@ error, and Hangar's exception name (`TimeoutError`, `McpServerStartError`) other
 
 ```bash
 # gateway readiness; the image has no curl or wget, so use its python3
-kubectl -n <ns> exec <pod> -- python3 -c 'import urllib.request as u; print(u.urlopen("http://localhost:8080/health/ready").read().decode())'
+kubectl -n <ns> exec <pod> -- python3 -c 'import urllib.request as u, urllib.error as e
+try: r = u.urlopen("http://localhost:8080/health/ready"); print(r.status, r.read().decode())
+except e.HTTPError as x: print(x.code, x.read().decode())'
 # tail the offending server's captured stderr (secrets are redacted):
 curl -s -H "X-API-Key: $KEY" "<hangar>/api/mcp_servers/<id>/logs?lines=200"
 ```

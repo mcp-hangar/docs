@@ -207,9 +207,8 @@ recipe is about pins.
    reads when it starts the server or when the backend sends
    `notifications/tools/list_changed`. A backend that changes its schema in
    place without notifying keeps being served under the old entry until Hangar
-   starts the server again, so restart the gateway (or stop and start
-   `payments`) to make it re-read. Then call `refund` again as `tenant:a` with
-   enforcement still set to `block`:
+   starts the server again, so restart the gateway to make it re-read. Then
+   call `refund` again as `tenant:a` with enforcement still set to `block`:
 
    ```bash
    curl -s http://localhost:8000/mcp \

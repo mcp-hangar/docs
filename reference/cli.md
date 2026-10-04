@@ -18,7 +18,7 @@ mcp-hangar [OPTIONS] COMMAND [ARGS]...
 
 ## Global Options
 
-These options are available for all commands:
+These options go before the command name (`mcp-hangar --json status`):
 
 | Option | Short | Type | Default | Env Variable | Description |
 | -------- | ------- | ------ | --------- | -------------- | ------------- |
@@ -27,7 +27,13 @@ These options are available for all commands:
 | `--quiet` | `-q` | FLAG | false | - | Suppress non-essential output |
 | `--json` | - | FLAG | false | - | Output in JSON format for scripting |
 | `--version` | `-V` | FLAG | - | - | Show version and exit |
+| `--install-completion` | - | FLAG | - | - | Install completion for the current shell |
+| `--show-completion` | - | FLAG | - | - | Print completion for the current shell |
 | `--help` | - | FLAG | - | - | Show help message and exit |
+
+`pin`, `config check` and `auth bootstrap-admin` do not read the global
+`--config`: each takes its own (see those commands). `serve` takes its own
+`--config` as well, and falls back to the global one.
 
 ## Commands
 
@@ -61,8 +67,8 @@ mcp-hangar init [OPTIONS]
 | -------- | ------- | ------ | --------- | ------------- |
 | `--non-interactive` | `-y` | FLAG | false | Run without prompts, using defaults |
 | `--bundle` | `-b` | TEXT | - | MCP Server bundle to install |
-| `--mcp_servers` | - | TEXT | - | Comma-separated list of MCP servers |
-| `--config-path` | - | PATH | - | Custom path for config file |
+| `--servers` | - | TEXT | - | Comma-separated list of MCP servers (alias: `--mcp_servers`) |
+| `--config-path` | - | PATH | `~/.config/mcp-hangar/config.yaml` | Custom path for config file. Without it, the global `--config` is used if given |
 | `--client` | - | TEXT | detected | Client to point at Hangar; repeatable. `claude-code`, `claude-code-project`, `cursor`, `cursor-project`, `claude-desktop`, `all` |
 | `--claude-config` | - | PATH | - | Write this exact client config file instead of the detected ones |
 | `--skip-clients` | - | FLAG | false | Do not modify any MCP client config (alias: `--skip-claude`) |
@@ -87,7 +93,7 @@ mcp-hangar init
 mcp-hangar init --bundle starter
 
 # Install specific mcp_servers
-mcp-hangar init --mcp_servers filesystem,github,sqlite
+mcp-hangar init --servers filesystem,github,sqlite
 
 # Non-interactive with developer bundle
 mcp-hangar init -y --bundle developer
@@ -109,17 +115,22 @@ mcp-hangar init --skip-clients
 2. Detects the MCP clients on this machine (Claude Code, Cursor, Claude Desktop)
 3. Presents MCP server categories for selection
 4. Collects required configuration (API keys, paths)
-5. Generates `config.yaml` — with `tool_access.mode: front_door`, an
-   `auth.stdio.principal` block, and `digest_enforcement: block`
+5. Generates `config.yaml` — with `tool_access.mode: front_door` and an
+   `auth.stdio.principal` block
 6. Starts each MCP server once to verify it, and **records a digest pin for
-   every tool it serves** while it is up
+   every tool it serves** while it is up, under that server's
+   `tool_projection` with `digest_enforcement: block`
 7. Writes the Hangar entry into the selected clients, merging it into their
    existing `mcpServers` rather than replacing them
 8. Shows what was written, what was tested and what was pinned
 
-With `--skip-test`, steps 6 writes no pins — an unverified pin would refuse every
+With `--skip-test`, step 6 writes no pins — an unverified pin would refuse every
 call to a tool nobody digested — and the summary says so instead of reporting a
 pass. Run [`pin --write`](#pin) afterwards to add them.
+
+With `-y`, nothing is asked: servers that need a path or a token are written
+without one, and an existing config file is copied to
+`config.backup.<timestamp>.yaml` beside it and overwritten.
 
 ---
 
@@ -130,14 +141,14 @@ Display health dashboard of all configured MCP servers with real-time updates.
 ### Synopsis
 
 ```bash
-mcp-hangar status [OPTIONS] [MCP_SERVER]
+mcp-hangar status [OPTIONS] [SERVER]
 ```
 
 ### Arguments
 
 | Argument | Required | Description |
 | ---------- | ---------- | ------------- |
-| `MCP_SERVER` | No | Show detailed status for specific MCP server |
+| `SERVER` | No | Show detailed status for specific MCP server |
 
 ### Options
 
@@ -185,16 +196,15 @@ mcp-hangar --json status
 
 - MCP Server name
 - State indicator
+- Health
 - Tools count
 
-**Detailed view (`--details`):**
+**Detailed view (`--details`)** adds:
 
-- MCP Server name
-- State indicator
 - Mode (subprocess/docker/remote)
-- Tools count
 - Memory usage
 - Uptime
+- Last used
 
 ---
 
@@ -270,6 +280,10 @@ When adding a MCP server that requires configuration, you'll be prompted for:
 
 Environment variables are detected automatically. If `GITHUB_TOKEN` is set, you'll be asked whether to use it.
 
+With `-y` no prompt is shown, so a server that needs configuration is added
+without it. `add` rewrites the config file through PyYAML, which keeps values
+but not comments.
+
 ---
 
 ## remove
@@ -314,7 +328,6 @@ mcp-hangar remove postgres --keep-running
 2. Prompts for confirmation (unless `-y`)
 3. Stops running instance (unless `--keep-running`)
 4. Removes from config.yaml
-5. Attempts hot-reload of server
 
 ---
 
@@ -330,10 +343,14 @@ mcp-hangar serve [OPTIONS]
 mcp-hangar [OPTIONS]
 ```
 
+Bare `mcp-hangar` accepts only the [global options](#global-options); pass
+`--http`, `--port` and the rest to `mcp-hangar serve`.
+
 ### Options
 
 | Option | Short | Type | Default | Env Variable | Description |
 | -------- | ------- | ------ | --------- | -------------- | ------------- |
+| `--config` | `-c` | PATH | `./config.yaml` | `MCP_CONFIG` | Path to config.yaml file. Overrides the global `--config` |
 | `--http` | - | FLAG | false | `MCP_MODE=http` | Run in HTTP mode |
 | `--host` | - | TEXT | 0.0.0.0 | `MCP_HTTP_HOST` | HTTP server host |
 | `--port` | `-p` | INT | 8000 | `MCP_HTTP_PORT` | HTTP server port |
@@ -376,7 +393,7 @@ When running in HTTP mode:
 
 | Endpoint | Method | Description |
 | ---------- | -------- | ------------- |
-| `/mcp` | POST/GET | MCP protocol endpoint |
+| `/mcp` | POST/GET | MCP protocol endpoint (`GET` is served with `tool_access.mode: front_door`; otherwise it answers 405) |
 | `/health/live` | GET | Liveness probe |
 | `/health/ready` | GET | Readiness probe |
 | `/health/startup` | GET | Startup probe |
@@ -451,8 +468,12 @@ mcp-hangar pin [OPTIONS]
 | `--write` | - | FLAG | false | Merge the observed digests into `mcp_servers.<id>.tool_projection.pins` |
 | `--check` | - | FLAG | false | Exit 1 when a configured pin disagrees with what the server serves |
 | `--json` | - | FLAG | false | Machine-readable output |
+| `--log-level` | - | TEXT | INFO | Log level; overrides the config file's `logging.level`. Env: `MCP_LOG_LEVEL` |
+| `--quiet` | `-q` | FLAG | false | Log errors only, and print only digests, drift and failures |
 
 `--write` and `--check` ask different questions; pass one or neither.
+`pin` reads only its own `--config`: `mcp-hangar --config X pin` still reads
+`$MCP_CONFIG` or `./config.yaml`, so write `mcp-hangar pin --config X`.
 
 ### Exit Codes
 
@@ -595,9 +616,9 @@ mcp-hangar auth bootstrap-admin --config PATH --principal PRINCIPAL [OPTIONS]
 
 | Option | Description |
 | -------- | ------------- |
-| `--config PATH` | Path to the server `config.yaml` whose durable auth backend to bootstrap. |
-| `--principal PRINCIPAL` | Existing external principal to grant global admin (e.g. `user:admin`). |
-| `--key-name NAME` | Human-readable label recorded for the bootstrap claim. |
+| `--config PATH`, `-c` | Required. Path to the server `config.yaml` whose durable auth backend to bootstrap. |
+| `--principal PRINCIPAL` | Required. Existing external principal to grant global admin (e.g. `user:admin`). |
+| `--key-name NAME` | Human-readable label recorded for the bootstrap key. Default: `initial admin`. |
 | `--show-key` | Print the minted API key's secret. Required when API keys are the only authenticator. Off by default. *Since 2.5.0.* |
 
 #### Behavior
@@ -618,6 +639,8 @@ mcp-hangar auth bootstrap-admin --config PATH --principal PRINCIPAL [OPTIONS]
   still works.
 - *Since 2.5.0:* a configuration with no authenticator at all — API keys
   disabled and no trusted issuer — is refused on the same grounds.
+- `--show-key` with `auth.api_key.enabled: false` is refused: no
+  authenticator would accept the printed secret.
 
 #### Example
 
@@ -653,7 +676,8 @@ ignored, so the setting simply does not apply -- which is why a misspelling
 surfaces as a server that will not start, or as authentication that is quietly
 off, rather than as a configuration error.
 
-`PATH` defaults to `$MCP_CONFIG`, then `./config.yaml`.
+`PATH` defaults to `$MCP_CONFIG`, then `./config.yaml`. The global `--config`
+is not read: pass the file as `PATH`.
 
 | exit code | meaning |
 | --- | --- |
@@ -666,7 +690,8 @@ $ mcp-hangar config check config.yaml
 FAIL config.yaml: 2 key(s) nothing reads:
 
   auth has unknown key(s) ['enabledd']; allowed keys: ['allow_anonymous',
-  'api_key', 'enabled', 'oidc', 'opa', 'rate_limit', 'role_assignments', 'storage']
+  'api_key', 'enabled', 'oidc', 'opa', 'rate_limit', 'role_assignments', 'stdio',
+  'storage']
   mcp_servers.math has unknown key(s) ['commandd']; allowed keys: [...]
 ```
 
@@ -684,12 +709,19 @@ of an `mcp_servers.<id>` spec. Not checked: anything deeper.
 
 ### Default Locations
 
-The CLI searches for configuration in this order:
+Not every command reads the same file by default:
 
-1. `--config` option
-2. `MCP_CONFIG` environment variable
-3. `~/.config/mcp-hangar/config.yaml`
-4. `./config.yaml` (current directory)
+| Command | Reads |
+| --- | --- |
+| `serve` | `serve --config`, the global `--config` or `MCP_CONFIG`; otherwise `./config.yaml` |
+| `pin`, `config check` | their own `--config` / `PATH`, or `MCP_CONFIG`; otherwise `./config.yaml` |
+| `init` | `--config-path` or the global `--config`; otherwise `~/.config/mcp-hangar/config.yaml` |
+| `add`, `remove` | the global `--config` or `MCP_CONFIG`; otherwise `~/.config/mcp-hangar/config.yaml` |
+| `status` | the global `--config` or `MCP_CONFIG`; otherwise `~/.config/mcp-hangar/config.yaml`, then `./config.yaml` |
+| `auth bootstrap-admin` | its required `--config` |
+
+So a config written by `init` or `add` is served with
+`mcp-hangar serve --config ~/.config/mcp-hangar/config.yaml`.
 
 ### Example Configuration
 
@@ -747,7 +779,7 @@ event_store:
 | ------ | --------- |
 | 0 | Success |
 | 1 | User error (invalid input, missing file, permission denied) |
-| 2 | System error (network failure, MCP server crash) |
+| 2 | System error (network failure, MCP server crash), or a usage error (unknown command or option) |
 | 130 | Interrupted by user (Ctrl+C) |
 
 ---

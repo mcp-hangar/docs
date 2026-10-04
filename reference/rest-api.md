@@ -1,6 +1,8 @@
 # REST API Reference
 
 Complete reference for all REST API endpoints exposed by MCP Hangar in HTTP mode.
+This page is the authoritative reference; the [REST API guide](../guides/REST_API.md)
+is an overview that links here.
 
 **Base URL:** `http://localhost:8000/api`
 
@@ -8,25 +10,72 @@ All endpoint paths shown below are relative to this base URL. Every route resolv
 
 **Collection endpoints carry a trailing slash.** `GET /api/mcp_servers` answers
 `307` and redirects to `/api/mcp_servers/`; `curl` does not follow a redirect
-unless you pass `-L`, and a `POST` that follows one without `--post301` loses
-its body. The same applies to `/api/groups/`, `/api/tools/`, `/api/config/` and
+unless you pass `-L` (a `307` keeps the method and body, so a `POST` followed
+with `-L` arrives intact). Using the trailing slash avoids the round trip. The
+same applies to `/api/groups/`, `/api/tools/`, `/api/config/` and
 `/api/system/`.
 
-All responses are JSON. Errors are **nested**:
+All responses are JSON. Domain errors are **nested**:
 
 ```json
 {"error": {"code": "<ExceptionType>", "message": "<description>", "details": {"field": "..."} }}
 ```
 
 `details` is `null` unless the error carries structured context. The HTTP
-status is in the status line, not the body.
+status is in the status line, not the body. The status follows the exception:
+`McpServerNotFoundError` and `ToolNotFoundError` are `404`, `ValidationError`
+`422`, `AuthenticationError` `401`, `AccessDeniedError` and `AuthorizationError`
+`403`, `RateLimitExceeded` `429` (with `Retry-After` when the refill time is
+known), `McpServerNotReadyError` and `McpServerNotHereError` `409`,
+`McpServerDegradedError` `503`, `ToolTimeoutError` `504`, and any other error
+`500` with the generic message `An internal server error occurred.`.
 
-Authentication failures are the one exception -- they are produced by the
-middleware before the handler chain and use a flat shape:
+Two other shapes are flat. Authentication failures are produced by the
+middleware before the handler chain:
 
 ```json
-{"error": "authentication_failed", "message": "No valid credentials provided", "details": {}}
+{"error": "authentication_failed", "message": "No valid credentials provided", "details": {"auth_method": "none", "expected_methods": ["ApiKeyAuthenticator"]}}
 ```
+
+Request-body checks made inside a handler answer `400` with a flat code, e.g.
+`{"error": "missing_fields", "detail": "required field(s) absent: group_id"}`,
+`{"error": "invalid_body", ...}` or `{"error": "invalid_mode", ...}`. The
+approvals routes use a flat `{"error": "<message>"}` throughout.
+
+## Required permissions
+
+With authentication enabled, every route is authorized from one route table;
+a route missing from it is denied. A refusal is `403` with `AccessDeniedError`.
+
+| Route | Permission |
+| ------- | ------------ |
+| `GET /mcp_servers`, `/mcp_servers/{id}` and its `tools`, `tools/history`, `health`, `logs` | `mcp_servers:read` |
+| `POST /mcp_servers`, `PUT`/`PATCH /mcp_servers/{id}` | `mcp_servers:write` |
+| `DELETE /mcp_servers/{id}` | `mcp_servers:write` and `mcp_servers:lifecycle` |
+| `POST /mcp_servers/{id}/start`, `/stop`, `/block`; `/sessions/{id}/suspend`; `/admin/tools/...` | `mcp_servers:lifecycle` |
+| `GET /mcp_servers/{id}/l7_policy` | `policy:read` |
+| `POST`/`PUT`/`DELETE /mcp_servers/{id}/l7_policy` | `policy:write` |
+| `GET /groups`, `/groups/{id}` | `group:read` |
+| `POST /groups` | `group:create` |
+| `PUT /groups/{id}`, `/rebalance`, members add/remove | `group:update` |
+| `DELETE /groups/{id}` | `group:delete` |
+| `GET /discovery/sources`, `/pending`, `/quarantined` | `discovery:read` |
+| `POST /discovery/sources/{id}/scan` | `discovery:trigger` |
+| Other source management, `/discovery/approve`, `/discovery/reject` | `discovery:approve` |
+| `GET /config`, `GET /config/diff`, `POST /config/export` | `config:read` |
+| `POST /config/backup` | `config:update` |
+| `POST /config/reload` | `config:reload` |
+| `GET /tools` | `tool:list` |
+| `GET /system`, `/system/me` | any authenticated principal |
+| `GET /approvals`, `/approvals/{id}` | `approval:read` |
+| `POST /approvals/{id}/resolve` | `approval:resolve` |
+| `/ws/events` | `audit:read` |
+| everything under `/auth` | `admin` (only `*:*` satisfies it) |
+
+A grant held only at tenant scope passes just the tenant-aware routes --
+`tools/history`, `/admin/tools/...`, `/approvals/...` and `/ws/events` -- and
+each of those confines what it reads or changes to that tenant. Every other
+route needs a global grant. With authentication disabled none of this applies.
 
 ---
 
@@ -48,18 +97,22 @@ GET /mcp_servers?state={state}
 {
   "mcp_servers": [
     {
-      "mcp_server": "math",
+      "mcp_server_id": "math",
       "state": "ready",
       "mode": "subprocess",
       "alive": true,
       "tools_count": 5,
       "health_status": "healthy",
       "tools_predefined": false,
+      "dead": null,
       "description": "Math computation mcp_server"
     }
   ]
 }
 ```
+
+`dead` is `null` unless the server is `dead`; then it says why, since when and
+what starts it again. `description` is omitted when none is set.
 
 ### Create MCP Server
 
@@ -80,7 +133,10 @@ POST /mcp_servers
 | `idle_ttl_s` | int | No | `300` | Idle timeout in seconds |
 | `health_check_interval_s` | int | No | `60` | Health check interval |
 | `description` | string | No | -- | Human-readable description |
-| `source` | string | No | `"api"` | Provenance recorded on the registration |
+
+The registration's provenance is always recorded as `api`; a `source` field in
+the body is ignored. A body without `mcp_server_id` or `mode` is `400
+missing_fields`, and an id that already exists is `422 ValidationError`.
 
 `volumes`, `network` and `read_only` are **not** read by this route. They are
 accepted by the request parser and dropped: the command it builds carries only
@@ -104,7 +160,10 @@ discovery supplies a pod IP with its provenance attached and is accepted.
 GET /mcp_servers/{mcp_server_id}
 ```
 
-**Response 200:** MCP Server detail object with tools, health, and configuration.
+**Response 200:** MCP Server detail object: `mcp_server_id`, `state`, `mode`,
+`alive`, `tools` (full tool objects), `health` (the object
+[Get MCP Server Health](#get-mcp-server-health) returns), `idle_time`, `meta`
+and `dead`.
 
 **Response 404:** MCP Server not found.
 
@@ -152,7 +211,11 @@ Stops the MCP server if running, then removes it from the registry.
 POST /mcp_servers/{mcp_server_id}/start
 ```
 
-**Response 200:** Start result object.
+**Response 200:**
+
+```json
+{"mcp_server": "math", "state": "ready", "tools": ["add", "subtract"]}
+```
 
 ### Stop MCP Server
 
@@ -166,7 +229,11 @@ POST /mcp_servers/{mcp_server_id}/stop
 | ------- | ------ | --------- | ------------- |
 | `reason` | string | `"user_request"` | Reason for stopping |
 
-**Response 200:** Stop result object.
+**Response 200:**
+
+```json
+{"stopped": "math", "reason": "user_request"}
+```
 
 ### Block MCP Server
 
@@ -193,10 +260,21 @@ GET /mcp_servers/{mcp_server_id}/tools
 ```json
 {
   "tools": [
-    {"name": "add", "description": "Add two numbers", "parameters": {...}}
+    {
+      "name": "add",
+      "description": "Add two numbers",
+      "inputSchema": {"type": "object", "properties": {"a": {"type": "number"}}},
+      "digest": "e84e846a57adc93e...",
+      "pinned_digest": "e84e846a57adc93e..."
+    }
   ]
 }
 ```
+
+`digest` is the tool's SHA-256 fingerprint as listed -- the value
+`mcp-hangar pin` computes. `pinned_digest` is present only when the tool has an
+all-tenants pin (`tool_projection.pins`); a per-tenant pin is not shown here.
+See [Digest Pinning](configuration.md#digest-pinning).
 
 ### Get MCP Server Health
 
@@ -204,7 +282,11 @@ GET /mcp_servers/{mcp_server_id}/tools
 GET /mcp_servers/{mcp_server_id}/health
 ```
 
-**Response 200:** Health status object with check history.
+**Response 200:**
+
+```json
+{"consecutive_failures": 0, "total_invocations": 1, "total_failures": 0, "success_rate": 1.0, "can_retry": true, "last_success_ago": 0.07, "last_failure_ago": null}
+```
 
 ### Get MCP Server Logs
 
@@ -214,14 +296,14 @@ GET /mcp_servers/{mcp_server_id}/logs?lines={n}
 
 | Parameter | In | Type | Default | Range | Description |
 | ----------- | ------ | ------ | --------- | ------- | ------------- |
-| `lines` | query | int | `100` | 1--1000 | Number of recent lines |
+| `lines` | query | int | `100` | 1--1000 | Number of recent lines; out-of-range values are clamped |
 
 **Response 200:**
 
 ```json
 {
   "logs": [
-    {"timestamp": "2026-03-23T10:15:30", "line": "...", "mcp_server_id": "math", "stream": "stderr"}
+    {"mcp_server_id": "math", "stream": "stderr", "content": "...", "recorded_at": 1774260930.5}
   ],
   "mcp_server_id": "math",
   "count": 42
@@ -236,8 +318,8 @@ GET /mcp_servers/{mcp_server_id}/tools/history?limit={n}&from_position={pos}
 
 | Parameter | In | Type | Default | Range | Description |
 | ----------- | ------ | ------ | --------- | ------- | ------------- |
-| `limit` | query | int | `100` | 1--500 | Max records |
-| `from_position` | query | int | `0` | -- | Event store version offset |
+| `limit` | query | int | `100` | 1--500 | Max records; out-of-range values are clamped |
+| `from_position` | query | int | `0` | -- | Event store version to start from (inclusive) |
 
 **Response 200:**
 
@@ -248,6 +330,10 @@ GET /mcp_servers/{mcp_server_id}/tools/history?limit={n}&from_position={pos}
   "total": 42
 }
 ```
+
+Each entry is a `ToolInvocationCompleted` or `ToolInvocationFailed` event.
+`total` counts the entries returned, not every invocation in the stream; page
+on with `from_position`.
 
 ---
 
@@ -418,7 +504,7 @@ GET /discovery/sources
       "mode": "additive",
       "is_healthy": true,
       "is_enabled": true,
-      "last_discovery": "2026-08-08T09:22:56Z",
+      "last_discovery": "2026-08-08T09:22:56+00:00",
       "mcp_servers_count": 3,
       "error_message": null
     }
@@ -463,6 +549,12 @@ POST /discovery/sources
 ```json
 {"source_id": "...", "registered": true}
 ```
+
+Keep the `source_id` from this response. A source registered here is recorded
+and answers the per-source routes (`/scan`, `/enable`, `PUT`, `DELETE`), but it
+is not one of the sources the discovery cycle runs, so *List Sources* does not
+show it. A `mode` other than `additive` or `authoritative` is `400
+invalid_mode`.
 
 ### Update Source
 
@@ -529,7 +621,7 @@ GET /discovery/pending
 **Response 200:**
 
 ```json
-{"pending": [{"name": "new-mcp-server", "source": "docker", "mode": "remote", ...}]}
+{"pending": [{"name": "new-mcp-server", "source_type": "docker", "mode": "remote", "connection_info": {...}, "fingerprint": "...", "ttl_seconds": 90, ...}]}
 ```
 
 ### List Quarantined MCP servers
@@ -550,7 +642,12 @@ GET /discovery/quarantined
 POST /discovery/approve/{name}
 ```
 
-**Response 200:** Approval result.
+Approves a **quarantined** MCP server. A name that is pending but not
+quarantined is not approved by this route.
+
+**Response 200:** `{"approved": true, "mcp_server": "...", "status": "registered"}` on success. A
+name not in quarantine also answers `200`, with
+`{"approved": false, "mcp_server": "...", "error": "McpServer not found in quarantine"}`.
 
 ### Reject MCP Server
 
@@ -558,7 +655,10 @@ POST /discovery/approve/{name}
 POST /discovery/reject/{name}
 ```
 
-**Response 200:** Rejection result.
+Rejects a quarantined MCP server.
+
+**Response 200:** `{"rejected": true, "mcp_server": "..."}`, or `"rejected": false` with the
+same `error` when the name is not in quarantine.
 
 ---
 
@@ -570,7 +670,11 @@ POST /discovery/reject/{name}
 GET /config
 ```
 
-Returns the current server configuration with sensitive fields stripped.
+Returns the MCP server records the durable configuration repository holds --
+the registrations a persistence backend keeps across a restart -- with
+sensitive fields stripped. It is not the running configuration: on a gateway
+without a durable persistence backend it answers `{"config": {}}`. For the
+running state use [Export Config](#export-config).
 
 **Response 200:**
 
@@ -598,7 +702,7 @@ there is no way to point it at another one over HTTP.
 **Response 200:**
 
 ```json
-{"status": "reloaded", "result": {...}}
+{"status": "reloaded", "result": {"success": true, "config_path": "...", "mcp_servers_added": [], "mcp_servers_removed": [], "mcp_servers_updated": [], "mcp_servers_unchanged": ["math"], "duration_ms": 3.9}}
 ```
 
 ### Export Config
@@ -630,17 +734,21 @@ Creates a rotating backup of the current configuration.
 ```
 
 The backup is written **next to the configuration file** as `<config>.bak1`,
-rotating older ones to `.bak2` and beyond. That directory has to be writable by
-the process, and in the published container image it is not: `/app` is owned by
-root and the gateway runs as `hangar`.
+rotating older ones to `.bak2` and beyond. The file this route (and
+[Config Diff](#config-diff)) reads is the one named by the `MCP_CONFIG`
+environment variable, or `config.yaml` in the process's working directory when
+that is unset -- not the `--config` argument. `mcp-hangar serve` reads
+`MCP_CONFIG` too, so setting it rather than passing `--config` makes all three
+agree. The returned `path` is relative when that name is.
+
+That directory has to be writable by the process, and in the published
+container image it is not: `/app` is owned by root and the gateway runs as
+`hangar`.
 
 *Since 2.5.0* that answers **503** with the reason --
 `could not write the backup beside 'config.yaml': Permission denied` -- rather
 than a bare `500` and `An internal server error occurred.`. Mount a writable
-directory and point `--config` at it if you need this endpoint.
-
-```json
-```
+directory and point `MCP_CONFIG` at the file in it if you need this endpoint.
 
 ### Config Diff
 
@@ -725,10 +833,16 @@ Lists all tools across all MCP servers (used by the supervisor to sync tool inve
 ```json
 {
   "tools": [
-    {"mcp_server_id": "math", "tool_name": "add", "description": "Add two numbers", "input_schema": "..."}
+    {"mcp_server_id": "math", "tool_name": "add", "description": "Add two numbers", "input_schema": "{'type': 'object', ...}", "digest": "e84e846a...", "pinned_digest": "e84e846a..."}
   ]
 }
 ```
+
+`input_schema` is a string -- the schema rendered as Python text, not a JSON
+object; use [Get MCP Server Tools](#get-mcp-server-tools) for a parseable
+`inputSchema`. `digest` and `pinned_digest` are as described there. Only
+servers whose tools are known appear: a `cold` server without predefined tools
+contributes nothing until it has started.
 
 ---
 
@@ -740,7 +854,9 @@ Lists all tools across all MCP servers (used by the supervisor to sync tool inve
 POST /sessions/{session_id}/suspend
 ```
 
-Adds a session to the in-memory suspended registry.
+Adds a session to the suspended registry of the replica that answers and
+announces it, so the other replicas apply it too. A `session_id` that is not
+1-128 letters, digits, dashes or underscores is `400`.
 
 **Request body (optional):**
 
@@ -772,6 +888,9 @@ Removes a session from the suspended registry.
 
 ## Auth Management
 
+Every route here requires the `admin` role. With authentication disabled they
+are not wired and answer `503`.
+
 ### Create API Key
 
 ```
@@ -790,8 +909,10 @@ POST /auth/keys
 **Response 201:**
 
 ```json
-{"key_id": "...", "raw_key": "mcp_...", "principal_id": "...", "name": "..."}
+{"key_id": "...", "raw_key": "mcp_...", "principal_id": "...", "name": "...", "expires_at": null, "warning": "Save this key now - it cannot be retrieved later!"}
 ```
+
+A body missing `principal_id` or `name` is a `500`, not a validation error.
 
 !!! warning
     The `raw_key` is returned only once. Store it securely.
@@ -819,6 +940,9 @@ GET /auth/keys
 | ----------- | ------ | ------ | ---------- | ------------- |
 | `principal_id` | query | string | Yes | Principal whose keys to list |
 | `include_revoked` | query | bool | No | Include revoked keys (default `true`) |
+
+**Response 200:** `{"principal_id": "...", "keys": [{"key_id", "name", "created_at", "expires_at", "last_used_at", "revoked"}], "total": 1, "active": 1}`.
+Without `principal_id` the list is empty.
 
 ### List All Roles
 
@@ -848,17 +972,27 @@ GET /auth/roles/{role_name}
 POST /auth/roles
 ```
 
+**Request body:** `role_name` (required), `description`, and `permissions` -- a
+list of `resource:action` or `resource:action:id` strings.
+
+**Response 201:** `{"role_name": "ops", "description": "...", "permissions_count": 2, "created": true, ...}`.
+
 ### Update Custom Role
 
 ```
 PATCH /auth/roles/{role_name}
 ```
 
+**Request body:** `permissions` (replaces the list) and `description`.
+
 ### Delete Custom Role
 
 ```
 DELETE /auth/roles/{role_name}
 ```
+
+**Response 204**, no body. A built-in role is `403 CannotModifyBuiltinRoleError`;
+an unknown one is `404`.
 
 ### Assign Role
 
@@ -907,13 +1041,17 @@ GET /auth/principals/roles
 GET /auth/permissions
 ```
 
-Lists all known permission resource types and their available actions.
+Returns a fixed manifest of resource types and actions.
 
 **Response 200:**
 
 ```json
-{"permissions": [{"resource_type": "mcp_servers", "actions": ["read", "write", "..."]}]}
+{"permissions": [{"resource_type": "provider", "actions": ["read", "write", "invoke", "admin"]}, {"resource_type": "group", "actions": ["read", "write", "admin"]}, "..."]}
 ```
+
+The manifest is static and does not list the permissions route enforcement
+checks (see [Required permissions](#required-permissions)); read a role's
+actual grants with `GET /auth/roles/{role_name}`.
 
 ### Check Permission
 
@@ -924,7 +1062,16 @@ POST /auth/check-permission
 **Request body:**
 
 ```json
-{"principal_id": "...", "permission": "mcp_servers:start"}
+{"principal_id": "...", "permission": "mcp_servers:lifecycle"}
+```
+
+`permission` is `resource:action[:id]`. Alternatively send `action`,
+`resource_type` and `resource_id` separately.
+
+**Response 200:**
+
+```json
+{"principal_id": "...", "action": "lifecycle", "resource_type": "mcp_servers", "resource_id": "*", "allowed": false, "granted_by_role": null}
 ```
 
 ### Get Tool Access Policy
@@ -938,6 +1085,10 @@ GET /auth/policies/{scope}/{target_id}
 | `scope` | path | string | Yes | `provider`, `group`, or `member` |
 | `target_id` | path | string | Yes | Identifier of the provider, group, or member |
 
+Any other `scope` is `400 ValidationError`. **Response 200:**
+`{"found": true, "scope": "provider", "target_id": "math", "allow_list": [...], "deny_list": [...]}`;
+`found` is `false` with empty lists when no policy is set.
+
 ### Set Tool Access Policy
 
 ```
@@ -950,11 +1101,15 @@ POST /auth/policies/{scope}/{target_id}
 {"allow_list": ["tool_a", "tool_b*"], "deny_list": ["tool_c"]}
 ```
 
+**Response 200:** the stored policy with `"set": true`.
+
 ### Clear Tool Access Policy
 
 ```
 DELETE /auth/policies/{scope}/{target_id}
 ```
+
+**Response 204**, no body.
 
 ---
 
@@ -971,7 +1126,8 @@ call.
 These routes are gated on `policy:read` / `policy:write`, **not** on
 `mcp_servers:write`. The distinction is deliberate: `mcp_servers:write` is held
 by `developer`, and gating policy mutation on it let that role clear an egress
-policy. `policy:write` is admin-only.
+policy. Among the built-in roles `policy:read` and `policy:write` are held by
+`admin` and `provider-admin` only.
 
 ### Get L7 Policy
 
@@ -982,7 +1138,8 @@ GET /mcp_servers/{mcp_server_id}/l7_policy
 Returns the attached policy in the same wire form `POST` accepts. Requires
 `policy:read`.
 
-**Response 200:** the compiled policy body.
+**Response 200:** the compiled policy body, with every section filled in and a
+`policyId` (`sha256:...`) added.
 
 **Response 404:** `{"error": "no_l7_policy", "mcp_server_id": "math"}` when the
 MCP server exists but holds no policy.
@@ -1003,8 +1160,10 @@ behave identically. Requires `policy:write`.
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `tools` | dict | Tool-name globs: `allow`, `deny`, `requireApproval` |
+| `headers` | dict | Header rules: `allow`, `deny`, `requireApproval` |
 | `arguments` | dict | Argument-level constraints: `secretPatterns`, `maxPayloadBytes` |
-| `defaultAction` | string | Action when no rule matches |
+| `defaultAction` | string | `Allow` or `Deny` when no rule matches; default `Deny` |
+| `mode` | string | `Audit` or `Enforce`; anything else, or absent, is `Enforce` |
 
 > **What `requireApproval` does depends on whether an approval gate is
 > configured.** With one, the match holds the call and waits for a human
@@ -1057,7 +1216,10 @@ policy, so a restart keeps the policy cleared either way.
 
 ## Admin Tools
 
-Runtime tool withdrawal/restore. Requires admin (`mcp_servers` resource, `lifecycle` action).
+Runtime tool withdrawal/restore. Requires `mcp_servers:lifecycle`, which the
+built-in `admin` and `developer` roles hold. A grant held only within a tenant
+acts on its own tenant: omitting `tenant_id` means that tenant, and naming
+another is `403`.
 
 ### Withdraw Tool
 
@@ -1079,11 +1241,12 @@ withdrawal when it reads the event, within one tail interval.
 | Field | Type | Default | Description |
 | ------- | ------ | --------- | ------------- |
 | `tenant_id` | string | `null` | Tenant to withdraw for. Omit/null withdraws globally for all tenants. |
+| `kind` | string | `"tool"` | `tool`, `prompt` or `resource`; anything else is `400 invalid_kind`. A resource is named by its uri, slashes included |
 
 **Response 200:**
 
 ```json
-{"withdrawn": true, "mcp_server": "math", "tool": "add", "tenant_id": null}
+{"withdrawn": true, "mcp_server": "math", "tool": "add", "kind": "tool", "tenant_id": null}
 ```
 
 ### Restore Tool
@@ -1099,11 +1262,12 @@ Removes a runtime withdrawal (config-declared withdrawals persist independently)
 | Field | Type | Default | Description |
 | ------- | ------ | --------- | ------------- |
 | `tenant_id` | string | `null` | Tenant to restore. Omit/null removes the entire runtime entry. |
+| `kind` | string | `"tool"` | As for withdraw |
 
 **Response 200:**
 
 ```json
-{"restored": true, "mcp_server": "math", "tool": "add", "tenant_id": null}
+{"restored": true, "mcp_server": "math", "tool": "add", "kind": "tool", "tenant_id": null}
 ```
 
 ---
@@ -1119,7 +1283,7 @@ Something has to put a tool behind the gate before anything appears here: see [`
 ### List Approvals
 
 ```
-GET /api/approvals?state={state}&provider_id={id}
+GET /approvals?state={state}&provider_id={id}
 ```
 
 | Parameter | In | Type | Default | Description |
@@ -1127,12 +1291,16 @@ GET /api/approvals?state={state}&provider_id={id}
 | `state` | query | string | `pending` | Filter: `pending`, `approved`, `denied`, `expired` |
 | `provider_id` | query | string | -- | Optional provider filter |
 
-**Response 200:** JSON array of approval request objects.
+**Response 200:** a bare JSON array of approval request objects, each with
+`approval_id`, `provider_id`, `tool_name`, `arguments`, `state`, `channel`,
+`requested_at`, `expires_at`, `expires_in_seconds`, `requested_by`,
+`decided_by`, `decided_at`, `reason` and `tenant_id`. An unknown `state` is
+`400`.
 
 ### Get Approval
 
 ```
-GET /api/approvals/{approval_id}
+GET /approvals/{approval_id}
 ```
 
 **Response 200:** Approval request object.
@@ -1142,7 +1310,7 @@ GET /api/approvals/{approval_id}
 ### Resolve Approval
 
 ```
-POST /api/approvals/{approval_id}/resolve
+POST /approvals/{approval_id}/resolve
 ```
 
 Approves or denies a pending approval. Requires an authenticated principal holding `approval:resolve`; the decision is attributed to that principal.
@@ -1158,7 +1326,9 @@ On a gateway with auth disabled the decision is attributed to the system princip
 | `decision` | string | Yes | `approve` or `deny` |
 | `reason` | string | No | Optional resolution reason |
 
-**Response 200:** Resolution result.
+**Response 200:** `{"approval_id": "...", "state": "approved"}` (or `denied`).
+A `decision` other than `approve` or `deny` is `400`; an approval that is
+already resolved is `409` with its `state`.
 
 ---
 
@@ -1170,6 +1340,29 @@ On a gateway with auth disabled the decision is attributed to the system princip
 ws://host:port/api/ws/events
 ```
 
-Streams all domain events as JSON frames.
+Streams all domain events as JSON frames. Requires `audit:read`; a principal
+without it is refused at the handshake (`403`). A grant held only within a
+tenant receives only the events that name that tenant.
+
+The upgrade needs a WebSocket library in the gateway's environment. The
+published image installs `websockets`; a `pip install mcp-hangar` does not, and
+without one the upgrade is answered `404` and uvicorn logs
+`No supported WebSocket library detected`. Install `websockets` alongside it.
 
 See the [WebSockets guide](../guides/WEBSOCKETS.md) for connection details.
+
+---
+
+## Outside `/api`
+
+These are served at the root, not under the base URL, and skip authentication:
+
+| Method | Path | Response |
+| -------- | ------ | ---------- |
+| `GET` | `/health/live` | `{"status": "healthy"}` |
+| `GET` | `/health/ready` | `{"status": "healthy", "ready_mcp_servers": 1, "total_mcp_servers": 1}` |
+| `GET` | `/health/startup` | `{"status": "healthy", "startup_complete": true, "uptime_seconds": 51.6}` |
+| `GET` | `/metrics` | Prometheus text format |
+| `GET` | `/.well-known/oauth-protected-resource` | RFC 9728 metadata; `404` when no OIDC issuer is configured |
+
+The MCP protocol itself is served at `/mcp`.

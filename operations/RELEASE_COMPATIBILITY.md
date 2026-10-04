@@ -82,9 +82,16 @@ table is **not** a supported combination — it may work, but it is not covered.
 | `2.0.x` | `0.15.0` | `0.13.7` / `0.12.5` | `1.25` -- `1.36` |
 | `1.6.x` | `0.15.0` | `0.13.6` / `0.12.5` | `1.25` -- `1.36` |
 
+**No rows yet for `2.22.x` -- `2.24.x`.** As of 2026-10-04 the published charts
+carry those cores as follows: `0.15.26` carries `2.22.0`, `0.15.27` carries
+`2.22.1`, and `0.15.28` carries `2.23.0` (read from the `helm-charts` release
+tags). No published chart carries `2.24.0` yet. Until the owners add rows, those
+cores are not a supported combination under the rule above.
+
 Each chart in the table carries the matching core as its `appVersion`, and
 `image.tag` defaults to `appVersion`, so a plain `helm install` of a chart pulls
-the core on its row: `0.15.16` carries `2.18.1`, `0.15.14` carries `2.17.1`,
+the core on its row: `0.15.25` carries `2.21.2`, `0.15.21` carries `2.20.0`,
+`0.15.20` carries `2.19.1`, `0.15.16` carries `2.18.1`, `0.15.14` carries `2.17.1`,
 `0.15.12` carries `2.16.0`, `0.15.11` carries `2.15.0`, `0.15.10` carries
 `2.14.1`, `0.15.8` carries `2.13.1`, `0.15.6` carries `2.12.0`, `0.15.5` carries
 `2.11.0`, `0.15.4` carries `2.10.1`, `0.15.2` carries `2.9.0`, `0.15.1` carries

@@ -18,6 +18,9 @@ Every serialized payload includes a schema version field:
 ```json
 {
   "_version": 1,
+  "event_id": "3871ae43-5da7-4b7f-9364-587dca31ccb9",
+  "occurred_at": 1791144114.042038,
+  "produced_by": "hangar-0c7b0b4a",
   "mcp_server_id": "math",
   "mode": "subprocess",
   "tools_count": 3,
@@ -41,6 +44,9 @@ MCP Hangar supports **upcasting**: converting an event payload from an older sch
 - Upcasters are **pure functions** (no I/O, no time dependence).
 - Upcasters must advance **exactly one version step**: `vN -> vN+1`.
 - Updating `EVENT_VERSION_MAP` requires providing the full upcaster chain.
+- An event type with no upcaster registered at all is passed through at its
+  stored version, not refused; the chain only checks completeness once one
+  upcaster for that type is registered.
 
 ### Where versions are defined
 
@@ -103,7 +109,9 @@ Deserializer ignores unknown payload keys when reconstructing event instances. T
 
 ## Troubleshooting
 
-- `UpcastingError: Missing upcaster...` usually means:
+- `EventSerializationError: Failed to serialize/deserialize <type>: Upcasting
+  failed for <type> from vN: Missing upcaster to reach vM` (an `UpcastingError`
+  wrapped by the serializer) usually means:
   - `EVENT_VERSION_MAP` was bumped, but the full set of upcasters was not registered.
 - If you need to rename an event type, treat it as a new type and keep the old one readable via:
   - keeping the old `event_type` registered in `EVENT_TYPE_MAP`, or

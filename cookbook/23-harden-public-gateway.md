@@ -110,7 +110,7 @@ Every control is classified by **who is responsible** for it:
 | Host boundary | application + external-infrastructure | `MCP_TRUSTED_HOSTS` (Hangar rejects off-allow-list `Host` headers; dev default `localhost,127.0.0.1,::1,testserver` MUST be replaced) + host-based routing at the edge |
 | Real client IP behind the proxy | application | `MCP_TRUSTED_PROXIES` so source IP is resolved from the proxy chain, not spoofable headers |
 | CORS scope | application | `MCP_CORS_ORIGINS` (dev default `http://localhost:5173` MUST be replaced with your reviewed origins); `MCP_CORS_CREDENTIALS` only if you truly need credentialed cross-origin calls |
-| OIDC signing-key rotation | provider + application | IdP rotates its JWKS; Hangar's JWKS client re-fetches signing keys on an unknown `kid`, so rotation needs no Hangar restart. Hangar warns (`jwks_uri_not_https`) if the JWKS URI is not HTTPS |
+| OIDC signing-key rotation | provider + application | IdP rotates its JWKS; Hangar's JWKS client re-fetches signing keys on an unknown `kid`, so rotation needs no Hangar restart. A configured `jwks_uri` (or, without one, `issuer`) that is not `https://` refuses startup -- `http://` is accepted only for `localhost`, `127.0.0.1` and `::1` -- and a non-HTTPS `jwks_uri` named by discovery is refused per request (`jwks_uri_not_https`) |
 | Token lifetime ceiling | application | `MCP_JWT_MAX_TOKEN_LIFETIME` caps accepted `exp - iat` (default 3600s) independent of what the IdP mints |
 | Rate-limiting scope | application + external-infrastructure | `rate_limit.rps` / `rate_limit.burst` (or `MCP_RATE_LIMIT_RPS` / `MCP_RATE_LIMIT_BURST`) inside Hangar, *plus* an edge/WAF rate cap and DDoS protection you own |
 | Durable storage | application + external-infrastructure | *Since 2.5.0:* one decision -- `persistence.backend: sqlite` on a durable, backed-up volume, or `postgresql`. A backend now serves **every** persisted concern or is refused, so the 2.4.0 trap of selecting PostgreSQL and silently losing tool-access policy management is unrepresentable. On 2.4.0 and earlier, use `auth.storage.driver: sqlite`: the PostgreSQL driver there does not carry tool-access policies, and needs `psycopg2-binary` installed explicitly |
@@ -139,6 +139,9 @@ auth:
     jwks_uri: https://idp.example/realms/prod/protocol/openid-connect/certs  # HTTPS
     resource_uri: https://gateway.example            # advertised AND enforced as aud
     tenant_claim: tenant_id
+  role_assignments:                # a validated token grants nothing by itself
+    - principal: "group:agents"    # from the token's `groups` claim
+      role: service-account        # invoke tools; no hangar_* management tools
 
   # Storage is chosen once, below, for every persisted concern. On 2.4.0 and
   # earlier it was picked here instead -- `storage: {driver: sqlite, path: ...}`
@@ -266,7 +269,7 @@ public edge; only the host and scheme change to your reviewed HTTPS endpoint.
      -H "Authorization: Bearer $ACME_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' \
-     | jq -S '.result.tools[].name'
+     | sed -n 's/^data: //p' | jq '.result.tools[].name' | sort
    ```
 
    Expected -- a flat, read-only surface, no meta-API, no other tenant's tools:
@@ -284,7 +287,7 @@ public edge; only the host and scheme change to your reviewed HTTPS endpoint.
      -H "Authorization: Bearer $ACME_JWT" \
      -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_report","arguments":{}},"id":1}' \
-     | jq '.error.code // .result.isError'   # -> -32601 (method not found)
+     | sed -n 's/^data: //p' | jq '.error.code // .result.isError'   # -> -32601 (method not found)
    ```
 
 3. Withdraw a tool **globally** at runtime and verify it disappears for every
@@ -301,7 +304,7 @@ public edge; only the host and scheme change to your reviewed HTTPS endpoint.
    Expected -- a global withdrawal (no `tenant_id`):
 
    ```json
-   {"withdrawn": true, "mcp_server": "reports", "tool": "get_report", "tenant_id": null}
+   {"withdrawn": true, "mcp_server": "reports", "tool": "get_report", "kind": "tool", "tenant_id": null}
    ```
 
    Re-run step 1: `get_report` is gone from acme's list, and a `tools/call`
@@ -491,8 +494,8 @@ Everything a responder or auditor needs is observable at the boundary:
   enablement, per-tenant policy loads, and per-request `tenant_id` and tool
   counts. Shipped immutably to the SIEM, they are the durable audit record.
 - **Metrics** at `/metrics` quantify the boundary over time:
-  `mcp_hangar_tool_access_denied` (authorization refusals),
-  `mcp_hangar_rate_limit_hits` (throttling pressure),
+  `mcp_hangar_tool_access_denied_total` (authorization refusals),
+  `mcp_hangar_rate_limit_hits_total` (throttling pressure),
   `mcp_hangar_tool_calls_total` (call volume by outcome),
   `mcp_hangar_mcp_server_up` and `mcp_hangar_health_checks_total`
   (provider and gateway health). Alert on denials and rate-limit spikes as

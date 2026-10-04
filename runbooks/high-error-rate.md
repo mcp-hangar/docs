@@ -4,8 +4,9 @@
 
 ## What it means
 
-`rate(mcp_hangar_tool_call_errors_total) / rate(mcp_hangar_tool_calls_total)` is high:
-a large fraction of proxied tool calls are failing.
+`rate(mcp_hangar_tool_call_errors_total) / rate(mcp_hangar_tool_calls_total)` is above 10%:
+a large fraction of proxied tool calls are failing. Both are labelled by the server that
+took the call, the member for a call to a group. A call refused by a batch gate is in neither.
 
 ## Impact
 
@@ -19,12 +20,17 @@ sum by (mcp_server) (rate(mcp_hangar_tool_call_errors_total[5m]))
   / sum by (mcp_server) (rate(mcp_hangar_tool_calls_total[5m]))
 ```
 
-Isolate: is it one server (`mcp_server` label) or one class (`error_type`)? Then:
+Isolate: is it one server (`mcp_server` label) or one class (`error_type`)? `error_type`
+is the upstream's JSON-RPC error code (`-32000`, `-1`) when the upstream answered with an
+error, and Hangar's exception name (`TimeoutError`, `McpServerStartError`) otherwise. Then:
 
 ```bash
-kubectl -n <ns> exec <pod> -- curl -s localhost:8080/health   # gateway health
+# gateway readiness; the image has no curl or wget, so use its python3
+kubectl -n <ns> exec <pod> -- python3 -c 'import urllib.request as u, urllib.error as e
+try: r = u.urlopen("http://localhost:8080/health/ready"); print(r.status, r.read().decode())
+except e.HTTPError as x: print(x.code, x.read().decode())'
 # tail the offending server's captured stderr (secrets are redacted):
-curl -s -H "X-API-Key: $KEY" <hangar>/api/mcp_servers/<id>/logs?lines=200
+curl -s -H "X-API-Key: $KEY" "<hangar>/api/mcp_servers/<id>/logs?lines=200"
 ```
 
 ## Remediate

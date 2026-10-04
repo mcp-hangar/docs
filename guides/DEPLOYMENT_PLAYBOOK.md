@@ -72,8 +72,8 @@ The global `--config` also works after `serve` (both
 `mcp-hangar --config X serve` and `mcp-hangar serve --config X` are accepted),
 so you can standardize on one form across your scripts.
 
-The companion recipe for this stage and the next is the **local and staging
-profile cookbook** (docs issue #18).
+The companion recipe for this stage and the next is
+[Cookbook 21 -- Local Dev & Staging Profiles](../cookbook/21-dev-staging-profiles.md).
 
 ## Stage 2: Staging
 
@@ -117,8 +117,9 @@ What changes from Stage 2:
   for container specs) and grant persistence only through explicit writable
   `volumes` mounts, for example `- "/absolute/path/to/data:/data:rw"`. Nothing
   outside a declared volume survives a restart, and nothing writes the root
-  filesystem. See [Cookbook 04 -- Failover](../cookbook/04-failover.md) and the
-  [Containers guide](CONTAINERS.md) for the container-mode caveats.
+  filesystem. See
+  [Cookbook 20 -- Read-Only Rootfs & Controlled Writes](../cookbook/20-readonly-controlled-write.md)
+  and the [Containers guide](CONTAINERS.md) for the container-mode caveats.
 - Curate the tool surface with RBAC and per-target tool-access policy so each
   principal sees least-privilege. Controlled-write tools get their own role.
 - Put rate limiting in front of your backends. Configure `rate_limit.rps` /
@@ -132,8 +133,8 @@ What changes from Stage 2:
 - Keep a rollback path: run behind a reverse proxy, pin images to a digest (not
   `latest`), and keep the previous config so a bad rollout is one revert away.
 
-The companion recipe for this stage is the **production read-only and
-controlled-write cookbook** (docs issue #19).
+The companion recipe for this stage is
+[Cookbook 20 -- Read-Only Rootfs & Controlled Writes](../cookbook/20-readonly-controlled-write.md).
 
 ## Stage 4: External Multi-Tenant Front Door
 
@@ -157,8 +158,8 @@ What changes from Stage 3:
   edge concerns (TLS, WAF, identity) listed under
   [What the Compose Examples Do Not Prove](#what-the-compose-examples-do-not-prove).
 
-The companion recipe for this stage is the **external multi-tenant OIDC
-front-door cookbook** (docs issue #20).
+The companion recipe for this stage is
+[Cookbook 22 -- External Multi-Tenant OIDC Front Door](../cookbook/22-external-multitenant-oidc.md).
 
 ## Try It
 
@@ -246,13 +247,14 @@ Walk this before each promotion. The full pre-launch list lives in
 
 ## Companion Recipes
 
-This umbrella guide references the following per-stage cookbooks. Where a
-dedicated recipe is still forthcoming, the nearest published guide is linked
-inline above.
+This umbrella guide references the following per-stage cookbooks:
 
-- Local and staging profile cookbook -- docs issue #18.
-- Production read-only and controlled-write cookbook -- docs issue #19.
-- External multi-tenant OIDC front-door cookbook -- docs issue #20.
+- [Cookbook 21 -- Local Dev & Staging Profiles](../cookbook/21-dev-staging-profiles.md)
+  (stages 1 and 2).
+- [Cookbook 20 -- Read-Only Rootfs & Controlled Writes](../cookbook/20-readonly-controlled-write.md)
+  (stage 3).
+- [Cookbook 22 -- External Multi-Tenant OIDC Front Door](../cookbook/22-external-multitenant-oidc.md)
+  (stage 4).
 
 Published references used at each stage today:
 

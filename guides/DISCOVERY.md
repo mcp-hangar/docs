@@ -44,8 +44,8 @@ services:
 | ------- | ---------- | --------- |
 | `mcp.hangar.enabled` | yes | - |
 | `mcp.hangar.name` | no | container name |
-| `mcp.hangar.mode` | no | `http` |
-| `mcp.hangar.port` | no | `8080` |
+| `mcp.hangar.mode` | no | `container` (Hangar runs the image); `http` connects to the running container |
+| `mcp.hangar.port` | no | `8080` (`http` mode) |
 | `mcp.hangar.group` | no | - |
 
 ### Kubernetes
@@ -194,7 +194,7 @@ validate.
 | Situation | What happens |
 | ----------- | -------------- |
 | `type` has no factory | Startup **fails** — a configured source that silently watches nothing is worse than a crash |
-| Your package fails to import | Logged as `discovery_source_plugin_failed` and skipped; the gateway still starts |
+| Your package fails to import | Logged as `discovery_source_plugin_failed` and skipped; the gateway still starts unless a configured source needs that `type`, which then fails startup as above |
 | Your entry point names a built-in | Logged as `discovery_source_plugin_ignored`; a plugin cannot quietly shadow `kubernetes` |
 
 ### Refusing what it discovers
@@ -248,16 +248,21 @@ A discovered server is registered through the same command as one created over
 the REST API, so it passes the same duplicate and SSRF checks, and the
 `McpServerRegistered` event carries `source: discovery:<type>`.
 
-> **The SSRF check applies to discovered endpoints too**, and a container or pod
-> address is private by definition. A source that reports an HTTP endpoint on a
-> private address is refused registration — see
+> **The SSRF check applies to discovered endpoints too**, scoped to what the
+> container runtime reported. A container or pod address is private by
+> definition, so the `docker` and `kubernetes` sources pass along the addresses
+> the runtime reported for that container or pod, and a discovered endpoint may
+> resolve to those addresses and nowhere else. A source that reports none --
+> `filesystem`, `entrypoint`, or a third-party source that sets no
+> `runtime_addresses` -- gets the same policy as a hand-registered server, so
+> an endpoint on a private address is refused. Link-local and cloud metadata
+> addresses are refused whatever the source. See
 > [#771](https://github.com/mcp-hangar/mcp-hangar/issues/771).
 >
-> **`McpServerRegistered` is not written to the event store.** It is published to
-> in-process subscribers only, so a server's registration does not appear in its
-> stream — updates, lifecycle transitions and tool invocations do. Do not rely on
-> the event history to answer "when was this server added, and by which source"
-> — see [#772](https://github.com/mcp-hangar/mcp-hangar/issues/772).
+> **`McpServerRegistered` is written to the server's stream** in the event
+> store, with its `source`, so the event history answers "when was this server
+> added, and by which source" -- see
+> [#772](https://github.com/mcp-hangar/mcp-hangar/issues/772).
 
 ## Tools
 

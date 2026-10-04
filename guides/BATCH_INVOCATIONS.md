@@ -67,7 +67,7 @@ hangar_call(
 | `max_concurrency` | `int` | 10 | Maximum parallel workers (1-50) |
 | `timeout` | `float` | 60.0 | Global timeout for entire batch (1-300s) |
 | `fail_fast` | `bool` | False | If True, abort remaining calls on first error |
-| `max_attempts` | `int` | 1 | Total attempts per call including retries (1-10, default 1 = no retry) |
+| `max_attempts` | `int` | 1 | Total attempts per call including retries (1-10; the default 1 means no retry unless a `retry:` block is configured) |
 
 **Call specification:**
 
@@ -157,14 +157,19 @@ Stop processing on first error:
 ```python
 results = hangar_call(
     calls=[
+        {"mcp_server": "math", "tool": "divide", "arguments": {"a": 1, "b": 0}},  # Will fail
         {"mcp_server": "math", "tool": "add", "arguments": {"a": 1, "b": 2}},
-        {"mcp_server": "nonexistent", "tool": "foo", "arguments": {}},  # Will fail
         {"mcp_server": "math", "tool": "multiply", "arguments": {"a": 3, "b": 4}},
     ],
     fail_fast=True,
 )
-# If call #1 fails, call #2 won't execute
+# Calls already running when #0 fails finish; calls not yet started come back
+# with "error": "Cancelled before execution", "error_type": "CancellationError"
 ```
+
+`fail_fast` acts on failures at execution time. A call naming an unknown server
+or tool fails [validation](#validation) instead, and then no call in the batch
+runs at all, with or without `fail_fast`.
 
 ### Per-Call Timeouts
 
@@ -194,7 +199,7 @@ results = hangar_call(calls=[
     "failed": 1,
     "results": [
         {"index": 0, "success": True, "result": {"sum": 3}, ...},
-        {"index": 1, "success": False, "error": "Circuit breaker open", "error_type": "CircuitBreakerOpen", ...}
+        {"index": 1, "success": False, "error": "Circuit breaker open (too many consecutive failures)", "error_type": "CircuitBreakerOpen", ...}
     ]
 }
 ```
@@ -207,7 +212,7 @@ Batch validation is **eager** - the entire batch is validated before any executi
 
 - MCP Server existence
 - Tool existence (for MCP servers with predefined tools)
-- Argument types
+- `arguments` present and a dictionary (not checked against the tool's schema)
 - Batch size limits
 - Timeout bounds
 
@@ -240,6 +245,10 @@ hangar_call(calls=[
 When `max_attempts > 1`:
 
 - Retries use exponential backoff
+- A `retry:` block in the configuration sets the attempts, and applies even
+  when the caller leaves `max_attempts` at its default of 1. A caller's
+  `max_attempts` of 2 or more can lower the configured count, never raise it
+  (see [Configuration](../reference/configuration.md#retry))
 - Only transient errors trigger retry (timeout, network errors, malformed JSON)
 - Permanent errors (validation, MCP server not found) do not retry
 - Each call retries independently within the batch
@@ -255,29 +264,30 @@ Example:
 - Elapsed time: 50s
 - Effective timeout: min(30, 10) = 10s
 
-### Response Truncation
+A call held for [approval](APPROVAL_ADAPTERS.md) is not cut short by the batch
+timeout: it reads its approval outcome (`approval_timeout` or `approval_denied`;
+an approval that arrives after the deadline reads `CancellationError` and is not
+dispatched), and the batch returns when the hold ends. A call the budget runs out
+on before it is held reads `TimeoutError`.
 
-Large responses are truncated to prevent memory issues:
+### Response Size
 
-- Max response per call: 10MB -- enforced, and the result carries
-  `truncated: true`
+An upstream response is bounded where it is read. One larger than the limit,
+32 MiB by default, is not read: the call fails with `error_type:
+"ResponseTooLarge"`, and the next call on the same server is served. Set the
+limit with `execution.max_response_bytes`, the `MCP_MAX_RESPONSE_BYTES`
+environment variable (which wins), or a server's own `max_response_bytes`.
+
+This replaced, in 2.24.0, a 10MB per-call cap that dropped an oversized result
+after reading it and returned `truncated_reason: "response_size_exceeded"`.
 
 A 50MB total-batch ceiling is defined as a constant and **not enforced**:
 nothing compares against it. A batch of many large responses is bounded only by
 the per-call limit multiplied by the call count.
 
-Truncated responses have `truncated: true` flag:
-
-```python
-{
-    "index": 2,
-    "success": True,
-    "truncated": True,
-    "truncated_reason": "response_size_exceeded",
-    "original_size_bytes": 15728640,
-    "result": None  # No partial data
-}
-```
+When response truncation is configured, a result cut to fit the batch budget
+carries `truncated: true`, a `truncated_reason`, `original_size_bytes` and a
+`continuation_id` for `hangar_fetch_continuation`.
 
 ## Limits
 
@@ -287,8 +297,8 @@ Truncated responses have `truncated: true` flag:
 | Max concurrency | 50 | Clamped to limit |
 | Max timeout | 300s | Clamped to limit |
 | Max attempts | 10 | Clamped to limit |
-| Max response per call | 10MB | Truncated |
-| Max total response | 50MB | Truncated |
+| Max response per call | 32 MiB (configurable) | Call fails with `ResponseTooLarge` |
+| Max total response | 50MB | Not enforced |
 
 ## Metrics
 
@@ -299,16 +309,15 @@ mcp_hangar_batch_calls_total{result="success|partial|failure|validation_error"}
 mcp_hangar_batch_size_bucket{}
 mcp_hangar_batch_duration_seconds_bucket{}
 mcp_hangar_batch_concurrency{}
-mcp_hangar_batch_truncations_total{reason="per_call|total_size"}
+mcp_hangar_batch_truncations_total{reason="batch_budget"}
 mcp_hangar_batch_circuit_breaker_rejections_total{mcp_server="..."}
 mcp_hangar_batch_cancellations_total{reason="timeout|fail_fast"}
 ```
 
 ## Configuration
 
-**There is none.** A `batch:` block in `config.yaml` was documented here and is
-not read anywhere -- all six values are module constants in
-`server/tools/batch/`. Writing the block changes nothing, which is worse than
+**There is no `batch:` block.** One was documented here and is not read
+anywhere -- the batch limits are module constants in `server/tools/batch/`. Writing the block changes nothing, which is worse than
 having no knob at all: the operator believes a limit was raised and it was not.
 
 The values in force:
@@ -318,10 +327,11 @@ The values in force:
 | Calls per batch | 100 |
 | Concurrency | 50 global, 10 per server |
 | Timeout | 60s default, 300s maximum |
-| Response per call | 10MB |
+| Response per call | 32 MiB, set with `execution.max_response_bytes` |
 
-Per-call concurrency is tunable, through `execution:` -- see
-[Configuration](../reference/configuration.md#execution).
+Per-call concurrency and the response limit are tunable through `execution:` --
+see [Configuration](../reference/configuration.md#execution) -- and retry
+attempts through `retry:`.
 
 ## Migration from Previous API
 

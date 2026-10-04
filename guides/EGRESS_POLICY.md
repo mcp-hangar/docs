@@ -123,6 +123,7 @@ spec:
 | `match.imageDigest` | `required` \| `inherited` | How the target's image pin gates this upstream. |
 | `match.issuers` | list | Restricts which token issuers may be brokered to this upstream. |
 | `tools.allow` / `tools.deny` / `tools.requireApproval` | list of globs | Tool-name globs. Precedence: **deny > requireApproval > allow > defaultAction**. |
+| `headers.allow` / `headers.deny` / `headers.requireApproval` | list | `Mcp-Param-*` header selectors; see [the policy language recipe](../cookbook/24-egress-policy-language.md). |
 | `arguments.deny.secretPatterns` | list | Named secret-pattern groups to reject (below). |
 | `arguments.deny.maxPayloadBytes` | integer | Reject tool-call argument payloads larger than this. |
 
@@ -155,9 +156,11 @@ The L7 half runs in the core, on the connections Hangar already proxies. It is *
    configured channel, resolution requires `approval:resolve`, and the
    decision is revalidated at dispatch — so an approval granted while a
    policy was in force is not usable after that policy changes, and `deny`
-   still wins if the policy hardens during the hold. With **no approval
-   channel configured, the verdict fails closed** (blocked), exactly as
-   before 2.11.0 (see [Limitations](#limitations-and-notes)).
+   still wins if the policy hardens during the hold. With no `approvals:`
+   block the call is held on the default `event_stream` channel. Only with
+   the gate turned off (`approvals: {enabled: false}`) does the **verdict
+   fail closed** -- refused as `EgressPolicyApprovalRequiredError`, exactly
+   as before 2.11.0 (see [Limitations](#limitations-and-notes)).
 3. `allow` — permit.
 4. otherwise — the policy's `defaultAction`.
 
@@ -169,7 +172,7 @@ Globs are case-sensitive for determinism (`get_*` does not match `GET_user`).
 
 ### Secret-pattern groups
 
-`secretPatterns` names groups; each maps to deterministic value-regexes shared with Hangar's output redactor, so what the redactor masks on the way out is what a policy refuses on the way in:
+`secretPatterns` names groups; each maps to deterministic value-regexes shared with Hangar's output redactor, so what the redactor masks on the way out is what a policy refuses on the way in (`pem-blocks` is the exception: the redactor carries no PEM pattern):
 
 | Group | Detects |
 | ------- | --------- |
@@ -183,7 +186,10 @@ Globs are case-sensitive for determinism (`get_*` does not match `GET_user`).
 | `bearer-tokens` | `Bearer …` credentials |
 | `npm-tokens`, `pypi-tokens` | npm / PyPI tokens |
 
-Unknown group names are ignored by the scanner (they are caught by CRD validation).
+An unknown group name refuses the whole policy: the core answers the push with
+`400` `invalid_l7_policy`, naming the unknown group and listing the known ones.
+CRD validation does not catch it -- the field is a plain string list -- so a
+misspelt `github-token` passes `kubectl apply` and is refused at delivery.
 
 ## Surviving a gateway restart
 
@@ -253,7 +259,7 @@ drops the policy on restart shows it on every reconcile.
 - **The CR does not report whether the gateway still holds the L7 policy.** `Compiled` means the operator compiled and delivered it, not that the gateway kept it. A gateway without durable storage drops it on restart until the next reconcile; see [Surviving a gateway restart](#surviving-a-gateway-restart). To see what a gateway holds right now, `GET /api/mcp_servers/{id}/l7_policy`.
 - **FQDN enforcement requires Cilium.** Under other CNIs, list upstreams as CIDRs, or accept that hostname upstreams are denied (fail closed) and surfaced via `Degraded`.
 - **L7 rules are merged per server.** Because the core enforces one policy per server (not per upstream connection), a policy's upstream `tools`/`arguments` rules are flattened together (see [above](#l7-semantics)). Scope host-specific tool rules with separate policies if you need them kept apart.
-- **`requireApproval` needs an approval channel to be interactive** — since core 2.11.0 a gated call blocks on the approval gate (typed pending approval, `approval:resolve` chokepoint, dispatch-time revalidation); on a deployment with no approval channel configured it fails closed, as it always did. `Audit` mode records the would-be verdict and never asks a human.
+- **`requireApproval` needs the approval gate to be interactive** — since core 2.11.0 a gated call blocks on the approval gate (typed pending approval, `approval:resolve` chokepoint, dispatch-time revalidation), delivered on the default `event_stream` channel when nothing else is configured; on a deployment with the gate turned off (`approvals: {enabled: false}`) it fails closed, as it always did. `Audit` mode records the would-be verdict and never asks a human.
 - **`Enforce` governs new connections only — it does not cut established ones.** This is normal NetworkPolicy behaviour: the CNI keeps established conntrack entries, so a server holding a TCP session opened *before* the policy landed keeps talking through it until that connection closes. Measured live (kind + Calico): data sent after a restrictive policy applied still flowed through the pre-existing session. Flipping `Audit` → `Enforce` and seeing `BackstopApplied: True` therefore means *"no new disallowed connections"*, not *"all disallowed traffic stopped now"*. To guarantee existing sessions are cut, roll the server's pods after switching to `Enforce` (`kubectl rollout restart`).
 - **stdio servers are out of scope of the L3/L4 backstop.** An in-pod stdio MCP server generates no network traffic of its own, so an `MCPEgressPolicy` backstop has nothing to act on — your transport choice decides whether the network half of this feature applies to you at all. The L7 half (tool/argument rules) still applies, because it is enforced in the data plane Hangar operates, not on the wire.
 - **`toFQDNs` upstreams do not survive NodeLocal DNSCache.** This bullet used to say the operator's DNS-topology configuration (`ExtraDNSEgressPeers`, set with `--dns-egress-cidrs`) covered the same ground. It does not. Measured live (kind + Cilium 1.20.1 + the upstream node-local-dns addon, kubelet pointed at `169.254.20.10`): a governed pod resolves through the cache whether or not the DNS egress rule names it -- the destination is the node itself, so that rule is not the control point -- and the allow-listed hostname is **denied anyway**, because Cilium's DNS proxy never observes a lookup the cache answers and the `toFQDNs` allow-list stays empty. Enforcement survives (a name outside the allow-list stays blocked), so this fails closed: on such a cluster every hostname upstream is unreachable while the policy reports `BackstopApplied: True`. `ExtraDNSEgressPeers` is also not read on the Cilium path at all -- that builder's DNS rule is a fixed `toEndpoints` selector on kube-dns. Use CIDR upstreams there, or keep the cluster's pods resolving through kube-dns, until [mcp-hangar-operator#178](https://github.com/mcp-hangar/mcp-hangar-operator/issues/178) is fixed.

@@ -14,10 +14,19 @@ auth:
   enabled: true  # Enable authentication
   allow_anonymous: false  # Require authentication for all requests
 
+  storage:
+    driver: sqlite        # durable; `mcp-hangar auth bootstrap-admin` needs it
+    path: data/auth.db
+
   api_key:
     enabled: true
     header_name: X-API-Key
 ```
+
+The storage driver defaults to `memory`, and `bootstrap-admin` refuses a
+`memory` backend (`Auth storage driver 'memory' is not durable`), so a deployment
+that relies on API keys needs `sqlite` or `postgresql` before it can get its
+first key.
 
 ### 2. Create an API Key
 
@@ -57,6 +66,9 @@ omitting it is refused rather than silently spending the claim. See
 [recipe 12](../cookbook/12-auth-rbac.md) for what that means in practice.
 
 ### 3. Use the API Key
+
+An API key travels only in the configured header. `Authorization: Bearer`
+carries a JWT, and an API key sent there is refused with `401`.
 
 ```bash
 # HTTP mode
@@ -141,13 +153,15 @@ Tokens with a missing, empty, non-string, or untrusted `iss` claim fail closed.
 | Role | Description | Permissions |
 | ------ | ------------- | ------------- |
 | `admin` | Full access | Everything |
-| `provider-admin` | Manage servers, deliver egress policy, invoke tools | **`providers:read`**, **`policy:write`**, `provider:*`, `group:*`, `discovery:read/trigger/approve`, `tool:invoke`, `tool:list`, `metrics:read`, **`approval:read`**, **`approval:resolve`** |
+| `provider-admin` | Manage servers, deliver egress policy, invoke tools | **`providers:read`**, `policy:read`, **`policy:write`**, `provider:*`, `group:*`, `discovery:read/trigger/approve`, `tool:invoke`, `tool:list`, `metrics:read`, **`approval:read`**, **`approval:resolve`** |
 | `developer` | Use tools, start servers on demand | `provider:read/list/start/load/load_verified/unload`, `providers:read/write/lifecycle`, `tool:invoke/list`, `group:read/list`, `discovery:read` |
 | `viewer` | Read-only | `providers:read`, `provider:read/list`, `tool:list`, `metrics:read`, `group:read/list`, `discovery:read` |
 | `auditor` | Audit logs and read-only oversight | `audit:read`, `metrics:read`, `provider:list`, `group:list`, `discovery:read`, **`approval:read`** |
 | `service-account` | Default for service accounts — invoke tools | `provider:read/list`, `tool:invoke/list` |
 
-Role names are exactly as shown. The name `mcp_server_admin` appeared in an
+Role names are exactly as shown. `providers:read/write/lifecycle` are the names
+the permission registry uses; the API reports them, and authorizes against
+them, as `mcp_servers:read/write/lifecycle`. The name `mcp_server_admin` appeared in an
 earlier revision of this table and does not exist — the role is
 `provider-admin`, which kept its original name through the provider→MCP-server
 rename.
@@ -203,19 +217,20 @@ curl -X POST http://localhost:8000/api/auth/roles/assign \
 
 ### 1. Use HTTPS in Production
 
-Always use HTTPS for MCP endpoints in production. The auth system will warn if OIDC issuer is not HTTPS.
+Always use HTTPS for MCP endpoints in production. Hangar refuses to start when
+the URL it fetches signing keys from -- `jwks_uri`, or the issuer when no
+`jwks_uri` is set -- is not `https://`; plain `http://` is accepted only for
+`localhost`, `127.0.0.1` and `::1`. An issuer that is not `https://` while
+`jwks_uri` is logs `oidc_issuer_not_https`.
 
 ### 2. Configure Trusted Proxies
 
 If behind a load balancer, configure trusted proxies for correct client IP detection.
-Trusted proxies are set programmatically via `FastMCPServerConfig`:
+Hangar reads `X-Forwarded-For` only from a peer listed in `MCP_TRUSTED_PROXIES`,
+a comma-separated list of addresses or CIDRs that defaults to `127.0.0.1,::1`:
 
-```python
-from mcp_hangar.fastmcp_server.config import FastMCPServerConfig
-
-config = FastMCPServerConfig(
-    trusted_proxies=frozenset(["10.0.0.0/8", "172.16.0.0/12"]),
-)
+```bash
+export MCP_TRUSTED_PROXIES="10.0.0.0/8,172.16.0.0/12"
 ```
 
 ### 3. Rotate API Keys Regularly
@@ -260,19 +275,23 @@ These are logged and can be sent to your observability stack.
 ### "No valid credentials provided"
 
 - Check that `auth.enabled: true` is set
-- Verify the X-API-Key header is being sent
-- Ensure the key has the correct prefix (`mcp_`)
+- Verify the X-API-Key header is being sent (not `Authorization: Bearer`)
 
 ### "Invalid API key"
 
-- The key may have been revoked
-- The key may have expired
 - Check for typos in the key
+- A key without the `mcp_` prefix reads "Invalid API key format: must start with 'mcp_'"
+
+### "API key has been revoked" / "API key has expired"
+
+- The key was revoked, or passed its `expires_at`; mint a new one
 
 ### "Access denied"
 
 - The principal doesn't have the required role
-- Check role assignments via the REST API (`GET /api/auth/roles`)
+- Check role assignments via the REST API
+  (`GET /api/auth/principals/roles?principal_id=<id>`; `GET /api/auth/roles`
+  lists the built-in roles, not assignments)
 - Verify the scope matches
 
 ## API Reference

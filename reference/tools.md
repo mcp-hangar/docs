@@ -1,33 +1,68 @@
 # MCP Tools Reference
 
-Complete reference for all MCP protocol tools exposed by MCP Hangar. These tools are callable by any MCP client (Claude Desktop, LM Studio, custom integrations).
+Complete reference for the `hangar_*` MCP tools MCP Hangar serves to MCP clients (Claude Desktop, LM Studio, custom integrations). Which of them a client sees, and which it may call, depends on the topology mode, the transport and the caller's permissions. See [Who sees and calls which tool](#who-sees-and-calls-which-tool).
 
 ## Quick Reference
 
-| Tool | Category | Description | Side Effects |
-| ------ | ---------- | ------------- | -------------- |
-| [`hangar_list`](#hangar_list) | Lifecycle | List all MCP servers with state and tool counts | None (read-only) |
-| [`hangar_start`](#hangar_start) | Lifecycle | Start a MCP server or group | Starts process/container |
-| [`hangar_stop`](#hangar_stop) | Lifecycle | Stop a MCP server or group | Stops process/container |
-| [`hangar_status`](#hangar_status) | Lifecycle | Status dashboard of the replica that answers | None (read-only) |
-| [`hangar_reload_config`](#hangar_reload_config) | Lifecycle | Reload configuration from disk | Stops/starts MCP servers |
-| [`hangar_load`](#hangar_load) | Hot-Loading | Load MCP server from registry at runtime | Downloads and starts MCP server |
-| [`hangar_unload`](#hangar_unload) | Hot-Loading | Unload a hot-loaded MCP server | Stops and removes MCP server |
-| [`hangar_tools`](#hangar_tools) | MCP Server | List tools available on a MCP server | May start cold MCP server |
-| [`hangar_details`](#hangar_details) | MCP Server | Detailed MCP server or group information | None (read-only) |
-| [`hangar_warm`](#hangar_warm) | MCP Server | Pre-start MCP servers for faster first call | Starts MCP server processes |
-| [`hangar_health`](#hangar_health) | Health | Health summary of the replica that answers | None (read-only) |
-| [`hangar_metrics`](#hangar_metrics) | Health | MCP Server metrics in JSON or Prometheus format | None (read-only) |
-| [`hangar_discover`](#hangar_discover) | Discovery | Trigger discovery scan across all sources | Updates pending MCP server list |
-| [`hangar_discovered`](#hangar_discovered) | Discovery | List pending discovered MCP servers | None (read-only) |
-| [`hangar_quarantine`](#hangar_quarantine) | Discovery | List quarantined MCP servers | None (read-only) |
-| [`hangar_approve`](#hangar_approve) | Discovery | Approve a pending or quarantined MCP server | Registers MCP server |
-| [`hangar_sources`](#hangar_sources) | Discovery | List discovery sources with id and health status | None (read-only) |
-| [`hangar_group_list`](#hangar_group_list) | Groups | List all MCP server groups with member details | None (read-only) |
-| [`hangar_group_rebalance`](#hangar_group_rebalance) | Groups | Rebalance group membership and reset circuit breaker | Re-checks members, resets circuit |
-| [`hangar_call`](#hangar_call) | Batch and Continuation | Invoke tools on MCP servers (single or batch) | May start cold MCP servers |
-| [`hangar_fetch_continuation`](#hangar_fetch_continuation) | Batch and Continuation | Fetch truncated response data | None (read-only) |
-| [`hangar_delete_continuation`](#hangar_delete_continuation) | Batch and Continuation | Delete cached continuation data | Removes cached response |
+| Tool | Category | Description | Side Effects | Permission |
+| ------ | ---------- | ------------- | -------------- | ------------ |
+| [`hangar_list`](#hangar_list) | Lifecycle | List all MCP servers with state and tool counts | None (read-only) | `mcp_servers:read` |
+| [`hangar_start`](#hangar_start) | Lifecycle | Start a MCP server or group | Starts process/container | `mcp_servers:lifecycle` |
+| [`hangar_stop`](#hangar_stop) | Lifecycle | Stop a MCP server or group | Stops process/container | `mcp_servers:lifecycle` |
+| [`hangar_status`](#hangar_status) | Lifecycle | Status dashboard of the replica that answers | None (read-only) | `mcp_servers:read` |
+| [`hangar_reload_config`](#hangar_reload_config) | Lifecycle | Reload configuration from disk | Stops/starts MCP servers | `config:reload` |
+| [`hangar_load`](#hangar_load) | Hot-Loading | Load MCP server from registry at runtime | Downloads and starts MCP server | `mcp_servers:write` |
+| [`hangar_unload`](#hangar_unload) | Hot-Loading | Unload a hot-loaded MCP server | Stops and removes MCP server | `mcp_servers:write` |
+| [`hangar_tools`](#hangar_tools) | MCP Server | List tools available on a MCP server | May start cold MCP server | `mcp_servers:read` |
+| [`hangar_details`](#hangar_details) | MCP Server | Detailed MCP server or group information | None (read-only) | `mcp_servers:read` |
+| [`hangar_warm`](#hangar_warm) | MCP Server | Pre-start MCP servers for faster first call | Starts MCP server processes | `mcp_servers:lifecycle` |
+| [`hangar_health`](#hangar_health) | Health | Health summary of the replica that answers | None (read-only) | `mcp_servers:read` |
+| [`hangar_metrics`](#hangar_metrics) | Health | MCP Server metrics in JSON or Prometheus format | None (read-only) | `metrics:read` |
+| [`hangar_discover`](#hangar_discover) | Discovery | Trigger discovery scan across all sources | Updates pending MCP server list | `discovery:trigger` |
+| [`hangar_discovered`](#hangar_discovered) | Discovery | List pending discovered MCP servers | None (read-only) | `discovery:read` |
+| [`hangar_quarantine`](#hangar_quarantine) | Discovery | List quarantined MCP servers | None (read-only) | `discovery:approve` |
+| [`hangar_approve`](#hangar_approve) | Discovery | Approve a pending or quarantined MCP server | Registers MCP server | `discovery:approve` |
+| [`hangar_sources`](#hangar_sources) | Discovery | List discovery sources with id and health status | None (read-only) | `discovery:read` |
+| [`hangar_group_list`](#hangar_group_list) | Groups | List all MCP server groups with member details | None (read-only) | `group:read` |
+| [`hangar_group_rebalance`](#hangar_group_rebalance) | Groups | Rebalance group membership and reset circuit breaker | Re-checks members, resets circuit | `group:update` |
+| [`hangar_call`](#hangar_call) | Batch and Continuation | Invoke tools on MCP servers (single or batch) | May start cold MCP servers | `tool:invoke`, checked per call |
+| [`hangar_fetch_continuation`](#hangar_fetch_continuation) | Batch and Continuation | Fetch truncated response data | None (read-only) | `tool:invoke` |
+| [`hangar_delete_continuation`](#hangar_delete_continuation) | Batch and Continuation | Delete cached continuation data | Removes cached response | `tool:invoke` |
+
+The Permission column is the `resource:action` a caller needs when authentication is on. Every tool except
+`hangar_fetch_continuation` and `hangar_delete_continuation` needs it as a global grant: a role held only within
+a tenant does not reach them, because they act on the whole fleet. `hangar_call` checks `tool:invoke` for each
+call in the batch, so one batch can carry calls that run and calls that are refused.
+
+## Who sees and calls which tool
+
+With authentication off (`--unsafe-no-auth`, or no `auth` block) every caller may call every tool. With it on,
+what a client sees depends on the topology mode (`tool_access.mode`) and the transport:
+
+| Surface | `tools/list` shows | Calling a tool the caller may not call |
+| --------- | -------------------- | ---------------------------------------- |
+| `egress`, HTTP | All 22 `hangar_*` tools, to every authenticated caller | `isError: true`, text `Not authorized to call '<tool>': <resource>:<action> permission required` |
+| `front_door`, HTTP | Only the `hangar_*` tools the caller may call. Never `hangar_call` or the continuation tools: there the upstream tools are listed under their own names instead | JSON-RPC error `-32601`, the same as an unknown tool |
+| stdio, no `auth.stdio.principal` | `egress`: all 22, each management tool refused with `Authentication required to call '<tool>'`. `front_door`: none | As above |
+| stdio, with `auth.stdio.principal` | As over HTTP, decided on the declared principal's roles | As above |
+
+An HTTP request with no valid credential is refused with `401` before any tool runs. On `front_door` a caller
+holding the built-in `viewer` role sees nine tools: `hangar_list`, `hangar_status`, `hangar_details`,
+`hangar_tools`, `hangar_health`, `hangar_metrics`, `hangar_group_list`, `hangar_discovered` and `hangar_sources`.
+
+## Error shapes
+
+A `hangar_*` tool fails in one of three ways:
+
+- **The tool ran and failed** (an unknown server, a bad continuation id). The call succeeds at the protocol
+  level (`isError: false`) and the result is the error payload every tool uses:
+  `{"error": "unknown_mcp_server: nope", "error_type": "ValueError", "details": {}}`. Read `error_type` to tell
+  it from a normal result.
+- **The call was refused before the tool ran**: authorization, or an invalid server id such as `bad id!`. The
+  result has `isError: true` and one text block, `Error executing tool <tool>: <reason>`.
+- **On `front_door`, a tool not listed for the caller**: JSON-RPC error `-32601`.
+
+The `Errors:` lines below give the `error` text of the first kind.
 
 ## Lifecycle
 
@@ -39,7 +74,7 @@ List all configured MCP servers, groups, and runtime (hot-loaded) MCP servers wi
 
 | Parameter | Type | Default | Description |
 | ----------- | ------ | --------- | ------------- |
-| `state_filter` | `str \| None` | `None` | Filter by state: `"cold"`, `"ready"`, `"degraded"`, `"dead"` |
+| `state_filter` | `str \| None` | `None` | Keep only entries in this state: a server state (`"cold"`, `"ready"`, `"degraded"`, `"dead"`) filters servers, a group state (`"healthy"`, `"partial"`, `"inactive"`) filters groups. An unknown value returns empty lists, not an error |
 
 **Side Effects:** None (read-only).
 
@@ -47,9 +82,11 @@ List all configured MCP servers, groups, and runtime (hot-loaded) MCP servers wi
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `mcp_servers` | `list[object]` | Configured MCP servers with `mcp_server`, `state`, `mode`, `alive`, `tools_count`, `health_status`, `tools_predefined`, `description` |
-| `groups` | `list[object]` | Groups with `group_id`, `state`, `strategy`, `healthy_count`, `members_in_rotation_count`, `total_members` |
-| `runtime_mcp_servers` | `list[object]` | Hot-loaded MCP servers with `mcp_server`, `state`, `source`, `verified`, `ephemeral`, `loaded_at`, `lifetime_seconds` |
+| `mcp_servers` | `list[object]` | Configured MCP servers, group members included, with `mcp_server_id`, `state`, `mode`, `alive`, `tools_count`, `health_status`, `tools_predefined`, `dead`, and `description` when one is configured |
+| `groups` | `list[object]` | Groups, each the same object [`hangar_group_list`](#hangar_group_list) returns: `group_id`, `description`, `state`, `strategy`, `min_healthy`, `healthy_count`, `members_in_rotation_count`, `total_members`, `is_available`, `circuit_open`, `members` |
+| `runtime_mcp_servers` | `list[object]` | Hot-loaded MCP servers with `mcp_server`, `state`, `source`, `verified`, `ephemeral`, `loaded_at`, `lifetime_seconds`, `dead` |
+
+`dead` is `null` unless the server's `state` is `dead`. Then it is the object [`hangar_details`](#hangar_details) reports: `reason` (`given_up`, `crashed`, `start_failed` or `capability_blocked`), `since`, `retry_allowed_at` and `revived_by`.
 
 **Two state vocabularies.** A server's `state` is its lifecycle: `cold`, `initializing`, `ready`, `degraded`, `dead`. A group's `state` is its availability, computed from its members: `inactive`, `partial`, `healthy`, `degraded`. A group's `degraded` means its circuit breaker is open, not that it is failing health checks, and a group is never `cold`: its members are. The same holds wherever a group's `state` appears, in `hangar_start`, `hangar_stop`, `hangar_status`, `hangar_details` and `hangar_group_list`. See [Group States](../guides/MCP_SERVER_GROUPS.md#group-states).
 
@@ -64,8 +101,8 @@ List all configured MCP servers, groups, and runtime (hot-loaded) MCP servers wi
 // Response
 {
   "mcp_servers": [
-    {"mcp_server": "math", "state": "ready", "mode": "subprocess", "alive": true,
-     "tools_count": 4, "health_status": "healthy", "tools_predefined": false}
+    {"mcp_server_id": "math", "state": "ready", "mode": "subprocess", "alive": true,
+     "tools_count": 4, "health_status": "healthy", "tools_predefined": false, "dead": null}
   ],
   "groups": [],
   "runtime_mcp_servers": []
@@ -115,7 +152,7 @@ For a group:
 {"mcp_server": "math", "state": "ready", "tools": ["add", "subtract", "multiply", "divide"]}
 ```
 
-Errors: `ValueError("unknown_mcp_server: <id>")`, `ValueError("unknown_group: <id>")`
+Errors: `unknown_mcp_server: <id>` (`error_type: ValueError`) for a name that is neither a server nor a group.
 
 ### `hangar_stop` {#hangar_stop}
 
@@ -153,10 +190,10 @@ For a group:
 {"mcp_server": "math"}
 
 // Response
-{"stopped": "math", "reason": "manual_stop"}
+{"stopped": "math", "reason": "user_request"}
 ```
 
-Errors: `ValueError("unknown_mcp_server: <id>")`
+Errors: `unknown_mcp_server: <id>` (`error_type: ValueError`)
 
 ### `hangar_status` {#hangar_status}
 
@@ -176,9 +213,9 @@ Human-readable status dashboard of the replica that answers the call, with state
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `mcp_servers` | `list[object]` | MCP servers with `id`, `indicator`, `state`, `mode` |
+| `mcp_servers` | `list[object]` | MCP servers with `id`, `indicator`, `state`, `mode`, `dead`, and a `note` when there is something to say (a cold server's `Will start on first request`, a dead server's reason) |
 | `groups` | `list[object]` | Groups with `id`, `indicator`, `state`, `healthy_members`, `total_members` |
-| `runtime_mcp_servers` | `list[object]` | Hot-loaded MCP servers with `id`, `indicator`, `state`, `source`, `verified` |
+| `runtime_mcp_servers` | `list[object]` | Hot-loaded MCP servers with `id`, `indicator`, `state`, `source`, `verified`, `dead` |
 | `summary` | `object` | Counts: `healthy_mcp_servers`, `total_mcp_servers`, `runtime_mcp_servers`, `runtime_healthy`, plus `uptime` and `uptime_seconds`, which are the answering replica's process uptime (the same values as `replica.*`) |
 | `replica` | `object` | The replica that answered: `instance_id`, `uptime_seconds`, `uptime` |
 | `scope` | `str` | Always `"replica"` |
@@ -199,7 +236,7 @@ Indicator values come from two vocabularies, and `formatted` shows servers and g
 // Response
 {
   "mcp_servers": [
-    {"id": "math", "indicator": "[READY]", "state": "ready", "mode": "subprocess"}
+    {"id": "math", "indicator": "[READY]", "state": "ready", "mode": "subprocess", "dead": null}
   ],
   "groups": [],
   "runtime_mcp_servers": [],
@@ -219,7 +256,7 @@ Reload configuration from disk, applying MCP server additions, removals, and upd
 
 | Parameter | Type | Default | Description |
 | ----------- | ------ | --------- | ------------- |
-| `graceful` | `bool` | `true` | Wait for idle before stopping modified/removed MCP servers |
+| `graceful` | `bool` | `true` | Accepted and recorded on the `ConfigurationReloadRequested` event. Both values stop removed and modified MCP servers at once: `true` does not wait for in-flight calls |
 
 **Side Effects:** Stops removed/modified MCP servers, registers new MCP servers, updates changed MCP servers.
 
@@ -227,7 +264,7 @@ Reload configuration from disk, applying MCP server additions, removals, and upd
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `status` | `str` | `"success"` or `"failed"` |
+| `status` | `str` | `"success"` |
 | `message` | `str` | Human-readable result description |
 | `mcp_servers_added` | `list[str]` | Newly added MCP server IDs |
 | `mcp_servers_removed` | `list[str]` | Removed MCP server IDs |
@@ -235,7 +272,7 @@ Reload configuration from disk, applying MCP server additions, removals, and upd
 | `mcp_servers_unchanged` | `list[str]` | Unchanged MCP server IDs |
 | `duration_ms` | `float` | Reload duration in milliseconds |
 
-On failure, the response includes `error_type` instead of MCP server lists.
+A failed reload answers with the [error payload](#error-shapes): `error` is `Configuration reload failed: <reason>` and `error_type` names the exception, for example `ConfigurationError`. Nothing is applied.
 
 **Example:**
 
@@ -245,7 +282,7 @@ On failure, the response includes `error_type` instead of MCP server lists.
 
 // Response
 {
-  "status": "success", "message": "Configuration reloaded",
+  "status": "success", "message": "Configuration reloaded successfully",
   "mcp_servers_added": ["new-api"], "mcp_servers_removed": [],
   "mcp_servers_updated": ["math"], "mcp_servers_unchanged": ["filesystem"],
   "duration_ms": 45.2
@@ -266,6 +303,7 @@ Load a MCP server from the MCP registry at runtime. Hot-loaded MCP servers are e
 | `force_unverified` | `bool` | `false` | Load unverified MCP servers without confirmation |
 | `allow_tools` | `list[str] \| None` | `None` | Fnmatch patterns for allowed tools |
 | `deny_tools` | `list[str] \| None` | `None` | Fnmatch patterns for denied tools |
+| `approval_tools` | `list[str] \| None` | `None` | Fnmatch patterns for tools that stay visible but wait for a human approval before each call. Refused when the deployment has no approval gate |
 
 **Side Effects:** Downloads and starts the MCP server process. Adds to the runtime registry.
 
@@ -276,19 +314,25 @@ The primary success response:
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `status` | `str` | `"loaded"` |
-| `mcp_server` | `str` | Assigned MCP server ID |
+| `message` | `str` | Result description |
+| `mcp_server_id` | `str` | Assigned MCP server ID; pass it to `hangar_unload` |
+| `mcp_server_name` | `str` | Registry name of the loaded server |
 | `tools` | `list[str]` | Available tool names |
+| `warnings` | `list[str]` | Present only when there is something to warn about |
 
-Other possible `status` values: `"ambiguous"` (multiple matches found, includes `matches` list), `"not_found"` (no match in registry), `"missing_secrets"` (required secrets not configured, includes `missing` list and `instructions`), `"unverified"` (MCP server not verified, use `force_unverified` to override), `"failed"` (configuration error).
+Other possible `status` values, each with a `message`: `"ambiguous"` (several registry entries match the name, listed in `matches`), `"not_found"` (no match in the registry), `"missing_secrets"` (required secrets not configured, with `mcp_server_name`, a `missing` list and `instructions`), `"unverified"` (MCP server not verified, with `mcp_server_name` and `instructions`; use `force_unverified` to override), `"already_loaded"` (with the existing `mcp_server_id`), `"failed"` (hot-loading is not configured, no installable package or runtime for this server, or `approval_tools` asked for with no approval gate configured).
+
+A short name often matches several registry entries: `filesystem` and `time` both answer `"ambiguous"`. Pass a name from `matches`.
 
 **Example:**
 
 ```json
 // Request
-{"name": "filesystem", "allow_tools": ["read_*"]}
+{"name": "<registry name>", "allow_tools": ["read_*"]}
 
 // Response
-{"status": "loaded", "mcp_server": "filesystem", "tools": ["read_file", "read_directory"]}
+{"status": "loaded", "message": "...", "mcp_server_id": "filesystem", "mcp_server_name": "filesystem",
+ "tools": ["read_file", "read_directory"]}
 ```
 
 ### `hangar_unload` {#hangar_unload}
@@ -307,7 +351,7 @@ Unload a hot-loaded MCP server. Only works for MCP servers loaded via `hangar_lo
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `status` | `str` | `"unloaded"` or `"not_hot_loaded"` or `"failed"` |
+| `status` | `str` | `"unloaded"`, `"not_hot_loaded"` (a configured server, or a name Hangar does not know), or `"failed"` (hot-loading is not configured) |
 | `mcp_server` | `str` | MCP Server ID |
 | `message` | `str` | Result description |
 | `lifetime_seconds` | `float` | How long the MCP server was loaded (success only) |
@@ -319,7 +363,7 @@ Unload a hot-loaded MCP server. Only works for MCP servers loaded via `hangar_lo
 {"mcp_server": "filesystem"}
 
 // Response
-{"status": "unloaded", "mcp_server": "filesystem", "message": "MCP Server unloaded",
+{"status": "unloaded", "mcp_server": "filesystem", "message": "Successfully unloaded 'filesystem'",
  "lifetime_seconds": 3600.5}
 ```
 
@@ -344,9 +388,9 @@ List the tools available on a MCP server or group. Tool access filtering (allow_
 | `mcp_server` | `str` | MCP Server ID |
 | `state` | `str` | MCP server state |
 | `predefined` | `bool` | Whether tools are predefined (not discovered at runtime) |
-| `tools` | `list[object]` | Tools with `name`, `description`, `inputSchema` |
+| `tools` | `list[object]` | Tools with `name`, `description`, `inputSchema`, `digest` (the SEP-1766 SHA-256 fingerprint of the tool's schema, the value [digest pinning](configuration.md#digest-pinning) compares) |
 
-For groups, the response includes `group: true` instead of `predefined`.
+For a group, the response carries `group: true` in place of `predefined`, and lists the tools of the member the group's strategy selects, starting it if it is cold. It has no `state`, except `"dead"` with an empty `tools` list when the selected member is dead. A group with no member in rotation, such as one whose members were all stopped, answers `no_healthy_members_in_group: <id>`: `hangar_start` the group first.
 
 **Example:**
 
@@ -364,7 +408,7 @@ For groups, the response includes `group: true` instead of `predefined`.
 }
 ```
 
-Errors: `ValueError("unknown_mcp_server: <id>")`, `ValueError("no_healthy_members_in_group: <id>")`
+Errors: `unknown_mcp_server: <id>`, `no_healthy_members_in_group: <id>` (both `error_type: ValueError`)
 
 ### `hangar_details` {#hangar_details}
 
@@ -384,15 +428,16 @@ For a MCP server:
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `mcp_server` | `str` | MCP Server ID |
+| `mcp_server_id` | `str` | MCP Server ID |
 | `state` | `str` | Current state |
 | `mode` | `str` | MCP Server mode |
 | `alive` | `bool` | Whether the MCP server process is running |
-| `tools` | `list[object]` | Tool list with schemas |
-| `health` | `object` | Health tracking: `consecutive_failures`, `last_check`, etc. |
+| `tools` | `list[object]` | Tool list with schemas, filtered by the tool access policy |
+| `health` | `object` | Health tracking: `consecutive_failures`, `total_invocations`, `total_failures`, `success_rate`, `can_retry`, `last_success_ago` and `last_failure_ago` (seconds, or `null`) |
 | `idle_time` | `float \| None` | Seconds since last use |
-| `meta` | `object` | MCP Server metadata |
-| `tools_policy` | `object` | Tool access policy: `type`, `has_allow_list`, `has_deny_list`, `filtered_count` |
+| `meta` | `object` | MCP Server metadata, such as `init_result`, `tools_count` and `started_at` |
+| `dead` | `object \| None` | `null` unless `state` is `dead`; then `reason`, `since`, `retry_allowed_at`, `revived_by` |
+| `tools_policy` | `object` | Tool access policy: `active` and `unrestricted`; with a policy configured also `has_allow_list` and `has_deny_list`; and `filtered_count` when the policy hid tools from `tools` |
 
 For a group:
 
@@ -418,15 +463,18 @@ For a group:
 
 // Response
 {
-  "mcp_server": "math", "state": "ready", "mode": "subprocess", "alive": true,
-  "tools": [{"name": "add", "description": "Add two numbers"}],
-  "health": {"consecutive_failures": 0, "last_check": "2026-01-15T10:30:00Z"},
+  "mcp_server_id": "math", "state": "ready", "mode": "subprocess", "alive": true,
+  "tools": [{"name": "add", "description": "Add two numbers", "inputSchema": {...}}],
+  "health": {"consecutive_failures": 0, "total_invocations": 2, "total_failures": 0, "success_rate": 1.0,
+             "can_retry": true, "last_success_ago": 16.0, "last_failure_ago": null},
   "idle_time": 45.2,
-  "tools_policy": {"type": "open", "has_allow_list": false, "has_deny_list": false}
+  "meta": {"tools_count": 4, "started_at": 1791133207.8, "init_result": {...}},
+  "dead": null,
+  "tools_policy": {"active": false, "unrestricted": true}
 }
 ```
 
-Errors: `ValueError("unknown_mcp_server: <id>")`
+Errors: `unknown_mcp_server: <id>` (`error_type: ValueError`)
 
 ### `hangar_warm` {#hangar_warm}
 
@@ -447,7 +495,7 @@ Pre-start one or more MCP servers so the first tool call does not incur cold-sta
 | `warmed` | `list[str]` | Successfully warmed MCP server IDs |
 | `already_warm` | `list[str]` | MCP servers that were already running |
 | `skipped_dead` | `list[str]` | Dead MCP servers left alone because no names were given |
-| `failed` | `list[object]` | Failed MCP servers with `id` and `error` |
+| `failed` | `list[object]` | Failed MCP servers with `id` and `error`; an unknown name fails with `McpServer not found` |
 | `summary` | `str` | Human-readable summary |
 
 **Example:**
@@ -481,8 +529,8 @@ Health summary of the replica that answers the call: MCP server state counts and
 | ------- | ------ | ------------- |
 | `status` | `str` | Overall status |
 | `mcp_servers` | `object` | `total` and `by_state` breakdown (`cold`, `ready`, `degraded`, `dead`), counting configured and hot-loaded servers on this replica |
-| `groups` | `object` | `total`, `by_state`, `total_members`, `healthy_members` |
-| `security` | `object` | Rate limiting info: `rate_limiting.active_buckets`, `rate_limiting.config` |
+| `groups` | `object` | `total`, `by_state`, `total_members`, `healthy_members`, `members_in_rotation_count` |
+| `security` | `object` | Rate limiting info: `rate_limiting.active_buckets`, and `rate_limiting.config` with `requests_per_second`, `burst_size`, `scope` |
 | `replica` | `object` | The replica that answered: `instance_id`, `uptime_seconds`, `uptime` |
 | `scope` | `str` | Always `"replica"` |
 | `scope_note` | `str` | The same scope, stated in words |
@@ -497,8 +545,10 @@ Health summary of the replica that answers the call: MCP server state counts and
 {
   "status": "healthy",
   "mcp_servers": {"total": 3, "by_state": {"ready": 2, "cold": 1}},
-  "groups": {"total": 1, "by_state": {"healthy": 1}, "total_members": 3, "healthy_members": 3},
-  "security": {"rate_limiting": {"active_buckets": 0, "config": {"rps": 10, "burst": 20}}},
+  "groups": {"total": 1, "by_state": {"healthy": 1}, "total_members": 3, "healthy_members": 3,
+             "members_in_rotation_count": 3},
+  "security": {"rate_limiting": {"active_buckets": 0,
+                                 "config": {"requests_per_second": 10.0, "burst_size": 20, "scope": "global"}}},
   "replica": {"instance_id": "hangar-0-3fa81c2e", "uptime_seconds": 8100.0, "uptime": "2h 15m"},
   "scope": "replica",
   "scope_note": "This describes what the replica named in replica.instance_id knows, not the fleet. ..."
@@ -515,7 +565,7 @@ MCP Server metrics in JSON or Prometheus exposition format.
 
 | Parameter | Type | Default | Description |
 | ----------- | ------ | --------- | ------------- |
-| `format` | `str` | `"json"` | Output format: `"json"` or `"prometheus"` |
+| `format` | `str` | `"json"` | Output format: `"json"` or `"prometheus"`. Any other value returns JSON |
 
 **Side Effects:** None (read-only).
 
@@ -525,9 +575,9 @@ MCP Server metrics in JSON or Prometheus exposition format.
 | ------- | ------ | ------------- |
 | `mcp_servers` | `dict[str, object]` | Per-MCP server metrics: `state`, `mode`, `tools_count`, `invocations`, `errors`, `avg_latency_ms` |
 | `groups` | `dict[str, object]` | Per-group metrics: `state`, `strategy`, `total_members`, `healthy_members` (members `ready` and in rotation), `members_in_rotation_count` |
-| `tool_calls` | `dict[str, object]` | Per-tool metrics keyed by `MCP server.tool`: `count`, `errors` |
-| `discovery` | `object` | Discovery metrics |
-| `errors` | `dict[str, int]` | Error counts by type |
+| `tool_calls` | `dict[str, object]` | Per-tool metrics keyed by `<mcp_server>.<tool>`: `count`, `errors` |
+| `discovery` | `object` | Discovery metrics per source type: `mcp_servers_discovered`, `mcp_servers_registered`, `mcp_servers_quarantined`, `cycles` |
+| `errors` | `dict[str, int]` | Error counts keyed by the `error_type` label, which for an upstream JSON-RPC error is its code, such as `"-1"` |
 | `performance` | `object` | Performance metrics |
 | `summary` | `object` | Totals: `total_mcp_servers`, `total_groups`, `total_tool_calls`, `total_errors` |
 
@@ -808,7 +858,7 @@ Rebalance a group by re-checking all members. Recovered members rejoin rotation,
 }
 ```
 
-Errors: `ValueError("unknown_group: <id>")`
+Errors: `unknown_group: <id>` (`error_type: ValueError`), also for the ID of a server that is not a group.
 
 ## Batch and Continuation
 
@@ -820,11 +870,13 @@ Invoke tools on MCP servers. Supports single calls and parallel batch execution 
 
 | Parameter | Type | Default | Range | Description |
 | ----------- | ------ | --------- | ------- | ------------- |
-| `calls` | `list[object]` | required | 1--100 items | List of `{MCP server, tool, arguments, timeout?}` objects |
+| `calls` | `list[object]` | required | 0--100 items | List of `{mcp_server, tool, arguments, timeout?}` objects. `mcp_server` is a server or group ID; `arguments` is required, `{}` for none; a per-call `timeout` must be a positive number |
 | `max_concurrency` | `int` | `10` | 1--50 | Parallel workers for this batch |
 | `timeout` | `float` | `60` | 1--300 | Batch timeout in seconds |
 | `fail_fast` | `bool` | `false` | -- | Stop batch on first error |
 | `max_attempts` | `int` | `1` | 1--10 | Total attempts per call including retries |
+
+A value outside its range is clamped to the nearest bound, not rejected: `max_concurrency: 51` runs with 50. An empty `calls` list returns a successful batch with `total: 0`. More than 100 calls is a validation error.
 
 **Side Effects:** May start cold MCP servers. Executes tool calls on MCP servers.
 
@@ -838,11 +890,15 @@ Invoke tools on MCP servers. Supports single calls and parallel batch execution 
 | `succeeded` | `int` | Successful call count |
 | `failed` | `int` | Failed call count |
 | `elapsed_ms` | `float` | Total batch execution time |
-| `results` | `list[object]` | Per-call results with `index`, `call_id`, `success`, `result`, `error`, `error_type`, `elapsed_ms` |
+| `results` | `list[object]` | Per-call results with `index`, `call_id`, `success`, `result`, `error`, `error_type`, `elapsed_ms`. `result` is the upstream's `tools/call` result as it returned it, typically `{"content": [...]}` |
 
-On validation failure, the response contains `validation_errors` (list of `{index, field, message}`) instead of `results`. Individual results may include `truncated: true` with a `continuation_id` for large responses -- use `hangar_fetch_continuation` to retrieve the full data.
+On validation failure -- an unknown server, a missing `arguments`, more than 100 calls -- nothing runs and the response is `{batch_id, success: false, error: "Validation failed", validation_errors}`, where `validation_errors` is a list of `{index, field, message}`, for example `{"index": 0, "field": "mcp_server", "message": "McpServer 'unknown' not found"}`.
 
-Results with retries include `retry_metadata` with `attempts` and `retries` counts.
+A call the caller may not make fails on its own, with `error_type: "AuthorizationDenied"` and `error` `Not authorized to invoke tool '<tool>': tool:invoke permission required`; the rest of the batch runs. A tool error the upstream reports, as a JSON-RPC error or an `isError` result, has `error_type: "ToolInvocationError"` and an `error` starting `tool_error:`.
+
+With truncation enabled, a result over the batch's size budget is cut and carries `truncated: true`, `truncated_reason` (for example `batch_budget_exceeded`), `original_size_bytes` and a `continuation_id` -- use `hangar_fetch_continuation` to retrieve the full data.
+
+When `max_attempts` is above 1, every result carries `retry_metadata`: `attempts` (a count), `retries` (a list, one entry per retry) and `total_time_ms`.
 
 **Example:**
 
@@ -861,9 +917,11 @@ Results with retries include `retry_metadata` with `attempts` and `retries` coun
   "batch_id": "batch-abc123", "success": true, "total": 2,
   "succeeded": 2, "failed": 0, "elapsed_ms": 45.2,
   "results": [
-    {"index": 0, "call_id": "call-1", "success": true, "result": 3,
+    {"index": 0, "call_id": "call-1", "success": true,
+     "result": {"content": [{"type": "text", "text": "3"}]},
      "error": null, "error_type": null, "elapsed_ms": 20.1},
-    {"index": 1, "call_id": "call-2", "success": true, "result": 12,
+    {"index": 1, "call_id": "call-2", "success": true,
+     "result": {"content": [{"type": "text", "text": "12"}]},
      "error": null, "error_type": null, "elapsed_ms": 22.8}
   ]
 }
@@ -879,7 +937,7 @@ Fetch full data for a truncated batch response. Continuation IDs are returned wh
 | ----------- | ------ | --------- | ------- | ------------- |
 | `continuation_id` | `str` | required | starts with `"cont_"` | Continuation ID from a truncated result |
 | `offset` | `int` | `0` | >= 0 | Byte offset to start reading from |
-| `limit` | `int` | `500000` | 1--2000000 | Maximum bytes to return |
+| `limit` | `int` | `500000` | 1--2000000 | Maximum bytes to return. `0` or less uses the default; more than 2000000 is clamped to it |
 
 **Side Effects:** None (read-only cache access).
 
@@ -888,13 +946,13 @@ Fetch full data for a truncated batch response. Continuation IDs are returned wh
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `found` | `bool` | Whether the continuation data exists |
-| `data` | `any` | The continuation data (when found) |
+| `data` | `any` | The continuation data (when found): the original value when this read returns all of it, a string slice of its JSON when it does not |
 | `total_size_bytes` | `int` | Total size of the cached data |
 | `offset` | `int` | Current read offset |
 | `has_more` | `bool` | Whether more data is available |
 | `complete` | `bool` | Whether all data has been returned |
 
-Returns `{found: false, error: "Continuation not found (may have expired)"}` when the continuation ID is invalid or expired.
+Returns `{found: false, error: "Continuation not found (may have expired)"}` when the continuation ID is unknown or expired, and also to a caller other than the tenant and principal whose `hangar_call` produced it.
 
 **Example:**
 
@@ -909,7 +967,7 @@ Returns `{found: false, error: "Continuation not found (may have expired)"}` whe
 }
 ```
 
-Errors: `ValueError` if `continuation_id` is empty, does not start with `"cont_"`, or `offset` is negative.
+Errors (`error_type: ValueError`): `continuation_id is required`, `Invalid continuation_id format (must start with 'cont_')`, `offset must be non-negative`.
 
 ### `hangar_delete_continuation` {#hangar_delete_continuation}
 
@@ -942,4 +1000,4 @@ Returns `{deleted: false, continuation_id: "..."}` when the ID is not found. Ret
 {"deleted": true, "continuation_id": "cont_abc123"}
 ```
 
-Errors: `ValueError` if `continuation_id` is empty.
+Errors: `continuation_id is required` (`error_type: ValueError`) if `continuation_id` is empty. Like a fetch, a delete reaches only the caller's own continuations.

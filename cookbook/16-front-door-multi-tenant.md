@@ -1,7 +1,7 @@
 # 16 -- Front-Door Multi-Tenant
 
 > **Prerequisite:** [12 -- Auth & RBAC](12-auth-rbac.md)
-> **You will need:** MCP Hangar 1.6.0, Docker, an OIDC issuer that mints JWTs with a `tenant_id` claim
+> **You will need:** MCP Hangar 1.6.0 or later, an OIDC issuer that mints JWTs with a `tenant_id` claim and `aud` set to your resource URI
 > **Time:** 20 minutes
 > **Adds:** Front-door topology mode, per-tenant tool access, runtime tool withdrawal, RFC 9728 discovery
 
@@ -32,9 +32,12 @@ auth:                                     # validate JWTs; Hangar does not issue
   oidc:                                   # NEW: OIDC resource server
     enabled: true
     issuer: https://auth.example.com      # your IdP
-    audience: mcp-hangar
-    resource_uri: https://hangar.example.com   # advertised by RFC 9728 metadata
+    audience: mcp-hangar                  # ignored while resource_uri is set
+    resource_uri: https://hangar.example.com   # advertised by RFC 9728 metadata, enforced as aud
     tenant_claim: tenant_id               # JWT claim -> CallerIdentity.tenant_id
+  storage:                                # from recipe 12: holds the admin key used in step 5
+    driver: sqlite
+    path: data/auth.db
 
 mcp_servers:
   payments:
@@ -57,6 +60,16 @@ mcp_servers:
 ```
 
 Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
+
+Because `resource_uri` is set, every token must carry
+`aud: https://hangar.example.com`; the `audience` line is not used. A token
+minted with `aud: mcp-hangar` is refused with `401` and `Invalid JWT audience`.
+[17 -- Multi-Issuer Front Door](17-multi-issuer-front-door.md) explains the
+binding.
+
+Steps 5 and 6 need an admin API key. Mint it as in
+[recipe 12](12-auth-rbac.md), with the gateway stopped:
+`mcp-hangar auth bootstrap-admin --config ~/.config/mcp-hangar/config.yaml --principal service:ops --show-key`.
 
 ## Try It
 
@@ -109,17 +122,21 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
 
 1. Call a tool as a tenant
 
-   Obtain a JWT from your IdP whose `tenant_id` claim is `tenant:b`, then list
-   tools. In front-door mode external agents see flat back-end tool names, not
-   the `hangar_*` meta-API.
+   Obtain a JWT from your IdP whose `tenant_id` claim is `tenant:b` and whose
+   `aud` is `https://hangar.example.com`, then list tools. In front-door mode
+   external agents see flat back-end tool names, not the `hangar_*` meta-API.
 
    ```bash
    curl -s http://localhost:8000/mcp \
      -H "Authorization: Bearer $TENANT_B_JWT" \
      -H "Content-Type: application/json" \
+     -H "Accept: application/json, text/event-stream" \
      -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' \
-     | jq '.result.tools[].name'
+     | sed -n 's/^data: //p' | jq '.result.tools[].name'
    ```
+
+   The answer is a server-sent event (`event: message`, then `data: {...}`),
+   so the `data:` line is stripped before `jq` reads it.
 
    Expected output for `tenant:b` (allow_list of `charge`, `refund`):
 
@@ -147,7 +164,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
    Expected output:
 
    ```json
-   {"withdrawn": true, "mcp_server": "payments", "tool": "refund", "tenant_id": "tenant:b"}
+   {"withdrawn": true, "mcp_server": "payments", "tool": "refund", "kind": "tool", "tenant_id": "tenant:b"}
    ```
 
    Re-running the `tools/list` from step 4 as `tenant:b` now returns only
@@ -166,7 +183,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
    Expected output:
 
    ```json
-   {"restored": true, "mcp_server": "payments", "tool": "refund", "tenant_id": "tenant:b"}
+   {"restored": true, "mcp_server": "payments", "tool": "refund", "kind": "tool", "tenant_id": "tenant:b"}
    ```
 
    Omitting `tenant_id` (or sending `null`) withdraws/restores globally for all
@@ -177,8 +194,10 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
 Setting `tool_access.mode: front_door` flips Hangar's topology from
 trusted-egress to untrusted-front-door. The access resolver now applies a
 fail-closed default: a caller with no tenant identity is denied every tool
-before any server- or group-level policy is even consulted. That is what makes
-the unauthenticated `tools/list` in step 3 return `401`.
+before any server- or group-level policy is even consulted. A valid token
+without a `tenant_id` claim therefore lists no tools at all. The `401` in step
+3 comes earlier, from authentication: `allow_anonymous: false` refuses a
+request that carries no credential before any tool policy runs.
 
 The tenant comes from the JWT `tenant_claim` (default `tenant_id`), which
 Hangar reads into `CallerIdentity.tenant_id` and uses to resolve the
@@ -213,7 +232,8 @@ Hangar **validates** the JWTs your IdP issues; it never issues tokens itself.
 | `tool_projection.tenant_overrides.<tenant>.withdrawn` | list | `[]` | Tools withdrawn for one tenant |
 | `auth.oidc.enabled` | bool | `false` | Enable OIDC/JWT validation |
 | `auth.oidc.issuer` | string | `""` | OIDC issuer; advertised in metadata |
-| `auth.oidc.resource_uri` | string | `""` | Public URI advertised as `resource` |
+| `auth.oidc.audience` | string | `""` | Expected `aud`; ignored while `resource_uri` is set |
+| `auth.oidc.resource_uri` | string | `""` | Public URI advertised as `resource`; also enforced as JWT `aud` when set |
 | `auth.oidc.tenant_claim` | string | `tenant_id` | JWT claim mapped to `tenant_id` |
 
 ## What's Next

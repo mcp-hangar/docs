@@ -69,6 +69,8 @@ gone the moment the process it was minted in exits.
    Initial global admin bootstrapped.
      principal : service:my-app
      key id    : N3xQ...
+     actor     : local-cli-bootstrap
+
      api key   : mcp_QWBXSRQ4OW...
 
    This secret is shown once and is not recoverable. It is stored hashed.
@@ -105,7 +107,7 @@ gone the moment the process it was minted in exits.
    ```
 
    ```json
-   {"key_id": "...", "raw_key": "mcp_aBcDeFg...", "principal_id": "service:my-app", "name": "My App Key"}
+   {"key_id": "...", "raw_key": "mcp_aBcDeFg...", "principal_id": "service:my-app", "name": "My App Key", "expires_at": null, "warning": "Save this key now - it cannot be retrieved later!"}
    ```
 
    Save the `raw_key` -- it is shown only once.
@@ -113,8 +115,11 @@ gone the moment the process it was minted in exits.
 4. Use the key:
 
    ```bash
-   curl -H "X-API-Key: mcp_aBcDeFg..." http://localhost:8000/api/mcp_servers
+   curl -H "X-API-Key: mcp_aBcDeFg..." http://localhost:8000/api/mcp_servers/
    ```
+
+   Keep the trailing slash: without it the gateway answers an authenticated
+   request with a `307` redirect and an empty body.
 
    ```json
    {"mcp_servers": [...]}
@@ -129,14 +134,24 @@ gone the moment the process it was minted in exits.
      -d '{"principal_id": "service:my-app", "role_name": "developer"}'
    ```
 
-6. Set a tool access policy:
+6. Set a tool access policy. The lists hold **tool name** patterns, not
+   principals: this one leaves only `add` and `subtract` callable on `my-mcp`,
+   for every caller.
 
    ```bash
    curl -X POST http://localhost:8000/api/auth/policies/provider/my-mcp \
      -H "X-API-Key: mcp_admin_key..." \
      -H "Content-Type: application/json" \
-     -d '{"allow_list": ["service:my-app"], "deny_list": []}'
+     -d '{"allow_list": ["add", "subtract"], "deny_list": []}'
    ```
+
+   ```json
+   {"scope":"provider","target_id":"my-mcp","allow_list":["add","subtract"],"deny_list":[],"set":true}
+   ```
+
+   A call to any other tool now fails with `Tool not available for this
+   mcp_server`. A principal id in `allow_list` matches no tool, so it would
+   block every tool on the server.
 
 ## What Just Happened
 
@@ -147,11 +162,19 @@ Built-in roles:
 | Role | Can do |
 | ------ | -------- |
 | `admin` | Everything |
-| `provider-admin` | Manage servers and groups, deliver compiled egress policy (`policy:write`). The least-privilege role for a Kubernetes operator API key. |
+| `provider-admin` | Read servers and deliver compiled egress policy (`policy:write`); cannot create, delete, start or stop a server through the API. The least-privilege role for a Kubernetes operator API key. |
 | `developer` | Invoke tools, read and manage server state. Cannot touch egress policy. |
 | `viewer` | Read-only access |
+| `auditor` | Read-only access to audit logs and metrics |
+| `service-account` | Tool invocation only |
 
-Tool access policies add fine-grained control per (principal, MCP server, tool) tuple.
+See [Authentication](../guides/AUTHENTICATION.md#built-in-roles) for each
+role's permissions.
+
+Tool access policies add fine-grained control per MCP server, group, or group
+member (the `provider`, `group` and `member` scopes): which tool names may be
+called there. They name tools, not callers; who may call at all is the role's
+job.
 
 ## Key Config Reference
 

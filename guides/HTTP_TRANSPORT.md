@@ -176,6 +176,19 @@ When a MCP server responds with `Content-Type: text/event-stream`, the client:
 2. Reads events until the response for the request ID is received
 3. Handles timeouts gracefully
 
+### Protocol Versions and Sessions
+
+Hangar opens every remote MCP server with `initialize`, and what the upstream
+answers decides how the rest of the connection is spoken:
+
+- An upstream that answers `initialize` keeps the version it negotiated. If it returns an `Mcp-Session-Id`, Hangar
+  sends that header on every later request, and when the upstream answers a
+  request with `404` (the session is gone, typically after an upstream restart)
+  Hangar runs `initialize` again and retries the request once.
+- A stateless upstream (2026-07-28) answers `initialize` with method-not-found.
+  Hangar then carries the protocol version and client info in each request's
+  `params._meta`, and never sends or stores a session id.
+
 ## Health Checks
 
 Remote MCP servers support the same health check mechanism as local MCP servers:
@@ -189,7 +202,7 @@ mcp_servers:
     max_consecutive_failures: 3
 ```
 
-Health checks use the MCP `initialize` or `tools/list` methods to verify connectivity.
+Health checks call the MCP `tools/list` method, with a 5-second timeout, on a server that is `ready`. A server that is cold or `dead` is not checked.
 
 ## Metrics
 
@@ -198,8 +211,8 @@ HTTP transport exposes the following metrics:
 | Metric | Type | Description |
 | -------- | ------ | ------------- |
 | `mcp_hangar_http_requests_total` | Counter | Total HTTP requests, labeled by mcp_server, method, status_code |
-| `mcp_hangar_http_request_duration_seconds` | Histogram | Request latency |
-| `mcp_hangar_http_errors_total` | Counter | HTTP errors by type |
+| `mcp_hangar_http_request_duration_seconds` | Histogram | Request latency, labeled by mcp_server, method |
+| `mcp_hangar_http_errors_total` | Counter | HTTP errors, labeled by mcp_server and error_type (`http_<status>`, `timeout`, `connection_refused`, `request_failed`, `session_terminated`, `response_too_large`, ...) |
 | `mcp_hangar_http_retries_total` | Counter | Retry attempts, labeled by mcp_server and retry_reason (the status code, or `connection_error`) |
 | `mcp_hangar_messages_sent_total` | Counter | JSON-RPC messages sent, labeled by mcp_server, method |
 | `mcp_hangar_messages_received_total` | Counter | JSON-RPC messages received, labeled by mcp_server, type (response/notification/error) |
@@ -212,12 +225,12 @@ HTTP transport exposes the following metrics:
 When a remote MCP server is unavailable:
 
 1. The MCP server transitions to `DEAD` or `DEGRADED` state
-2. Backoff with exponential retry is applied
-3. Health checks continue to monitor recovery
+2. A `DEGRADED` server is restarted by the recovery saga, with exponential backoff between attempts
+3. A `DEAD` server is not health-checked or restarted on its own: the next call or an explicit start brings it back
 
 ### Authentication Failures
 
-HTTP 401/403 responses are logged and cause MCP server degradation. Check:
+A 401 or 403 from the upstream fails the call with `HTTP error: 401` (or `403`) and is counted in `mcp_hangar_http_errors_total{error_type="http_401"}`. Failing health checks count toward `max_consecutive_failures`, so a server whose credentials stopped working degrades. Check:
 
 1. Credentials in environment variables
 2. Token expiration

@@ -2,36 +2,51 @@
 
 ## Purpose
 
-Branch protection on `main` ensures that every commit landing in the default branch has passed the full CI validation suite. It prevents direct pushes (except in emergencies during solo mode), enforces linear history via squash-merge, and requires conversation resolution before merge.
+Branch protection on `main` in `mcp-hangar/mcp-hangar` ensures that every commit landing in the default branch has passed the full CI validation suite. It prevents direct pushes, enforces linear history (squash-merge; rebase-merge is disabled), and requires conversation resolution before merge.
 
-## Current configuration (solo mode)
+## Current configuration
 
-- Required status checks (strict — branch must be up to date):
-  - `pr-validation / required-check`
-  - `enterprise-boundary`
-  - `pr-title / validate`
-  - `changelog / check`
-  - `branch-name / validate`
-  - `pr-body / validate`
+Two layers apply to `main`, and both must pass.
+
+Classic branch protection:
+
+- Required status checks (strict — branch must be up to date): the 14 listed below
 - Required approving reviewers: 0
 - Require code owner reviews: false
-- Enforce admins: false
+- Enforce admins: **true**
 - Required linear history: true
 - Allow force pushes: false
 - Allow deletions: false
 - Block creations: false
 - Required conversation resolution: true
 
+Repository rulesets, both with an always-bypass for the admin role:
+
+- `main` (default branch): no deletion, no force push.
+- `main-integrity` (`refs/heads/main`): no deletion, no force push, linear
+  history, the same 14 status checks (strict), and a pull request with 0
+  approvals and every review thread resolved.
+
+Read the live state with `gh api repos/mcp-hangar/mcp-hangar/branches/main/protection`
+and `gh api repos/mcp-hangar/mcp-hangar/rules/branches/main`.
+
 ## Required status checks
+
+The context is the job name; a check from a reusable workflow is
+`<calling job> / <reusable job>`.
 
 | Check name | Workflow file | What it enforces |
 | --- | --- | --- |
-| `pr-validation / required-check` | `pr-validation.yml` | Paths-filter summary gate |
-| `enterprise-boundary` | `security.yml` | No cross-boundary imports |
+| `required-check` | `pr-validation.yml` | Paths-filter summary gate |
+| `check` | `changelog-check.yml` | Changelog fragment present in `changelog.d/` |
 | `pr-title / validate` | `pr-title.yml` | Conventional Commits title |
-| `changelog / check` | `changelog-check.yml` | CHANGELOG entry present |
 | `branch-name / validate` | `branch-name.yml` | Branch naming convention |
 | `pr-body / validate` | `pr-body.yml` | PR body section structure |
+| `lint` | `ci-core.yml` | ruff check and format, mypy, import contracts |
+| `test (3.11)`, `test (3.12)`, `test (3.13)`, `test (3.14)` | `ci-core.yml` | Tests per Python version; on a pull request 3.12 and 3.13 report a skip and run on `main` only |
+| `decision-coverage` | `ci-core.yml` | Branch-coverage floors on decision paths |
+| `integration`, `integration-newest` | `ci-core.yml` | Integration tests |
+| `build` | `ci-core.yml` | Package build |
 
 ## Solo vs community mode
 
@@ -44,6 +59,12 @@ Branch protection on `main` ensures that every commit landing in the default bra
 Flip to community mode when there is at least one second maintainer. Until then `require_code_owner_reviews: true` would block all merges to CODEOWNERS-protected paths since GitHub does not allow self-approval.
 
 ## Applying the protection
+
+`scripts/setup-branch-protection.sh` has not kept up: it still writes the six
+checks of an older layout, two of which (`pr-validation / required-check` and
+`enterprise-boundary`) no job reports, and its solo mode sets
+`enforce_admins: false`. Running it replaces the live list above. Update its
+`contexts` array before running it; the rulesets are not managed by the script.
 
 ```bash
 bash scripts/setup-branch-protection.sh
@@ -66,9 +87,7 @@ bash scripts/setup-branch-protection.sh --dry-run
 
 ## Emergency bypass
 
-In solo mode (`enforce_admins: false`) the maintainer can push directly via `git push origin main` for true emergencies. This bypasses all checks — use only when CI itself is broken or a critical hotfix cannot wait.
-
-In community mode (`enforce_admins: true`) bypass requires:
+With `enforce_admins: true`, which is the live setting, a direct `git push origin main` is refused even for an admin; the rulesets' admin bypass does not lift the classic protection. Use only when CI itself is broken or a critical hotfix cannot wait. Bypass requires:
 
 1. Temporarily set `enforce_admins: false` via GitHub UI.
 2. Perform the emergency action.

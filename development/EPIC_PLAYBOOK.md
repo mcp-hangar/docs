@@ -28,9 +28,9 @@ Example: ADR-NNN merged with `Status: Accepted` before child #1 opens.
 
 ## Tracking on the GH Project board
 
-The epic issue carries a `Target Release` field. Children inherit the field value.
+The epic issue carries a `Target Release` field. Set the same value on each child; the board does not copy it.
 Use the project board to visualize progress across children.
-Example: epic issue carries `Target Release: 1.2.0`; children inherit the field.
+Example: epic issue carries `Target Release: 1.2.0`, and so does each child.
 
 <!-- TODO: expand after first epic completes -->
 

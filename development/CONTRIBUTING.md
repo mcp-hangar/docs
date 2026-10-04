@@ -7,6 +7,9 @@ git clone https://github.com/mcp-hangar/mcp-hangar.git
 cd mcp-hangar
 
 # Install with dev dependencies
+uv sync --extra dev
+
+# Or with pip
 pip install -e ".[dev]"
 
 # Or use root Makefile
@@ -46,20 +49,19 @@ mcp-hangar/
 │   ├── server/           # MCP server module (see below)
 │   └── fastmcp_server/   # MCP-over-HTTP server (FastMCP-based)
 ├── tests/                # Python tests
-├── packages/
-│   └── core/             # vestigial pre-v0.13 package location; real source
-│                         # is src/mcp_hangar/, tracked for removal
+├── changelog.d/          # one changelog fragment per PR
+├── upgrade.d/            # one upgrade note per change a reader must act on
 ├── docs/                 # internal architecture/design docs (not this docs
 │                         # site -- that's the separate docs repo)
 ├── examples/             # Quick starts, OTEL recipes
-├── docker/               # Per-example-server Dockerfiles
+├── fuzz/                 # Fuzz targets (ClusterFuzzLite)
 ├── security/             # Seccomp profiles, network policies
 ├── scripts/              # Dev/release tooling
 └── Makefile              # Root orchestration
 ```
 
-There is no `packages/operator/`, `packages/ui/`, or `packages/helm-charts/`
-in this repo -- those live in the separate repos listed above.
+There is no `packages/` directory in this repo: the operator and the Helm
+charts live in the separate repos listed above.
 
 ## Python Core Structure
 
@@ -68,7 +70,7 @@ src/mcp_hangar/
 ├── domain/           # DDD domain layer
 │   ├── model/        # Aggregates, entities
 │   ├── services/     # Domain services
-│   ├── events.py     # Domain events
+│   ├── events/       # Domain events
 │   ├── contracts/    # Interfaces consumed by src/mcp_hangar/
 │   └── exceptions.py
 ├── application/      # Application layer
@@ -127,8 +129,8 @@ def invoke_tool(
 ## Testing
 
 ```bash
-pytest -v -m "not slow"
-pytest --cov=mcp_hangar --cov-report=html
+uv run pytest tests/unit -q
+uv run pytest tests/unit --cov=mcp_hangar --cov-report=html
 
 # Or from root
 make test
@@ -176,7 +178,7 @@ PRs must follow the template in [`.github/PULL_REQUEST_TEMPLATE.md`](https://git
 **Value Objects:**
 
 ```python
-mcp_server_id = ProviderId("my-mcp-server")  # Validated
+mcp_server_id = McpServerId("my-mcp-server")  # Validated
 ```
 
 **Events:**
@@ -215,7 +217,7 @@ except McpServerStartError as e:
 **Logging:**
 
 ```python
-logger.info("mcp_server_started: %s, mode=%s", mcp_server_id, mode)
+logger.info("mcp_server_started", mcp_server_id=mcp_server_id, mode=mode)
 ```
 
 ## Releasing
@@ -226,12 +228,12 @@ MCP Hangar uses automated CI/CD for releases. The process ensures quality throug
 
 1. **Version Validation** — Tag must match `pyproject.toml` version
 2. **Full Test Suite** — All tests across Python 3.11-3.14
-3. **Security Scanning** — Dependency audit and container scanning
+3. **Wheel smoke test** — the built wheel is installed and run, not the source tree
 4. **Artifact Publishing** — PyPI package and Docker images
 
 ### Creating a Release
 
-Releases are automated via [release-please](https://github.com/googleapis/release-please). When Conventional Commit PRs merge to `main`, release-please maintains a long-running Release PR that bumps the version and updates the changelog. Merging that PR creates the version tag, which `release.yml` consumes to publish to PyPI and GHCR.
+Releases are automated via [release-please](https://github.com/googleapis/release-please). When Conventional Commit PRs merge to `main`, release-please maintains a long-running Release PR that bumps the version, and the changelog is assembled onto it from `changelog.d/`. Merging that PR creates the version tag, which `release.yml` consumes to publish to PyPI and GHCR.
 
 See [RELEASE.md](../runbooks/RELEASE.md) for the full operational runbook.
 
@@ -265,20 +267,24 @@ Before releasing, ensure:
 
 - [ ] All tests pass locally: `pytest -v`
 - [ ] Linting passes: `pre-commit run --all-files`
-- [ ] CHANGELOG.md is updated with all notable changes
+- [ ] Every non-trivial PR added its `changelog.d/` fragment (never edit CHANGELOG.md)
 - [ ] Documentation is updated for new features
-- [ ] Breaking changes are clearly documented
+- [ ] Breaking changes have an upgrade note in `upgrade.d/`
 - [ ] Version follows [Semantic Versioning](https://semver.org/)
 
 ### Versioning Guidelines
 
-We follow Semantic Versioning (SemVer):
+release-please computes the version from the Conventional Commit types:
 
 | Change Type | Version Bump | Example |
 | ------------- | -------------- | --------- |
-| Bug fixes, patches | PATCH | 1.0.0 → 1.0.1 |
-| New features (backward-compatible) | MINOR | 1.0.1 → 1.1.0 |
-| Breaking changes | MAJOR | 1.1.0 → 2.0.0 |
+| Bug fixes, patches | PATCH | 2.22.0 → 2.22.1 |
+| New features (backward-compatible) | MINOR | 2.22.1 → 2.23.0 |
+| Breaking changes | MINOR, with an upgrade note | 2.23.0 → 2.24.0 |
+
+The 2.x line never computes a major: no commit uses `!` or `BREAKING CHANGE:`.
+A major is a maintainer decision. See the
+[deprecation policy](GIT_FLOW.md#deprecation-policy).
 
 ### Release Artifacts
 
@@ -309,6 +315,8 @@ Please read our [Code of Conduct](../code-of-conduct.md) before contributing.
 
 ## First Contribution?
 
-Look for issues labeled [`good first issue`](https://github.com/mcp-hangar/mcp-hangar/labels/good%20first%20issue).
+Browse the [open issues](https://github.com/mcp-hangar/mcp-hangar/issues); the
+repository has no `good first issue` label yet.
 
-Questions? Open a [Discussion](https://github.com/mcp-hangar/mcp-hangar/discussions).
+Questions? Open an [issue](https://github.com/mcp-hangar/mcp-hangar/issues/new);
+GitHub Discussions are not enabled.

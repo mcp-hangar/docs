@@ -13,7 +13,8 @@ General repository conventions, such as language requirements and source layout,
 External contributors should also consult CONTRIBUTING.md for environment setup.
 
 Rules defined here are enforced by CI via required status checks (pr-title.yml,
-branch-name.yml, changelog-check.yml, pr-body.yml, pr-validation.yml, security.yml).
+branch-name.yml, changelog-check.yml, pr-body.yml, pr-validation.yml, ci-core.yml);
+see [BRANCH_PROTECTION.md](BRANCH_PROTECTION.md) for the exact check names.
 Enforcement details are listed under Automation surface.
 
 ## Decision log
@@ -28,7 +29,7 @@ The following table tracks the evolution of git and workflow standards.
 | 4 | Stale bot | 90-day stale, 30-day close (applied via stale.yml) | Tightened from 180/90 post-1.0 per PR #113. |
 | 5 | CC scope list | 13 approved, 3 rejected, 1 deferred | Auth, events, and cqrs were collapsed into core or security to reduce noise. Proto deferred pending higher change frequency. |
 | 6 | Release cadence | ad-hoc, release-please planned | - |
-| 7 | Deprecation policy | post-1.0 SemVer: deprecate in minor, remove in next major | Project is at v2.0.0. Breaking changes require a major version bump. |
+| 7 | Deprecation policy | 2.x: a change that breaks callers ships as a minor with an upgrade note | A major is a maintainer decision, never computed from a commit; see Deprecation policy. |
 | 8 | Dependabot auto-merge | auto-merge dev, actions, and runtime CVE patches | Runtime CVE patches are included in auto-merge to maintain security posture with minimal manual intervention. |
 | 9 | ADR authorship | agents may draft, maintainer authors PR | - |
 | 10 | Pre-release flow location | documented in this file (see Pre-release flow) | - |
@@ -37,7 +38,8 @@ The following table tracks the evolution of git and workflow standards.
 ## Branch naming and merge strategy
 
 The project uses a squash-merge strategy for all pull requests.
-Rebase-merge and merge-commit are disabled at the repository level.
+Rebase-merge is disabled at the repository level, and the required linear history
+on `main` refuses a merge commit.
 This preserves a linear history where every commit on main corresponds
 to exactly one PR whose title was validated by `pr-title.yml`.
 Branch names must follow a structured prefix pattern to support automation.
@@ -53,6 +55,8 @@ Standard prefixes:
 - build/ (build system or dependency changes)
 - ci/ (continuous integration configuration)
 - chore/ (routine maintenance)
+- revert/ (reverting an earlier change)
+- security/ (security fixes)
 - hotfix/<vX.Y.Z> (emergency fixes)
 
 Tool-specific prefixes:
@@ -81,7 +85,6 @@ define their own the same way.
 | Scope | Description |
 | ------- | ------------- |
 | core | Logic in src/mcp_hangar/domain/ or application/ |
-| enterprise | **Legacy.** Pre-MIT-relicense name for logic in src/mcp_hangar/auth, compliance, integrations, approvals, and infrastructure/persistence. The scope is still CI-accepted for compatibility; prefer `core` or `security` in new commits. |
 | cli | Command line interface and Typer registration |
 | ci | Continuous integration workflow changes |
 | operator | Kubernetes operator components |
@@ -91,6 +94,7 @@ define their own the same way.
 | security | Authentication, authorization, and secret management |
 | docs | Markdown documentation and MkDocs config |
 | deps | Dependency updates and lockfile changes |
+| deps-dev | Development-only dependency updates |
 | release | Release artifacts and versioning |
 | repo | Root-level governance files: AGENTS.md, CODEOWNERS, LICENSE |
 | infra | Dockerfile, Makefile, and local dev setup |
@@ -106,9 +110,12 @@ Deferred:
 
 - proto (revisit when protobuf change frequency justifies)
 
+`enterprise`, the pre-MIT-relicense name for the auth, compliance, integrations
+and approvals code, is no longer accepted; use `core` or `security`.
+
 ### `mcp-hangar/helm-charts`
 
-Accepted scopes: `agent`, `ci`, `deps`, `docs`, `hangar`, `infra`,
+Accepted scopes: `ci`, `deps`, `docs`, `hangar`, `infra`,
 `operator`, `release`, `repo`. Note this repo uses `hangar` where the core
 table above uses `helm` -- the two lists are independent, not aliases of
 each other.
@@ -133,7 +140,7 @@ flowchart TD
     F --> G[Squash merge]
     B -- Critical --> H[Branch from last tag]
     H --> I[Implement hotfix]
-    I --> J[Manual tag vX.Y.Z-hotfix.N]
+    I --> J[Manual tag vX.Y.Z]
     J --> K[Cherry-pick to main]
      K --> L[See HOTFIX_RUNBOOK.md]
 ```
@@ -182,7 +189,7 @@ flowchart TD
 Until the project has at least 5 active external contributors, Phase A may be conducted as a draft PR with `Status: Proposed` and label `rfc`, held open for a 5-14 day soak. GH Discussion is not required. If external comment arrives, incorporate. If not, proceed to merge after soak. Revisit this fallback when sustained Discussion traffic exists.
 
 ADRs must be merged before implementation begins.
-Once a status is set to `**Status:** Accepted` (per ADR-006 line 3), the ADR is immutable.
+Once a status is set to `**Status:** Accepted` (line 3 of the ADR), the ADR is immutable.
 Changes require a new ADR that supersedes the old one with bidirectional references.
 Agents may draft ADRs in issue comments but never author the PR.
 
@@ -198,11 +205,15 @@ Agents may draft ADRs in issue comments but never author the PR.
 
 ## Deprecation policy
 
-The project is at v2.0.0 and follows standard SemVer deprecation rules:
+The 2.x line does not compute a major version from commits. A change that
+breaks callers ships as a **minor**, with an upgrade note in the core repo's
+`upgrade.d/` naming the old and the new form; 2.2.0, 2.3.0 and 2.24.0 shipped
+that way. A commit never uses `!` or a `BREAKING CHANGE:` footer, which would
+make release-please compute a major. A major is a maintainer decision.
 
-- Deprecations must be marked in at least one minor release.
-- Removal occurs earliest in the next major release.
-- ADR-008 will formalize additional deprecation workflow details.
+- Mark a deprecation in at least one minor release before removing it where
+  the change allows.
+- Every removal or behaviour change a reader must act on gets its upgrade note.
 
 ## Pre-release flow
 
@@ -250,8 +261,10 @@ separate `## [Unreleased]` blocks by hand. release-please now runs with
 fragments own the prose.
 
 Enforced by `changelog-check.yml`, which requires an added fragment on any PR
-touching `src/`, `pyproject.toml` or `packages/`, renders it to catch a
-malformed one at PR time, and is bypassed by the `skip-changelog` label.
+touching `src/` or `pyproject.toml`, renders it to catch a
+malformed one at PR time, and is bypassed by the `skip-changelog` label. A PR
+whose title is `ci`, `test`, `style` or `docs`, or a `deps`/`deps-dev`
+`chore`/`ci`/`build` bump, needs no fragment.
 See `changelog.d/README.md` in the core repo.
 
 ## Release cadence and process
@@ -284,9 +297,10 @@ images and charts are cosign-signed.
   merging it tags `vX.Y.Z`, consumed by `release.yml` to publish to PyPI and
   a signed Docker image on GHCR.
 - **operator** (`mcp-hangar/mcp-hangar-operator`): pushing a `v*.*.*` tag
-  publishes a signed image and an `install.yaml` manifest to GHCR.
-- **helm-charts** (`mcp-hangar/helm-charts`): push-to-main publishes the OCI
-  charts to GHCR.
+  publishes a signed image to GHCR and attaches the rendered `install.yaml` to
+  the GitHub Release.
+- **helm-charts** (`mcp-hangar/helm-charts`): a push to `main` that touches a
+  chart publishes the OCI charts to GHCR.
 
 ## Hotfix process
 
@@ -301,7 +315,7 @@ Detailed manual steps are in [HOTFIX_RUNBOOK.md](HOTFIX_RUNBOOK.md).
 
 ### Active today
 
-This is the core repo's (`mcp-hangar/mcp-hangar`) full workflow set.
+These are the core repo's (`mcp-hangar/mcp-hangar`) main workflows.
 Per ADR-009, chart and operator CI live in their own repos -- `mcp-hangar/helm-charts`
 and `mcp-hangar/mcp-hangar-operator` respectively -- not here.
 
@@ -315,28 +329,34 @@ PR gates:
 - ci-core.yml (lint, domain and application tests, integration, build)
 - ci-docs.yml (markdown linting via markdownlint-cli2)
 - actionlint.yml (workflow file linting)
+- domain-lint.yml (rejects non-canonical `mcp-hangar.io` hosts in URLs, ADR-011)
 - security.yml (dependency-audit, codeql, container-scan, secrets-scan, semgrep, sbom)
 
 Release:
 
 - release.yml (PyPI publishing, releases and pre-releases alike)
 - release-please.yml (automated version bump and Release PR)
+- image-main.yml (image built from `main`)
 
 Housekeeping:
 
 - stale bot (stale.yml)
 - Dependabot auto-merge (dependabot-automerge.yml)
-- project-add.yml (adds new issues and PRs to the project board)
+- project-board.yml (adds new issues and PRs to the project board and moves their status)
+- labels-sync.yml (applies `.github/labels.yml`)
 - live-verify.yml (black-box live verification; opt-in via workflow_dispatch and nightly, not on PRs)
+- other checks, none of them required: conformance.yml, fuzz.yml, cfl-pr.yml and
+  cfl-batch.yml, deps-floor-audit.yml, examples-compose.yml, task-relay-smoke.yml,
+  interceptor-pin-drift.yml (scheduled), scorecard.yml
 
 ### Retained but enforcing nothing
 
 The former enterprise import boundary is **no longer enforced**.
-Both `security.yml`'s `import-boundary` job and `pr-validation.yml`'s
-`enterprise-boundary` job are no-op stubs whose only step echoes a message,
-v1.3 having folded the enterprise package into `src/mcp_hangar/`.
-Both jobs still run and still report green.
-Do not rely on either to catch a boundary violation.
+`security.yml`'s `import-boundary` job is a no-op stub whose only step echoes a
+message, v1.3 having folded the enterprise package into `src/mcp_hangar/`. It
+still runs and still reports green; do not rely on it to catch a boundary
+violation. Import rules that are enforced live in `.importlinter`, checked by
+the `lint` job.
 
 ### Reviewer-only (not auto-enforced)
 

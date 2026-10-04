@@ -22,8 +22,12 @@ Otherwise hand-author the smallest possible diff. No refactoring.
 ## 4. Test minimal subset
 
 ```bash
-pytest tests/security/ tests/<affected_module>/
+uv run pytest -m security tests/unit/
+uv run pytest tests/unit/<affected_tests>
 ```
+
+Security tests live in `tests/unit` with the `security` marker; there is no
+`tests/security/` directory.
 
 Full suite is optional locally; CI runs it on the PR.
 
@@ -49,7 +53,11 @@ the headings stay in descending order.
 
 ## 6. Bump pyproject.toml
 
-Patch version only. Update the `version` field in `pyproject.toml`.
+Patch version only. Update the `version` field in `pyproject.toml`, and both
+`version` and `packages[0].version` in `server.json`: `release.yml` refuses a tag
+that does not match `pyproject.toml`, and its MCP registry job refuses one that
+does not match `server.json`. Run `uv lock` so `uv.lock` carries the same
+version, as release-please would.
 
 ## 7. Tag and push
 

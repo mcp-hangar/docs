@@ -51,7 +51,7 @@ license tier or gated by license keys.
 - **Digest Pinning** -- SHA-256 tool-schema verification ([ADR-004](../adr/ADR-004-sep-1766-digest-pinning.md))
 - **Interceptor Framework** -- Experimental pre/post hooks, off by default ([ADR-005](../adr/ADR-005-sep-1763-interceptor-compliance.md))
 
-## The per-request enforcement pipeline (core, v1.6.0)
+## The per-request enforcement pipeline (core)
 
 Every governed synchronous `tools/call` funnels through a single chokepoint (the
 batch executor; the front-door flat `tools/call` handler delegates to it to reuse
@@ -66,13 +66,15 @@ tool invocation, just before any bytes leave for the upstream:
 | 3 | **Tool-withdrawal check** | Per-tenant withdrawal of a previously exposed tool | v1.6.0 |
 | 4 | **Tool-schema digest-pin verify** | SHA-256 pin over the tool's canonical schema; audit/warn/block, fails closed under block | v1.6.0 (opt-in) |
 | 5 | **Circuit-breaker / health** | Two different things. A server's own breaker refuses the call. A group's breaker does not: nothing on the call path asks it, so a member still in rotation is still selected and still served, and the call is refused with `NoAvailableMemberError` only when no member is left in rotation | v1.6.0 |
-| 6 | **Interceptor validators** | Empty/no-op unless explicitly configured | v1.6.0 (experimental, **off by default**) |
-| 7 | **Approval gate (HITL)** | A tool matched by `tools.approval_list` is **held** for a human decision (`approval_timeout_seconds`, default 300); denial or expiry refuses the call. Fails closed | 2.1.0 (reachable) |
-| 8 | **Concurrency / backpressure** | Global + per-server semaphores | v1.6.0 |
-| 9 | **Interceptor mutators (request)** | Argument rewriting; no-op unless configured | v1.6.0 (experimental, off) |
-| 10 | **Egress L7 policy** | **The last gate before the wire.** Tool-name globs + secret-pattern + payload-size scan; DENY or REQUIRE_APPROVAL. Evaluated inside tool invocation, before cold-start and before any upstream I/O | v1.6.0 |
+| 6 | **Interceptor validators** | Empty unless `interceptors.validators` registers one (the built-in is `payload_size`) | v1.6.0 (experimental, **off by default**) |
+| 7 | **Tenant budget** | Per-tenant concurrency and rate from `execution.tenant_limits`; nothing is limited without that section | 2.21.0 |
+| 8 | **Approval gate (HITL)** | A tool matched by `tools.approval_list`, or by an L7 `requireApproval` rule, is **held** for a human decision (`approval_timeout_seconds`, default 300); denial or expiry refuses the call. Fails closed | 2.1.0 (reachable) |
+| 9 | **Cold start** | Single-flight start of a cold or DEAD target; a digest pin that had to wait for the catalogue is checked once the server is up | |
+| 10 | **Concurrency / backpressure** | Global + per-server semaphores | v1.6.0 |
+| 11 | **Interceptor mutators (request)** | Argument rewriting; no configuration registers a mutator, so this is a no-op | v1.6.0 (experimental, off) |
+| 12 | **Egress L7 policy** | **The last gate before the wire.** Tool-name globs + secret-pattern + payload-size scan; DENY or REQUIRE_APPROVAL. Evaluated inside tool invocation, before the `tools/call` reaches the upstream. It runs after the cold start, so a call it refuses can still have started a cold server | v1.6.0 |
 | → | **Upstream MCP server** | Hangar-originated connection | |
-| 11 | **Interceptor mutators (response)** + **response truncation** | Response-side transforms; oversized responses truncated | v1.6.0 |
+| 13 | **Interceptor mutators (response)** + **response truncation** | Response-side mutators (none registered); batch truncation when `truncation.enabled` is set | v1.6.0 |
 
 **Cross-cutting: audit & observability.** Every governed step emits both **domain
 events** (on the event bus, persisted to the event store) and **OTel spans**
@@ -88,7 +90,7 @@ Notes and honest caveats:
   `interceptors/list` endpoints are conformance-shaped no-ops. Do not treat
   interceptors as a live enforcement control. See
   [Interceptor Framework](INTERCEPTOR_FRAMEWORK.md).
-- **The HITL gate (step 7) prompts a human and waits — from 2.1.0 only.** The
+- **The HITL gate (step 8) prompts a human and waits — from 2.1.0 only.** The
   control existed and was unit-tested from v1.6.0, but on every shipped build no
   config key could put a tool behind it, the gate service was never constructed,
   and `GET /api/approvals` answered `500` while the gated call executed
@@ -96,10 +98,11 @@ Notes and honest caveats:
   wired on all construction paths from 2.1.0, and a config that demands it
   without a gate service now refuses the boot rather than starting ungated. See
   [`approval_list`](../reference/configuration.md#holding-a-tool-for-a-human-approval_list).
-- **The sync L7 `requireApproval` outcome is a different control and still fails
-  closed** — it blocks the call outright. It is not an approval queue and does not
-  enqueue one. Nor is the v2 relay consent gate (below) a human prompt: it fails
-  closed on a decision the client volunteers by driving `tasks/update`.
+- **The sync L7 `requireApproval` outcome goes to the same approval gate** (step 8),
+  and a granted approval lets the call past the L7 verdict; `deny` still wins.
+  Where no approval gate is configured it fails closed and blocks the call. The
+  v2 relay consent gate (below) is not a human prompt: it fails closed on a
+  decision the client volunteers by driving `tasks/update`.
 - Deeper detail: [Front-Door Mode & Per-Tenant Tool Governance](../guides/FRONT_DOOR.md),
   [Egress Policy](../guides/EGRESS_POLICY.md), [Authentication & RBAC](../guides/AUTHENTICATION.md).
 
@@ -121,7 +124,7 @@ version is `v1alpha2`. See [ADR-013](../adr/ADR-013-egress-policy-enforcement-mo
   server pod may reach. FQDN upstreams require the Cilium flavor.
 - **MCPEgressPolicy controller** — compiles an `MCPEgressPolicy` CR and pushes the
   L7 policy down to the core engine, where it is enforced at the tool-invocation
-  chokepoint (control #10 above).
+  chokepoint (control #12 above).
 
 **End-to-end L7 egress enforcement is shipped.** The core L7 engine and REST
 intake arrived in 1.6.0; the operator's MCPEgressPolicy controller compiles a
@@ -176,12 +179,12 @@ The Python core follows Domain-Driven Design with strict layer separation:
 src/mcp_hangar/
 +-- domain/           Core business logic (NO external dependencies)
 |   +-- model/        Aggregates: MCP Server, McpServerGroup
-|   +-- events.py     Domain events
+|   +-- events/       Domain events
 |   +-- exceptions.py Exception hierarchy
 |   +-- value_objects/ McpServerId, McpServerMode, IdleTTL, ToolDigest, etc.
 |   +-- policies/     Egress L7 policy engine (deterministic evaluate())
 |   +-- services/     Digest validator, tool-access resolver, task consent
-|   +-- contracts/    Interfaces (IMetricsPublisher, IMcpServerRuntime)
+|   +-- contracts/    Interfaces (IMetricsPublisher, McpServerRuntime, IEventStore)
 |   +-- security/     Rate limiting, input validation
 |
 +-- application/      Use cases and orchestration
@@ -189,13 +192,13 @@ src/mcp_hangar/
 |   +-- queries/      Query handlers (CQRS read side)
 |   +-- sagas/        Long-running processes (recovery, failover)
 |   +-- event_handlers/ React to domain events
-|   +-- services/     Application services (TracedMcpServerService)
+|   +-- services/     Application services (McpServerService, ValidatorPipeline, MutatorPipeline)
 |   +-- ports/        Port interfaces (ObservabilityPort)
 |
 +-- infrastructure/   External concerns (implements domain contracts)
 |   +-- discovery/    Docker, K8s, filesystem, entrypoint sources
 |   +-- identity/     Identity middleware (tenant binding)
-|   +-- persistence/  Repositories, Event Store (SQLite, in-memory)
+|   +-- persistence/  Repositories, Event Store (SQLite, PostgreSQL, in-memory)
 |   +-- registry/     Registry client
 |   +-- event_bus.py  In-process event bus
 |   +-- command_bus.py CQRS command dispatcher
@@ -246,6 +249,7 @@ stateDiagram-v2
     INITIALIZING --> DEAD: failure
     READY --> DEGRADED: failures ≥ threshold
     DEGRADED --> INITIALIZING: reinitialize
+    DEGRADED --> DEAD: recovery gives up
     DEAD --> INITIALIZING: retry < max
 ```
 
@@ -256,7 +260,7 @@ stateDiagram-v2
 | COLD | INITIALIZING |
 | INITIALIZING | READY, DEAD, DEGRADED |
 | READY | COLD, DEAD, DEGRADED |
-| DEGRADED | INITIALIZING, COLD |
+| DEGRADED | INITIALIZING, COLD, DEAD |
 | DEAD | INITIALIZING, DEGRADED |
 
 There is no direct DEGRADED -> READY transition. Degraded MCP servers must
@@ -290,12 +294,14 @@ PROVIDER(10) < PROVIDER_GROUP(11) < EVENT_BUS(20) < EVENT_STORE(30) < SAGA_MANAG
 
 | Thread | Purpose |
 | -------- | --------- |
-| Main | FastMCP server, tool calls |
+| Main | FastMCP server |
+| Batch executor pool | Runs each call of a batch, gates included |
 | Reader (per MCP server) | Read stdout, dispatch responses |
 | Stderr Reader (per MCP server) | Capture stderr into log buffer |
 | GC Worker | Idle MCP server cleanup |
 | Health Worker | Periodic health checks |
 | Metrics Snapshot Worker | Periodic metrics history capture |
+| Group Recovery Worker | Starts this replica's group members again |
 
 ### Safe I/O Pattern
 
@@ -317,11 +323,16 @@ response = client.call(...)  # Outside lock
 
 ### Circuit Breaker
 
-MCP Server groups use a circuit breaker to isolate failing members:
+Two mechanisms carry the name.
 
-- **CLOSED** -- Normal operation, failures tracked
-- **OPEN** -- Requests rejected, backoff timer active
-- **HALF_OPEN** -- Single test request allowed to probe recovery
+- **A server's own breaker** is its health tracker: once its consecutive
+  failures reach `max_consecutive_failures` the batch executor refuses calls to
+  it with `CircuitBreakerOpen` (control #5).
+- **A group's circuit** opens after `circuit_breaker.failure_threshold` member
+  failures (default 10) and marks the group degraded. Nothing on the call path
+  asks it: calls keep going to members still in rotation, and are refused with
+  `NoAvailableMemberError` only when none is left. It never half-opens on a
+  timer; it closes once `min_healthy` members are back in rotation.
 
 ## Performance
 

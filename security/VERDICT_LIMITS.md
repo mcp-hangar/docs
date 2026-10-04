@@ -24,7 +24,7 @@ as a `denied` tool invocation), a group call's record names the group, an
 allowed call's record names the role that admitted it, and the front door's
 flat `tools/call` now checks `tool:invoke`. Spans gained the L7 verdict and lost
 the caller's own ids by default. Rows corrected for it: the listed digest (new),
-approval `approved`, L7 Enforce, any L7 verdict, the `Mcp-Param-*` selector, tool
+approval `approved`, L7 Enforce, L7 Audit, any L7 verdict, the `Mcp-Param-*` selector, tool
 access and auth -- see
 [what a refusal leaves since 2.24.0](#what-a-refusal-leaves-since-2240). The
 tool access row also named the wrong log line for a front-door denial, a slip
@@ -52,7 +52,7 @@ before reading anything a 2.15.0 or earlier gateway produced.
 | **Tool access `denied`** | this caller cannot call this tool | that the tool does not exist — **at the front door**, withdrawn, denied and unknown are all `-32601`, deliberately (shown equals callable, [ADR-022](../adr/ADR-022-the-management-surface-is-what-the-caller-may-call.md)). On the batch surface the answer differs: `ToolAccessDeniedError`, "Tool not available for this mcp_server". **A front-door denial leaves no audit record**: it is answered before the executor runs, so there is no `ToolCallRefused` and no `batch_call_refused` for it | reading the operator-side log, which carries the reason the client is not given. At the front door that is `front_door_tool_call` at info with `outcome=not_found` and `reason=not_projected` (`unknown` when no upstream holds the name). On the batch surface — and at the front door for a tool denied between the listing and the call — it is `batch_call_refused` at warning, carrying `gate=tool_access` and `reason=tool_not_in_access_policy` (the per-gate `tool_access_denied` line is still written, at debug), and since 2.24.0 a `ToolCallRefused` audit record with the same gate and reason |
 | **Empty projection (`{"tools": []}`)** | nothing about whether the caller is allowed anything | which of `no_identity` (a fail-closed deny), `nothing_discovered` (a replica whose warm-up has not finished or did not succeed) or `filtered` (the honest empty) produced it — indistinguishable from outside, classified only on the operator's side: in the log line and in the `reason` label of `mcp_hangar_empty_projection_total` | reading that log line before treating `[]` as a policy result |
 | **SSRF check passed** | the endpoint resolved to a permitted range at registration and, for an API-registered `remote` server, again at connect — `_SsrfGuardedTransport` re-resolves and pins per request | anything about `remote` endpoints declared in `config.yaml` ([ADR-021](../adr/ADR-021-config-file-endpoints-outside-the-ssrf-policy.md)) — the boot warning names each one, a hostname included (`ssrf_policy_not_applied_to_config_file_endpoint`), but it warns and does not refuse | knowing that moving an upstream into the config file drops both halves |
-| **Auth `401` / `403`, `tool:invoke` denied** | the credential was not accepted, or the principal lacks the permission. A `tool:invoke` denial of a tool call is not an HTTP status: it is a tool error (`Not authorized to invoke tool '<tool>': tool:invoke permission required`), on `hangar_call` and, since 2.24.0, on the front door's flat `tools/call`, and since 2.24.0 one `ToolCallRefused` with `gate=authorization` and reason `tool_invoke_denied` or `unauthenticated`. An allowed call's audit record carries `mcp.caller.roles` *(2.24.0)*: the role the allow decision matched, or `opa_policy` | over stdio, that anyone presented a credential — the principal is the one `auth.stdio.principal` declares, trusted because the process was spawned ([ADR-026](../adr/ADR-026-stdio-is-an-authenticated-transport.md)); what the matched role grants, or granted when the call was made; any role on a trace — `mcp.caller.roles` is on the audit record only, and absent with auth off | role mapping; the stdio declaration |
+| **Auth `401` / `403`, `tool:invoke` denied** | the credential was not accepted, or the principal lacks the permission. A `tool:invoke` denial of a tool call is not an HTTP status: it is `Not authorized to invoke tool '<tool>': tool:invoke permission required` — a failed batch entry (`AuthorizationDenied`) on `hangar_call`, and since 2.24.0 a tool error (`isError`) on the front door's flat `tools/call` — and since 2.24.0 one `ToolCallRefused` with `gate=authorization` and reason `tool_invoke_denied` or `unauthenticated`. An allowed call's audit record carries `mcp.caller.roles` *(2.24.0)*: the role the allow decision matched, or `opa_policy` | over stdio, that anyone presented a credential — the principal is the one `auth.stdio.principal` declares, trusted because the process was spawned ([ADR-026](../adr/ADR-026-stdio-is-an-authenticated-transport.md)); what the matched role grants, or granted when the call was made; any role on a trace — `mcp.caller.roles` is on the audit record only, and absent with auth off | role mapping; the stdio declaration |
 | **Capability drift** | `CapabilityViolationDetected` with `violation_type`, `violation_detail` and the `enforcement_action` taken (`alert` / `block` / `quarantine`) | that the drift was hostile | which action the mode maps to |
 | **Projection withdrawal** | a tool was withheld, and why: `mcp_hangar_projection_withdrawals_total{reason}` — `invalid_x_mcp_header` or `header_exposure_withdraw` | that the upstream stopped offering it — the definition is still served byte-identical upstream, only the projection dropped it; that a `header_exposure_warn` sample was withheld — `warn` counts the tool and still serves it | `on_violation`, whose default `warn` serves the tool |
 
@@ -93,7 +93,8 @@ the gates), a `tool:invoke` denial (`gate=authorization`), and an L7 `deny` or
 `require_approval` at dispatch. The OTLP audit exporter writes it as
 `tool_invocation` with `mcp.tool.status=denied`, the caller and tenant fields,
 and `hangar.gate.name` and `hangar.gate.reason`, or the `hangar.l7.*` fields;
-CEF, LEEF, JSON lines and syslog write it as `ToolInvocationDenied` (`103`).
+CEF, LEEF, JSON lines and syslog write it as `ToolInvocationDenied` (event id
+`103` in CEF, LEEF and syslog).
 It carries codes only, never the refusal's text. Three things it does **not**
 establish, all of the same form -- the absence of a record:
 
@@ -104,8 +105,11 @@ establish, all of the same form -- the absence of a record:
   record of the first three.
 - **The publish is best-effort.** One that fails is logged as
   `tool_call_refused_not_published` and the call is still refused.
-- **The SIEM feed is opt-in.** The compliance formats are written only when
-  `MCP_COMPLIANCE_FORMAT` is set.
+- **Both exports are opt-in.** The OTLP audit record is written only when an
+  OTLP endpoint is set explicitly (`OTEL_EXPORTER_OTLP_ENDPOINT` or
+  `observability.tracing.otlp_endpoint`) and `MCP_AUDIT_EXPORT_ENABLED` has not
+  turned it off; the compliance formats only when `MCP_COMPLIANCE_FORMAT` is
+  set.
 
 **A group call's record names the group.** `mcp.server.id` on a
 `tool_invocation` record is the target the caller named, and the member that
@@ -125,11 +129,12 @@ are set only with `observability.tracing.caller_ids: true` or
 `MCP_TRACING_CALLER_IDS=true`. So **a 2.24.0 trace does not say who called**
 unless the operator opted in; the audit record does.
 
-**The log line carries codes only.** `batch_call_refused` lost its `error`
-field, the message the caller is told
+**The log line carries no gate's text.** A gate refusal's `batch_call_refused`
+lost its `error` field, the message the caller is told, which some gates fill
+with text they do not bound
 ([mcp-hangar#1589](https://github.com/mcp-hangar/mcp-hangar/pull/1589)); an L7
-refusal's line carries the verdict's bounded fields in place of the policy's
-reasons ([mcp-hangar#1596](https://github.com/mcp-hangar/mcp-hangar/pull/1596));
+refusal's line keeps `error`, the fixed caller-facing message, and carries the
+verdict's bounded fields in place of the policy's reasons ([mcp-hangar#1596](https://github.com/mcp-hangar/mcp-hangar/pull/1596));
 and a tenant-budget refusal after the gates is now logged at all, as
 `gate=tenant_budget`
 ([mcp-hangar#1632](https://github.com/mcp-hangar/mcp-hangar/pull/1632)). A call

@@ -50,8 +50,9 @@ auth:
 Three lines are doing the work:
 
 - `tool_access.mode: front_door` — your client sees the servers' own tool names
-  (`fetch`, `read_file`, …), not Hangar's `hangar_*` API. Hangar mediates every
-  call to them.
+  (`fetch`, `read_file`, …), plus only the read-only `hangar_*` tools the
+  `viewer` role permits (`hangar_status`, `hangar_list`, …) — nothing that can
+  start, stop or reconfigure a server. Hangar mediates every call.
 - `tool_projection.pins` — the SHA-256 of each tool's name, description and
   schemas, as they were when you installed. This is what "changed underneath
   you" is measured against.
@@ -106,8 +107,8 @@ mcp-hangar pin --config demo.yaml --write     # pin what it serves today
 > pinning.
 
 Now point your client at this config instead of the one `init` wrote: in the
-entry `init` added, add `--config` and the **absolute** path to `demo.yaml`, so
-the command reads `mcp-hangar --config /path/to/demo.yaml serve`. Make the
+entry `init` added, replace the `--config` path with the **absolute** path to
+`demo.yaml`, so the command reads `mcp-hangar --config /path/to/demo.yaml serve`. Make the
 `command:` path in `demo.yaml` absolute too — your client starts Hangar from its
 own working directory, not from the one you ran `pin` in. Restart the client and
 ask it to call `echo`. It works — that is the pinned state.
@@ -173,20 +174,27 @@ channel is not just documentation — it is instructions the model follows.
 ## Other ways to install
 
 ```bash
-# one-liner: install, configure, run
-curl -sSL https://mcp-hangar.io/install.sh | bash && mcp-hangar init -y && mcp-hangar serve
+# installer: a private venv in ~/.mcp-hangar, put on PATH for new shells
+curl -sSL https://mcp-hangar.io/install.sh | bash
+export PATH="$HOME/.mcp-hangar/bin:$PATH"   # this shell; or open a new one
+mcp-hangar init -y
 
 # guided, with server selection
 mcp-hangar init
 
-# a specific client, or all of them
+# a specific client, or every client it detects
 mcp-hangar init -y --client claude-code
 mcp-hangar init -y --client all
 ```
 
 `--client` takes `claude-code`, `claude-code-project`, `cursor`,
-`cursor-project`, `claude-desktop` or `all`. Without it, `init` writes the
-clients it finds; `--skip-clients` writes none.
+`cursor-project`, `claude-desktop` or `all` (every client it detects). Without
+it, `init` writes the clients it finds; `--skip-clients` writes none.
+
+`pin` and a bare `serve` read `--config`, else `$MCP_CONFIG`, else
+`./config.yaml` in the current directory — not the file `init` wrote. Name it
+with `--config` (as the commands below do), or export it once:
+`export MCP_CONFIG=~/.config/mcp-hangar/config.yaml`.
 
 ## Adding more MCP servers
 
@@ -195,7 +203,7 @@ mcp-hangar add github     # GitHub integration (needs token)
 mcp-hangar add sqlite     # SQLite database access
 mcp-hangar add postgres   # PostgreSQL access
 
-mcp-hangar pin --write    # pin whatever you just added
+mcp-hangar pin --config ~/.config/mcp-hangar/config.yaml --write    # pin what you added
 ```
 
 Bundles configure several at once:
@@ -218,15 +226,16 @@ If you prefer to write the file yourself:
 mcp_servers:
   # Both are official servers from modelcontextprotocol/servers; the full list,
   # with what each one needs, is in ../guides/OFFICIAL_SERVERS.md
+  # A subprocess server's arguments go in `command`; `args` is read in
+  # docker/container mode only.
   filesystem:
     mode: subprocess
-    command: [npx, -y, "@modelcontextprotocol/server-filesystem"]
-    args: [/Users/your-username/Documents]
+    command: [npx, -y, "@modelcontextprotocol/server-filesystem", /Users/your-username/Documents]
     idle_ttl_s: 300
 
   fetch:
     mode: subprocess
-    command: [npx, -y, "@modelcontextprotocol/server-fetch"]
+    command: [uvx, "mcp-server-fetch"]
     idle_ttl_s: 300
 
 tool_access:
@@ -240,7 +249,8 @@ auth:
       roles: [viewer]
 ```
 
-Then `mcp-hangar pin --write` to add the pins, and point your client at it:
+Then `mcp-hangar pin --config ~/.config/mcp-hangar/config.yaml --write` to add
+the pins, and point your client at it:
 
 ```json
 {
@@ -263,7 +273,7 @@ the `"type"` line is optional there.
 
 ```bash
 mcp-hangar status          # your servers (COLD until first use)
-mcp-hangar pin --check     # every pinned tool still matches its pin
+mcp-hangar pin --config ~/.config/mcp-hangar/config.yaml --check   # every pin still matches
 ```
 
 ## Troubleshooting
@@ -277,7 +287,8 @@ logs:
 
 ```
 empty_projection reason=no_identity -- front_door served zero tools because the
-caller carried no tenant identity. Fail-closed deny, not an empty catalogue.
+caller carried no tenant identity. Fail-closed deny, not an empty catalogue:
+check authentication.
 ```
 
 Add the block from step 1.
@@ -285,8 +296,8 @@ Add the block from step 1.
 ### A tool you did not change is being refused
 
 Something about it did change — that is what the refusal means. `mcp-hangar pin
---check` prints the pinned and the served digest. If the change is legitimate,
-`mcp-hangar pin --write` re-pins it. If you want drift recorded instead of
+--config <your config> --check` prints the pinned and the served digest. If the
+change is legitimate, `--write` in place of `--check` re-pins it. If you want drift recorded instead of
 enforced while you investigate, set `digest_enforcement: audit` on that server.
 
 ### MCP server won't start

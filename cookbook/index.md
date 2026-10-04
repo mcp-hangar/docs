@@ -1,6 +1,6 @@
 # Cookbook
 
-From zero to production in 24 recipes. Start at 01 and go in order, or jump to
+From zero to production in 25 recipes. Start at 01 and go in order, or jump to
 what you need.
 
 ## The Path (sequential)

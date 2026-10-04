@@ -54,7 +54,7 @@ export MCP_RATE_LIMIT_BURST=10       # NEW: allow short bursts up to 10
 
 ## Try It
 
-Rate limiting guards the MCP tool-call path -- the command bus that every `hangar_call` (and the other `hangar_*` tools) flows through. Exercise it by firing a burst of tool calls in a single session.
+Rate limiting guards the MCP tool-call path -- the command bus that `hangar_call`, and every other `hangar_*` tool that does work, flows through. Exercise it by firing a burst of tool calls in a single session.
 
 1. Configure a tight limit so the burst is easy to hit:
 
@@ -63,7 +63,7 @@ Rate limiting guards the MCP tool-call path -- the command bus that every `hanga
    export MCP_RATE_LIMIT_BURST=3        # allow a short burst of 3
    ```
 
-2. Fire a burst of `hangar_call`s back-to-back in one session, using the JSON-RPC approach from recipe 05. Print only the responses:
+2. Fire a burst of `hangar_call`s back-to-back in one stdio session, as in recipe 01, then one more call two seconds later. Print only the responses:
 
    ```bash
    (
@@ -71,45 +71,35 @@ Rate limiting guards the MCP tool-call path -- the command bus that every `hanga
      sleep 0.5
      echo '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
      sleep 0.5
-     for i in $(seq 2 7); do
+     for i in $(seq 2 8); do
+       [ "$i" = 8 ] && sleep 2
        echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}},"id":'"$i"'}'
      done
-     sleep 2
-   ) | mcp-hangar serve 2>/dev/null | grep '"id":'
+     sleep 3
+   ) | mcp-hangar --config ~/.config/mcp-hangar/config.yaml serve 2>/dev/null | grep '"id":[2-8]'
    ```
 
-   The first calls (up to the burst size) return a tool result. Once the burst is exhausted, the command bus rejects the remaining `hangar_call`s with a `RateLimitExceeded` error whose message reads `Rate limit exceeded: ...`:
+   The first calls (up to the burst size) return a tool result. Once the burst is exhausted, the command bus rejects the remaining `hangar_call`s: the call's entry in `results` has `"success": false`, `"error_type": "RateLimitExceeded"` and an `error` that names the budget and when to retry. Responses can arrive out of order:
 
    ```
-   {"jsonrpc":"2.0","id":2,"result": ... "3" ... }
-   {"jsonrpc":"2.0","id":3,"result": ... "3" ... }
-   {"jsonrpc":"2.0","id":4,"result": ... "3" ... }
-   {"jsonrpc":"2.0","id":5,"result": ... "Rate limit exceeded: ..." ... }
-   {"jsonrpc":"2.0","id":6,"result": ... "Rate limit exceeded: ..." ... }
-   {"jsonrpc":"2.0","id":7,"result": ... "Rate limit exceeded: ..." ... }
+   {"jsonrpc":"2.0","id":5,"result": ... "error": "RateLimitExceeded: the rate limit all callers share for InvokeToolCommand is used up (3 at once, refilled at 1 per second). Retry after 0.99s." ... }
+   {"jsonrpc":"2.0","id":6,"result": ... "RateLimitExceeded: ..." ... }
+   {"jsonrpc":"2.0","id":7,"result": ... "RateLimitExceeded: ..." ... }
+   {"jsonrpc":"2.0","id":3,"result": ... "success": true ... "result": 3.0 ... }
+   {"jsonrpc":"2.0","id":4,"result": ... "success": true ... "result": 3.0 ... }
+   {"jsonrpc":"2.0","id":2,"result": ... "success": true ... "result": 3.0 ... }
+   {"jsonrpc":"2.0","id":8,"result": ... "success": true ... "result": 3.0 ... }
    ```
 
-3. Wait for the token bucket to refill, then a fresh call succeeds again:
+3. Call 8 went through. It was sent two seconds after the burst, and the bucket refills at `MCP_RATE_LIMIT_RPS` tokens per second, so a token was there again.
 
-   ```bash
-   sleep 2
-   (
-     echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
-     sleep 0.5
-     echo '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
-     sleep 0.5
-     echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp-group","tool":"add","arguments":{"a":1,"b":2}}]}},"id":2}'
-     sleep 2
-   ) | mcp-hangar serve 2>/dev/null | grep '"id":2'
-   ```
-
-   The bucket refills at `MCP_RATE_LIMIT_RPS` tokens per second, so once enough time passes the next call is allowed through.
+   Keep the burst and the retry in one session. Each `mcp-hangar ... serve` pipeline is a new Hangar process with a full bucket of its own, so a second pipeline would succeed whether or not anything had refilled.
 
 ## What Just Happened
 
-Rate limiting is enforced by a token-bucket limiter wired into the command bus as middleware -- every MCP tool call (`hangar_call` and the other `hangar_*` tools) is dispatched through it. When a call would exceed `MCP_RATE_LIMIT_RPS` (requests per second) and the burst allowance is spent, the middleware raises `RateLimitExceeded` before the command reaches its handler. That error is surfaced back to the MCP client in the tool response. The `MCP_RATE_LIMIT_BURST` setting sizes the bucket, allowing short spikes above the steady-state rate.
+Rate limiting is enforced by a token-bucket limiter wired into the command bus as middleware -- every MCP tool call that does work (`hangar_call`, `hangar_start`, `hangar_tools`, ...) is dispatched through it. The read-only tools (`hangar_list`, `hangar_status`, `hangar_details`, `hangar_group_list` and the like) never are, and are never refused by it. When a call would exceed `MCP_RATE_LIMIT_RPS` (requests per second) and the burst allowance is spent, the middleware raises `RateLimitExceeded` before the command reaches its handler. That error is surfaced back to the MCP client in the tool response, as the failed call's `error` and `error_type`. The `MCP_RATE_LIMIT_BURST` setting sizes the bucket, allowing short spikes above the steady-state rate.
 
-Scope: the limiter covers the MCP tool-call (command-bus) path only. The REST `/api/*` routes are **not** rate-limited by these settings -- protecting those endpoints is out of scope for this recipe and handled by separate infrastructure (for example a reverse proxy or gateway in front of Hangar).
+Scope: the limiter sits on the command bus, not on a transport. A REST route that sends a command spends the same bucket: once it is empty, `POST /api/mcp_servers/my-mcp/start` is refused with HTTP 429 and a `RateLimitExceeded` error body. REST routes that only read (`GET`) go through the query bus and are not limited by these settings. Protecting the REST API as a whole is out of scope for this recipe and handled by separate infrastructure (for example a reverse proxy or gateway in front of Hangar).
 
 **The bucket is per process, so the number multiplies by your replica count.**
 Three replicas configured for 10 rps admit 30 across the fleet, because each
@@ -117,8 +107,8 @@ holds its own bucket. That is deliberate -- a shared bucket puts a database
 round trip on the path of every call -- and it means the figure you set here is
 per pod, not per gateway. Dividing by the replica count drifts exactly when it
 matters, since a rolling update runs N+1 and a failure runs N-1; a fleet-wide
-cap belongs at the ingress, where the fleet has one entrance. `GET /api/system`
-reports `rate_limits_are_per_instance` so the scope is readable from outside.
+cap belongs at the ingress, where the fleet has one entrance. `GET /api/system/`
+reports `system.rate_limits_are_per_instance` so the scope is readable from outside.
 See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 
 ## Key Config Reference

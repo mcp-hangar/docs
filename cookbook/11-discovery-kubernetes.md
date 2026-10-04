@@ -19,7 +19,7 @@ logs `discovery_source_unavailable`, and this source discovers nothing.
 
 This recipe requires the **MCP-Hangar Operator** running in your cluster.
 The operator ships from a separate repository:
-<https://github.com/mcp-hangar/hangar-operator>.
+<https://github.com/mcp-hangar/mcp-hangar-operator>.
 
 Install via Helm (from the [helm-charts](https://github.com/mcp-hangar/helm-charts) repo):
 
@@ -37,6 +37,7 @@ kubectl get crd | grep mcp-hangar.io
 #   mcpservers.mcp-hangar.io
 #   mcpservergroups.mcp-hangar.io
 #   mcpdiscoverysources.mcp-hangar.io
+#   mcpegresspolicies.mcp-hangar.io
 ```
 
 ## The Problem
@@ -58,6 +59,10 @@ discovery:
       namespaces: ["mcp-servers"]        # NEW: watch these namespaces (top-level, plural list)
       label_selector: "app.kubernetes.io/part-of=mcp"  # NEW: filter pods
 ```
+
+The source assumes Hangar runs inside the cluster and reads the pod's service
+account. To run Hangar outside it -- on a laptop, against your current
+kubeconfig -- add `in_cluster: false` to the source.
 
 ## Try It
 
@@ -112,12 +117,13 @@ discovery:
 4. Check registered MCP servers:
 
    ```bash
-   mcp-hangar status
+   curl http://localhost:8000/api/mcp_servers/
    ```
 
-   ```
-   k8s-math    remote    cold    source=kubernetes:auto-discovery
-   ```
+   `k8s-math` is listed in `remote` mode, `cold` until its first call, with the
+   description `Discovered from kubernetes`. (`mcp-hangar status` cannot show it:
+   in 2.24.0 that command does not reach a running gateway and reads only
+   `config.yaml`.)
 
 5. Scale up and watch Hangar adapt:
 
@@ -176,9 +182,10 @@ See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
 | `discovery.sources[].type` | string | -- | Set to `kubernetes` |
-| `discovery.sources[].mode` | string | -- | `additive` or `authoritative` |
+| `discovery.sources[].mode` | string | `additive` | `additive` or `authoritative` |
 | `discovery.sources[].namespaces` | list | all namespaces | Kubernetes namespaces to watch |
 | `discovery.sources[].label_selector` | string | -- | Pod label selector |
+| `discovery.sources[].in_cluster` | bool | `true` | Use the in-cluster service account; `false` uses your kubeconfig |
 | `discovery.sources[].allowed_namespaces` | list | -- | Namespaces a pod may be registered from; empty means "everything not denied" |
 | `discovery.sources[].denied_namespaces` | list | `[kube-system, default]` | Namespaces never registered from. Wins over the allowlist |
 
@@ -188,8 +195,10 @@ See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 | ------------ | ---------- | --------- | ------------- |
 | `mcp-hangar.io/enabled` | Yes | -- | Must be `"true"` |
 | `mcp-hangar.io/name` | No | Pod name | MCP Server name |
+| `mcp-hangar.io/mode` | No | `http` | MCP Server mode |
 | `mcp-hangar.io/port` | No | `8080` | MCP Server port |
-| `mcp-hangar.io/group` | No | -- | Auto-add to group |
+| `mcp-hangar.io/path` | No | `/mcp` | Path of the MCP endpoint on the pod |
+| `mcp-hangar.io/group` | No | -- | Recorded in the discovered server's `metadata.group` |
 
 ## What's Next
 

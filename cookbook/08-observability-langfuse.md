@@ -30,9 +30,10 @@ observability:                           # NEW: Langfuse tracing
 
 ## Try It
 
-1. Set environment variables:
+1. Install the Langfuse SDK with Hangar, and set environment variables:
 
    ```bash
+   pip install "mcp-hangar[langfuse]"
    export LANGFUSE_PUBLIC_KEY="pk-lf-..."
    export LANGFUSE_SECRET_KEY="sk-lf-..."
    ```
@@ -40,26 +41,38 @@ observability:                           # NEW: Langfuse tracing
 2. Start Hangar:
 
    ```bash
-   mcp-hangar serve --http --host 127.0.0.1 --port 8000
+   mcp-hangar serve --config ~/.config/mcp-hangar/config.yaml \
+     --http --host 127.0.0.1 --port 8000
    ```
+
+   The log reports `langfuse_initialized` with your host.
 
 3. Make a tool call:
 
    ```bash
-   curl -X POST http://localhost:8000/api/mcp_servers/my-mcp/start
+   curl -s http://localhost:8000/mcp \
+     -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"hangar_call","arguments":{"calls":[{"mcp_server":"my-mcp","tool":"add","arguments":{"a":1,"b":2}}]}}}'
    ```
 
-4. Open Langfuse dashboard and find the trace. You see spans for:
-   - `batch.execute` -- the batch the call arrived in
+4. Open Langfuse dashboard and find the trace. With Langfuse SDK 4.x it holds:
+   - `tools/call hangar_call` -- the MCP request
    - `batch.call.<tool>` -- the call itself, carrying `mcp.server.id`
-   - `policy.check_access`, `concurrency.acquire` -- the gates it passed
+   - `execute_tool <tool>` -- the call to the upstream
+   - `policy.check_access`, `approval_gate.check`,
+     `command.send.InvokeToolCommand` -- the gates it passed
 
    The spans are named after the pipeline that produces them; there is no
-   `hangar.` prefix.
+   `hangar.` prefix. Which of Hangar's spans reach Langfuse is the SDK's
+   choice, not Hangar's: SDK 4.x exports only the spans its default filter
+   keeps, so `batch.execute` and `concurrency.acquire` do not appear there
+   although Hangar records them.
 
 ## What Just Happened
 
-The `TracedMcpServerService` wraps tool invocations with Langfuse spans via the `LangfuseObservabilityAdapter`. Each tool call creates a trace with child spans for cold start (if needed) and the actual MCP server call. Correlation IDs link Hangar traces to MCP server-side traces.
+Hangar records every tool call as OpenTelemetry spans. Enabling Langfuse constructs the Langfuse client, and the Langfuse SDK attaches itself to the process's OpenTelemetry tracer provider and sends those spans to `<host>/api/public/otel/v1/traces`. That is where the trace comes from. Hangar's own `LangfuseObservabilityAdapter` is initialised too, but on 2.24.0 nothing calls it, so it records no spans or scores of its own ([mcp-hangar#1683](https://github.com/mcp-hangar/mcp-hangar/issues/1683)).
+
+Calls to an upstream carry a W3C `traceparent` header, so an MCP server that is itself traced with OpenTelemetry joins the same trace.
 
 ## Key Config Reference
 
@@ -69,6 +82,9 @@ The `TracedMcpServerService` wraps tool invocations with Langfuse spans via the 
 | `observability.langfuse.public_key` | string | -- | Langfuse public key (use env var) |
 | `observability.langfuse.secret_key` | string | -- | Langfuse secret key (use env var) |
 | `observability.langfuse.host` | string | `https://cloud.langfuse.com` | Langfuse host URL |
+
+`LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_HOST`, when set,
+take precedence over the file, and `MCP_LANGFUSE_ENABLED` over `enabled`.
 
 ## What's Next
 

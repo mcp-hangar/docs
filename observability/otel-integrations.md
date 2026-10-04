@@ -308,7 +308,10 @@ same rule for the logger provider (`audit_log_external_provider_in_use`).
   trace ID matches the call's trace. Treat the audit-to-trace join as
   best-effort, not as guaranteed navigation.
 - Both signals share the resource attributes `service.name` and
-  `service.instance.id`, so a replica's records and spans can be matched.
+  `service.instance.id`, so a replica's records and spans can be matched. One
+  exception: after a restart, events the previous process stored but did not
+  deliver are delivered again (`hangar.event.delivery_mode=recovered`), and their
+  audit records carry the new process's `service.instance.id`.
 
 ---
 

@@ -136,7 +136,8 @@ The test MCP server doesn't know Hangar exists — it sees standard MCP JSON-RPC
 
 ## Cleanup
 
-When you are done with this recipe (or before starting recipe 02), stop the test container:
+Recipes 02 and 03 use this container too. Remove it when you are done with
+them, before recipe 04, which starts its own containers on the same port:
 
 ```bash
 docker rm -f mcp-math

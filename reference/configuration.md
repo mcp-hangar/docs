@@ -1,8 +1,8 @@
 # Configuration Reference
 
-All MCP Hangar behavior is controlled through a YAML configuration file and environment variables. The config file defaults to `config.yaml` in the working directory, overridden by the `MCP_CONFIG` environment variable. Environment variables take precedence over YAML settings where both exist.
+All MCP Hangar behavior is controlled through a YAML configuration file and environment variables. The config file defaults to `config.yaml` in the working directory, overridden by the `MCP_CONFIG` environment variable. Where a setting has both an environment variable and a YAML key, which one wins depends on the setting: most environment variables win, but the top-level `rate_limit` block wins over `MCP_RATE_LIMIT_*`, and `logging.level` wins over an `MCP_LOG_LEVEL` of `INFO`. Each section below says which applies.
 
-## `MCP servers`
+## `mcp_servers`
 
 MCP Server definitions. Each key is a unique MCP server ID.
 
@@ -31,7 +31,7 @@ mcp_servers:
 
 | Key | Type | Default | Range | Description |
 | ----- | ------ | --------- | ------- | ------------- |
-| `mode` | `str` | `"subprocess"` | subprocess, docker, remote | MCP Server mode. `container` and `podman` normalize to `docker`. |
+| `mode` | `str` | `"subprocess"` | subprocess, docker, container, remote, group | MCP Server mode. `container` is an alias of `docker`. `podman` is not a mode and refuses the config; select Podman with `MCP_CONTAINER_RUNTIME`. `group` is described under [`groups`](#groups). |
 | `command` | `list[str]` | -- | -- | Command for subprocess mode (required for subprocess) |
 | `image` | `str` | -- | -- | Docker image for docker mode (required for docker) |
 | `endpoint` | `str` | -- | -- | HTTP endpoint for remote mode (required for remote) |
@@ -45,14 +45,24 @@ mcp_servers:
 | `network` / `network_mode` | `str` | `"none"` | -- | Container network mode (docker mode only) |
 | `read_only` | `bool` | `true` | -- | Read-only filesystem (docker mode only) |
 | `user` | `str` | -- | -- | Container user. `"current"` maps to host `uid:gid` |
-| `args` | `list[str]` | -- | -- | Container CMD override (docker mode only) |
+| `args` | `list[str]` | -- | -- | Container CMD override (docker mode only). A subprocess server does not read it; put its arguments in `command` |
 | `description` | `str` | -- | -- | Human-readable MCP server description |
 | `tools` | `list` or `dict` | -- | -- | Predefined tool schemas (list) or access policy (dict). See below. |
 | `auth` | `dict` | -- | -- | HTTP auth configuration (remote mode only) |
 | `tls` | `dict` | -- | -- | TLS for a `remote` upstream: `verify_ssl` (bool, default `true`) and `ca_cert_path` (a bundle to trust, for an upstream signed by your own CA). Both are honoured from 2.5.0; earlier releases accepted and discarded them |
 | `http` | `dict` | -- | -- | HTTP transport configuration (remote mode only) |
-| `max_concurrency` | `int` | -- | -- | Per-MCP server concurrency limit |
+| `max_concurrency` | `int` | -- | >= 0 | Per-MCP server concurrency limit; `0` means no limit. Unset uses `execution.default_mcp_server_concurrency` |
+| `max_response_bytes` | `int` | -- | > 0 | Largest upstream response this server's transport reads before failing the call with `ResponseTooLarge`. Wins over `execution.max_response_bytes` and `MCP_MAX_RESPONSE_BYTES`. Anything but a positive integer refuses the config |
 | `capabilities` | `dict` | -- | -- | Declared capability contract (network, filesystem, environment, tools, resources, `enforcement_mode`). Hangar enforces these at runtime and flags deviations. |
+| `access` | `dict` | -- | -- | Prompt and resource access policy. See [Prompts and resources](#prompts-and-resources-access) |
+| `tool_access` | `dict` | -- | -- | `tool_access.member.<tenant>`: a per-tenant policy for this server, with the same keys as `tools` plus `access` |
+| `tool_projection` | `dict` | -- | -- | Digest pins. See [Digest Pinning](#digest-pinning) |
+| `header_exposure` | `dict` | -- | -- | See [Header Exposure](#header-exposure) |
+
+`network_mode` and `user` are read, but the 2.24.0 key check does not list
+them: each logs `unknown_config_key`, and `HANGAR_CONFIG_STRICT=1` and
+`mcp-hangar config check` refuse a file that sets one. Write `network` rather
+than `network_mode`.
 
 ### `mode: remote` and the SSRF policy
 
@@ -71,9 +81,9 @@ An upstream declared in `config.yaml` gets neither check. The file is trusted
 input written by the operator, and a gateway sitting in the same cluster as its
 backends usually means the private address it wrote there; refusing it would
 break working deployments to enforce a rule about a channel the operator already
-controls. From 2.6.0 the gateway logs one line per such upstream at startup,
-naming the server, its endpoint and what does not apply to it. Nothing is
-refused.
+controls. From 2.6.0 the gateway logs one line per such upstream at startup
+(`ssrf_policy_not_applied_to_config_file_endpoint`), naming the server, its
+endpoint and what does not apply to it. Nothing is refused.
 
 If you want an endpoint checked, register it through the REST API instead of the
 file. The reasoning is recorded in
@@ -100,7 +110,8 @@ mcp_servers:
             b: { type: number }
 ```
 
-**Dict format** -- tool access policy using fnmatch glob patterns.
+**Dict format** -- tool access policy using fnmatch glob patterns, matched
+against the bare tool name as the upstream reports it.
 
 ```yaml
 mcp_servers:
@@ -227,6 +238,10 @@ approvals:
 | `enabled` | `bool` | `true` | Turn the gate off entirely. See the interaction with [`startup_checks`](#startup_checks) below |
 | `channel` | `str` | `event_stream` | Channel for any policy that does not name one |
 | `delivery.required` | `bool` | `false` | When `true`, a gated policy whose channel reaches nobody **refuses the boot** instead of logging at `ERROR` |
+| `<channel>` | `map` | -- | Settings for an installed delivery adapter, keyed by its channel name and passed to it as-is. The 2.24.0 key check knows only `slack` and `webhook` here; any other name logs `unknown_config_key` |
+
+`dashboard` is an old name for `event_stream`; it still resolves, and logs
+`approval_delivery_channel_renamed`.
 
 `event_stream` is the built-in channel: it does not push anywhere itself,
 because the notification already travels as a `ToolApprovalRequested` domain
@@ -501,7 +516,35 @@ execution:
 | Key | Type | Default | Range | Description |
 | ----- | ------ | --------- | ------- | ------------- |
 | `max_concurrency` | `int` | `50` | 0 = unlimited | System-wide maximum concurrent tool invocations |
-| `default_mcp_server_concurrency` | `int` | `10` | -- | Default per-MCP server concurrency limit |
+| `default_mcp_server_concurrency` | `int` | `10` | 0 = unlimited | Default per-MCP server concurrency limit |
+| `max_response_bytes` | `int` | `33554432` (32 MiB) | > 0 | Largest upstream response either transport reads before failing the call with `ResponseTooLarge`, for every server without its own `max_response_bytes`. `MCP_MAX_RESPONSE_BYTES` wins over it |
+| `tenant_limits` | `dict[str, dict]` | -- | -- | Per-tenant execution budgets, keyed by tenant id (see below) |
+
+A negative limit, or a `max_response_bytes` that is not a positive integer,
+refuses the config.
+
+### `tenant_limits`
+
+```yaml
+execution:
+  tenant_limits:
+    "tenant:a":
+      max_concurrency: 5
+      rps: 2
+      burst: 10
+    "*":
+      max_concurrency: 2
+      rps: 1
+      burst: 5
+```
+
+Each entry needs exactly `max_concurrency` (integer, at least 1), `rps` (a
+number above 0) and `burst` (integer, at least 1); a missing or extra key
+refuses the config. A listed tenant gets its own budget. `"*"` is a template:
+every unlisted tenant gets a budget of its own built from it, and callers with
+no tenant share one. With no `"*"` entry, an unlisted tenant and a caller with
+no tenant are refused. A call over its budget is refused at once with
+`TenantQuotaExceeded`, never queued. Budgets are counted per replica.
 
 ## `discovery`
 
@@ -523,12 +566,12 @@ discovery:
 
 | Key | Type | Default | Range | Description |
 | ----- | ------ | --------- | ------- | ------------- |
-| `enabled` | `bool` | -- | -- | Enable or disable discovery |
-| `refresh_interval_s` | `int` | -- | -- | Interval between discovery scans in seconds |
-| `auto_register` | `bool` | -- | -- | Automatically register discovered MCP servers |
+| `enabled` | `bool` | `false` | -- | Enable or disable discovery |
+| `refresh_interval_s` | `int` | `30` | -- | Interval between discovery scans in seconds |
+| `auto_register` | `bool` | `true` | -- | Automatically register discovered MCP servers |
 | `sources` | `list[dict]` | `[]` | -- | Discovery source configurations (see below) |
 | `security` | `dict` | -- | -- | Security constraints for discovery |
-| `lifecycle` | `dict` | -- | -- | Lifecycle management for discovered MCP servers |
+| `lifecycle` | `dict` | -- | -- | Lifecycle management for discovered MCP servers. Read, but missing from the 2.24.0 key check: it logs `unknown_config_key`, and strict mode and `config check` refuse it |
 
 ### `sources[]` entry
 
@@ -544,16 +587,17 @@ nothing.
 | Key | Type | Description |
 | ----- | ------ | ------------- |
 | `type` | `str` | Source type: `kubernetes`, `docker`, `filesystem`, `entrypoint`, or any type registered under the `mcp_hangar.discovery_sources` entry point group. An unregistered type **fails startup** |
-| `mode` | `str` | `additive` (only adds) or `authoritative` (adds and removes) |
-| `path` / `pattern` | `str` | File path or glob pattern (filesystem source) |
-| `watch` | `bool` | Enable file watching (filesystem source) |
+| `mode` | `str` | `additive` (only adds, the default) or `authoritative` (adds and removes). Any other value **fails startup** |
+| `path` | `str` | Directory to scan (filesystem source), default `/etc/mcp-hangar/mcp_servers.d/`; a relative path is taken from the working directory |
+| `pattern` | `str` | File glob inside `path` (filesystem source), default `*.yaml` |
+| `watch` | `bool` | Enable file watching (filesystem source), default `true` |
 | `socket_path` | `str` | Docker/Podman socket (docker source) |
 | `namespaces` | `list[str]` | Kubernetes namespaces to scan |
 | `label_selector` | `str` | Kubernetes label selector |
-| `in_cluster` | `bool` | Use in-cluster Kubernetes config |
+| `in_cluster` | `bool` | Use in-cluster Kubernetes config, default `true` |
 | `allowed_namespaces` | `list[str]` | Kubernetes namespace allowlist; empty means "everything not denied" |
 | `denied_namespaces` | `list[str]` | Kubernetes namespace denylist, default `[kube-system, default]`. Wins over the allowlist |
-| `group` | `str` | Target group for discovered MCP servers |
+| `group` | `str` | Python entry point group to read servers from (entrypoint source), default `mcp.mcp_servers` |
 
 ### `security` sub-section
 
@@ -563,20 +607,20 @@ Constraints applied to every source, whatever it discovers.
 | ----- | ------ | --------- | ------------- |
 | `allowed_namespaces` | `list[str]` | -- | **Deprecated** — moved to the kubernetes source entry above. Still honoured, and logs `discovery_namespace_policy_deprecated_location`; the source's own setting wins when both are present |
 | `denied_namespaces` | `list[str]` | -- | **Deprecated** — see `allowed_namespaces` |
-| `require_health_check` | `bool` | -- | Require health check before registration |
-| `require_mcp_schema` | `bool` | -- | Require valid MCP schema |
-| `max_mcp_servers_per_source` | `int` | -- | Maximum MCP servers per source |
-| `max_registration_rate` | `int` | -- | Registration rate limit |
-| `health_check_timeout_s` | `float` | -- | Health check timeout in seconds |
-| `quarantine_on_failure` | `bool` | -- | Quarantine MCP servers that fail health checks |
+| `require_health_check` | `bool` | `true` | Require health check before registration |
+| `require_mcp_schema` | `bool` | `false` | Require valid MCP schema |
+| `max_mcp_servers_per_source` | `int` | `100` | Maximum MCP servers per source |
+| `max_registration_rate` | `int` | `10` | Registrations per minute |
+| `health_check_timeout_s` | `float` | `5.0` | Health check timeout in seconds |
+| `quarantine_on_failure` | `bool` | `true` | Quarantine MCP servers that fail health checks |
 
 ### `lifecycle` sub-section
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
-| `default_ttl_s` | `int` | -- | Default TTL for discovered MCP servers |
-| `check_interval_s` | `int` | -- | Lifecycle check interval in seconds |
-| `drain_timeout_s` | `int` | -- | Drain timeout before removal |
+| `default_ttl_s` | `int` | `90` | Default TTL for discovered MCP servers |
+| `check_interval_s` | `int` | `10` | Lifecycle check interval in seconds |
+| `drain_timeout_s` | `int` | `30` | Drain timeout before removal |
 
 ## `retry`
 
@@ -624,7 +668,7 @@ retry:
 | `default_policy.backoff` | `str` | `exponential` | Backoff strategy: `exponential`, `linear`, or `constant` |
 | `default_policy.initial_delay` | `float` | `1.0` | Initial delay in seconds |
 | `default_policy.max_delay` | `float` | `30.0` | Maximum delay in seconds |
-| `default_policy.retry_on` | `list[str]` | -- | Exception types to retry on |
+| `default_policy.retry_on` | `list[str]` | transient errors | Exception type names to retry on. Unset means `MalformedJSON`, `JSONDecodeError`, `Timeout`, `TimeoutError`, `ConnectionError`, `McpServerNotResponding`, `TransientError`, `McpServerProtocolError` and `NetworkError` |
 | `default_policy.jitter` | `bool` | `true` | Add random jitter to each delay |
 | `default_policy.jitter_factor` | `float` | `0.25` | Jitter range as a fraction of the delay (`0.25` = ±25%) |
 | `per_mcp_server` | `dict[str, dict]` | `{}` | Per-server overrides keyed by MCP server ID; each value takes the same keys as `default_policy` and is **merged over it** (unset keys inherit the default) |
@@ -758,9 +802,12 @@ event_store:
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
-| `enabled` | `bool` | -- | Enable event persistence |
-| `driver` | `str` | -- | Storage driver: `sqlite` or `memory` |
-| `path` | `str` | -- | SQLite database path (sqlite driver only) |
+| `enabled` | `bool` | `true` | Enable event persistence |
+| `driver` | `str` | `sqlite` | Storage driver: `sqlite` or `memory`. Any other value refuses to start |
+| `path` | `str` | `data/events.db` | SQLite database path (sqlite driver only) |
+
+With a [`persistence`](#persistence) backend selected, the event log lives in
+that backend.
 | `allow_memory_fallback` | `bool` | `false` | Permit degrading to an in-memory store when a durable driver cannot initialize, instead of refusing to start |
 
 ### Durable-store fail-fast
@@ -878,6 +925,10 @@ logging:
 | `json_format` | `bool` | `false` | Enable structured JSON logging |
 | `file` | `str` | -- | Log file path |
 
+`--log-level`, `--log-file` and `--json-logs` (and `MCP_LOG_LEVEL` /
+`MCP_JSON_LOGS`) win over this block, with one exception: a level of `INFO`
+cannot be told apart from the default, so `logging.level` wins over it.
+
 ## `observability`
 
 Tracing and LLM observability integrations.
@@ -895,12 +946,28 @@ observability:
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
-| `enabled` | `bool` | -- | Enable OpenTelemetry tracing |
+| `enabled` | `bool` | `true` | Enable OpenTelemetry tracing |
 | `otlp_endpoint` | `str` | `"http://localhost:4317"` | OTLP exporter endpoint |
 | `service_name` | `str` | `"mcp-hangar"` | Service name for traces |
 | `jaeger_host` | `str` | -- | Jaeger agent host |
 | `jaeger_port` | `int` | `6831` | Jaeger agent port |
-| `console_export` | `bool` | -- | Export traces to console (development) |
+| `console_export` | `bool` | `false` | Export traces to console (development) |
+| `caller_ids` | `bool` | `false` | Put user, agent and session ids on spans. `MCP_TRACING_CALLER_IDS` wins over it |
+
+The environment variables in [Observability / Tracing](#observability--tracing)
+win over these keys.
+
+### `audit` sub-section
+
+```yaml
+observability:
+  audit:
+    enabled: true
+```
+
+| Key | Type | Default | Description |
+| ----- | ------ | --------- | ------------- |
+| `enabled` | `bool` | `true` | Export audit records as OTLP logs. They go only to an endpoint set explicitly, in `tracing.otlp_endpoint` or `OTEL_EXPORTER_OTLP_ENDPOINT`, never to the default. Independent of `tracing.enabled`. `MCP_AUDIT_EXPORT_ENABLED` wins over it |
 
 ### `langfuse` sub-section
 
@@ -966,17 +1033,28 @@ block to keep the env/default behavior (10 rps, burst 20):
 rate_limit:
   rps: 10     # tokens refilled per second (default 10)
   burst: 20   # burst capacity / bucket size (default 20)
+  per_caller: # optional; off when absent
+    rps: 2
+    burst: 5
 ```
+
+That budget is shared by every caller. `per_caller` adds a budget of each
+caller's own under it, a caller being its tenant and principal (every
+anonymous caller counts as one). It needs both `rps` (a number above 0) and
+`burst` (an integer of at least 1), and anything else refuses the config. The
+listing and inspection tools are not charged. Both budgets are per replica.
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
-| `enabled` | `bool` | -- | Enable authentication |
-| `allow_anonymous` | `bool` | -- | Allow unauthenticated requests |
-| `api_key.enabled` | `bool` | -- | Enable API key authentication |
-| `api_key.header_name` | `str` | -- | HTTP header name for API key |
-| `oidc.enabled` | `bool` | -- | Enable OpenID Connect authentication |
+| `enabled` | `bool` | `false` | Enable authentication |
+| `allow_anonymous` | `bool` | `false` | Allow unauthenticated requests |
+| `api_key.enabled` | `bool` | `true` | Enable API key authentication |
+| `api_key.header_name` | `str` | `X-API-Key` | HTTP header name for API key |
+| `oidc.enabled` | `bool` | `false` | Enable OpenID Connect authentication |
 | `oidc.issuer` | `str` | -- | OIDC issuer URL |
 | `oidc.audience` | `str` | -- | Expected token audience |
+| `oidc.jwks_uri` | `str` | -- | JWKS endpoint |
+| `oidc.client_id` | `str` | -- | Optional client ID for additional validation |
 | `oidc.resource_uri` | `str` | -- | Public resource URI. When set, this is advertised in RFC 9728 metadata and enforced as JWT `aud` for all issuers. |
 | `oidc.issuers` | `list[dict]` | `[]` | Multi-issuer trust entries. When non-empty, these override the legacy top-level `oidc.issuer`. |
 | `oidc.issuers[].issuer` | `str` | inherited | Trusted OIDC issuer URL |
@@ -984,20 +1062,22 @@ rate_limit:
 | `oidc.issuers[].jwks_uri` | `str` | inherited | JWKS endpoint for this issuer |
 | `oidc.issuers[].client_id` | `str` | inherited | Optional client ID for additional validation |
 | `oidc.issuers[].max_token_lifetime_seconds` | `int` | inherited | Maximum JWT lifetime for this issuer; `0` disables the check |
-| `oidc.subject_claim` | `str` | -- | JWT subject claim field |
-| `oidc.groups_claim` | `str` | -- | JWT groups claim field |
-| `oidc.email_claim` | `str` | -- | JWT email claim field |
-| `oidc.tenant_claim` | `str` | -- | JWT tenant claim field |
-| `oidc.max_token_lifetime_seconds` | `int` | `3600` | Maximum accepted JWT lifetime (`exp - iat`); `0` disables the check |
+| `oidc.issuers[].<other>` | -- | inherited | Each issuer may also override `subject_claim`, `groups_claim`, `email_claim`, `tenant_claim`, `session_id_claim`, `require_tenant`, `strict_tenant_audience` and `tenant_audiences` |
+| `oidc.subject_claim` | `str` | `sub` | JWT subject claim field |
+| `oidc.groups_claim` | `str` | `groups` | JWT groups claim field |
+| `oidc.email_claim` | `str` | `email` | JWT email claim field |
+| `oidc.tenant_claim` | `str` | `tenant_id` | JWT tenant claim field |
+| `oidc.session_id_claim` | `str` | `sid` | JWT session id claim field |
+| `oidc.max_token_lifetime_seconds` | `int` | `3600` | Maximum accepted JWT lifetime (`exp - iat`); `0` disables the check. `MCP_JWT_MAX_TOKEN_LIFETIME` wins over it |
 | `oidc.clock_skew_leeway_seconds` | `int` | `60` | Leeway applied to `exp`/`nbf`/`iat` validation to absorb clock skew between Hangar and the issuer |
 | `oidc.require_tenant` | `bool` | `false` | **Fail-closed multi-tenant gate.** When `true`, a trusted token whose tenant claim is missing or empty is rejected instead of falling back to an untenanted principal |
 | `oidc.strict_tenant_audience` | `bool` | `false` | Opt-in strict per-tenant audience binding (RFC 8707): the token's audience must match the audience mapped to its claimed tenant in `tenant_audiences`, so a token minted for one tenant cannot be replayed as another |
 | `oidc.tenant_audiences` | `dict[str, str]` | `{}` | Explicit tenant -> expected audience/resource URI map, used when `strict_tenant_audience` is `true` |
-| `opa.enabled` | `bool` | -- | Enable Open Policy Agent authorization |
-| `opa.url` | `str` | -- | OPA server URL |
-| `opa.policy_path` | `str` | -- | OPA policy path |
-| `opa.timeout` | `float` | -- | OPA request timeout in seconds |
-| `storage` | `dict` | -- | Auth storage configuration (driver, path, host, etc.) |
+| `opa.enabled` | `bool` | `false` | Enable Open Policy Agent authorization |
+| `opa.url` | `str` | `http://localhost:8181` | OPA server URL |
+| `opa.policy_path` | `str` | `v1/data/mcp/authz/allow` | OPA policy path |
+| `opa.timeout` | `float` | `5.0` | OPA request timeout in seconds |
+| `storage` | `dict` | `driver: memory` | Auth storage configuration (driver, path, host, etc.) |
 | `rate_limit` | `dict` | -- | Auth-specific rate limiting |
 | `role_assignments` | `list[dict]` | -- | Role assignment rules |
 | `stdio.principal` | `dict` | -- | The caller a stdio session is declared to be (see below). Ignored over HTTP |
@@ -1067,13 +1147,13 @@ config_reload:
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
-| `enabled` | `bool` | -- | Enable automatic config file watching |
-| `use_watchdog` | `bool` | -- | Use watchdog library for file system events |
-| `interval_s` | `int` | -- | Polling interval in seconds (fallback when watchdog unavailable) |
+| `enabled` | `bool` | `true` | Enable automatic config file watching |
+| `use_watchdog` | `bool` | `true` | Use watchdog library for file system events |
+| `interval_s` | `int` | `5` | Polling interval in seconds (fallback when watchdog unavailable) |
 
 ## `groups`
 
-MCP Server groups are configured inside the `MCP servers` section with `mode: group`. A group load-balances requests across multiple member MCP servers.
+MCP Server groups are configured inside the `mcp_servers` section with `mode: group`. A group load-balances requests across multiple member MCP servers.
 
 ```yaml
 mcp_servers:
@@ -1111,7 +1191,7 @@ mcp_servers:
 | Key | Type | Default | Range | Description |
 | ----- | ------ | --------- | ------- | ------------- |
 | `mode` | `str` | -- | `"group"` | Must be `"group"` |
-| `strategy` | `str` | `"round_robin"` | round_robin, weighted_round_robin, least_connections, random, priority | Load balancing strategy |
+| `strategy` | `str` | `"round_robin"` | round_robin, weighted_round_robin, least_connections, random, priority | Load balancing strategy. An unknown value logs `unknown_strategy_using_default` and uses `round_robin` |
 | `min_healthy` | `int` | `1` | >= 1 | Members in rotation, not `dead`, needed for the group `healthy` state and to close an open circuit |
 | `auto_start` | `bool` | `true` | -- | Auto-start members when the group is created |
 | `description` | `str` | -- | -- | Group description |
@@ -1123,6 +1203,8 @@ mcp_servers:
 | `canary.split_pct` | `int` | `0` | 0--100 | Deterministic percentage of tenants routed to `canary.member` |
 | `canary.pinned_tenants` | `dict[str, str]` | `{}` | -- | Tenant ID to member ID pins; explicit pins win over split routing |
 | `members` | `list[dict]` | `[]` | -- | Member MCP server configurations |
+| `max_concurrency` | `int` | -- | >= 0 | Concurrency limit for calls that name the group |
+| `access`, `tool_projection`, `header_exposure` | `dict` | -- | -- | The same blocks as on a server, applied to the group |
 
 A group's circuit closes once `min_healthy` members are back in rotation, after
 a passing health check or a completed start; it has no timer.
@@ -1133,13 +1215,18 @@ effect. A config that still sets it loads and logs `unknown_config_key`;
 
 ### Member configuration
 
-Each member entry supports all standard MCP server keys (`mode`, `command`, `image`, `endpoint`, `env`, etc.) plus:
+A member whose `id` names a server declared under `mcp_servers` is that server:
+its entry reads only the keys below, and any other key logs
+`group_member_entry_settings_ignored`. A member with no such server is built
+from its own entry, which then takes all standard MCP server keys (`mode`,
+`command`, `image`, `endpoint`, `env`, etc.) and must say how to run it, or the
+config is refused. The member keys are:
 
 | Key | Type | Default | Range | Description |
 | ----- | ------ | --------- | ------- | ------------- |
 | `id` | `str` | -- | -- | Unique member ID (required) |
-| `weight` | `int` | -- | 1--100 | Weight for weighted_round_robin and random strategies |
-| `priority` | `int` | -- | 1--100 | Priority for priority strategy (lower number = higher priority) |
+| `weight` | `int` | `1` | 1--100 | Weight for weighted_round_robin and random strategies |
+| `priority` | `int` | `1` | 1--100 | Priority for priority strategy (lower number = higher priority) |
 | `tools` | `dict` | -- | -- | Member-level tool access policy, same keys as the group-level block |
 
 ## `resource_links`
@@ -1170,6 +1257,46 @@ seen). Sustained `tenant_cap` means this value is too low for the workload;
 
 The map is per replica and in memory, so links do not survive a restart and are
 not readable from another replica.
+
+## `tool_access`
+
+Selects the gateway topology, and in `front_door` what a replica must have
+projected before it reports ready.
+
+```yaml
+tool_access:
+  mode: front_door
+  required_catalogue:
+    servers: [payments, search-pool]
+    retry_for_s: 600
+```
+
+| Key | Type | Default | Description |
+| ----- | ------ | --------- | ------------- |
+| `mode` | `str` | `egress` | `egress` or `front_door`. Any other value refuses the config. A reload cannot change it |
+| `required_catalogue.servers` | `list[str]` | -- | Server or group ids that must have been projected once before `/health/ready` answers 200. A group is met by any one member. Must be a non-empty list of ids declared in `mcp_servers` |
+| `required_catalogue.retry_for_s` | `float` | `600` | How long readiness waits for the list, and the missing servers are retried, counted from the first config apply. Must be above 0 |
+
+`required_catalogue` applies in `front_door` only; in `egress` it is checked and
+ignored. Where several replicas take the management lease, a required server
+in a local mode (subprocess or docker) refuses the config, because only the
+lease holder may start one. See the [front-door guide](../guides/FRONT_DOOR.md).
+
+## `http`
+
+```yaml
+http:
+  graceful_shutdown_timeout_s: 90
+```
+
+| Key | Type | Default | Description |
+| ----- | ------ | --------- | ------------- |
+| `graceful_shutdown_timeout_s` | `int` | *(unset)* | How long `serve --http` waits for in-flight requests once told to stop, before cancelling them. Unset waits without a bound. Must be a positive integer. Read when the HTTP server starts, so a reload checks it but does not apply it |
+
+## `relay_tasks_enabled`
+
+A top-level boolean, default `true`: the kill switch for the governed task
+relay. See [Governed tasks](../guides/GOVERNED_TASKS.md).
 
 ## Unknown keys
 
@@ -1220,6 +1347,11 @@ single place in the product that enumerates them, and a schema assembled from
 twenty readers would drift into rejecting valid configuration -- a worse failure
 than accepting a typo.
 
+`truncation` is the exception at section level: its keys are not checked.
+Some blocks below that level check their own keys and refuse an unknown one
+whatever the strict setting: `execution.tenant_limits`, `rate_limit.per_caller`
+and `tool_access.required_catalogue`.
+
 One thing the check will not catch, because both spellings are real:
 `rate_limit` exists at the top level, where it takes `rps` and `burst`, **and**
 under `auth`, where it does not. Nesting it in the wrong place gives you a valid
@@ -1235,10 +1367,11 @@ Environment variables override corresponding YAML settings. Variables follow the
 | ---------- | --------- | ------------- |
 | `MCP_CONFIG` | `"config.yaml"` | Path to YAML configuration file |
 | `MCP_MODE` | `"stdio"` | Server mode: `stdio` or `http` |
-| `MCP_HTTP_HOST` | `"0.0.0.0"` | HTTP bind host |
+| `MCP_HTTP_HOST` | `"0.0.0.0"` | HTTP bind host. A non-loopback host without authentication refuses to start unless `--unsafe-no-auth` is passed |
 | `MCP_HTTP_PORT` | `8000` | HTTP bind port |
 | `MCP_LOG_LEVEL` | `"INFO"` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `MCP_JSON_LOGS` | `"false"` | Enable structured JSON logging |
+| `HANGAR_CONFIG_STRICT` | -- | `1`, `true`, `yes` or `on` refuses a config with an unknown key instead of warning. See [Unknown keys](#unknown-keys) |
 
 ### Security / Runtime
 
@@ -1247,6 +1380,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 | `MCP_RATE_LIMIT_RPS` | `"10"` | Rate limit: requests per second |
 | `MCP_RATE_LIMIT_BURST` | `"20"` | Rate limit: burst size |
 | `MCP_ALLOW_ABSOLUTE_PATHS` | `"false"` | Allow absolute paths in input validation |
+| `MCP_MAX_RESPONSE_BYTES` | -- | Wins over `execution.max_response_bytes`; a server's own `max_response_bytes` wins over both |
 
 ### Persistence
 
@@ -1264,6 +1398,8 @@ Environment variables override corresponding YAML settings. Variables follow the
 | ---------- | --------- | ------------- |
 | `MCP_TRACING_ENABLED` | `"true"` | Enable OpenTelemetry tracing |
 | `MCP_TRACING_CONSOLE` | from config | Enable console trace export |
+| `MCP_TRACING_CALLER_IDS` | from config | Put user, agent and session ids on spans |
+| `MCP_AUDIT_EXPORT_ENABLED` | from config | Export audit records as OTLP logs (`observability.audit.enabled`) |
 | `MCP_ENVIRONMENT` | `"development"` | Deployment environment label |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `"http://localhost:4317"` | OTLP exporter endpoint |
 | `OTEL_SERVICE_NAME` | `"mcp-hangar"` | OpenTelemetry service name |
@@ -1279,15 +1415,15 @@ Environment variables override corresponding YAML settings. Variables follow the
 | `LANGFUSE_SECRET_KEY` | -- | Langfuse secret key (sensitive) |
 | `LANGFUSE_HOST` | `"https://cloud.langfuse.com"` | Langfuse API host |
 | `MCP_LANGFUSE_SAMPLE_RATE` | `"1.0"` | Trace sampling rate (0.0--1.0) |
-| `MCP_LANGFUSE_SCRUB_INPUTS` | `"false"` | Redact sensitive tool inputs |
-| `MCP_LANGFUSE_SCRUB_OUTPUTS` | `"false"` | Redact sensitive tool outputs |
+| `MCP_LANGFUSE_SCRUB_INPUTS` | `"true"` | Redact sensitive tool inputs |
+| `MCP_LANGFUSE_SCRUB_OUTPUTS` | `"true"` | Redact sensitive tool outputs |
 
-!!! note "Legacy `HANGAR_*` prefix"
-    The following legacy variables are supported for backward compatibility but `MCP_*` is the canonical prefix:
-    `HANGAR_LANGFUSE_ENABLED` maps to `MCP_LANGFUSE_ENABLED`,
-    `HANGAR_LANGFUSE_SAMPLE_RATE` maps to `MCP_LANGFUSE_SAMPLE_RATE`,
-    `HANGAR_LANGFUSE_SCRUB_INPUTS` maps to `MCP_LANGFUSE_SCRUB_INPUTS`,
-    `HANGAR_LANGFUSE_SCRUB_OUTPUTS` maps to `MCP_LANGFUSE_SCRUB_OUTPUTS`.
+!!! note "Legacy `HANGAR_LANGFUSE_*` variables"
+    `HANGAR_LANGFUSE_ENABLED`, `HANGAR_LANGFUSE_SAMPLE_RATE`,
+    `HANGAR_LANGFUSE_SCRUB_INPUTS` and `HANGAR_LANGFUSE_SCRUB_OUTPUTS` are not
+    read by the gateway's Langfuse integration in 2.24.0, and setting them does
+    not enable or configure it. Use the `MCP_LANGFUSE_*` names above, or the
+    `observability.langfuse` block.
 
 ### Deprecated Variables
 
@@ -1311,4 +1447,4 @@ custom deployment checks for `license_tier`, `LicenseTier`, or
 
 | Variable | Default | Description |
 | ---------- | --------- | ------------- |
-| `MCP_JWT_MAX_TOKEN_LIFETIME` | -- | Maximum JWT token lifetime |
+| `MCP_JWT_MAX_TOKEN_LIFETIME` | -- | Maximum JWT lifetime in seconds. Wins over `oidc.max_token_lifetime_seconds`; an issuer's own `max_token_lifetime_seconds` wins over both |

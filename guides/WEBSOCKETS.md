@@ -73,7 +73,7 @@ The server acknowledges with:
 }
 ```
 
-The server waits up to 5 seconds after accepting the connection for this first message, and only then starts streaming: events published in that window are not delivered, whether or not a `subscribe` arrives. Only the first `subscribe` is acknowledged.
+The server waits for this first message, up to 5 seconds after accepting the connection, and only then starts streaming: events published before the first message arrives, or before the 5 seconds run out, are not delivered. Only the first `subscribe` is acknowledged.
 
 You can update filters at any time by sending another `subscribe` message; it takes effect without an acknowledgement. Omit a key to not filter on that dimension (e.g., omit `mcp_server_ids` to receive events from all MCP servers). An `event_types` entry matches an event type exactly, and `"*"` matches every type.
 

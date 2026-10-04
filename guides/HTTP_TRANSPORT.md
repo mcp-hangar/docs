@@ -181,8 +181,7 @@ When a MCP server responds with `Content-Type: text/event-stream`, the client:
 Hangar opens every remote MCP server with `initialize`, and what the upstream
 answers decides how the rest of the connection is spoken:
 
-- An upstream that answers `initialize` (protocol versions before 2026-07-28)
-  keeps the version it negotiated. If it returns an `Mcp-Session-Id`, Hangar
+- An upstream that answers `initialize` keeps the version it negotiated. If it returns an `Mcp-Session-Id`, Hangar
   sends that header on every later request, and when the upstream answers a
   request with `404` (the session is gone, typically after an upstream restart)
   Hangar runs `initialize` again and retries the request once.

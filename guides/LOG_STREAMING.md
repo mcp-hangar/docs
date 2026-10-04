@@ -15,7 +15,7 @@ flowchart TD
     proc --> reader --> buffer --> endpoint --> api
 ```
 
-Each MCP server gets a dedicated `McpServerLogBuffer` -- a thread-safe ring buffer holding the most recent 1000 log lines. A background reader thread continuously reads the MCP server's stderr and appends lines to the buffer. Each line passes through the secret redactor before it is stored, so a token or key the server prints is served as `[REDACTED]`.
+Each MCP server gets a dedicated `McpServerLogBuffer` -- a thread-safe ring buffer holding the most recent 1000 log lines. A background reader thread continuously reads the MCP server's stderr and appends lines to the buffer. Each line passes through the secret redactor before it is stored. The redactor is pattern-based: values it recognises (`api_key=` assignments, `Bearer` tokens, credentials in URLs, JWTs, and common provider key formats such as GitHub, Slack, Stripe, AWS and Google keys) are replaced with `[REDACTED]`, and a secret in a shape it does not recognise is served as printed.
 
 ## Log Line Format
 
@@ -66,5 +66,5 @@ Log capture is automatic for subprocess, docker and container MCP servers. No co
 | Buffer size | 1000 lines per MCP server |
 | Line length limit | None: a line is stored whole |
 | Encoding | Text in the gateway's locale encoding (UTF-8 on most systems) |
-| Redaction | Secrets replaced with `[REDACTED]` before storage |
+| Redaction | Recognised secret patterns replaced with `[REDACTED]` before storage; others served as printed |
 | Capture source | stderr only (stdout is JSON-RPC) |

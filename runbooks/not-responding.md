@@ -4,9 +4,9 @@
 
 ## What it means
 
-Prometheus cannot scrape the Hangar (`up{job="mcp-hangar"} == 0`) for 1m, or every
-registered MCP server is down while at least one is configured. The gateway is
-effectively unavailable to clients.
+Prometheus cannot scrape the Hangar (`up{job="mcp-hangar"} == 0`) for 1m, or no MCP
+server reports up while at least one is DEAD (4), for 1m. A pool that is merely all
+cold does not fire it. The gateway is effectively unavailable to clients.
 
 ## Impact
 
@@ -23,17 +23,20 @@ kubectl -n <ns> get endpoints <svc>         # is the Service backed by a ready p
 
 ```promql
 up{job="mcp-hangar"}
-sum(mcp_hangar_mcp_server_up)               # 0 while mcp_hangar_mcp_server_info > 0 ?
+sum(mcp_hangar_mcp_server_up)               # 0 ...
+count(mcp_hangar_mcp_server_state == 4)     # ... while at least one server is DEAD?
 ```
 
-Check readiness: `GET /health/ready` reflects event-store durability posture — a
-not-ready pod is pulled from the Service.
+Check readiness: `GET /health/ready` does not wait for a warm server. It fails when
+a configured durable event store fell back to memory, or, on a front door with
+`tool_access.required_catalogue`, while the listed servers are not yet projected.
+A not-ready pod is pulled from the Service.
 
 ## Remediate
 
 - Crashloop → fix the failing dependency shown in logs; roll back the last deploy if it correlates.
 - OOMKilled → raise memory limits (see `MCPHangarHighMemoryUsage`).
-- All-providers-down → the servers are the problem, not Hangar; work `provider-unhealthy`.
+- All-providers-down → the servers are the problem, not Hangar; work [provider-dead](provider-dead.md).
 - Scrape-only failure (app healthy) → check the ServiceMonitor/NetworkPolicy `allowMonitoring`.
 
 ## Escalate

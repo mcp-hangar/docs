@@ -35,17 +35,20 @@ mcp_hangar_mcp_server_state == 4                                   # 4 = DEAD, b
 time() - mcp_hangar_mcp_server_last_healthy_timestamp_seconds      # seconds since Hangar last saw it working
 ```
 
-The reason is not on a metric and not in `hangar_details`. Hangar's own log
-names it: search it for the server id and the events in the table above. For a
+The reason is not on a metric. Since 2.21.0, `hangar_details`, `hangar_list`,
+`hangar_status` and `GET /api/mcp_servers/<id>` carry a `dead` block: `reason`
+(the values in the table above), `since`, `retry_allowed_at` (when its backoff
+ends) and `revived_by` (`call_or_start` or `start`). Hangar's own log names it
+too: search it for the server id and the events in the table above. For a
 group member, the group also logs `Member <id> dead in group <group>: <reason>`.
 
 ```bash
-curl -s -H "X-API-Key: $KEY" <hangar>/api/mcp_servers/<id>/logs?lines=200   # the server's own recent output
+curl -s -H "X-API-Key: $KEY" "<hangar>/api/mcp_servers/<id>/logs?lines=200"   # the server's own recent output
+curl -s -H "X-API-Key: $KEY" "<hangar>/api/mcp_servers/<id>/health"           # its health block
 ```
 
-`hangar_details` on the server shows `state: dead` and its `health` block:
-`consecutive_failures`, `last_failure_ago`, and `can_retry`, which is `false`
-while its backoff lasts.
+The `health` block holds `consecutive_failures`, `last_failure_ago`, and
+`can_retry`, which is `false` while its backoff lasts.
 
 ## What starts it again
 

@@ -56,6 +56,10 @@ The context is the job name; a check from a reusable workflow is
 | Require code owner reviews | false | true |
 | Enforce admins | false | true |
 
+These are the script's two modes. The live setting matches neither: 0
+reviewers and no code owner reviews, as in solo, but `enforce_admins: true`, as
+in community.
+
 Flip to community mode when there is at least one second maintainer. Until then `require_code_owner_reviews: true` would block all merges to CODEOWNERS-protected paths since GitHub does not allow self-approval.
 
 ## Applying the protection
@@ -78,17 +82,24 @@ bash scripts/setup-branch-protection.sh --dry-run
 2. Wait for at least one PR to run it green.
 3. Add the check name to the `contexts` array in `scripts/setup-branch-protection.sh`.
 4. Re-run the script.
+5. Add it to the `main-integrity` ruleset too. The ruleset carries its own copy
+   of the required checks, which the script never touches.
 
 ## Removing a required check
 
 1. Comment out (do not delete) the check name in the script.
 2. Re-run the script to apply the reduced list.
-3. Delete or disable the workflow file in a separate PR.
+3. Remove it from the `main-integrity` ruleset, which the script does not
+   change; a check still listed there stays required.
+4. Delete or disable the workflow file in a separate PR.
 
 ## Emergency bypass
 
-With `enforce_admins: true`, which is the live setting, a direct `git push origin main` is refused even for an admin; the rulesets' admin bypass does not lift the classic protection. Use only when CI itself is broken or a critical hotfix cannot wait. Bypass requires:
+The live setting is `enforce_admins: true`, so the classic protection applies to admins as well, and a direct `git push origin main` is not an option while it is set; the rulesets' admin bypass does not lift the classic protection. Use only when CI itself is broken or a critical hotfix cannot wait. Bypass requires:
 
 1. Temporarily set `enforce_admins: false` via GitHub UI.
 2. Perform the emergency action.
-3. Re-run `bash scripts/setup-branch-protection.sh --mode community` to restore.
+3. Set `enforce_admins` back to `true` in the GitHub UI, or with
+   `gh api -X POST repos/mcp-hangar/mcp-hangar/branches/main/protection/enforce_admins`.
+   Do not restore it by re-running the script, which also rewrites the
+   required checks and the review settings.

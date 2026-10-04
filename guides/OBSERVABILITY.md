@@ -51,11 +51,14 @@ the payloads live.
 
 ```bash
 # HTTP mode (exposes /metrics endpoint)
-mcp-hangar serve --http --port 8000
+mcp-hangar serve --http --host 127.0.0.1 --port 8000
 
 # With custom config
-MCP_CONFIG=config.yaml mcp-hangar serve --http --port 8000
+MCP_CONFIG=config.yaml mcp-hangar serve --http --host 127.0.0.1 --port 8000
 ```
+
+Without authentication configured, `serve --http` refuses to bind its default
+host `0.0.0.0`; bind the loopback address for a local run.
 
 Verify metrics are exposed:
 
@@ -89,7 +92,7 @@ from:
 | What | Chart value | Renders | Source |
 | ------ | ------------- | --------- | -------- |
 | Scrape target | `serviceMonitor.enabled=true` | a `ServiceMonitor` (needs the Prometheus Operator) | the chart |
-| Alert rules | `prometheusRule.enabled=true` | a `PrometheusRule` with 30 rules | [`mcp-hangar/files/prometheus-alerts.yaml`](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/files/prometheus-alerts.yaml) |
+| Alert rules | `prometheusRule.enabled=true` | a `PrometheusRule` with 29 rules | [`mcp-hangar/files/prometheus-alerts.yaml`](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/files/prometheus-alerts.yaml) |
 | Dashboards | `dashboards.enabled=true` | four ConfigMaps labelled `grafana_dashboard` for the Grafana sidecar | [`mcp-hangar/files/dashboards/`](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files/dashboards) |
 
 Everything else is your own: a raw Prometheus scrape config, Alertmanager
@@ -139,7 +142,7 @@ MCP Hangar exports Prometheus metrics at `/metrics`. All metrics use the `mcp_ha
 | Metric | Type | Labels | Description |
 | -------- | ------ | -------- | ------------- |
 | `mcp_hangar_tool_calls_total` | Counter | MCP server, tool, status | Total tool invocations |
-| `mcp_hangar_tool_call_duration_seconds` | Histogram | MCP server, tool | Invocation latency (buckets: 0.01-30s) |
+| `mcp_hangar_tool_call_duration_seconds` | Histogram | MCP server, tool | Invocation latency (buckets: 0.001-30s) |
 | `mcp_hangar_tool_call_errors_total` | Counter | MCP server, tool, error_type | Failed invocations by error type |
 
 **Example queries:**
@@ -159,11 +162,11 @@ sum(rate(mcp_hangar_tool_call_errors_total[5m])) / sum(rate(mcp_hangar_tool_call
 
 | Metric | Type | Labels | Description |
 | -------- | ------ | -------- | ------------- |
-| `mcp_hangar_batch_calls_total` | Counter | result | Batch invocations (success/failure) |
+| `mcp_hangar_batch_calls_total` | Counter | result | Batch invocations (`success`, `failure`, `partial`) |
 | `mcp_hangar_batch_duration_seconds` | Histogram | - | Batch execution time |
 | `mcp_hangar_batch_size` | Histogram | - | Number of calls per batch |
-| `mcp_hangar_batch_cancellations_total` | Counter | - | Cancelled batches |
-| `mcp_hangar_batch_circuit_breaker_rejections_total` | Counter | - | Circuit breaker rejections |
+| `mcp_hangar_batch_cancellations_total` | Counter | reason | Cancelled batches (`timeout`, `fail_fast`) |
+| `mcp_hangar_batch_circuit_breaker_rejections_total` | Counter | mcp_server | Circuit breaker rejections |
 | `mcp_hangar_batch_concurrency` | Gauge | - | Current parallel executions |
 
 **Example queries:**
@@ -202,10 +205,10 @@ sum(rate(mcp_hangar_health_checks_total{result="healthy"}[5m])) by (mcp_server)
 | -------- | ------ | -------- | ------------- |
 | `mcp_hangar_mcp_server_state` | Gauge | mcp_server | Current state (0=cold, 1=initializing, 2=ready, 3=degraded, 4=dead) |
 | `mcp_hangar_mcp_server_up` | Gauge | mcp_server | 1 while the MCP server is `ready`, 0 in every other state |
-| `mcp_hangar_mcp_server_starts_total` | Counter | mcp_server | MCP server start attempts |
+| `mcp_hangar_mcp_server_starts_total` | Counter | mcp_server, result | MCP server start attempts |
 | `mcp_hangar_mcp_server_initialized` | Gauge | mcp_server | 0 while the MCP server is `cold`, 1 in every other state, `dead` included |
 | `mcp_hangar_mcp_server_last_healthy_timestamp_seconds` | Gauge | mcp_server | When Hangar last saw the MCP server working: a passing health check, a completed start or a successful tool call. Kept when it goes cold or dead |
-| `mcp_hangar_mcp_server_cold_start_seconds` | Histogram | mcp_server | Cold start latency |
+| `mcp_hangar_mcp_server_cold_start_seconds` | Histogram | mcp_server, mode | Cold start latency |
 | `mcp_hangar_mcp_server_cold_start_in_progress` | Gauge | mcp_server | 1 if cold start is in progress |
 
 *`mcp_hangar_mcp_server_last_healthy_timestamp_seconds` since 2.20.0.*
@@ -274,8 +277,8 @@ mcp_hangar_group_circuit_open == 1
 - If several Hangar deployments share one Prometheus, add the label that
   separates them (for example `job` or `namespace`) to each `by (...)`.
 - A replica that has not loaded the group has no series and does not count. A
-  replica that is down drops out once its series go stale. From the first
-  release after 2.22.1, a configuration reload that removes a group drops that
+  replica that is down drops out once its series go stale. Since 2.23.0, a
+  configuration reload that removes a group drops that
   group's series, so a group removed with its circuit open no longer reads as
   open for good.
 - For an alert, give the disagreement query a `for:` clause, for example
@@ -292,17 +295,17 @@ answers for one replica. See
 
 | Metric | Type | Labels | Description |
 | -------- | ------ | -------- | ------------- |
-| `mcp_hangar_discovery_mcp_servers` | Gauge | source | Discovered MCP servers per source |
-| `mcp_hangar_discovery_registrations_total` | Counter | source | New registrations |
-| `mcp_hangar_discovery_errors_total` | Counter | source | Errors by source |
-| `mcp_hangar_discovery_cycle_duration_seconds` | Histogram | source | Discovery cycle duration |
+| `mcp_hangar_discovery_mcp_servers` | Gauge | source_type, status | Discovered MCP servers per source |
+| `mcp_hangar_discovery_registrations_total` | Counter | source_type | New registrations |
+| `mcp_hangar_discovery_errors_total` | Counter | source_type, error_type | Errors by source |
+| `mcp_hangar_discovery_cycle_duration_seconds` | Histogram | source_type | Discovery cycle duration |
 
 #### HTTP Transport
 
 | Metric | Type | Labels | Description |
 | -------- | ------ | -------- | ------------- |
 | `mcp_hangar_http_requests_total` | Counter | mcp_server, method, status_code | HTTP requests to remote MCP servers |
-| `mcp_hangar_http_request_duration_seconds` | Histogram | method | HTTP request latency |
+| `mcp_hangar_http_request_duration_seconds` | Histogram | mcp_server, method | HTTP request latency |
 
 #### Messages (stdio + HTTP)
 
@@ -316,7 +319,7 @@ answers for one replica. See
 
 | Metric | Type | Labels | Description |
 | -------- | ------ | -------- | ------------- |
-| `mcp_hangar_rate_limit_hits_total` | Counter | principal | Rate limit rejections |
+| `mcp_hangar_rate_limit_hits_total` | Counter | result | Rate limiter decisions: `allowed` or `rejected` |
 
 #### Approval Gate
 
@@ -482,7 +485,7 @@ If you are not running the Grafana sidecar:
 
 ### Alert Configuration
 
-The 30 maintained alert rules ship with the Helm chart. `prometheusRule.enabled=true`
+The 29 maintained alert rules ship with the Helm chart. `prometheusRule.enabled=true`
 renders them as a `PrometheusRule` CR, which needs the Prometheus Operator CRDs
 installed; the source is
 [`mcp-hangar/files/prometheus-alerts.yaml`](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/files/prometheus-alerts.yaml).
@@ -496,15 +499,14 @@ They are organized by severity:
 | `MCPHangarHighErrorRate` | Error rate > 10% | 2m | Significant failures |
 | `MCPHangarBatchHighFailureRate` | Batch failure > 20% | 3m | Batch operations failing |
 | `MCPHangarCircuitBreakerTripped` | CB rejections > 10/5m | 2m | MCP Server isolated |
-| `MCPHangarProviderUnhealthy` | Consecutive failures > 5 | 2m | MCP Server critically unhealthy |
-| `MCPHangarAllProvidersDown` | All MCP servers down (with servers configured) | 1m | Total outage |
+| `MCPHangarAllProvidersDown` | No MCP server up, and at least one dead | 1m | Total outage |
 | `MCPHangarProviderDead` | MCP server state = DEAD (4) | 1m | MCP server failed and nothing restarts it on its own; see [provider-dead](../runbooks/provider-dead.md) |
 
 #### Warning Alerts (Investigate)
 
 | Alert | Condition | For | Description |
 | ------- | ----------- | ----- | ------------- |
-| `MCPHangarHighConsecutiveFailures` | Consecutive failures > 2 | 2m | Health check issues |
+| `MCPHangarHighConsecutiveFailures` | Consecutive failures >= 1 | 2m | Health check issues |
 | `MCPHangarHealthCheckSlow` | P95 health check > 5s | 5m | Slow health checks |
 | `MCPHangarHighLatencyP95` | P95 latency > 3s | 5m | Performance degradation |
 | `MCPHangarHighLatencyP99` | P99 latency > 5s | 5m | Tail latency issues |
@@ -516,6 +518,8 @@ They are organized by severity:
 | `MCPHangarGCSlowCycles` | P95 GC > 0.5s | 5m | GC performance issue |
 | `MCPHangarHighMemoryUsage` | Memory > 2GB | 10m | Memory pressure |
 | `MCPHangarHighCPUUsage` | CPU > 80% | 10m | CPU saturation |
+| `MCPHangarTelemetryExportFailing` | OTLP export failures > 0 | 10m | Traces or audit records are not reaching the collector |
+| `MCPHangarDiscoveryValidationFailing` | Discovery validation failures > 0 | 15m | Discovered servers are being rejected |
 | `MCPHangarProviderDegraded` | MCP server state = DEGRADED | 5m | MCP Server degraded |
 | `MCPHangarProviderNotSeenHealthy` | Not seen working for 15m, and not cold | 5m | MCP server not working; see [provider-dead](../runbooks/provider-dead.md) |
 | `MCPHangarRemoteProviderUnreachable` | Connection-refused errors > 10/5m | 5m | Remote MCP server unreachable |
@@ -602,9 +606,13 @@ curl -s http://localhost:9090/api/v1/alerts | jq '.data.alerts[] | select(.state
 ### OpenTelemetry Integration
 
 MCP Hangar supports distributed tracing via OpenTelemetry. Every tool invocation
-produces an OTEL span carrying MCP governance attributes (`mcp.server.id`,
-`gen_ai.tool.name`, `mcp.tool.status`, enforcement context, and identity context
-when available).
+produces a `batch.call.<tool>` span carrying MCP governance attributes
+(`mcp.server.id`, `gen_ai.tool.name`, `hangar.call.outcome`, the route and, for
+a refused call, the refusal's gate and reason), and an `execute_tool <tool>`
+CLIENT span for the upstream call. Caller type and tenant are added when the
+call has an identity; the caller's user, agent and session ids only with
+`observability.tracing.caller_ids: true` (or `MCP_TRACING_CALLER_IDS=true`),
+which is off by default.
 
 For the full MCP attribute taxonomy, partner backend recipes (OTEL Collector,
 OpenLIT, Langfuse, Grafana), and reference docker-compose setups, see:
@@ -627,35 +635,26 @@ with trace_span("process_request", {"request.id": req_id}) as span:
 
 ### MCP Governance Attributes on Spans
 
-`TracedMcpServerService` automatically creates an OTEL span for each tool invocation
-with standard MCP governance attributes via `set_governance_attributes()`:
-
-```python
-from mcp_hangar.observability.conventions import McpServer, MCP, set_governance_attributes
-
-# set_governance_attributes(span, ...) sets all applicable attributes in one call.
-# None values are omitted -- no empty strings pollute OTLP backends.
-set_governance_attributes(
-    span,
-    mcp_server_id="math",
-    tool_name="add",
-    user_id="alice",           # optional
-    session_id="sess-42",      # optional
-    policy_result="allow",     # optional
-    enforcement_action=None,   # omitted from span
-)
-```
+The gateway sets these attributes itself, on `batch.call.<tool>`, for every call
+that goes through `hangar_call`, a front-door tool call or the facade's
+`invoke`. There is nothing to construct or wire. `TracedMcpServerService`, which
+earlier versions of this page showed here, was removed in 2.22.0, and the
+`set_governance_attributes` helper in 2.24.0.
 
 ### OTLP Audit Export
 
-Security-relevant domain events (tool invocations, MCP server state transitions) are
-automatically exported as OTLP log records when `OTEL_EXPORTER_OTLP_ENDPOINT` is
-set. This is handled by `OTLPAuditExporter` and `OTLPAuditEventHandler` -- no
-additional configuration needed.
+Security-relevant domain events (tool invocations, refusals, MCP server state
+transitions) are automatically exported as OTLP log records when an OTLP endpoint
+is set explicitly, with `OTEL_EXPORTER_OTLP_ENDPOINT` or
+`observability.tracing.otlp_endpoint`. This is handled by `OTLPAuditExporter` and
+`OTLPAuditEventHandler` -- no additional configuration needed.
+`observability.audit.enabled: false` (or `MCP_AUDIT_EXPORT_ENABLED=false`) turns
+it off.
 
 Events exported:
 
 - `ToolInvocationCompleted` / `ToolInvocationFailed` -- with MCP server, tool, status, duration, caller identity, cost attribution
+- `ToolCallRefused` -- a call a control refused, with `mcp.tool.status=denied` and the refusing gate and reason
 - `McpServerStateChanged` -- with MCP server, from_state, to_state
 
 Caller identity attributes (`mcp.caller.type`, `mcp.caller.id`, `mcp.caller.roles`)
@@ -677,7 +676,9 @@ OTLP. Available exporters (in `src/mcp_hangar/compliance/`):
 | Syslog (RFC 5424) | `SyslogExporter` | Any syslog-compatible SIEM |
 
 All exporters implement the `IAuditExporter` protocol and output to file, callback,
-or stderr (for container log collection). Configure via the compliance bootstrap.
+or stderr (for container log collection). Select one with `MCP_COMPLIANCE_FORMAT`
+(`cef`, `leef`, `jsonlines` or `syslog`) and point it at a file with
+`MCP_COMPLIANCE_OUTPUT`; without it, records go to stderr.
 
 ### Environment Variables
 
@@ -686,17 +687,20 @@ or stderr (for container log collection). Configure via the compliance bootstrap
 | `MCP_TRACING_ENABLED` | `true` | Enable/disable tracing |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4317` | OTLP collector endpoint (also activates OTLP audit export) |
 | `OTEL_SERVICE_NAME` | `mcp-hangar` | Service name in traces |
+| `MCP_TRACING_CALLER_IDS` | `false` | Put caller user, agent and session ids on spans; overrides `observability.tracing.caller_ids` |
 
 ### Trace Context Propagation
 
 W3C TraceContext is automatically propagated across agent -> Hangar -> MCP server
 boundaries:
 
-- **Inbound:** `BatchExecutor` extracts `traceparent` from call metadata, creating
-  child spans linked to the agent's root trace.
-- **Outbound:** `HttpClient` injects `traceparent` into outbound HTTP headers when
-  calling remote MCP servers.
-- **Stdio:** Not supported (JSON-RPC over stdin/stdout has no header mechanism).
+- **Inbound:** `BatchExecutor` extracts `traceparent` from the inbound request's
+  `params._meta` and from call metadata, creating child spans linked to the
+  agent's root trace.
+- **Outbound HTTP:** `HttpClient` injects `traceparent` into the outbound HTTP
+  headers and into `params._meta` when calling remote MCP servers.
+- **Outbound stdio:** `traceparent` travels in `params._meta` (SEP-414), since
+  JSON-RPC over stdin/stdout has no headers.
 
 Manual propagation is also available:
 
@@ -738,18 +742,9 @@ observability:
 
 ### Trace Propagation
 
-```python
-from mcp_hangar.application.services import TracedMcpServerService
-
-result = traced_service.invoke_tool(
-    mcp_server_id="math",
-    tool_name="add",
-    arguments={"a": 1, "b": 2},
-    trace_id="your-langfuse-trace-id",
-    user_id="user-123",
-    session_id="session-456",
-)
-```
+`TracedMcpServerService`, the wrapper this section used to show, was removed in
+2.22.0, and there is no per-call `trace_id`, `user_id` or `session_id` argument
+to pass. Hangar's own tool-call traces go out over OTLP; see [Tracing](#tracing).
 
 See [ADR-007](../adr/ADR-007-langfuse-integration.md) for architectural details.
 
@@ -761,13 +756,19 @@ MCP Hangar uses structlog for structured JSON logging:
 
 ```json
 {
-  "timestamp": "2026-02-03T10:30:00.123Z",
+  "batch_id": "6190218a-cc44-427c-b9e9-52cb97519cc0",
+  "total": 1,
+  "succeeded": 1,
+  "failed": 0,
+  "cancelled": 0,
+  "elapsed_ms": 31.86,
+  "event": "batch_completed",
   "level": "info",
-  "event": "tool_invoked",
-  "mcp_server": "math",
-  "tool": "add",
-  "duration_ms": 150,
-  "service": "mcp-hangar"
+  "logger": "mcp_hangar.server.tools.batch.executor",
+  "timestamp": "2026-10-04T18:13:55.558790Z",
+  "service": "mcp-hangar",
+  "trace_id": "5df7a7f9961e8becfa2c91f8471e87b7",
+  "span_id": "bb0058b16848f4e0"
 }
 ```
 
@@ -782,12 +783,14 @@ logging:
 Environment variable:
 
 ```bash
-MCP_LOG_LEVEL=DEBUG mcp-hangar serve --http
+MCP_LOG_LEVEL=DEBUG mcp-hangar serve --http --host 127.0.0.1
 ```
 
 ### Log Correlation
 
-Include trace IDs for correlation with distributed traces:
+A line logged inside a span carries that span's `trace_id` and `span_id`
+automatically, as in the example above. To add the trace ID to a line of your
+own outside Hangar's logger:
 
 ```python
 from mcp_hangar.observability import get_current_trace_id
@@ -809,20 +812,22 @@ logger.info("processing", trace_id=get_current_trace_id())
 
 ### Response Format
 
-```json
-{
-  "status": "healthy",
-  "checks": [
-    {
-      "name": "mcp_servers",
-      "status": "healthy",
-      "duration_ms": 1.2
-    }
-  ],
-  "version": "0.6.3",
-  "uptime_seconds": 3600.5
-}
+The endpoints answer without authentication:
+
+```bash
+$ curl -s localhost:8000/health/live
+{"status":"healthy"}
+$ curl -s localhost:8000/health/ready
+{"status":"healthy","ready_mcp_servers":1,"total_mcp_servers":3}
+$ curl -s localhost:8000/health/startup
+{"status":"healthy","startup_complete":true,"uptime_seconds":0.38}
 ```
+
+Readiness does not wait for a warm MCP server: a gateway whose servers are all
+cold is ready. It answers `503` with `"status": "unhealthy"` when a configured
+durable event store has fallen back to memory (an `event_store` object says why),
+or, on a front door with `tool_access.required_catalogue`, while that catalogue
+has not been projected (a `catalogue` object counts what is missing).
 
 ### Kubernetes Configuration
 

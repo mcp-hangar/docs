@@ -9,10 +9,13 @@ drift and the review steps that automation cannot cover.
 
 ## Automated checks
 
-Two scripts run in CI (`.github/workflows/validate-docs.yml`) on every pull
-request, on push to `main`, and weekly. They are separate because they need
-different things: the link checker needs only this repository, the drift
-detector needs the product source tree checked out beside it.
+Seven scripts run in CI (`.github/workflows/validate-docs.yml`) on every pull
+request, on push to `main`, and weekly: links, CLI commands, Kubernetes
+manifests, PromQL, version currency, config blocks and symbol drift, with the
+freshness and config gates' `--selftest` run ahead of the check each guards.
+They are separate because they need different things: the link checker needs
+only this repository; the others need the product source, the operator
+repository or `promtool` beside it.
 
 ### Links and anchors
 
@@ -216,7 +219,7 @@ next undocumented section would go to hide.
 
 What it catches is a reader copying a block and getting a setting that silently
 does not apply. Note that `rate_limit` exists **both** at the top level (`rps`,
-`burst`) and under `auth`, and they take different keys; the nesting is the easy
+`burst`, `per_caller`) and under `auth`, and they take different keys; the nesting is the easy
 thing to get wrong.
 
 Depth matches the schema: section names, each section's own keys, and
@@ -303,15 +306,15 @@ relevant docs:
   `discovery`, etc. Verify against the config parsers in
   `src/mcp_hangar/server/config.py` and the relevant value objects.
 - **Class / event / enum names** in architecture docs and ADRs.
-- **Version and changelog accuracy** -- the `changelog.md` should mirror the
-  authoritative release-please `CHANGELOG.md` in the product repo; cookbook /
-  guide version claims should match the release a feature actually shipped in.
+- **Version accuracy** -- cookbook / guide version claims should match the
+  release a feature actually shipped in, per the product's `CHANGELOG.md`. This
+  repository's own `changelog.md` is written by release-please from the docs PR
+  titles; do not edit it by hand.
 
 ## When the product changes
 
 1. Run the validator locally against your `mcp-hangar` checkout.
 2. Fix any phantom symbol references it reports.
 3. Manually review the structural items above for the area you changed.
-4. If a feature shipped in a new release, update `changelog.md` to mirror the
-   product `CHANGELOG.md`, and check that any cookbook/guide that references a
-   version names the release the feature actually shipped in.
+4. If a feature shipped in a new release, check that any cookbook/guide that
+   references a version names the release the feature actually shipped in.

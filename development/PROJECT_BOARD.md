@@ -4,7 +4,7 @@
 
 The MCP Hangar project uses a GitHub Projects v2 board for issue triage and lifecycle tracking.
 
-Board URL: `https://github.com/orgs/mcp-hangar/projects/<N>` (set after first run of setup script).
+Board URL: `https://github.com/orgs/mcp-hangar/projects/1` (private). The `PROJECT_NUMBER` repository variable holds `1`.
 
 ## Custom fields
 
@@ -40,11 +40,11 @@ Triage and Done stay on the built-in workflows deliberately. They are reliable a
 
 ### Options with no mechanism
 
-`Backlog` and `Ready` exist on the field and nothing writes them. Either drive them or delete them; an option nobody sets is a column that lies about the state of the work.
+The Status field has exactly the five options above. `Backlog` and `Ready` were deleted: nothing wrote them, and an option nobody sets is a column that lies about the state of the work.
 
-Neither has an honest signal today. `Ready` would mean scheduled, and the signal for that is a milestone — there is one stale milestone in the whole organization and none in four of the five active repositories. `Backlog` would mean triaged but unscheduled, and the only automatic rule available is "carries the taxonomy labels", which the issue templates apply at creation, making it a synonym for `Triage`. Driving either would put a column on the board reporting a process nobody runs.
+Neither had an honest signal. `Ready` would mean scheduled, and the signal for that is a milestone — there is one stale milestone in the whole organization and none in four of the five active repositories. `Backlog` would mean triaged but unscheduled, and the only automatic rule available is "carries the taxonomy labels", which the issue templates apply at creation, making it a synonym for `Triage`. Driving either would have put a column on the board reporting a process nobody runs.
 
-`In Review` used to be listed here. It is driven now: an open pull request is under review, which is the one thing the column can mean without anybody declaring it, and pull requests are 1181 of the board's 1588 items. A draft goes to `In Progress` instead — work with a branch pushed, not work awaiting review.
+`In Review` used to be listed here. It is driven now: an open pull request is under review, which is the one thing the column can mean without anybody declaring it. A draft goes to `In Progress` instead — work with a branch pushed, not work awaiting review.
 
 **Delete status options in the Projects UI only.** The `updateProjectV2Field` mutation takes the complete option list with no ids and rebuilds the field, so every option gets a new id and **every item loses its status** — including the options that were not being changed. This was measured on a scratch project on 2026-09-09: an item assigned to an option that stayed in the list came back with no value at all.
 

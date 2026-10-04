@@ -16,7 +16,11 @@
 curl -sSL https://mcp-hangar.io/install.sh | bash
 ```
 
-This will install the latest version of MCP Hangar and set up your environment.
+The installer puts the newest release from PyPI into a private virtual
+environment under `~/.mcp-hangar` and adds `~/.mcp-hangar/bin` to `PATH` in
+your shell profile. That takes effect in new
+shells; in the one you ran it from, `export PATH="$HOME/.mcp-hangar/bin:$PATH"`
+first, or `mcp-hangar` is not found.
 
 ## Install from PyPI
 
@@ -68,7 +72,7 @@ that refuses to boot when the configuration demands a subsystem the runtime
 cannot reach. It is drop-in unless your config already carries `approval_list`;
 see [Upgrade to 2.1.0](../upgrade.md#upgrade-to-210).
 
-2.5.0 is what you actually land on. It makes storage one decision —
+Later 2.x releases build on that. 2.5.0 makes storage one decision —
 `persistence.backend: sqlite | postgresql` picks one backend for every persisted
 concern, or the selection is refused — and adds multi-replica coordination: a
 `coordination:` block declares that several replicas are one gateway, exactly
@@ -130,9 +134,10 @@ line — it is the default resolve.
 
 ## Install from Source (Monorepo)
 
-MCP Hangar is organized as a monorepo:
+The core is one Python package in its own repository (the operator and the
+Helm charts live in theirs, see [Releases & Artifacts](releases.md)):
 
-```
+```text
 mcp-hangar/
 ├── src/mcp_hangar/     # Python package (PyPI: mcp-hangar)
 ```
@@ -154,22 +159,27 @@ cd mcp-hangar
 # Install with dev dependencies
 pip install -e ".[dev]"
 
-# Or use uv from root
+# Or the same pip install through make
 make setup
 ```
 
 ## Docker
 
 ```bash
-docker pull ghcr.io/mcp-hangar/mcp-hangar:2.18.1
+docker pull ghcr.io/mcp-hangar/mcp-hangar:2.24.0
 
 # Run with config
-docker run -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  ghcr.io/mcp-hangar/mcp-hangar:2.18.1
+docker run -p 8080:8080 -v $(pwd)/config.yaml:/app/config.yaml:ro \
+  ghcr.io/mcp-hangar/mcp-hangar:2.24.0
 ```
 
-> The tag above pins the current stable release, matching what
-> `pip install mcp-hangar` gives you. See
+The image serves HTTP on `0.0.0.0:8080`, and Hangar refuses to bind a
+non-loopback address without authentication: unless `config.yaml` sets
+`auth.enabled: true`, the container exits at startup with
+`http_auth_required_for_non_loopback`. See
+[Authentication & RBAC](../guides/AUTHENTICATION.md).
+
+> The tag above pins the stable release this page was checked against. See
 > [Releases & Artifacts](releases.md) for the authoritative version index.
 
 ## Verify Installation

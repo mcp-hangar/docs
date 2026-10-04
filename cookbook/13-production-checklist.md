@@ -11,11 +11,12 @@
 - [ ] RBAC roles assigned with least-privilege
 - [ ] Tool access policies set for sensitive tools
 - [ ] Secrets use environment variable interpolation (`${VAR}`), not plain text in config
-- [ ] Docker MCP servers use `read_only: true` and `network: none` where possible
+- [ ] Docker MCP servers keep the defaults `read_only: true` and `network: none` unless they need otherwise
 
 ## Reliability
 
-- [ ] Health checks enabled on all MCP servers (`health_check_interval_s`)
+- [ ] Health checks enabled on all MCP servers (`health_check_interval_s`; in
+      2.24.0 every server is checked on the worker's 60 s cycle whatever the value says)
 - [ ] Circuit breaker thresholds tuned (`max_consecutive_failures`)
 - [ ] MCP Server groups configured for critical MCP servers (at least 2 members)
 - [ ] `min_healthy` set to match your SLA requirements
@@ -44,7 +45,7 @@
 
 ## Configuration
 
-- [ ] Config file reviewed for correctness (no `validate` subcommand exists)
+- [ ] Config file checked with `mcp-hangar config check config.yaml`, which reports keys nothing reads (it does not validate values)
 - [ ] Hot-reload tested via the `add`/`remove` API and via `SIGHUP` (graceful config reload)
 - [ ] Environment-specific configs separated (dev/staging/prod)
 
@@ -60,11 +61,11 @@
 ## Kubernetes (if applicable)
 
 > The MCP-Hangar Operator is an external component shipped from
-> [hangar-operator](https://github.com/mcp-hangar/hangar-operator).
+> [mcp-hangar-operator](https://github.com/mcp-hangar/mcp-hangar-operator).
 > See [Recipe 11](11-discovery-kubernetes.md#prerequisites) for install instructions.
 
 - [ ] MCP-Hangar Operator installed (see [Recipe 11 prerequisites](11-discovery-kubernetes.md#prerequisites))
-- [ ] CRDs applied (`MCPServer`, `MCPServerGroup`, `MCPDiscoverySource`)
+- [ ] CRDs applied (`MCPServer`, `MCPServerGroup`, `MCPDiscoverySource`, `MCPEgressPolicy`)
 - [ ] RBAC (Kubernetes) configured for operator service account
 - [ ] Network policies restricting MCP server-to-MCP server communication
 - [ ] Resource requests and limits in Helm values

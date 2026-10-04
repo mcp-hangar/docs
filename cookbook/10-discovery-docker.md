@@ -70,13 +70,22 @@ discovery:                               # NEW: discovery configuration
    ```
 
    ```json
-   {"pending": [{"name": "docker-math", "source_type": "docker", "mode": "remote",
-                 "connection_info": {"endpoint": "http://172.17.0.3:8080/mcp"},
-                 "metadata": {}, "fingerprint": "...", "discovered_at": "...",
-                 "last_seen_at": "...", "ttl_seconds": 300, "is_expired": false}]}
+   {"pending": [{"name": "docker-math", "source_type": "docker", "mode": "http",
+                 "connection_info": {"host": "172.17.0.3", "port": 8080,
+                                     "endpoint": "http://172.17.0.3:8080"},
+                 "metadata": {"container_id": "...", "container_name": "my-mcp-server",
+                              "image": "my-mcp-server:latest", "status": "running",
+                              "group": null, "runtime_addresses": ["172.17.0.3"]},
+                 "fingerprint": "...", "discovered_at": "...", "last_seen_at": "...",
+                 "ttl_seconds": 90, "is_expired": false}]}
    ```
 
-   The key is `source_type`, not `source`.
+   The key is `source_type`, not `source`. The endpoint is the container's
+   published host port when it has one (`-p`), otherwise its network IP, and it
+   carries **no path**: in 2.24.0 the Docker source has no label for one, so a
+   server that serves MCP at `/mcp` (the SDK default) answers the first call
+   with `MCP initialization failed: HTTP error: 404`. The Kubernetes source
+   has `mcp-hangar.io/path` for exactly this; the Docker source does not yet.
 
 5. Approve the MCP server:
 
@@ -84,15 +93,33 @@ discovery:                               # NEW: discovery configuration
    curl -X POST http://localhost:8000/api/discovery/approve/docker-math
    ```
 
-6. Verify it's registered:
+   In 2.24.0 this route approves only a server in **quarantine** (`GET
+   /api/discovery/quarantined`), not one in the pending queue. For the pending
+   server above it answers `200` with:
+
+   ```json
+   {"approved":false,"mcp_server":"docker-math","error":"McpServer not found in quarantine"}
+   ```
+
+   Until that is fixed, a server held by `auto_register: false` cannot be
+   approved, and `auto_register: true` is the only way to register it.
+
+6. Verify it's registered. With `auto_register: true` the server appears
+   without approval, registered in `remote` mode:
 
    ```bash
-   mcp-hangar status
+   curl http://localhost:8000/api/mcp_servers/
    ```
 
+   ```json
+   {"mcp_servers": [{"mcp_server_id": "docker-math", "state": "cold", "mode": "remote",
+                     "alive": false, "tools_count": 0, "health_status": "unknown",
+                     "tools_predefined": false, "dead": null,
+                     "description": "Discovered from docker"}]}
    ```
-   docker-math    COLD
-   ```
+
+   `mcp-hangar status` does not show it: in 2.24.0 that command cannot reach a
+   running gateway and only reads `config.yaml`.
 
 ## What Just Happened
 
@@ -118,7 +145,7 @@ for the same rule stated in full, and
 | `discovery.refresh_interval_s` | int | `30` | Seconds between scans |
 | `discovery.auto_register` | bool | **`true`** | Register a discovered server without approval. The default registers -- set it to `false`, as this recipe does, if you want the pending queue |
 | `discovery.sources[].type` | string | -- | `docker`, `filesystem`, `kubernetes`, `entrypoint` |
-| `discovery.sources[].mode` | string | -- | `additive` (add only) or `authoritative` (add and remove) |
+| `discovery.sources[].mode` | string | `additive` | `additive` (add only) or `authoritative` (add and remove) |
 
 ### Docker Labels
 
@@ -126,9 +153,10 @@ for the same rule stated in full, and
 | ------- | ---------- | --------- | ------------- |
 | `mcp.hangar.enabled` | Yes | -- | Must be `"true"` |
 | `mcp.hangar.name` | No | Container name | MCP Server name |
-| `mcp.hangar.mode` | No | `container` | MCP Server mode |
-| `mcp.hangar.port` | No | `8080` | MCP Server port |
-| `mcp.hangar.group` | No | -- | Auto-add to group |
+| `mcp.hangar.mode` | No | `container` | `container` (Hangar runs the image) or `http`/`sse` (Hangar connects to the running container) |
+| `mcp.hangar.port` | No | `8080` | Container port, for `http`/`sse` mode |
+| `mcp.hangar.group` | No | -- | Recorded in the discovered server's `metadata.group` |
+| `mcp.hangar.ttl` | No | `90` | Seconds the discovery stays valid without being seen again |
 
 ## What's Next
 

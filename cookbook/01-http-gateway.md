@@ -11,8 +11,10 @@ You have one MCP server today. Tomorrow you'll have five. You need a control pla
 
 ## Prerequisites
 
-You need a running MCP server to point Hangar at. This repo ships a test
-server in `examples/provider_math/` that runs on Streamable HTTP.
+You need a running MCP server to point Hangar at. The
+[mcp-hangar](https://github.com/mcp-hangar/mcp-hangar) repository ships a test
+server in `examples/provider_math/` that runs on Streamable HTTP; run the
+commands below from a checkout of it.
 
 ```bash
 # Build the test MCP server (requires Docker)
@@ -32,7 +34,8 @@ curl -s http://localhost:8080/mcp -d '{"jsonrpc":"2.0","method":"initialize","pa
   -H "Content-Type: application/json" | head -c 80
 ```
 
-You should see a JSON-RPC response. Keep the container running.
+You should see an `event: message` line followed by `data:` and the JSON-RPC
+response. Keep the container running.
 
 ## The Config
 
@@ -48,7 +51,10 @@ mcp_servers:
       read_timeout: 30.0
 ```
 
-Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
+Save this as `~/.config/mcp-hangar/config.yaml`. Every command below passes it
+with `--config`, and that is not optional: without `--config`, `serve` reads
+`MCP_CONFIG` or `./config.yaml` and never looks in `~/.config/mcp-hangar/`
+([mcp-hangar#1657](https://github.com/mcp-hangar/mcp-hangar/issues/1657)).
 
 ## Try It
 
@@ -60,10 +66,11 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
    ```
 
    ```json
-   {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{...},"serverInfo":{"name":"mcp-hangar","version":"2.5.0"}}}
+   {"jsonrpc":"2.0","id":1,"result":{"capabilities":{...},"protocolVersion":"2024-11-05","serverInfo":{"name":"mcp-hangar","version":"..."}}}
    ```
 
-   Hangar responds to MCP initialize. Press Ctrl+C to stop.
+   Hangar responds to MCP initialize, and exits by itself once `echo` closes
+   its stdin.
 
 2. Check MCP server status (create test script)
 
@@ -89,7 +96,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
 
    MCP Server shows COLD state (not started yet).
 
-3. List tools to trigger cold start
+3. Ask for the server's tools to trigger the cold start, then list
 
    ```bash
    cat > /tmp/test-list.sh << 'EOF'
@@ -99,19 +106,23 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
      sleep 0.5
      echo '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
      sleep 0.5
-     echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_list","arguments":{}},"id":2}'
-     sleep 5
-   ) | mcp-hangar --config ~/.config/mcp-hangar/config.yaml serve 2>/dev/null | grep '"id":2'
+     echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_tools","arguments":{"mcp_server":"my-mcp"}},"id":2}'
+     sleep 3
+     echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"hangar_list","arguments":{}},"id":3}'
+     sleep 2
+   ) | mcp-hangar --config ~/.config/mcp-hangar/config.yaml serve 2>/dev/null | grep '"id":3'
    EOF
    chmod +x /tmp/test-list.sh
    /tmp/test-list.sh
    ```
 
    ```json
-   {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"...\"mcp_server\": \"my-mcp\", \"state\": \"ready\", \"mode\": \"remote\", \"tools_count\": 5..."}]}}
+   {"jsonrpc":"2.0","id":3,"result":{"content":[{"text":"...\"mcp_server_id\": \"my-mcp\",\n      \"state\": \"ready\",\n      \"mode\": \"remote\",\n      \"alive\": true,\n      \"tools_count\": 5..."}]}}
    ```
 
-   MCP Server transitioned to READY and discovered tools.
+   `hangar_list` only reads state: on its own it would still report `cold`.
+   `hangar_tools` is what started the server, and it transitioned to READY and
+   discovered its tools.
 
 4. Configure Claude Desktop
 
@@ -122,17 +133,22 @@ Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
      "mcpServers": {
        "hangar": {
          "command": "mcp-hangar",
-         "args": ["serve", "--config", "~/.config/mcp-hangar/config.yaml"]
+         "args": ["serve", "--config", "/Users/you/.config/mcp-hangar/config.yaml"]
        }
      }
    }
    ```
 
+   Use an absolute path. Claude Desktop starts the command without a shell, so
+   a `~` reaches Hangar unexpanded, and a `--config` path that does not exist
+   does not fail: Hangar logs `config_not_found_using_default` and starts on a
+   built-in demo configuration instead of yours.
+
 ## What Just Happened
 
-Hangar loaded your MCP server configuration and started in stdio mode (JSON-RPC over stdin/stdout). When you sent the `initialize` handshake, Hangar responded with its capabilities. On the first `hangar_list` call, Hangar performed a cold start: it connected to the remote MCP server (`examples/provider_math` in this recipe), sent MCP `initialize` + `tools/list` to discover available tools, and registered them in its internal registry.
+Hangar loaded your MCP server configuration and started in stdio mode (JSON-RPC over stdin/stdout). When you sent the `initialize` handshake, Hangar responded with its capabilities. On the `hangar_tools` call, Hangar performed a cold start: it connected to the remote MCP server (`examples/provider_math` in this recipe), sent MCP `initialize` + `tools/list` to discover available tools, and registered them in its internal registry.
 
-The test MCP server doesn't know Hangar exists — it sees standard MCP JSON-RPC requests. This is a transparent proxy pattern. Hangar adds nothing yet: no health checks, no circuit breaker, no authentication. That's the point — recipe 01 is the baseline.
+The test MCP server doesn't know Hangar exists — it sees standard MCP JSON-RPC requests. This is a transparent proxy pattern. Hangar adds little yet: no group, no circuit breaker, no authentication. The background health check already probes a READY server; recipe 02 looks at it. That's the point — recipe 01 is the baseline.
 
 ## Cleanup
 
@@ -149,7 +165,7 @@ docker rm -f mcp-math
 | ----- | ------ | --------- | ------------- |
 | `mode` | string | — | MCP Server mode. Use `remote` for HTTP/SSE MCP servers |
 | `endpoint` | string | — | Full URL of the remote MCP server (including path) |
-| `description` | string | `""` | Human-readable description shown in status |
+| `description` | string | none | Human-readable description shown in status |
 | `http.connect_timeout` | float | `10.0` | TCP connection timeout in seconds |
 | `http.read_timeout` | float | `30.0` | Response read timeout in seconds |
 

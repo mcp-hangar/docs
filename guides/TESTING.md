@@ -7,9 +7,11 @@ uv sync --extra dev
 uv run pytest tests/unit
 ```
 
-The unit tier is the one you run while working — roughly 6,600 tests in about
-half a minute. `pytest` with no path runs everything under `tests/`, which adds
-the integration tier and the in-process conformance and CI-metadata checks.
+The unit tier is the one you run while working — roughly 10,000 tests. Run
+serially they take a few minutes; with `-n auto` (pytest-xdist, a dev
+dependency, and what CI passes) they take about half a minute. `pytest` with no
+path runs everything under `tests/`, which adds the integration tier and the
+in-process conformance and CI-metadata checks.
 
 ## Running Tests
 
@@ -45,9 +47,10 @@ report ask for it explicitly.
 | `t2` | Live tier 2 — auth / IdP, needs Keycloak |
 
 That is the whole list, and all six are registered in `pyproject.toml`.
-`pytest` does not run with `--strict-markers`, so `-m something-else` selects
-nothing and exits green — a passing run of zero tests. Check the collected
-count when a marker filter returns suspiciously fast.
+`pytest` does not run with `--strict-markers`, so `-m something-else` is not
+rejected as an unknown marker: it deselects every test and exits with code 5
+(no tests ran). Check the collected count when a marker filter returns
+suspiciously fast.
 
 ### There are no opt-in flags
 
@@ -134,8 +137,11 @@ mcp_servers:
 ```
 
 ```bash
-mcp-hangar serve --http
+mcp-hangar serve --http --host 127.0.0.1
 ```
+
+Without authentication configured, `serve --http` refuses to bind its default
+host `0.0.0.0`, so a local run names the loopback address.
 
 Drive it directly to check a handshake:
 

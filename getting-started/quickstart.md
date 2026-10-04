@@ -1,9 +1,9 @@
 # Quick Start
 
 Install Hangar, point your client at it, and watch it refuse a tool that changed
-underneath you. Ten minutes, one laptop, no cluster.
+underneath you. About five minutes, one laptop, no cluster.
 
-> **The concept:** [From install to a governed deny in 60 seconds](https://mcp-hangar.io/learn/from-install-to-a-governed-deny-locally)
+> **The concept:** [From install to a governed deny in five minutes (no cluster)](https://mcp-hangar.io/learn/from-install-to-a-governed-deny-locally)
 > explains what the refusal below actually proves. The
 > [cluster walkthrough](https://mcp-hangar.io/learn/from-install-to-a-governed-deny)
 > is the same idea with an operator and network policy.

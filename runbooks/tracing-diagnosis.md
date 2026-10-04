@@ -4,7 +4,7 @@ Use this page to find one request in your trace backend, read why Hangar allowed
 
 How to configure the exporter, who owns the tracer provider, and how logs join traces are covered in [OpenTelemetry integrations](../observability/otel-integrations.md#effective-tracing-configuration).
 
-The span trees and attribute values below were captured from a real `mcp-hangar serve --http` process, run from core `main` at `d9766bd4`. It exported over OTLP/gRPC to an OpenTelemetry Collector 0.96.0 with the file exporter from `examples/otel-collector/`. Retry examples come from the assertions of the core unit tests, not from a capture. The route and L7 examples were captured at the in-process OTLP receiver of core's T3 live tests `test_t3_route_decisions.py` and `test_t3_l7_verdicts.py`, run from core `main` at `f08ac564`. The `canary_fallback`, `no_available_member`, Audit-mode and evaluator-failure cases come from the assertions of the core unit tests.
+The span trees and attribute values below were captured from a real `mcp-hangar serve --http` process, run from core `main` at `d9766bd4`. It exported over OTLP/gRPC to an OpenTelemetry Collector 0.96.0 with the file exporter from `examples/otel-collector/`. Retry examples come from the assertions of the core unit tests, not from a capture. The route and L7 examples were captured at the in-process OTLP receiver of core's T3 live tests `test_t3_route_decisions.py` and `test_t3_l7_verdicts.py`, run from core `main` at `f08ac564`. The `canary_fallback`, `no_available_member`, Audit-mode and evaluator-failure cases come from the assertions of the core unit tests. The warm, denied and failing call trees, the cold start, the health check spans and the audit records were checked again against a 2.24.0 gateway, at its console exporter and at an in-process OTLP receiver.
 
 Attribute keys are the constants in core's `observability/conventions.py`, with two groups of exceptions. `error.type`, `exception.type` and the resource keys belong to OpenTelemetry. `hangar.startup.role`, `hangar.startup.mechanism`, `cold_start.result` and the audit record's `mcp.event.name` are exported as shown, but are defined next to the code that writes them rather than in that registry.
 
@@ -101,7 +101,7 @@ Count errors on `batch.call.<tool>` or on the `execute_tool <tool>` CLIENT span,
 
 ### Which member served a group call
 
-This is on `main`, unreleased after 2.23.0. `batch.call.<tool>` carries `hangar.route.backend`, the server the call was dispatched to, and `hangar.route.reason`, why. `hangar.route.backend` is also on `mcp_server.cold_start` and on each `command.send.InvokeToolCommand`. The reasons are:
+Since 2.24.0, `batch.call.<tool>` carries `hangar.route.backend`, the server the call was dispatched to, and `hangar.route.reason`, why. `hangar.route.backend` is also on `mcp_server.cold_start` and on each `command.send.InvokeToolCommand`. The reasons are:
 
 | `hangar.route.reason` | Meaning |
 | --- | --- |
@@ -121,7 +121,7 @@ batch.call.whoami  mcp.server.id=llm-group  hangar.route.reason=load_balanced  h
   command.send.InvokeToolCommand  mcp.server.id=llm-group  hangar.route.backend=member-a
 ```
 
-`mcp.server.id` means the logical target the caller named, for a group the group, on every span the executor opens for the call: `batch.call.<tool>`, `policy.check_access`, `approval_gate.check`, `concurrency.acquire`, `mcp_server.cold_start`, `invoke_with_retry` and `command.send.InvokeToolCommand`. The member a group selected is `hangar.route.backend`. On `main`, unreleased after 2.23.0; in 2.23.0 and earlier, `mcp_server.cold_start` and `command.send.InvokeToolCommand` carried the member in `mcp.server.id`. The lifecycle spans `mcp_server.launch` and `mcp_server.startup_wait` are not opened by the call and still name the member they start.
+`mcp.server.id` means the logical target the caller named, for a group the group, on every span the executor opens for the call: `batch.call.<tool>`, `policy.check_access`, `approval_gate.check`, `concurrency.acquire`, `mcp_server.cold_start`, `invoke_with_retry` and `command.send.InvokeToolCommand`. The member a group selected is `hangar.route.backend`. This is since 2.24.0; in 2.23.0 and earlier, `mcp_server.cold_start` and `command.send.InvokeToolCommand` carried the member in `mcp.server.id`. The lifecycle spans `mcp_server.launch` and `mcp_server.startup_wait` are not opened by the call and still name the member they start.
 
 To find the calls one member served, query `hangar.route.backend`, not `mcp.server.id`:
 
@@ -134,7 +134,7 @@ jq -c '.resourceSpans[]?.scopeSpans[].spans[]
 
 ### L7 egress verdicts
 
-This is on `main`, unreleased after 2.23.0. When a server has an L7 egress policy, `batch.call.<tool>` carries the verdict of the call's last attempt:
+Since 2.24.0, when a server has an L7 egress policy, `batch.call.<tool>` carries the verdict of the call's last attempt:
 
 - `hangar.l7.verdict`: `allow`, `audit_observed`, `deny`, `require_approval` or `approval_honored`.
 - `hangar.l7.mode`: `audit` or `enforce`.
@@ -188,7 +188,7 @@ batch.call.add
   ...
 ```
 
-In the capture, three calls reached a cold server concurrently. One trace has the shape above. The other two recorded `hangar.gate.decision name=cold_start outcome=skip reason=not_cold` and waited in a `mcp_server.startup_wait` span under `handler.InvokeToolCommand`, with `hangar.startup.role=waiter` and `hangar.startup.mechanism=ensure_ready`. A caller that waits in the executor's single flight instead records `hangar.startup.mechanism=single_flight`, and its wait span carries a link to the leader's `mcp_server.cold_start` when the leader published one. A waiter that arrives before that gets no link: Hangar never invents a cause. The launch span, `mcp_server.launch`, is on `main` and unreleased after 2.23.0.
+In the capture, three calls reached a cold server concurrently. One trace has the shape above. The other two recorded `hangar.gate.decision name=cold_start outcome=skip reason=not_cold` and waited in a `mcp_server.startup_wait` span under `handler.InvokeToolCommand`, with `hangar.startup.role=waiter` and `hangar.startup.mechanism=ensure_ready`. A caller that waits in the executor's single flight instead records `hangar.startup.mechanism=single_flight`, and its wait span carries a link to the leader's `mcp_server.cold_start` when the leader published one. A waiter that arrives before that gets no link: Hangar never invents a cause. The launch span, `mcp_server.launch`, was added in 2.24.0.
 
 ```bash
 jq -c '.resourceSpans[]?.scopeSpans[].spans[]
@@ -203,11 +203,15 @@ Two layers can retry one call, and both are recorded, since 2.22.0. Each `comman
 
 ### Background work
 
-These spans are on `main` and unreleased after 2.23.0. They are not children of a tool call:
+These spans were added in 2.24.0. They are not children of a tool call:
 
 - `mcp_server.health_check`: one span per check that runs, with `hangar.health.outcome` (`healthy`, `unhealthy` or `error`) and `mcp.health.consecutive_failures`.
 - `saga.run`: one span per synchronous saga run, with `hangar.saga.type` and `hangar.saga.outcome`, and one `hangar.saga.step` event per step. A command fired later by a saga timer opens `saga.scheduled_command` in a new trace, linked to the span that scheduled it.
 - `event.publish.<Type>`: one span per domain event, with `hangar.event.id`, `hangar.event.producer` and `hangar.event.delivery_mode` (`live`, `tailed` or `recovered`). Each handler run adds a `hangar.event.handled` event with its name, kind and outcome. `event_store.append` carries `hangar.event_store.append.outcome`.
+
+### Payload shaping
+
+Since 2.24.0. Request and response mutation each add a `hangar.shaping.mutation` event to `batch.call.<tool>`, with `hangar.shaping.direction` (`request` or `response`), `hangar.shaping.changed` and `hangar.shaping.duration_ms`. With no mutators registered, nothing is recorded. Batch truncation opens a `batch.truncate` span under `batch.execute` with `hangar.shaping.truncated_count` and `hangar.shaping.continuation`, and a batch with nothing cut opens none. A result over the size limit fails the call with `error.type=ResponseTooLarge`. Payloads and continuation ids are never recorded.
 
 ## Not yet traced
 
@@ -215,7 +219,6 @@ Do not build queries or alerts on these. The task that will add each one is name
 
 | Question | State |
 | --- | --- |
-| Payload mutation, the per-call size limit and batch truncation | Not yet traced (#1298, not merged). |
 | Exemplars from metrics to traces, and diagnosis by scenario | Out of scope here (#1305). |
 
 ## Sampling, dropped spans and missing export
@@ -233,7 +236,7 @@ Hangar has no counter for spans dropped because the SDK's in-memory batch queue 
 
 ## Missing audit records
 
-An OTLP audit record (scope `mcp_hangar.audit`, `mcp.event.name=tool_invocation`) is written for an invoked tool, not for a call that a gate refused. In the capture, the refused call produced a `batch_call_refused` log line and a span, and no `tool_invocation` record. If records are missing for calls that were allowed:
+An OTLP audit record (scope `mcp_hangar.audit`, `mcp.event.name=tool_invocation`) is written for an invoked tool, with `mcp.tool.status` `success` or `error`. Since 2.24.0, a call that a gate or an L7 policy refused gets one too, with `mcp.tool.status=denied` and `hangar.gate.name` and `hangar.gate.reason` (or the `hangar.l7.*` fields). A gate that broke and an L7 evaluator failure write none. If records are missing:
 
 - Check that audit export is on. It needs an OTLP endpoint set explicitly, in `OTEL_EXPORTER_OTLP_ENDPOINT` or `observability.tracing.otlp_endpoint`. `MCP_AUDIT_EXPORT_ENABLED=false` turns it off.
 - Check `mcp_hangar_otlp_audit_export_failures_total` and the `audit_log_export_initialized` log line.
@@ -253,4 +256,4 @@ Run through this list on a new install before relying on its traces.
 2. **Effective settings.** Read the startup lines `tracing_sampler_configured`, `tracing_otlp_exporter_added` (protocol, and whether the endpoint came from Hangar's configuration or from the environment and SDK default) and `tracing_initialized` (the exporters). Hangar does not log endpoints or headers, so compare the environment with the [precedence rules](../observability/otel-integrations.md#effective-tracing-configuration).
 3. **Export health.** Check that `mcp_hangar_otlp_export_failures_total` and `mcp_hangar_otlp_audit_export_failures_total` stay flat. Enable the chart's alerts and dashboards (`prometheusRule.enabled`, `dashboards.enabled`) from [mcp-hangar/helm-charts](https://github.com/mcp-hangar/helm-charts/tree/main/mcp-hangar/files) instead of writing your own.
 4. **Collector self-telemetry.** Confirm that the Collector's own metrics (port 8888 in the example) show spans and log records being accepted, not refused.
-5. **Controlled requests.** Make one warm call and one call to a tool you have denied. Check that the warm trace ends in an `execute_tool <tool>` CLIENT span, that the denied call has `hangar.call.outcome=deny` with no CLIENT span, and that one `tool_invocation` audit record arrived for the warm call.
+5. **Controlled requests.** Make one warm call and one call to a tool you have denied. Check that the warm trace ends in an `execute_tool <tool>` CLIENT span, that the denied call has `hangar.call.outcome=deny` with no CLIENT span, and that one `tool_invocation` audit record arrived for each: `mcp.tool.status=success` for the warm call and `denied` for the denied one.

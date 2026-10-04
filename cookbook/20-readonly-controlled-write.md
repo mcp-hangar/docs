@@ -91,6 +91,11 @@ event_store:
      ghcr.io/mcp-hangar/mcp-hangar:2.5.0 serve --http --port 8080
    ```
 
+   `serve --http` binds `0.0.0.0` by default, and the config above has no
+   `auth:` block, so Hangar refuses to start (`http_auth_required_for_non_loopback`).
+   Add the `auth:` block from [12 -- Auth & RBAC](12-auth-rbac.md) first; for a
+   throwaway local rehearsal only, append `--unsafe-no-auth`.
+
 3. Confirm the event store is durable. `/health/ready` includes the
    event-store durability check; a durable store returns `200` and the body reports readiness counts (an unhealthy store adds an `event_store` block and turns the code into `503`):
 
@@ -99,8 +104,11 @@ event_store:
    ```
 
    ```json
-   {"status": "healthy", "ready_mcp_servers": 1, "total_mcp_servers": 1}
+   {"status": "healthy", "ready_mcp_servers": 0, "total_mcp_servers": 2}
    ```
+
+   (`ready_mcp_servers` counts servers that are running; both providers here
+   start on first use.)
 
 4. Now prove the fail-closed behaviour. Point the event store at a path under
    the read-only root (no writable mount) and start again:
@@ -112,26 +120,36 @@ event_store:
      ghcr.io/mcp-hangar/mcp-hangar:2.5.0 serve --http
    ```
 
-   Startup aborts instead of silently degrading:
+   Startup aborts (exit code `2`) instead of silently degrading. The image
+   creates `/app/data`, so the directory exists and SQLite itself fails to open
+   the file:
 
+   ```text
+   Unexpected error: unable to open database file
    ```
-   EventStoreConfigurationError: event store path '/app/data/events.db' is not
-   writable ([Errno 30] Read-only file system); set event_store.driver: memory
-   to explicitly opt into a non-durable store, or
-   event_store.allow_memory_fallback: true to accept a non-durable in-memory
-   fallback
+
+   When the directory cannot be created at all, the refusal names the cause and
+   both opt-outs:
+
+   ```text
+   Unexpected error: event store path '/srv/ro/events.db' is not writable ([Errno 13] Permission denied: ...);
+   set event_store.driver: memory to explicitly opt into a non-durable store, or
+   event_store.allow_memory_fallback: true to accept a non-durable in-memory fallback
    ```
+
+   In 2.24.0 only that second case honours `allow_memory_fallback: true`; the
+   first fails to start either way.
 
 5. Prove the same boundary for a stateful provider. Remove its `:rw` volume and
-   invoke a tool that writes -- the provider fails with `EROFS`:
+   invoke a tool that writes -- the provider fails with `EROFS` (the exact text
+   is the provider's own; illustrative):
 
-   ```
-   sqlite3.OperationalError: unable to open database file
-   OSError: [Errno 30] Read-only file system: '/data/store.db'
+   ```text
+   OSError: [Errno 30] Read-only file system: '/app/data/...'
    ```
 
    Restore the `volumes:` entry and the write succeeds -- writes are now
-   confined to `/data`, and nowhere else.
+   confined to `/app/data`, and nowhere else.
 
 ## What Just Happened
 
@@ -155,13 +173,11 @@ tamper surface.
 
 The event store enforces the same discipline for Hangar's own audit trail. When
 `driver: sqlite` is configured but the path is not writable (the classic
-read-only-deploy mistake), initialization raises `EventStoreConfigurationError`
-and Hangar **fails fast** rather than swapping in a non-durable in-memory store
+read-only-deploy mistake), initialization fails and Hangar **fails fast** rather than swapping in a non-durable in-memory store
 and quietly losing history. A non-durable store is only ever used when you ask
 for it explicitly -- either `driver: memory`, or `allow_memory_fallback: true`.
-If the fallback is taken, the degraded posture is recorded and the
-`event_store_durability` readiness check turns critical, so `/health/ready`
-reports `503` and your orchestrator refuses to route traffic to a node that has
+If the fallback is taken, the degraded posture is recorded and `/health/ready`
+adds an `event_store` block with `"status": "unhealthy"` and reports `503` and your orchestrator refuses to route traffic to a node that has
 lost durability.
 
 Finally, the stock Hangar image runs as a **non-root** user (`hangar`), and its
@@ -187,11 +203,10 @@ cannot name what it persists, it does not get a volume.
   <container>` returns `true` for every provider container.
 - Writes are confined: the only `:rw` bind mounts in `docker inspect` are the
   ones you declared; `/tmp` is a tmpfs.
-- Durability is live: `/health/ready` shows `event_store_durability: healthy`;
-  intentionally breaking the mount flips it to `503`.
+- Durability is live: `/health/ready` answers `200` with no `event_store`
+  block; a store that fell back to memory adds one and answers `503`.
 - Fail-fast works: launching with an unwritable `event_store.path` and
-  `allow_memory_fallback: false` aborts startup with
-  `EventStoreConfigurationError`.
+  `allow_memory_fallback: false` aborts startup with exit code `2`.
 
 ## Key Config Reference
 

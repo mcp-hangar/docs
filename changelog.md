@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.23](https://github.com/mcp-hangar/docs/compare/v1.2.22...v1.2.23) (2026-10-05)
+
+
+### Changed
+
+* **guides:** state the quickstart's duration the way the site does ([#410](https://github.com/mcp-hangar/docs/issues/410)) ([2160de8](https://github.com/mcp-hangar/docs/commit/2160de83759be03645fba2396fa68ce575f61496))
+
 ## [1.2.22](https://github.com/mcp-hangar/docs/compare/v1.2.21...v1.2.22) (2026-10-04)
 
 

@@ -42,7 +42,7 @@ This audit covers the authentication, authorization, and request-enforcement pat
 
 - Authentication failures close the socket with code `1008` before `websocket.accept()`, so the client sees the handshake refused (uvicorn answers it as HTTP `403`) and the connection is never used.
 - `Origin` validation happens before `websocket.accept()` to mitigate cross-site WebSocket hijacking.
-- The WebSocket endpoints need a WebSocket library in the environment. The container image installs `websockets`; a `pip`/`uv` install of 2.24.0 does not, and there the upgrade is never served -- the request is answered as plain HTTP (`401` without credentials) ([mcp-hangar/mcp-hangar#1676](https://github.com/mcp-hangar/mcp-hangar/issues/1676)).
+- The WebSocket endpoints need a WebSocket library in the environment. Since 2.25.0 `websockets` is a dependency of `mcp-hangar`. Before that only the container image installed it, and on a `pip`/`uv` install of 2.24.0 or earlier the upgrade is never served -- the request is answered as plain HTTP (`401` without credentials) ([mcp-hangar/mcp-hangar#1676](https://github.com/mcp-hangar/mcp-hangar/issues/1676)).
 - Per-connection backpressure is enforced with bounded queues.
 
 ### Module Boundary (optional auth and approvals components)
@@ -102,9 +102,12 @@ Re-run against core 2.24.0 on 2026-10-04:
 
 Open defects in this audit's scope, filed publicly:
 
-- A `tools:` access policy with one invalid field is dropped whole with only a warning, so the gateway enforces no policy for that server -- denied and approval-listed tools run ([mcp-hangar/mcp-hangar#1648](https://github.com/mcp-hangar/mcp-hangar/issues/1648)).
-- The auth routes take `assigned_by` / `created_by` / `revoked_by` / `updated_by` from the request body, so the actor recorded for a key or role change is caller-supplied ([mcp-hangar/mcp-hangar#1649](https://github.com/mcp-hangar/mcp-hangar/issues/1649)).
 - `/config/diff` and `/config/backup` accept a `config_path` and ignore `--config` ([mcp-hangar/mcp-hangar#1652](https://github.com/mcp-hangar/mcp-hangar/issues/1652)).
 - `oidc.clock_skew_leeway_seconds` is never parsed ([mcp-hangar/mcp-hangar#1654](https://github.com/mcp-hangar/mcp-hangar/issues/1654)).
 - A global `developer` can withdraw or restore a tool for all tenants ([mcp-hangar/mcp-hangar#1656](https://github.com/mcp-hangar/mcp-hangar/issues/1656)).
 - An explicit `--config` / `MCP_CONFIG` path that does not exist boots a demo configuration ([mcp-hangar/mcp-hangar#1650](https://github.com/mcp-hangar/mcp-hangar/issues/1650)) -- confirm the path exists before starting; and a bare `mcp-hangar` ignores `MCP_HTTP_HOST` / `MCP_HTTP_PORT` ([mcp-hangar/mcp-hangar#1651](https://github.com/mcp-hangar/mcp-hangar/issues/1651)) -- start with `mcp-hangar serve` and an explicit `--host`.
+
+Fixed in 2.25.0. A gateway older than that still has them:
+
+- A `tools:` access policy with one invalid field was dropped whole with only a warning, so the gateway enforced no policy for that server -- denied and approval-listed tools ran ([mcp-hangar/mcp-hangar#1648](https://github.com/mcp-hangar/mcp-hangar/issues/1648)); and a policy list written as a string was split into its characters, so `deny_list: add` allowed `add` ([mcp-hangar/mcp-hangar#1718](https://github.com/mcp-hangar/mcp-hangar/issues/1718)). Since 2.25.0 either refuses the boot, and a reload, naming the scope and the field.
+- The auth routes took `assigned_by` / `created_by` / `revoked_by` / `updated_by` from the request body, so the actor recorded for a key or role change was caller-supplied ([mcp-hangar/mcp-hangar#1649](https://github.com/mcp-hangar/mcp-hangar/issues/1649)). Since 2.25.0 the actor is the authenticated principal (`anonymous` with auth off), and a body carrying one of those fields is refused with `422`. An auth event written by an older gateway names whoever its request body said.

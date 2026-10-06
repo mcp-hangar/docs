@@ -14,10 +14,13 @@ mcp-hangar serve --http --host 127.0.0.1 --port 8000 --config config.yaml
 kill -HUP $(pgrep -f "mcp-hangar serve")
 ```
 
-Name the file with `--config` or `MCP_CONFIG`. A gateway that picked up
-`./config.yaml` on its own has no path to reload: the watcher logs
+The file reloaded is the one the gateway booted from, found by
+[the CLI's one rule](cli.md#default-locations). Before 2.25.0 a gateway that
+picked up `./config.yaml` on its own had no path to reload: the watcher logged
 `config_reload_worker_disabled` with `reason=no_config_path`, and SIGHUP, the
-tool and the REST endpoint fail with `No configuration path specified`.
+tool and the REST endpoint failed with `No configuration path specified`
+([mcp-hangar#1657](https://github.com/mcp-hangar/mcp-hangar/issues/1657)).
+On those versions, name the file with `--config` or `MCP_CONFIG`.
 
 ## Overview
 
@@ -31,6 +34,7 @@ tool and the REST endpoint fail with `No configuration path specified`.
 
 All reload operations are **atomic**: changes are validated before application. Invalid configuration is rejected; current config preserved.
 A file that changes `tool_access.mode` is refused the same way: the mode needs a restart.
+Since 2.25.0 so is a file with an invalid `tools:` or `access:` policy field, or a policy list that is not a list: the previous policy stays in force ([Configuration](configuration.md#tools-dual-format)).
 
 ## Configuration
 
@@ -323,8 +327,8 @@ config_reload:
 # Check watchdog installed
 pip list | grep watchdog
 
-# Check worker status (config_reload_worker_disabled reason=no_config_path:
-# restart with --config or MCP_CONFIG)
+# Check worker status (config_reload_worker_disabled reason=no_config_path,
+# before 2.25.0: restart with --config or MCP_CONFIG)
 grep "config_reload_worker" logs/mcp-hangar.log
 
 # Manual reload

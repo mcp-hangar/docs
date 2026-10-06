@@ -737,9 +737,11 @@ The backup is written **next to the configuration file** as `<config>.bak1`,
 rotating older ones to `.bak2` and beyond. The file this route (and
 [Config Diff](#config-diff)) reads is the one named by the `MCP_CONFIG`
 environment variable, or `config.yaml` in the process's working directory when
-that is unset -- not the `--config` argument. `mcp-hangar serve` reads
-`MCP_CONFIG` too, so setting it rather than passing `--config` makes all three
-agree. The returned `path` is relative when that name is.
+that is unset -- not the `--config` argument, and not the file the gateway
+booted from. Since 2.25.0 `serve` falls back to
+`~/.config/mcp-hangar/config.yaml` when neither is present, and these two
+routes do not follow it. Setting `MCP_CONFIG` rather than passing `--config`
+makes all three agree. The returned `path` is relative when that name is.
 
 That directory has to be writable by the process, and in the published
 container image it is not: `/app` is owned by root and the gateway runs as
@@ -891,6 +893,18 @@ Removes a session from the suspended registry.
 Every route here requires the `admin` role. With authentication disabled they
 are not wired and answer `503`.
 
+*Since 2.25.0* the actor of every change -- the creator of a key or role, the
+revoker, the assigner, the updater, the deleter -- is the principal that
+authenticated the request. It is recorded in the domain event, the log line
+and, for a new key, the response. A body that still carries `created_by`,
+`revoked_by`, `assigned_by` or `updated_by`, whatever its value (`null` and
+the caller's own id included), is refused with `422` and a `ValidationError`
+naming the field, and nothing is changed
+([mcp-hangar#1649](https://github.com/mcp-hangar/mcp-hangar/issues/1649)).
+Before 2.25.0 those fields were accepted, defaulted to `"system"`, and were
+recorded as written, so an event from an older gateway names whoever the body
+said.
+
 ### Create API Key
 
 ```
@@ -903,16 +917,16 @@ POST /auth/keys
 | ------- | ------ | ---------- | --------- | ------------- |
 | `principal_id` | string | Yes | -- | Principal this key authenticates as |
 | `name` | string | Yes | -- | Human-readable key name |
-| `created_by` | string | No | `"system"` | Creator principal |
 | `expires_at` | string | No | -- | ISO8601 expiry datetime |
 
 **Response 201:**
 
 ```json
-{"key_id": "...", "raw_key": "mcp_...", "principal_id": "...", "name": "...", "expires_at": null, "warning": "Save this key now - it cannot be retrieved later!"}
+{"key_id": "...", "raw_key": "mcp_...", "principal_id": "...", "name": "...", "created_by": "user:alice", "expires_at": null, "warning": "Save this key now - it cannot be retrieved later!"}
 ```
 
-A body missing `principal_id` or `name` is a `500`, not a validation error.
+`created_by` is the caller's principal id. A body missing `principal_id` or
+`name` is a `500`, not a validation error.
 
 !!! warning
     The `raw_key` is returned only once. Store it securely.
@@ -927,7 +941,6 @@ DELETE /auth/keys/{key_id}
 
 | Field | Type | Default | Description |
 | ------- | ------ | --------- | ------------- |
-| `revoked_by` | string | `"system"` | Revoking principal |
 | `reason` | string | `""` | Revocation reason |
 
 ### List API Keys
@@ -992,7 +1005,7 @@ DELETE /auth/roles/{role_name}
 ```
 
 **Response 204**, no body. A built-in role is `403 CannotModifyBuiltinRoleError`;
-an unknown one is `404`.
+an unknown one is `404`. The caller is recorded as `deleted_by`.
 
 ### Assign Role
 
@@ -1003,7 +1016,7 @@ POST /auth/roles/assign
 **Request body:**
 
 ```json
-{"principal_id": "...", "role_name": "developer", "scope": "global", "assigned_by": "system"}
+{"principal_id": "...", "role_name": "developer", "scope": "global"}
 ```
 
 ### Revoke Role
@@ -1015,7 +1028,7 @@ DELETE /auth/roles/revoke
 **Request body:**
 
 ```json
-{"principal_id": "...", "role_name": "developer", "scope": "global", "revoked_by": "system"}
+{"principal_id": "...", "role_name": "developer", "scope": "global"}
 ```
 
 ### List Principals
@@ -1288,7 +1301,7 @@ GET /approvals?state={state}&provider_id={id}
 
 | Parameter | In | Type | Default | Description |
 | ----------- | ------ | ------ | --------- | ------------- |
-| `state` | query | string | `pending` | Filter: `pending`, `approved`, `denied`, `expired` |
+| `state` | query | string | `pending` | Filter: `pending`, `approved`, `denied`, `expired`, `cancelled` (2.25.0) |
 | `provider_id` | query | string | -- | Optional provider filter |
 
 **Response 200:** a bare JSON array of approval request objects, each with
@@ -1330,6 +1343,24 @@ On a gateway with auth disabled the decision is attributed to the system princip
 A `decision` other than `approve` or `deny` is `400`; an approval that is
 already resolved is `409` with its `state`.
 
+*Since 2.25.0* an approval for a held call whose `hangar_call` batch deadline
+has already passed is refused: the call will not run, so there is nothing to
+let through. The answer is `409`:
+
+```json
+{"error": "Approval refused: the held call was cancelled and did not run", "state": "cancelled"}
+```
+
+The record moves to the terminal state `cancelled`, and the gate publishes
+`ToolApprovalCancelled`, whose `attempted_by` names the approver, instead of
+`ToolApprovalGranted`. On a `cancelled` record `decided_by` names who tried to
+approve the call, not who let it through. A client that reads every `409` as
+"already resolved" should read `state`. A denial after the deadline is still
+recorded as a denial. An approval that lands on a different gateway instance
+from the held call still answers `200` there; the instance holding the call
+records it `cancelled`
+([mcp-hangar#1702](https://github.com/mcp-hangar/mcp-hangar/issues/1702)).
+
 ---
 
 ## WebSocket Endpoints
@@ -1344,10 +1375,11 @@ Streams all domain events as JSON frames. Requires `audit:read`; a principal
 without it is refused at the handshake (`403`). A grant held only within a
 tenant receives only the events that name that tenant.
 
-The upgrade needs a WebSocket library in the gateway's environment. The
-published image installs `websockets`; a `pip install mcp-hangar` does not, and
-without one the upgrade is answered `404` and uvicorn logs
-`No supported WebSocket library detected`. Install `websockets` alongside it.
+*Since 2.25.0* `websockets` is a dependency of `mcp-hangar`, so the endpoint
+works on a `pip` or `uv` install as well as in the image. Before 2.25.0 only
+the image installed a WebSocket library; on a `pip` install the upgrade was
+answered `404` and uvicorn logged `No supported WebSocket library detected`
+([mcp-hangar#1676](https://github.com/mcp-hangar/mcp-hangar/issues/1676)).
 
 See the [WebSockets guide](../guides/WEBSOCKETS.md) for connection details.
 

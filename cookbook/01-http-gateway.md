@@ -52,9 +52,11 @@ mcp_servers:
 ```
 
 Save this as `~/.config/mcp-hangar/config.yaml`. Every command below passes it
-with `--config`, and that is not optional: without `--config`, `serve` reads
-`MCP_CONFIG` or `./config.yaml` and never looks in `~/.config/mcp-hangar/`
+with `--config`. Since 2.25.0 a bare `serve` finds that file too, unless
+`MCP_CONFIG` is set or the working directory has a `config.yaml` of its own;
+before 2.25.0 it never looked in `~/.config/mcp-hangar/`
 ([mcp-hangar#1657](https://github.com/mcp-hangar/mcp-hangar/issues/1657)).
+Naming the file works on every version.
 
 ## Try It
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.24](https://github.com/mcp-hangar/docs/compare/v1.2.23...v1.2.24) (2026-10-06)
+
+
+### Changed
+
+* **guides:** send spans to Langfuse over OTLP, and fail closed on SIEM export ([#412](https://github.com/mcp-hangar/docs/issues/412)) ([59bc36c](https://github.com/mcp-hangar/docs/commit/59bc36c85a01e212a70bb37353dadc520b9b2b6e))
+
 ## [1.2.23](https://github.com/mcp-hangar/docs/compare/v1.2.22...v1.2.23) (2026-10-05)
 
 

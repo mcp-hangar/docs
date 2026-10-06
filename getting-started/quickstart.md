@@ -23,7 +23,10 @@ mcp-hangar init -y
 
 `init` detects your client, writes `~/.config/mcp-hangar/config.yaml`, starts
 each MCP server once to check it works, and — while they are up — records a
-**digest pin** for every tool they serve.
+**digest pin** for every tool they serve. Run it in a directory without a
+`config.yaml` of its own: since 2.25.0 `init` writes `./config.yaml` when there
+is one, and `-y` backs it up and replaces it. `--config-path
+~/.config/mcp-hangar/config.yaml` keeps the usual target anywhere.
 
 The file it writes governs from the first call:
 

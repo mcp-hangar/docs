@@ -728,8 +728,10 @@ configuration file by one rule, highest first
 
 So a bare `mcp-hangar serve` after `init` serves the file `init` wrote, unless
 the working directory has a `config.yaml` of its own -- and then `init`, `add`
-and `remove` there edit that file too. Run them where `config.yaml` is
-Hangar's, or name the file. A gateway started without `--config` reloads the
+and `remove` there use that file too: `add` and `remove` edit it in place, and
+`init -y` backs it up and replaces it. Run them where `config.yaml` is
+Hangar's, or name the file (`--config ~/.config/mcp-hangar/config.yaml`, or
+`init --config-path`) to keep the old target. A gateway started without `--config` reloads the
 file it booted from. If no rule finds a file, `serve` still boots the built-in
 demo configuration.
 

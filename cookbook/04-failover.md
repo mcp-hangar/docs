@@ -159,10 +159,12 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    (`health.unhealthy_threshold`, 2 by default) took the primary out of
    rotation, and the next two calls were served by the backup.
 
-   Health checks do not speed this up for a stopped server on 2.24.0: the
-   refused connection is logged as `background_task_failed` instead of
-   counting as a failed check (recipe 02, step 5). A hung primary is caught by
-   either: calls that time out, or three failed health checks.
+   Since 2.25.0 health checks catch a stopped primary too: each refused
+   connection counts as a failed check, and two of them take it out of
+   rotation without a call having to fail first (recipe 02, step 5). On 2.24.0
+   the refused connection was logged as `background_task_failed` instead, and
+   only calls took the primary out. A hung primary is caught by either: calls
+   that time out, or failed health checks.
 
 6. Confirm where traffic goes now
 

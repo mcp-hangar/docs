@@ -1,4 +1,4 @@
-<!-- verified-against: 2.24.0 -->
+<!-- verified-against: 2.25.0 -->
 
 # What a Verdict Establishes
 
@@ -17,8 +17,19 @@ establish / left to the operator**.
 Nothing here is forward-looking. Every "establishes" claim is backed by code or
 an ADR, and anything not shipped appears only in the middle column.
 
-**Reviewed against 2.24.0.** Every claim below was re-checked against the code
-that release ships. What moved since the 2.22.0 review is the **audit** side: a
+**Reviewed against 2.25.0.** Every row below was re-checked against the code
+that release ships. What moved since the 2.24.0 review: a pinned server's
+catalogue is re-listed on an interval, so the digest rows no longer depend on a
+restart to see unannounced drift; an approval that arrives after its call was
+cancelled is recorded `cancelled`, not `approved`; an invalid tool access
+policy refuses the configuration instead of being dropped; the actor of an auth
+change is the authenticated caller, not the request body; and a SIEM export the
+gateway cannot perform refuses startup instead of dropping records. Rows
+corrected for it: digest mismatch, approval `approved` (and a new `cancelled`
+row), tool access and auth -- see
+[what a record from before 2.25.0 lacks](#what-a-record-from-before-2250-lacks).
+
+**The 2.24.0 review.** What moved since the 2.22.0 review is the **audit** side: a
 refused call now leaves an audit record of its own (`ToolCallRefused`, exported
 as a `denied` tool invocation), a group call's record names the group, an
 allowed call's record names the role that admitted it, and the front door's
@@ -30,6 +41,8 @@ access and auth -- see
 tool access row also named the wrong log line for a front-door denial, a slip
 present since 2.22.0.
 A record is only as good as the gateway that wrote it: read
+[what a record from before 2.25.0 lacks](#what-a-record-from-before-2250-lacks)
+before trusting anything a 2.24.x or earlier gateway produced,
 [what a record from before 2.24.0 lacks](#what-a-record-from-before-2240-lacks)
 before trusting an export a 2.23.x or earlier gateway produced, and
 [the three rows that were weaker before 2.16.0](#three-rows-that-were-weaker-before-2160)
@@ -41,18 +54,19 @@ before reading anything a 2.15.0 or earlier gateway produced.
 | --- | --- | --- | --- |
 | **Digest pin passed** | the tool's `{name, description, inputSchema, outputSchema}` is byte-identical (RFC 8785 JCS) to the pinned one | the tool is safe; that `annotations`, `execution`, `icons` or `_meta` are unchanged; that the upstream *implements* the schema it declares; **that an empty-valued field is unchanged** — `None` / `""` / `{}` / `[]` are dropped before canonicalization (`digest_computation._is_meaningful`), so gaining `description: ""` or losing `outputSchema` to `{}` moves nothing | pin provenance: since 2.18.0 `mcp-hangar pin --write` records what a server served at a moment nobody else witnessed, so *who ran it, and against which upstream* is the operator's to keep; who approved the digest |
 | **`pin --check` clean** *(2.18.0)* | at the moment the command ran, every tool named in `tool_projection.pins` was served with the digest the file records — computed by `compute_tool_digest`, the same function the gate compares against, so a clean check and a passing call agree by construction rather than by two implementations | that it still holds: an upstream can change between the check and the call, which is what the gate is for; anything about a tool that is served and **not** pinned — `pins` is a subset by design and an unpinned tool is not drift; that the servers behave as their schemas say | which tools are pinned at all; running the check where it can fail loudly (exit 1) rather than only before a release |
-| **Digest mismatch / unknown** | the contract moved, or was never pinned; the record carries expected, observed, `enforcement`, `correlation_id`, `tenant_id` | that the change is hostile; whether the caller was served or refused — read `enforcement`, where `DigestEnforcement.BLOCK` is the only blocking value | `block` vs `warn`; the `unknown` policy (`ALLOW_UNVERIFIED` returns valid and emits no event at all) |
+| **Digest mismatch / unknown** | the contract moved, or was never pinned; the record carries expected, observed, `enforcement`, `correlation_id`, `tenant_id`. Since 2.25.0 a pinned READY server is re-listed every `tool_projection.pin_recheck_interval_s` (60 s by default), and the pass that first sees a drifted pin publishes one `DigestMismatchEvent` with `correlation_id` `pin_recheck` and logs `tool_digest_pin_drift_detected`, before anyone calls the tool | that the change is hostile; whether the caller was served or refused — read `enforcement`, where `DigestEnforcement.BLOCK` is the only blocking value; **that a missing event means no drift** -- a change is seen at most one interval plus the listing time after it happened, never with the interval at `0`, not while the server is `cold`, degraded or DEAD, and not while its listing fails (`pin_recheck_failed`) | `block` vs `warn`; the `unknown` policy (`ALLOW_UNVERIFIED` returns valid and emits no event at all) |
 | **Listed `digest` / `pinned_digest`** *(2.24.0)* | the tool as this listing returned it hashes to `digest` under `compute_tool_digest`, the function `pin` and the gate use; `pinned_digest`, when present, is the pin found for the id the caller named, then for the group member that served the listing -- on `hangar_tools` for the caller's tenant or all tenants, on `GET /api/tools` and `GET /api/mcp_servers/{id}/tools` the all-tenants pin only. A pair that differs is drift, read without the CLI | that a call will be refused or served -- the gate decides at call time, and the upstream can change between the listing and the call; that the upstream serves this schema when the server has predefined tools -- the listing, and so the digest, is the schema the configuration declares; **that a missing `pinned_digest` means no pin** -- a pin a member inherits from a group that owns it is not shown, and a per-tenant pin is not shown on the REST routes; anything about a tool the caller cannot list, which carries neither field | reading `pinned_digest` against `tool_projection.pins`, the file that is the pin's source |
-| **Approval `approved`** | one principal (`decided_by`) resolved this `approval_id` before `expires_at`; at dispatch the state, the expiry and a hash of the **raw** arguments were re-checked (`ApprovalGateService.revalidate`) | that the approver saw the raw arguments — they saw a redacted copy; that the approver was competent or authorized in any legal sense; that the call was dispatched — an approval that arrives after the batch's deadline has passed reads `CancellationError` and is not dispatched; that the call then succeeded | who may resolve; channel delivery; hold timeout |
+| **Approval `approved`** | one principal (`decided_by`) resolved this `approval_id` before `expires_at`; at dispatch the state, the expiry and a hash of the **raw** arguments were re-checked (`ApprovalGateService.revalidate`) | that the approver saw the raw arguments — they saw a redacted copy; that the approver was competent or authorized in any legal sense; that the call was dispatched — an approval that arrives after the batch's deadline has passed reads `CancellationError` and is not dispatched, and since 2.25.0 is recorded `cancelled` instead (next row), but an approval resolved on a different instance from the one holding the call answers `200` with `approved` there before the holder records it `cancelled`; that the call then succeeded | who may resolve; channel delivery; hold timeout |
+| **Approval `cancelled`** *(2.25.0)* | the held call's `hangar_call` batch was cancelled before an approval arrived, and the call did not run: the resolve answered `409` with `state: "cancelled"` (or, resolved on another instance, the holder recorded it), and the gate published `ToolApprovalCancelled` instead of `ToolApprovalGranted`. `decided_by` and the event's `attempted_by` name who tried to approve it | that anyone let the call through -- nothing did; anything about a call whose hold ended in a denial or an expiry after the deadline, which is still recorded as that | a client or dashboard that reads every `409` as "already resolved" reading `state` instead |
 | **Approval `expired` / `denied`** | the call was not dispatched through this gate | anything about whether it was attempted elsewhere | — |
 | **L7 egress `deny` (Enforce)** | the call was refused before reaching the upstream, and the refusal is recorded: `EgressPolicyEnforced` carries tool, server, `action`, reasons, `rule_kind`, `policy_id`, `correlation_id`, `identity_context`; `mcp_hangar_egress_policy_enforced_total{action,rule_kind}` counts it; a `batch_call_refused` warning carries the verdict as bounded fields (`l7_verdict`, `l7_mode`, `l7_rule_kind`, `l7_inspection_failed`, `policy_id`) rather than the reasons, since 2.24.0; and since 2.24.0 the call has an audit record, `ToolCallRefused`, with `hangar.l7.verdict`, `hangar.l7.mode`, `hangar.l7.rule_kind` and `hangar.l7.policy_id` | that traffic did not reach the destination by another path; that established connections were cut — they are not (conntrack, see [EGRESS_POLICY](../guides/EGRESS_POLICY.md)); the reasons — they are on the event and the aggregate's `egress_policy_enforced` warning only, never on a span, the `batch_call_refused` line or the audit record. A deny because the arguments **could not be inspected** (`rule_kind` `arguments`) is still refused and still in `EgressPolicyEnforced`, but reads as a failure everywhere else: `batch_call_failed` at warning, a span that ends ERROR with `hangar.call.outcome=error`, and no `ToolCallRefused` | backstop flavour; pod restart after switching to `Enforce` |
 | **L7 `deny` observed (Audit)** | the policy *would* have refused: `EgressPolicyViolationObserved` carries the same fields, with `would_be_action` in place of `action` and no `rule_kind`, and `mcp_hangar_egress_policy_violations_observed_total` counts it; since 2.24.0 the call's span reads `hangar.l7.verdict=audit_observed` | that anything was blocked — Audit falls through and the call proceeds | the decision to switch to `Enforce` |
 | **Any L7 verdict** | which policy produced it: `policy_id` is a content hash of the compiled rules, carried by the verdict, by the refusals and by `EgressPolicySet` -- and since 2.24.0 by the call's span (`hangar.l7.policy_id`) and a refusal's audit record -- so a record and a policy change join on a value rather than on adjacent timestamps | that the *rules* are visible in the record — the id resolves to them only against a gateway still holding that policy (`GET /api/mcp_servers/{id}/l7_policy` returns `policyId`) | keeping the policy documents that ids were computed from |
 | **L7 verdict by `Mcp-Param-*` selector** | the header matched a rule **and** the header was validated against the request body: only the front door binds a header for the policy, only one the called tool declares with `x-mcp-header`, only after re-running the SDK's check, and as the SDK decoded it (a `=?base64?...?=` sentinel included) | anything on a request where a header was not checked — `hangar_call` (it declares no header), a handshake-era request, a skipped or failed validation, a state that does not say validation ran: none of these headers reaches a selector, and the call falls through to the tool rules and the policy default ([ADR-025](../adr/ADR-025-header-selectors-must-not-match-unvalidated-headers.md)); the fall-through is visible as `rule_kind` `tool` and in the verdict reasons ("header rules not consulted", on the event), not in the absence of one. A checked header beside an unchecked one still decides, with that reason added | `headers.param_validation.required`, which refuses a modern-revision call carrying an `Mcp-Param-*` header that did not reach the selector rather than serving it; a handshake-era call is served with its headers ignored |
-| **Tool access `denied`** | this caller cannot call this tool | that the tool does not exist — **at the front door**, withdrawn, denied and unknown are all `-32601`, deliberately (shown equals callable, [ADR-022](../adr/ADR-022-the-management-surface-is-what-the-caller-may-call.md)). On the batch surface the answer differs: `ToolAccessDeniedError`, "Tool not available for this mcp_server". **A front-door denial leaves no audit record**: it is answered before the executor runs, so there is no `ToolCallRefused` and no `batch_call_refused` for it | reading the operator-side log, which carries the reason the client is not given. At the front door that is `front_door_tool_call` at info with `outcome=not_found` and `reason=not_projected` (`unknown` when no upstream holds the name). On the batch surface — and at the front door for a tool denied between the listing and the call — it is `batch_call_refused` at warning, carrying `gate=tool_access` and `reason=tool_not_in_access_policy` (the per-gate `tool_access_denied` line is still written, at debug), and since 2.24.0 a `ToolCallRefused` audit record with the same gate and reason |
+| **Tool access `denied`** | this caller cannot call this tool. Since 2.25.0 the policy behind it is the one written: a policy with an invalid field, or a list that is not a list, refuses the boot and the reload instead of being dropped or misread | that the tool does not exist — **at the front door**, withdrawn, denied and unknown are all `-32601`, deliberately (shown equals callable, [ADR-022](../adr/ADR-022-the-management-surface-is-what-the-caller-may-call.md)). On the batch surface the answer differs: `ToolAccessDeniedError`, "Tool not available for this mcp_server". **A front-door denial leaves no audit record**: it is answered before the executor runs, so there is no `ToolCallRefused` and no `batch_call_refused` for it | reading the operator-side log, which carries the reason the client is not given. At the front door that is `front_door_tool_call` at info with `outcome=not_found` and `reason=not_projected` (`unknown` when no upstream holds the name). On the batch surface — and at the front door for a tool denied between the listing and the call — it is `batch_call_refused` at warning, carrying `gate=tool_access` and `reason=tool_not_in_access_policy` (the per-gate `tool_access_denied` line is still written, at debug), and since 2.24.0 a `ToolCallRefused` audit record with the same gate and reason |
 | **Empty projection (`{"tools": []}`)** | nothing about whether the caller is allowed anything | which of `no_identity` (a fail-closed deny), `nothing_discovered` (a replica whose warm-up has not finished or did not succeed) or `filtered` (the honest empty) produced it — indistinguishable from outside, classified only on the operator's side: in the log line and in the `reason` label of `mcp_hangar_empty_projection_total` | reading that log line before treating `[]` as a policy result |
 | **SSRF check passed** | the endpoint resolved to a permitted range at registration and, for an API-registered `remote` server, again at connect — `_SsrfGuardedTransport` re-resolves and pins per request | anything about `remote` endpoints declared in `config.yaml` ([ADR-021](../adr/ADR-021-config-file-endpoints-outside-the-ssrf-policy.md)) — the boot warning names each one, a hostname included (`ssrf_policy_not_applied_to_config_file_endpoint`), but it warns and does not refuse | knowing that moving an upstream into the config file drops both halves |
-| **Auth `401` / `403`, `tool:invoke` denied** | the credential was not accepted, or the principal lacks the permission. A `tool:invoke` denial of a tool call is not an HTTP status: it is `Not authorized to invoke tool '<tool>': tool:invoke permission required` — a failed batch entry (`AuthorizationDenied`) on `hangar_call`, and since 2.24.0 a tool error (`isError`) on the front door's flat `tools/call` — and since 2.24.0 one `ToolCallRefused` with `gate=authorization` and reason `tool_invoke_denied` or `unauthenticated`. An allowed call's audit record carries `mcp.caller.roles` *(2.24.0)*: the role the allow decision matched, or `opa_policy` | over stdio, that anyone presented a credential — the principal is the one `auth.stdio.principal` declares, trusted because the process was spawned ([ADR-026](../adr/ADR-026-stdio-is-an-authenticated-transport.md)); what the matched role grants, or granted when the call was made; any role on a trace — `mcp.caller.roles` is on the audit record only, and absent with auth off | role mapping; the stdio declaration |
+| **Auth `401` / `403`, `tool:invoke` denied** | the credential was not accepted, or the principal lacks the permission. A `tool:invoke` denial of a tool call is not an HTTP status: it is `Not authorized to invoke tool '<tool>': tool:invoke permission required` — a failed batch entry (`AuthorizationDenied`) on `hangar_call`, and since 2.24.0 a tool error (`isError`) on the front door's flat `tools/call` — and since 2.24.0 one `ToolCallRefused` with `gate=authorization` and reason `tool_invoke_denied` or `unauthenticated`. An allowed call's audit record carries `mcp.caller.roles` *(2.24.0)*: the role the allow decision matched, or `opa_policy` | over stdio, that anyone presented a credential — the principal is the one `auth.stdio.principal` declares, trusted because the process was spawned ([ADR-026](../adr/ADR-026-stdio-is-an-authenticated-transport.md)); what the matched role grants, or granted when the call was made; any role on a trace — `mcp.caller.roles` is on the audit record only, and absent with auth off | role mapping; the stdio declaration. Since 2.25.0 a key or role change is recorded against the principal that made it (`anonymous` with auth off); before, the request body named the actor |
 | **Capability drift** | `CapabilityViolationDetected` with `violation_type`, `violation_detail` and the `enforcement_action` taken (`alert` / `block` / `quarantine`) | that the drift was hostile | which action the mode maps to |
 | **Projection withdrawal** | a tool was withheld, and why: `mcp_hangar_projection_withdrawals_total{reason}` — `invalid_x_mcp_header` or `header_exposure_withdraw` | that the upstream stopped offering it — the definition is still served byte-identical upstream, only the projection dropped it; that a `header_exposure_warn` sample was withheld — `warn` counts the tool and still serves it | `on_violation`, whose default `warn` serves the tool |
 
@@ -151,6 +165,44 @@ depending on thread timing
 ([mcp-hangar#1595](https://github.com/mcp-hangar/mcp-hangar/pull/1595)). An L7
 refusal is marked `hangar.call.outcome=deny` with those fields, not with
 `hangar.refusal.gate`, which names a batch gate.
+
+## What a record from before 2.25.0 lacks
+
+The same rule again: an export from a 2.24.x or earlier gateway has the older
+behaviour, whatever the rows above now say.
+
+**An `approved` record does not establish that the call could run.** An
+approval that arrived after its call's batch deadline was accepted with `200`,
+recorded `approved` and published as `ToolApprovalGranted` with the approver in
+`decided_by`, although the call was never dispatched
+([mcp-hangar#1702](https://github.com/mcp-hangar/mcp-hangar/issues/1702)).
+
+**An auth event does not establish who made the change.** `created_by`,
+`revoked_by`, `assigned_by` and `updated_by` came from the request body and
+defaulted to `"system"`, so an admin could mint a key or grant a role and have
+the event, the log line and the response name someone else
+([mcp-hangar#1649](https://github.com/mcp-hangar/mcp-hangar/issues/1649)).
+
+**A gateway that booted may have had no policy for a scope.** A `tools:` or
+`access:` policy with one invalid field was dropped with an
+`invalid_tools_access_config` warning, and a list written as a string was read
+as its characters -- `deny_list: add` allowed `add`
+([mcp-hangar#1648](https://github.com/mcp-hangar/mcp-hangar/issues/1648),
+[mcp-hangar#1718](https://github.com/mcp-hangar/mcp-hangar/issues/1718)). A tool
+call it served is not evidence that the written policy allowed it; read its
+boot log for that warning.
+
+**A pin did not see unannounced drift.** The catalogue a pin was checked against
+was refreshed only at start and on `tools/list_changed`, so a passing pin there
+says the tool matched what the server served when it last started
+([mcp-hangar#1693](https://github.com/mcp-hangar/mcp-hangar/issues/1693)).
+
+**A SIEM export may be missing records without saying so.** An unknown
+`MCP_COMPLIANCE_FORMAT` started the gateway with no export, and a record that
+could not be written was dropped with an error log line and no metric
+([mcp-hangar#1701](https://github.com/mcp-hangar/mcp-hangar/issues/1701)). Since
+2.25.0 the first refuses startup and the second is counted in
+`mcp_hangar_compliance_export_failures_total`.
 
 ## What a record from before 2.24.0 lacks
 

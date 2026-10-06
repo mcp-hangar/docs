@@ -197,7 +197,7 @@ These endpoints are outside the `/api/` prefix and skip authentication:
 
 | Path | Description |
 | ------ | ------------- |
-| `/api/ws/events` | Real-time domain event stream (filterable); requires `audit:read` and a WebSocket library such as `websockets` installed |
+| `/api/ws/events` | Real-time domain event stream (filterable); requires `audit:read`; `websockets` ships with `mcp-hangar` since 2.25.0 |
 
 See the [WebSockets guide](WEBSOCKETS.md) for connection details.
 

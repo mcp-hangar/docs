@@ -307,6 +307,8 @@ Load a MCP server from the MCP registry at runtime. Hot-loaded MCP servers are e
 
 **Side Effects:** Downloads and starts the MCP server process. Adds to the runtime registry.
 
+Since 2.25.0 a policy that fails to parse -- an empty pattern in `allow_tools`, `deny_tools` or `approval_tools`, or a value that is not a list -- refuses the load before anything is installed or started. Before, the server was installed and started first, and stayed loaded with no policy ([mcp-hangar#1718](https://github.com/mcp-hangar/mcp-hangar/issues/1718)).
+
 **Returns:**
 
 The primary success response:

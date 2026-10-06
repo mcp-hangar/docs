@@ -13,10 +13,10 @@
 - Python 3.11+ with `uv` installed
 - `websocat` or any WebSocket client, for watching the notification stream
 - mcp-hangar checked out at the release you are testing
-- On a `pip`/`uv` install, a WebSocket library for the gateway
-  (`uv pip install websockets`): without one, `/api/ws/events` is never
-  upgraded ([mcp-hangar#1676](https://github.com/mcp-hangar/mcp-hangar/issues/1676)).
-  The container image ships it.
+- Testing a release before 2.25.0 from a `pip`/`uv` install: a WebSocket
+  library for the gateway (`uv pip install websockets`), or `/api/ws/events`
+  is never upgraded ([mcp-hangar#1676](https://github.com/mcp-hangar/mcp-hangar/issues/1676)).
+  From 2.25.0 it is a dependency, and the container image always shipped it.
 - With auth on, an API key per role you test, sent as `X-API-Key: $KEY`
   (`Authorization: Bearer` carries an OIDC token, not an API key). The steps
   below write `$KEY`; omit the header with auth off.
@@ -135,7 +135,7 @@ A tool on `deny_list` is always blocked -- even if also on `approval_list`.
      -H "X-API-Key: $KEY"        # omit with auth off
    ```
 
-   Send `{"type":"subscribe","event_types":["ToolApprovalRequested","ToolApprovalGranted","ToolApprovalDenied","ToolApprovalExpired"]}`
+   Send `{"type":"subscribe","event_types":["ToolApprovalRequested","ToolApprovalGranted","ToolApprovalDenied","ToolApprovalExpired","ToolApprovalCancelled"]}`
    on connect to filter to approvals only. Name the events exactly: a wildcard
    is accepted only as a whole `/`-separated segment, so `ToolApproval*` is
    dropped and the socket then delivers nothing. Send the message promptly --
@@ -229,6 +229,19 @@ channel, and `channel` on the `ToolApprovalRequested` event matches. Before
 3. Do NOT approve or deny -- wait for timeout
 
 **Expected Result:** After 10 seconds, the call's result carries `error_type: "approval_timeout"` and the error "No response within timeout". Resolving it afterwards answers `409` with `state: "expired"`.
+
+### 3.3a Approval After the Batch Deadline (2.25.0+)
+
+1. Keep `approval_timeout_seconds` well above the batch's `timeout` -- for
+   example 120 against a `hangar_call` `timeout` of 10
+2. Invoke a tool matching `approval_list` through `hangar_call`
+3. Wait past the batch timeout, then approve it over REST
+
+**Expected Result:** the resolve answers `409` with
+`{"error": "Approval refused: the held call was cancelled and did not run", "state": "cancelled"}`,
+`GET /api/approvals?state=cancelled` lists the record, and the socket carries
+`ToolApprovalCancelled` with `attempted_by`, not `ToolApprovalGranted`. The tool
+does not run. Before 2.25.0 the resolve answered `200` with `state: "approved"`.
 
 ### 3.4 Deny-List Override
 
@@ -398,6 +411,7 @@ After each approval action, verify events in the event store/log:
 | Approve | `ToolApprovalGranted` |
 | Deny | `ToolApprovalDenied` |
 | Timeout | `ToolApprovalExpired` |
+| Approve after the batch deadline (2.25.0+) | `ToolApprovalCancelled` |
 
 Check via the `/api/ws/events` socket from §3.1, or the server log, which
 records each one as a `domain_event` line with its `event_type`. There is no

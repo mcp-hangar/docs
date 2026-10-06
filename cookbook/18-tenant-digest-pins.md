@@ -205,9 +205,11 @@ recipe is about pins.
    property, change a type -- anything that alters the canonical schema). The
    pin is checked against the schema Hangar holds in its catalogue, which it
    reads when it starts the server or when the backend sends
-   `notifications/tools/list_changed`. A backend that changes its schema in
-   place without notifying keeps being served under the old entry until Hangar
-   starts the server again, so restart the gateway to make it re-read. Then
+   `notifications/tools/list_changed`, and since 2.25.0 on every
+   `tool_projection.pin_recheck_interval_s` (60 seconds by default) for a
+   pinned server that is READY. So wait out one interval -- the log shows
+   `tool_digest_pin_drift_detected` -- or, before 2.25.0, restart the gateway
+   to make it re-read. Then
    call `refund` again as `tenant:a` with enforcement still set to `block`:
 
    ```bash

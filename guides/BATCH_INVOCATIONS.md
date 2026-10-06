@@ -267,7 +267,9 @@ Example:
 A call held for [approval](APPROVAL_ADAPTERS.md) is not cut short by the batch
 timeout: it reads its approval outcome (`approval_timeout` or `approval_denied`;
 an approval that arrives after the deadline reads `CancellationError` and is not
-dispatched), and the batch returns when the hold ends. A call the budget runs out
+dispatched), and the batch returns when the hold ends. Since 2.25.0 that late
+approval is refused with `409` and recorded `cancelled`, not `approved`
+([mcp-hangar#1702](https://github.com/mcp-hangar/mcp-hangar/issues/1702)). A call the budget runs out
 on before it is held reads `TimeoutError`.
 
 ### Response Size

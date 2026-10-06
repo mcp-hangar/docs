@@ -2,7 +2,7 @@
 
 MCP Hangar provides a WebSocket endpoint for real-time streaming of domain events.
 
-The endpoint needs a WebSocket library in the gateway's environment, and none is a declared dependency of `mcp-hangar`. Install one beside it (`pip install websockets`, or `wsproto`). Without one, the HTTP server answers the upgrade request with `404` and logs `No supported WebSocket library detected`.
+Since 2.25.0 `websockets` is a dependency of `mcp-hangar`, so the endpoint works on a `pip` or `uv` install as well as in the container image. An older gateway installed with `pip` has no WebSocket library unless you add one (`pip install websockets`, or `wsproto`); without one, the HTTP server answers the upgrade request with `404` and logs `No supported WebSocket library detected` ([mcp-hangar#1676](https://github.com/mcp-hangar/mcp-hangar/issues/1676)).
 
 ## Endpoint
 

@@ -22,7 +22,7 @@ These options go before the command name (`mcp-hangar --json status`):
 
 | Option | Short | Type | Default | Env Variable | Description |
 | -------- | ------- | ------ | --------- | -------------- | ------------- |
-| `--config` | `-c` | PATH | - | `MCP_CONFIG` | Path to config.yaml file |
+| `--config` | `-c` | PATH | - | `MCP_CONFIG` | Path to config.yaml file, for every command. A command's own flag wins over it, and it wins over `MCP_CONFIG`; see [Default Locations](#default-locations) |
 | `--verbose` | `-v` | FLAG | false | - | Show verbose output including debug information |
 | `--quiet` | `-q` | FLAG | false | - | Suppress non-essential output |
 | `--json` | - | FLAG | false | - | Output in JSON format for scripting |
@@ -68,7 +68,7 @@ mcp-hangar init [OPTIONS]
 | `--non-interactive` | `-y` | FLAG | false | Run without prompts, using defaults |
 | `--bundle` | `-b` | TEXT | - | MCP Server bundle to install |
 | `--servers` | - | TEXT | - | Comma-separated list of MCP servers (alias: `--mcp_servers`) |
-| `--config-path` | - | PATH | `~/.config/mcp-hangar/config.yaml` | Custom path for config file. Without it, the global `--config` is used if given |
+| `--config-path` | - | PATH | [the shared rule](#default-locations) | Custom path for config file. Without it, the global `--config`, then `MCP_CONFIG`, then `./config.yaml` if present, then `~/.config/mcp-hangar/config.yaml` |
 | `--client` | - | TEXT | detected | Client to point at Hangar; repeatable. `claude-code`, `claude-code-project`, `cursor`, `cursor-project`, `claude-desktop`, `all` |
 | `--claude-config` | - | PATH | - | Write this exact client config file instead of the detected ones |
 | `--skip-clients` | - | FLAG | false | Do not modify any MCP client config (alias: `--skip-claude`) |
@@ -350,7 +350,7 @@ Bare `mcp-hangar` accepts only the [global options](#global-options); pass
 
 | Option | Short | Type | Default | Env Variable | Description |
 | -------- | ------- | ------ | --------- | -------------- | ------------- |
-| `--config` | `-c` | PATH | `./config.yaml` | `MCP_CONFIG` | Path to config.yaml file. Overrides the global `--config` |
+| `--config` | `-c` | PATH | [the shared rule](#default-locations) | - | Path to config.yaml file. Overrides the global `--config`, which overrides `MCP_CONFIG` |
 | `--http` | - | FLAG | false | `MCP_MODE=http` | Run in HTTP mode |
 | `--host` | - | TEXT | 0.0.0.0 | `MCP_HTTP_HOST` | HTTP server host |
 | `--port` | `-p` | INT | 8000 | `MCP_HTTP_PORT` | HTTP server port |
@@ -463,7 +463,7 @@ mcp-hangar pin [OPTIONS]
 
 | Option | Short | Type | Default | Description |
 | -------- | ------- | ------ | --------- | ------------- |
-| `--config` | `-c` | PATH | `$MCP_CONFIG`, else `./config.yaml` | Configuration to read (and, with `--write`, to update) |
+| `--config` | `-c` | PATH | [the shared rule](#default-locations) | Configuration to read (and, with `--write`, to update) |
 | `--server` | `-s` | TEXT | every server | Only this MCP server. Repeatable |
 | `--write` | - | FLAG | false | Merge the observed digests into `mcp_servers.<id>.tool_projection.pins` |
 | `--check` | - | FLAG | false | Exit 1 when a configured pin disagrees with what the server serves |
@@ -472,8 +472,10 @@ mcp-hangar pin [OPTIONS]
 | `--quiet` | `-q` | FLAG | false | Log errors only, and print only digests, drift and failures |
 
 `--write` and `--check` ask different questions; pass one or neither.
-`pin` reads only its own `--config`: `mcp-hangar --config X pin` still reads
-`$MCP_CONFIG` or `./config.yaml`, so write `mcp-hangar pin --config X`.
+`pin` reads its own `--config`, then the global one, so `mcp-hangar --config X pin`
+and `mcp-hangar pin --config X` read the same file. Before 2.25.0 `pin` ignored
+the global `--config`
+([mcp-hangar#1682](https://github.com/mcp-hangar/mcp-hangar/issues/1682)).
 
 ### Exit Codes
 
@@ -676,8 +678,9 @@ ignored, so the setting simply does not apply -- which is why a misspelling
 surfaces as a server that will not start, or as authentication that is quietly
 off, rather than as a configuration error.
 
-`PATH` defaults to `$MCP_CONFIG`, then `./config.yaml`. The global `--config`
-is not read: pass the file as `PATH`.
+`PATH` wins; without it the command reads the global `--config`, then follows
+[the shared rule](#default-locations). Before 2.25.0 the global `--config` was
+not read here.
 
 | exit code | meaning |
 | --- | --- |
@@ -709,19 +712,43 @@ of an `mcp_servers.<id>` spec. Not checked: anything deeper.
 
 ### Default Locations
 
-Not every command reads the same file by default:
+*Since 2.25.0* `init`, `status`, `add`, `remove`, `pin`, `serve`, a bare
+`mcp-hangar`, `config check` and `python -m mcp_hangar.server` find the
+configuration file by one rule, highest first
+([mcp-hangar#1657](https://github.com/mcp-hangar/mcp-hangar/issues/1657)):
 
-| Command | Reads |
-| --- | --- |
-| `serve` | `serve --config`, the global `--config` or `MCP_CONFIG`; otherwise `./config.yaml` |
-| `pin`, `config check` | their own `--config` / `PATH`, or `MCP_CONFIG`; otherwise `./config.yaml` |
-| `init` | `--config-path` or the global `--config`; otherwise `~/.config/mcp-hangar/config.yaml` |
-| `add`, `remove` | the global `--config` or `MCP_CONFIG`; otherwise `~/.config/mcp-hangar/config.yaml` |
-| `status` | the global `--config` or `MCP_CONFIG`; otherwise `~/.config/mcp-hangar/config.yaml`, then `./config.yaml` |
-| `auth bootstrap-admin` | its required `--config` |
+1. a path on the command line -- the command's own flag or argument
+   (`serve --config`, `pin --config`, `init --config-path`,
+   `config check PATH`), then the global `--config`;
+2. `$MCP_CONFIG`;
+3. `./config.yaml`, if the working directory has one;
+4. `~/.config/mcp-hangar/config.yaml`, the file `init` writes.
 
-So a config written by `init` or `add` is served with
-`mcp-hangar serve --config ~/.config/mcp-hangar/config.yaml`.
+`auth bootstrap-admin` takes its own required `--config`.
+
+So a bare `mcp-hangar serve` after `init` serves the file `init` wrote, unless
+the working directory has a `config.yaml` of its own -- and then `init`, `add`
+and `remove` there use that file too: `add` and `remove` edit it in place, and
+`init -y` backs it up and replaces it. Run them where `config.yaml` is
+Hangar's, or name the file (`--config ~/.config/mcp-hangar/config.yaml`, or
+`init --config-path`) to keep the old target. A gateway started without `--config` reloads the
+file it booted from. If no rule finds a file, `serve` refuses to start and tells
+you to run `mcp-hangar init` *(2.25.0)*. A path named by a flag or by
+`MCP_CONFIG` that does not exist, is a directory or is not readable is refused
+the same way, with the path and where it came from on stderr, for example:
+
+```text
+Error: Configuration file /etc/hangar/confg.yaml (named on the command line) does not exist. Nothing is served without the configuration that was asked for.
+```
+
+Before 2.25.0 every one of those cases booted a built-in demo configuration
+(`math_subprocess` and every `hangar_*` tool, with none of your pins, policies
+or auth) and logged only `config_not_found_using_default` at INFO.
+
+Before 2.25.0 each command picked its own default: `serve`, `pin` and
+`config check` read `./config.yaml`, `init`, `add` and `remove` wrote
+`~/.config/mcp-hangar/config.yaml`, `MCP_CONFIG` beat a global `--config` on
+`serve`, and a gateway started without a path could not reload.
 
 ### Example Configuration
 

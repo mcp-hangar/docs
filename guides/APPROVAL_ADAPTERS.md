@@ -320,6 +320,8 @@ async def handle_slack_callback(
 
 `mint_hangar_token_for` is yours to implement, and it is where the security of this integration actually lives. The `Bearer` header above carries a JWT from an issuer Hangar trusts; if the approver's credential is a Hangar API key instead, send it as `X-API-Key`, because an API key in `Authorization: Bearer` is refused with `401`. It must establish that this Slack user corresponds to a Hangar principal holding `approval:resolve` — an OIDC exchange, a mapping table, whatever your identity story is. **Do not mint a single shared service token for every approver**: the audit trail would then record one identity for every decision, which is exactly the attribution problem this design removes.
 
+`raise_for_status()` treats every `409` as a failure, and a `409` means one of two things. Read `state` in the body before you tell the approver what happened: a resolved approval answers with the state it already holds (`approved`, `denied`, `expired`), and since 2.25.0 an approval for a held call whose `hangar_call` batch deadline has passed answers `{"error": "Approval refused: the held call was cancelled and did not run", "state": "cancelled"}` -- the call will not run, and the record says `cancelled`, not `approved` ([mcp-hangar#1702](https://github.com/mcp-hangar/mcp-hangar/issues/1702)). See [Resolve Approval](../reference/rest-api.md#resolve-approval).
+
 ## Testing an adapter
 
 Test the signature verification against known-good and tampered payloads, including a stale timestamp — that is the part core no longer checks for you.

@@ -23,7 +23,10 @@ mcp-hangar init -y
 
 `init` detects your client, writes `~/.config/mcp-hangar/config.yaml`, starts
 each MCP server once to check it works, and — while they are up — records a
-**digest pin** for every tool they serve.
+**digest pin** for every tool they serve. Run it in a directory without a
+`config.yaml` of its own: since 2.25.0 `init` writes `./config.yaml` when there
+is one, and `-y` backs it up and replaces it. `--config-path
+~/.config/mcp-hangar/config.yaml` keeps the usual target anywhere.
 
 The file it writes governs from the first call:
 
@@ -191,10 +194,12 @@ mcp-hangar init -y --client all
 `cursor-project`, `claude-desktop` or `all` (every client it detects). Without
 it, `init` writes the clients it finds; `--skip-clients` writes none.
 
-`pin` and a bare `serve` read `--config`, else `$MCP_CONFIG`, else
-`./config.yaml` in the current directory — not the file `init` wrote. Name it
-with `--config` (as the commands below do), or export it once:
-`export MCP_CONFIG=~/.config/mcp-hangar/config.yaml`.
+Every command reads `--config`, else `$MCP_CONFIG`, else `./config.yaml` if
+the current directory has one, else the file `init` wrote. So in a directory
+without a `config.yaml`, `pin` and a bare `serve` use
+`~/.config/mcp-hangar/config.yaml`. That is since 2.25.0; before it they read
+`./config.yaml` only. The commands below name the file with `--config`, which
+works on every version.
 
 ## Adding more MCP servers
 

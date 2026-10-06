@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All MCP Hangar behavior is controlled through a YAML configuration file and environment variables. The config file defaults to `config.yaml` in the working directory, overridden by the `MCP_CONFIG` environment variable. Where a setting has both an environment variable and a YAML key, which one wins depends on the setting: most environment variables win, but the top-level `rate_limit` block wins over `MCP_RATE_LIMIT_*`, and `logging.level` wins over an `MCP_LOG_LEVEL` of `INFO`. Each section below says which applies.
+All MCP Hangar behavior is controlled through a YAML configuration file and environment variables. Every command finds the config file by one rule, highest first: a path on the command line (the command's own flag, then the global `--config`), then `$MCP_CONFIG`, then `./config.yaml` if the working directory has one, then `~/.config/mcp-hangar/config.yaml`, the file `init` writes -- see [CLI: which file a command reads](cli.md#default-locations). Where a setting has both an environment variable and a YAML key, which one wins depends on the setting: most environment variables win, but the top-level `rate_limit` block wins over `MCP_RATE_LIMIT_*`, and `logging.level` wins over an `MCP_LOG_LEVEL` of `INFO`. Each section below says which applies.
 
 ## `mcp_servers`
 
@@ -140,6 +140,30 @@ The same block is accepted at every scope that takes an access policy — an
 `mcp_servers` entry, a `groups` entry, a group member, and the per-tenant
 `tool_access.member` block — and all four go through one parser, so a key cannot
 be honoured at one scope and dropped at another.
+
+**An invalid policy refuses the configuration** *(2.25.0)*. A `tools:` policy at
+any of those scopes, or an `access:` block, with one invalid field fails the
+boot, and a reload is refused with the previous policy kept in force. The
+`ConfigurationError` names the scope and the field:
+
+```text
+Invalid tools access policy for mcp_server 'calc': Invalid deny_list: expected a list of patterns, got str 'add'
+```
+
+Invalid means an `approval_timeout_seconds` that is not a positive integer, an
+empty or non-string pattern, a whitespace-only `approval_channel`, or an
+`allow_list`, `deny_list` or `approval_list` that is not a list, or a policy block
+that is present but is not a mapping -- `tools: add`, a null `tools:`, or the
+same at `access:`, `tool_access:` or a `tool_access.member` entry (on a server,
+`tools:` may still be a list of tool schemas, each a mapping). Write a single
+pattern as `deny_list: [add]`. Before 2.25.0 an invalid field logged
+`invalid_tools_access_config` (or its group, member, tenant or `access`
+variant) and the gateway booted with **no policy** for that scope, so denied
+tools ran and approval-listed tools ran without a hold; and a string list was
+split into its characters, so `deny_list: add` denied `a` and `d` and allowed
+`add` ([mcp-hangar#1648](https://github.com/mcp-hangar/mcp-hangar/issues/1648),
+[mcp-hangar#1718](https://github.com/mcp-hangar/mcp-hangar/issues/1718)). A
+policy you mean to have no effect is removed by deleting the block.
 
 ### Prompts and resources (`access`)
 
@@ -417,6 +441,40 @@ matches no per-tenant pin -- drift stays computable and nothing stops it. Since
 v2.6.0 that configuration **refuses to start**, naming the pins it found and the
 auth setting that makes them unmatchable. Use `tool_projection.pins` to pin
 without authentication; it holds every caller, including an anonymous one.
+
+### Re-checking pins against the upstream
+
+*Since 2.25.0* every READY server that a pin covers -- a `pins` or
+`tenant_overrides.<tenant>.pins` entry on the server, or on a group it is a
+member of -- is re-listed on an interval, set by a **top-level** key, not the
+per-server block above
+([mcp-hangar#1693](https://github.com/mcp-hangar/mcp-hangar/issues/1693)):
+
+```yaml
+tool_projection:
+  pin_recheck_interval_s: 60   # the default; 0 turns the re-check off
+```
+
+| Key | Type | Default | Description |
+| ----- | ------ | --------- | ------------- |
+| `tool_projection.pin_recheck_interval_s` | `int` | `60` | Seconds between re-listings of pinned servers. `0` turns it off; any other value must be 5--3600, and anything else, a string or a boolean included, refuses the boot. Read at start: a reload does not change it |
+
+A pinned tool the upstream changed without sending `tools/list_changed` is
+refused (`ToolDigestMismatchError`, gate reason `digest_mismatch`) from the
+next call after the pass that sees it -- at most one interval, plus the time
+the pass takes to list the pinned servers, after the change. The pass logs
+`tool_digest_pin_drift_detected` at warning and publishes one
+`DigestMismatchEvent` when it first sees the drift. Each pass sends one
+`tools/list` per pinned server to its upstream, from every replica. Servers
+that are `cold`, starting, degraded or DEAD are not listed and not started;
+a listing that fails keeps the previous catalogue. A re-list refreshes the rest
+of the catalogue too, so a tool added without an announcement is seen within an
+interval, and a pinned server whose `capabilities` enforcement blocks or
+quarantines a tool outside `expected_tools` is blocked at its next call.
+
+Before 2.25.0 the catalogue a pin was checked against was refreshed only at
+start and on `tools/list_changed`, so an unannounced change was served under
+the old pin until the gateway restarted.
 
 ## Header Exposure
 
@@ -1351,7 +1409,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 
 | Variable | Default | Description |
 | ---------- | --------- | ------------- |
-| `MCP_CONFIG` | `"config.yaml"` | Path to YAML configuration file |
+| `MCP_CONFIG` | -- | Path to YAML configuration file. A `--config` on the command line wins over it; without either, `./config.yaml` if present, else `~/.config/mcp-hangar/config.yaml` |
 | `MCP_MODE` | `"stdio"` | Server mode: `stdio` or `http` |
 | `MCP_HTTP_HOST` | `"0.0.0.0"` | HTTP bind host. A non-loopback host without authentication refuses to start unless `--unsafe-no-auth` is passed |
 | `MCP_HTTP_PORT` | `8000` | HTTP bind port |

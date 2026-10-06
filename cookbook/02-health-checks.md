@@ -106,12 +106,15 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    One check a minute, each waiting 5 seconds for a reply; the third failure
    degrades the server.
 
-   A stopped server (`docker stop mcp-math`) is not detected this way on
-   2.24.0: the refused connection escapes the check instead of counting as a
-   failure, so the log shows `background_task_failed` with
+   Since 2.25.0 a stopped server (`docker stop mcp-math`) is detected the same
+   way: the refused connection counts as a failed check, and the third one
+   degrades the server
+   ([mcp-hangar#1698](https://github.com/mcp-hangar/mcp-hangar/issues/1698)).
+   On 2.24.0 the refused connection escaped the check instead, so the log
+   showed `background_task_failed` with
    `connection_failed: [Errno 61] Connection refused` (`Errno 111` on Linux) once a minute and the
-   server stays `ready`. A tool call to it still fails, and in a group those
-   failures take it out of rotation (recipe 03).
+   server stayed `ready`; only its failing tool calls took it out of a group's
+   rotation (recipe 03).
 
 6. Verify DEGRADED state
 

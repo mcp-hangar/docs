@@ -29,7 +29,7 @@ Hangar's log shows the path: `mcp_server_degraded_by_health_check: <id>`, then
 ## Remediate
 
 - Container mode: check the pod/process — crashloop, bad image, missing env/secret.
-- Remote mode: check reachability/TLS/auth to the upstream endpoint (`MCPHangarRemoteProviderUnreachable`). In 2.24.0 a refused connection does not fail a remote server's health check (#1698), so a stopped remote upstream can stay READY; its tool-call errors are the signal.
+- Remote mode: check reachability/TLS/auth to the upstream endpoint (`MCPHangarRemoteProviderUnreachable`). Since 2.25.0 a refused connection fails a remote server's health check like a timeout: with the defaults the member leaves its group's rotation after 2 failed checks (`health.unhealthy_threshold`) and the server degrades after 3 (`max_consecutive_failures`), then reads DEAD once the recovery retries fail. The group circuit (`circuit_breaker.failure_threshold`, 10) does not open from health checks alone with these defaults: a degraded server is not probed again, so the group's count stops short of it. On 2.24.0 and earlier a refused connection did not fail the check at all (#1698), so a stopped remote upstream stayed READY; its tool-call errors were the signal.
 - Transient → a restart by the recovery saga succeeds and the server returns to READY.
 - Not transient → when the saga runs out of retries the server reads DEAD (4), `MCPHangarProviderDegraded` resolves and `MCPHangarProviderDead` fires; work [provider-dead](provider-dead.md).
 

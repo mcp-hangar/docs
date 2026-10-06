@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.25](https://github.com/mcp-hangar/docs/compare/v1.2.24...v1.2.25) (2026-10-06)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#415](https://github.com/mcp-hangar/docs/issues/415)) ([aa91d05](https://github.com/mcp-hangar/docs/commit/aa91d05feda34752f23f0fed30cdc61cc3a16c33))
+* **reference:** document the 2.25.0 policy, auth, approval, pin and config-path changes ([#413](https://github.com/mcp-hangar/docs/issues/413)) ([c157d71](https://github.com/mcp-hangar/docs/commit/c157d717ddc490279fe92887587941c5fe98b9ef))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#416](https://github.com/mcp-hangar/docs/issues/416)) ([f3fb490](https://github.com/mcp-hangar/docs/commit/f3fb4904674eb6092315c8592b57d8d8aabf34a3))
+
 ## [1.2.24](https://github.com/mcp-hangar/docs/compare/v1.2.23...v1.2.24) (2026-10-06)
 
 

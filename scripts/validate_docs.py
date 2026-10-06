@@ -55,6 +55,12 @@ ALLOWLIST: set[str] = {
     # This validator's own source-path override, documented in
     # development/DOCS_VALIDATION.md -- a docs-tooling var, not a product var.
     "MCP_HANGAR_SRC",
+    # The extra core 2.25.0 removed with the Langfuse adapter (core#1683). Named
+    # only by ADR-007, an accepted ADR that records the decision as it was made;
+    # ADRs are human-authored, so its install line is not rewritten here. The
+    # entry is global, so a guide recommending the extra would also pass. Delete
+    # it when ADR-007 is superseded or annotated.
+    "langfuse",
 }
 
 # Docs files excluded from symbol validation. The changelog is an immutable
@@ -184,7 +190,7 @@ def main() -> int:
                     findings[category].setdefault(match, []).append(f"{rel}:{lineno}")
             for group in EXTRA_RE.findall(line):
                 for name in (n.strip() for n in group.split(",")):
-                    if name and name not in extras:
+                    if name and name not in extras and name not in ALLOWLIST:
                         findings["extra"].setdefault(name, []).append(f"{rel}:{lineno}")
 
     total = sum(len(v) for v in findings.values())

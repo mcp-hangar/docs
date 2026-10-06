@@ -12,7 +12,7 @@ This guide covers MCP Hangar's observability features: metrics, tracing, logging
 - [Grafana Dashboards](#grafana-dashboards)
 - [Alerting](#alerting)
 - [Tracing](#tracing)
-- [Langfuse Integration](#langfuse-integration)
+- [Langfuse](#langfuse)
 - [Logging](#logging)
 - [Health Checks](#health-checks)
 - [SLIs/SLOs](#slisslos)
@@ -27,8 +27,8 @@ This guide covers MCP Hangar's observability features: metrics, tracing, logging
 # Core package
 pip install mcp-hangar
 
-# For full observability support -- these are two separate extras
-pip install mcp-hangar[opentelemetry,langfuse]
+# For OTLP trace export (Jaeger, Tempo, Langfuse, ...)
+pip install mcp-hangar[opentelemetry]
 ```
 
 ### Ship the Dashboards and Alerts
@@ -329,7 +329,7 @@ answers for one replica. See
 | -------- | ------ | -------- | ------------- |
 | `mcp_hangar_approval_requests_total` | Counter | channel | Tool invocations held by the gate |
 | `mcp_hangar_approval_deliveries_total` | Counter | channel, outcome | Notifications handed to a channel: `sent`, `failed`, `not_notified` |
-| `mcp_hangar_approval_decisions_total` | Counter | channel, decision | How each hold ended: `granted`, `denied`, `expired` |
+| `mcp_hangar_approval_decisions_total` | Counter | channel, decision | How each hold ended: `granted`, `denied`, `expired`, and since 2.25.0 `cancelled` (an approval for a call whose batch was cancelled) |
 
 **Example queries:**
 
@@ -680,6 +680,31 @@ or stderr (for container log collection). Select one with `MCP_COMPLIANCE_FORMAT
 (`cef`, `leef`, `jsonlines` or `syslog`) and point it at a file with
 `MCP_COMPLIANCE_OUTPUT`; without it, records go to stderr.
 
+Since 2.25.0 an export the gateway cannot perform refuses startup with a
+`ConfigurationError` naming the value: an unknown `MCP_COMPLIANCE_FORMAT`, a
+format whose exporter cannot be imported, or an `MCP_COMPLIANCE_OUTPUT` that
+cannot be appended to. Before, each was a warning or a per-record error, and
+the gateway served calls with no export
+([mcp-hangar#1701](https://github.com/mcp-hangar/mcp-hangar/issues/1701)).
+
+A file write that fails after startup does not stop the gateway or refuse
+calls. The record is dropped and counted:
+
+| Metric | Type | Labels | Description |
+| -------- | ------ | -------- | ------------- |
+| `mcp_hangar_compliance_export_failures_total` | Counter | format, reason | Compliance records dropped on a failed write. `format`: `cef`, `leef`, `jsonlines`, `syslog`; `reason`: `not_found`, `permission_denied`, `is_a_directory`, `no_space`, `os_error` |
+
+```promql
+# The SIEM feed is dropping records.
+sum(rate(mcp_hangar_compliance_export_failures_total[5m])) by (format, reason) > 0
+```
+
+The first failure of a burst logs `compliance_export_write_failed`, and the
+next successful write `compliance_export_write_recovered` with the count
+dropped. While writes fail, `/health/ready` and `hangar_health` carry a
+`compliance_export` field whose `status` is `degraded`; see
+[Health Checks](#health-checks). Alert on the counter, not on readiness.
+
 ### Environment Variables
 
 | Variable | Default | Description |
@@ -715,38 +740,35 @@ inject_trace_context(headers)
 context = extract_trace_context(request_headers)
 ```
 
-## Langfuse Integration
+## Langfuse
 
-MCP Hangar integrates with [Langfuse](https://langfuse.com) for LLM-specific observability.
-
-### Configuration
+Langfuse receives Hangar's spans over OTLP, like any other OTLP backend. It
+takes OTLP over HTTP, not gRPC:
 
 ```bash
-export MCP_LANGFUSE_ENABLED=true
-export LANGFUSE_PUBLIC_KEY=pk-lf-...
-export LANGFUSE_SECRET_KEY=sk-lf-...
-export LANGFUSE_HOST=https://cloud.langfuse.com
+AUTH_STRING=$(printf '%s' "${LANGFUSE_PUBLIC_KEY}:${LANGFUSE_SECRET_KEY}" | base64 | tr -d '\n')
+export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://cloud.langfuse.com/api/public/otel/v1/traces
+export OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_TRACES_HEADERS="Authorization=Basic%20${AUTH_STRING},x-langfuse-ingestion-version=4"
 ```
 
-Or via config.yaml:
+Use the `TRACES_` variables: the generic `OTEL_EXPORTER_OTLP_ENDPOINT` also
+turns on OTLP audit log export, which Langfuse does not accept. The full recipe
+is [Cookbook 08](../cookbook/08-observability-langfuse.md).
 
-```yaml
-observability:
-  langfuse:
-    enabled: true
-    public_key: ${LANGFUSE_PUBLIC_KEY}
-    secret_key: ${LANGFUSE_SECRET_KEY}
-    host: https://cloud.langfuse.com
-    sample_rate: 1.0
-```
-
-### Trace Propagation
-
-`TracedMcpServerService`, the wrapper this section used to show, was removed in
-2.22.0, and there is no per-call `trace_id`, `user_id` or `session_id` argument
-to pass. Hangar's own tool-call traces go out over OTLP; see [Tracing](#tracing).
-
-See [ADR-007](../adr/ADR-007-langfuse-integration.md) for architectural details.
+The Langfuse adapter is removed in 2.25.0, with `observability.langfuse`,
+`MCP_LANGFUSE_*`, `HANGAR_LANGFUSE_*` and the `langfuse` extra. Nothing called
+it after 2.22.0, so those settings sent nothing. A scrub setting
+(`MCP_LANGFUSE_SCRUB_*`, `HANGAR_LANGFUSE_SCRUB_*`,
+`observability.langfuse.scrub_*`) now refuses the boot whatever its value; the
+other environment variables are named in a `langfuse_settings_removed`
+warning; and the rest of an `observability.langfuse` block is reported as an
+unknown key -- a warning, or a refusal under `HANGAR_CONFIG_STRICT` and in
+`mcp-hangar config check`
+([mcp-hangar#1683](https://github.com/mcp-hangar/mcp-hangar/issues/1683)).
+Hangar's spans carry no tool arguments or results; to redact what they do
+carry, put an OpenTelemetry Collector with an `attributes` or `redaction`
+processor in front of Langfuse.
 
 ## Logging
 
@@ -828,6 +850,14 @@ cold is ready. It answers `503` with `"status": "unhealthy"` when a configured
 durable event store has fallen back to memory (an `event_store` object says why),
 or, on a front door with `tool_access.required_catalogue`, while that catalogue
 has not been projected (a `catalogue` object counts what is missing).
+
+With `MCP_COMPLIANCE_OUTPUT` set (2.25.0), readiness carries a
+`compliance_export` object -- `status` (`healthy`, or `degraded` from a failed
+write until one succeeds), `format`, `failures` since boot and `last_reason`.
+It leaves the file path out, because the endpoint answers without
+authentication, and it does **not** fail readiness: the answer stays `200`, so a
+broken SIEM feed does not drain the replica. `hangar_health` carries the same
+object with the path as `output`, and turns its own `status` `degraded`.
 
 ### Kubernetes Configuration
 

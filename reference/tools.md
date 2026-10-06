@@ -529,13 +529,14 @@ Health summary of the replica that answers the call: MCP server state counts and
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `status` | `str` | Overall status |
+| `status` | `str` | Overall status. `degraded` while a compliance file export is failing |
 | `mcp_servers` | `object` | `total` and `by_state` breakdown (`cold`, `ready`, `degraded`, `dead`), counting configured and hot-loaded servers on this replica |
 | `groups` | `object` | `total`, `by_state`, `total_members`, `healthy_members`, `members_in_rotation_count` |
 | `security` | `object` | Rate limiting info: `rate_limiting.active_buckets`, and `rate_limiting.config` with `requests_per_second`, `burst_size`, `scope` |
 | `replica` | `object` | The replica that answered: `instance_id`, `uptime_seconds`, `uptime` |
 | `scope` | `str` | Always `"replica"` |
 | `scope_note` | `str` | The same scope, stated in words |
+| `compliance_export` | `object` | *(2.25.0)* Present only when `MCP_COMPLIANCE_OUTPUT` sends the compliance (SIEM) export to a file: `status` (`healthy`, or `degraded` from a failed write until one succeeds), `format`, `failures` since boot, `last_reason`, and the file path as `output`. `/health/ready` carries the same object without `output` and stays `200`. See [Compliance](../operations/COMPLIANCE.md) |
 
 **Example:**
 

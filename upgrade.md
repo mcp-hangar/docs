@@ -2801,12 +2801,14 @@ If you want either surface restricted, they are governed by the same policy
 surface tools use, keyed by kind:
 
 ```yaml
-access:
-  prompt:   {deny_list: ["draft_*"]}
-  resource: {allow_list: ["docs://*"]}
-tool_projection:
-  withdrawn_prompts: [retired_prompt]
-  withdrawn_resources: ["demo://gone/1"]
+mcp_servers:
+  docs_server:
+    access:
+      prompt:   {deny_list: ["draft_*"]}
+      resource: {allow_list: ["docs://*"]}
+    tool_projection:
+      withdrawn_prompts: [retired_prompt]
+      withdrawn_resources: ["demo://gone/1"]
 ```
 
 `allow_list` / `deny_list` mean exactly what they mean for tools, and an

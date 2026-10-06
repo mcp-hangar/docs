@@ -359,56 +359,57 @@ audit log records with `mcp.server.state` attributes.
 ## Langfuse
 
 Langfuse provides LLM-specific observability: input/output recording, token
-counting, user session tracking, and evaluation workflows. It complements the
-OTEL governance telemetry path -- Langfuse handles LLM observability while OTEL
-handles governance observability.
+counting, user session tracking, and evaluation workflows. It accepts
+OpenTelemetry traces on an OTLP/HTTP endpoint, so Hangar sends it the same
+spans any OTLP backend receives -- no Langfuse package and no Langfuse-specific
+setting.
 
-- **OTEL path:** Enforcement decisions, capability violations, MCP server lifecycle,
-  audit trails. Exported via OTLP to any OTEL-compatible backend.
-- **Langfuse path:** in 2.24.0, enabling Langfuse builds the
-  `LangfuseObservabilityAdapter`, but nothing calls it (#1683): Hangar sends no
-  Langfuse traces, generations or scores of its own. What reaches Langfuse arrives
-  through the Langfuse SDK's own OpenTelemetry span processor, which the SDK may
-  attach to the tracer provider when its client is created. Which of Hangar's spans
-  it forwards is decided by the SDK and its version.
+Hangar shipped a Langfuse adapter until 2.24.0. Nothing called it after
+2.22.0, and 2.25.0 removes it with `observability.langfuse`, `MCP_LANGFUSE_*`,
+`HANGAR_LANGFUSE_*` and the `langfuse` extra
+([mcp-hangar#1683](https://github.com/mcp-hangar/mcp-hangar/issues/1683)). A
+scrub setting from it refuses the boot; the other settings are named in a
+warning. See the [upgrade guide](../upgrade.md).
 
 **Example:** [`examples/langfuse/`](https://github.com/mcp-hangar/mcp-hangar/tree/main/examples/langfuse)
 
 ### Getting started
 
-You need a running Langfuse instance -- either [Langfuse Cloud](https://cloud.langfuse.com/)
-or a self-hosted deployment.
-
-Set these environment variables:
+You need a running Langfuse instance (v3.22.0 or later) -- either
+[Langfuse Cloud](https://cloud.langfuse.com/) or a self-hosted deployment --
+and Hangar installed with the `opentelemetry` extra. Langfuse takes OTLP over
+HTTP only, so set the protocol as well as the endpoint; the credential is HTTP
+Basic auth over `public_key:secret_key`:
 
 ```bash
-LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_HOST=https://cloud.langfuse.com   # or your self-hosted URL
+LANGFUSE_SECRET_KEY=sk-lf-...
+AUTH_STRING=$(printf '%s' "${LANGFUSE_PUBLIC_KEY}:${LANGFUSE_SECRET_KEY}" | base64 | tr -d '\n')
+
+export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://cloud.langfuse.com/api/public/otel/v1/traces
+export OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_TRACES_HEADERS="Authorization=Basic%20${AUTH_STRING},x-langfuse-ingestion-version=4"
 ```
 
-Enable Langfuse in `config.yaml`:
-
-```yaml
-observability:
-  langfuse:
-    enabled: true
-    # Keys are read from environment variables
-    # Never put secret keys in config files
-```
+- Self-hosted: `https://<your-host>/api/public/otel/v1/traces`.
+- Use the `TRACES_` variables, not the generic `OTEL_EXPORTER_OTLP_ENDPOINT`:
+  the generic one also turns on Hangar's OTLP audit log export, and Langfuse
+  does not accept logs.
+- To send to Langfuse and another backend, or to redact span attributes before
+  they leave your network, run an [OTEL Collector](#otel-collector) with
+  Langfuse as an `otlphttp` exporter.
 
 !!! warning "Secret handling"
-    `LANGFUSE_SECRET_KEY` is a secret. Use environment variables, HashiCorp Vault,
-    or Kubernetes secrets. Never commit secrets to config files or source control.
+    `LANGFUSE_SECRET_KEY` is a secret, and so is the header built from it. Use
+    environment variables, HashiCorp Vault, or Kubernetes secrets. Never commit
+    either to config files or source control.
 
-### How Hangar maps to Langfuse concepts
+### What Langfuse receives
 
-The adapter maps a tool invocation to a Langfuse span with its input and output
-(scrubbed to their keys by default), the caller to `user_id` and the MCP session
-to `session_id`. None of that is
-emitted in 2.24.0, because the adapter is not called (#1683). Spans that reach
-Langfuse through the SDK's OpenTelemetry processor carry the attributes described
-on this page, with caller identifiers only when `MCP_TRACING_CALLER_IDS` is on.
+Hangar's spans, with the attributes described on this page: names, ids,
+outcomes and durations, and the trace context propagated from the caller. Tool
+arguments and results are not on spans, and caller identifiers are only when
+`MCP_TRACING_CALLER_IDS` (or `observability.tracing.caller_ids`) is on.
 
 ---
 

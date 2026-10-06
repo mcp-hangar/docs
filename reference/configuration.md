@@ -931,7 +931,7 @@ cannot be told apart from the default, so `logging.level` wins over it.
 
 ## `observability`
 
-Tracing and LLM observability integrations.
+Tracing and OTLP audit export.
 
 ### `tracing` sub-section
 
@@ -969,29 +969,15 @@ observability:
 | ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | `true` | Export audit records as OTLP logs. They go only to an endpoint set explicitly, in `tracing.otlp_endpoint` or `OTEL_EXPORTER_OTLP_ENDPOINT`, never to the default. Independent of `tracing.enabled`. `MCP_AUDIT_EXPORT_ENABLED` wins over it |
 
-### `langfuse` sub-section
+### `langfuse` sub-section (removed in 2.25.0)
 
-```yaml
-observability:
-  langfuse:
-    enabled: true
-    public_key: pk-lf-...
-    secret_key: ${LANGFUSE_SECRET_KEY}
-    host: https://cloud.langfuse.com
-    sample_rate: 1.0
-    scrub_inputs: true
-    scrub_outputs: true
-```
-
-| Key | Type | Default | Description |
-| ----- | ------ | --------- | ------------- |
-| `enabled` | `bool` | `false` | Enable Langfuse LLM observability |
-| `public_key` | `str` | -- | Langfuse public API key |
-| `secret_key` | `str` | -- | Langfuse secret key. Supports env var interpolation: `${LANGFUSE_SECRET_KEY}` |
-| `host` | `str` | `"https://cloud.langfuse.com"` | Langfuse API host |
-| `sample_rate` | `float` | `1.0` | Trace sampling rate (0.0--1.0) |
-| `scrub_inputs` | `bool` | **`true`** | Redact sensitive data from tool inputs. On by default -- set it to `false` to send raw arguments to Langfuse |
-| `scrub_outputs` | `bool` | **`true`** | Redact sensitive data from tool outputs. On by default |
+`observability.langfuse` is removed with the Langfuse adapter, which nothing
+called after 2.22.0 ([mcp-hangar#1683](https://github.com/mcp-hangar/mcp-hangar/issues/1683)).
+`scrub_inputs` or `scrub_outputs` in the block **refuses the boot**, whatever
+its value; any other key in it is reported as unknown -- a warning, or a
+refusal under `HANGAR_CONFIG_STRICT` and in `mcp-hangar config check`. Delete
+the block. Langfuse takes Hangar's spans over OTLP; see
+[Langfuse](#langfuse).
 
 ## `auth`
 
@@ -1408,22 +1394,29 @@ Environment variables override corresponding YAML settings. Variables follow the
 
 ### Langfuse
 
-| Variable | Default | Description |
-| ---------- | --------- | ------------- |
-| `MCP_LANGFUSE_ENABLED` | `"false"` | Enable Langfuse LLM observability |
-| `LANGFUSE_PUBLIC_KEY` | -- | Langfuse public API key |
-| `LANGFUSE_SECRET_KEY` | -- | Langfuse secret key (sensitive) |
-| `LANGFUSE_HOST` | `"https://cloud.langfuse.com"` | Langfuse API host |
-| `MCP_LANGFUSE_SAMPLE_RATE` | `"1.0"` | Trace sampling rate (0.0--1.0) |
-| `MCP_LANGFUSE_SCRUB_INPUTS` | `"true"` | Redact sensitive tool inputs |
-| `MCP_LANGFUSE_SCRUB_OUTPUTS` | `"true"` | Redact sensitive tool outputs |
+Langfuse is configured with the standard OpenTelemetry trace exporter
+variables, not with Hangar settings. It takes OTLP over HTTP only:
 
-!!! note "Legacy `HANGAR_LANGFUSE_*` variables"
-    `HANGAR_LANGFUSE_ENABLED`, `HANGAR_LANGFUSE_SAMPLE_RATE`,
-    `HANGAR_LANGFUSE_SCRUB_INPUTS` and `HANGAR_LANGFUSE_SCRUB_OUTPUTS` are not
-    read by the gateway's Langfuse integration in 2.24.0, and setting them does
-    not enable or configure it. Use the `MCP_LANGFUSE_*` names above, or the
-    `observability.langfuse` block.
+| Variable | Value |
+| ---------- | --------- |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `https://cloud.langfuse.com/api/public/otel/v1/traces`, or `https://<your-host>/api/public/otel/v1/traces` |
+| `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` | `http/protobuf` |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | `Authorization=Basic%20<base64 of public_key:secret_key>,x-langfuse-ingestion-version=4` |
+
+Use the `TRACES_` variables: `OTEL_EXPORTER_OTLP_ENDPOINT` also turns on OTLP
+audit log export, which Langfuse does not accept. See
+[Cookbook 08](../cookbook/08-observability-langfuse.md).
+
+!!! note "Removed in 2.25.0: `MCP_LANGFUSE_*` and `HANGAR_LANGFUSE_*`"
+    `MCP_LANGFUSE_SCRUB_INPUTS`, `MCP_LANGFUSE_SCRUB_OUTPUTS`,
+    `HANGAR_LANGFUSE_SCRUB_INPUTS` and `HANGAR_LANGFUSE_SCRUB_OUTPUTS`, set to
+    any value, refuse the boot with a `ConfigurationError` naming them.
+    `MCP_LANGFUSE_ENABLED`, `MCP_LANGFUSE_SAMPLE_RATE`,
+    `HANGAR_LANGFUSE_ENABLED` and `HANGAR_LANGFUSE_SAMPLE_RATE` are named in a
+    `langfuse_settings_removed` warning, and the boot continues. Nothing read
+    them to any effect after 2.22.0. `LANGFUSE_PUBLIC_KEY`,
+    `LANGFUSE_SECRET_KEY` and `LANGFUSE_HOST` are the Langfuse SDK's own
+    variables, and Hangar leaves them alone.
 
 ### Deprecated Variables
 

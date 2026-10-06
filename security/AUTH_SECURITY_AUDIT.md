@@ -105,7 +105,7 @@ Open defects in this audit's scope, filed publicly:
 - `/config/diff` and `/config/backup` accept a `config_path` and ignore `--config` ([mcp-hangar/mcp-hangar#1652](https://github.com/mcp-hangar/mcp-hangar/issues/1652)).
 - `oidc.clock_skew_leeway_seconds` is never parsed ([mcp-hangar/mcp-hangar#1654](https://github.com/mcp-hangar/mcp-hangar/issues/1654)).
 - A global `developer` can withdraw or restore a tool for all tenants ([mcp-hangar/mcp-hangar#1656](https://github.com/mcp-hangar/mcp-hangar/issues/1656)).
-- An explicit `--config` / `MCP_CONFIG` path that does not exist boots a demo configuration ([mcp-hangar/mcp-hangar#1650](https://github.com/mcp-hangar/mcp-hangar/issues/1650)) -- confirm the path exists before starting; and a bare `mcp-hangar` ignores `MCP_HTTP_HOST` / `MCP_HTTP_PORT` ([mcp-hangar/mcp-hangar#1651](https://github.com/mcp-hangar/mcp-hangar/issues/1651)) -- start with `mcp-hangar serve` and an explicit `--host`.
+- Before 2.25.0 an explicit `--config` / `MCP_CONFIG` path that does not exist booted a demo configuration ([mcp-hangar/mcp-hangar#1650](https://github.com/mcp-hangar/mcp-hangar/issues/1650)); since 2.25.0 it stops the gateway. A bare `mcp-hangar` ignores `MCP_HTTP_HOST` / `MCP_HTTP_PORT` ([mcp-hangar/mcp-hangar#1651](https://github.com/mcp-hangar/mcp-hangar/issues/1651)) -- start with `mcp-hangar serve` and an explicit `--host`.
 
 Fixed in 2.25.0. A gateway older than that still has them:
 

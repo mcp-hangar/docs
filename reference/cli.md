@@ -732,8 +732,18 @@ and `remove` there use that file too: `add` and `remove` edit it in place, and
 `init -y` backs it up and replaces it. Run them where `config.yaml` is
 Hangar's, or name the file (`--config ~/.config/mcp-hangar/config.yaml`, or
 `init --config-path`) to keep the old target. A gateway started without `--config` reloads the
-file it booted from. If no rule finds a file, `serve` still boots the built-in
-demo configuration.
+file it booted from. If no rule finds a file, `serve` refuses to start and tells
+you to run `mcp-hangar init` *(2.25.0)*. A path named by a flag or by
+`MCP_CONFIG` that does not exist, is a directory or is not readable is refused
+the same way, with the path and where it came from on stderr, for example:
+
+```text
+Error: Configuration file /etc/hangar/confg.yaml (named on the command line) does not exist. Nothing is served without the configuration that was asked for.
+```
+
+Before 2.25.0 every one of those cases booted a built-in demo configuration
+(`math_subprocess` and every `hangar_*` tool, with none of your pins, policies
+or auth) and logged only `config_not_found_using_default` at INFO.
 
 Before 2.25.0 each command picked its own default: `serve`, `pin` and
 `config check` read `./config.yaml`, `init`, `add` and `remove` wrote

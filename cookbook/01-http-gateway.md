@@ -142,9 +142,10 @@ Naming the file works on every version.
    ```
 
    Use an absolute path. Claude Desktop starts the command without a shell, so
-   a `~` reaches Hangar unexpanded, and a `--config` path that does not exist
-   does not fail: Hangar logs `config_not_found_using_default` and starts on a
-   built-in demo configuration instead of yours.
+   a `~` reaches Hangar unexpanded. Since 2.25.0 a `--config` path that does not
+   exist stops the gateway with the path on stderr; before 2.25.0 Hangar logged
+   `config_not_found_using_default` and started on a built-in demo configuration
+   instead of yours.
 
 ## What Just Happened
 

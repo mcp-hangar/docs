@@ -152,7 +152,10 @@ Invalid tools access policy for mcp_server 'calc': Invalid deny_list: expected a
 
 Invalid means an `approval_timeout_seconds` that is not a positive integer, an
 empty or non-string pattern, a whitespace-only `approval_channel`, or an
-`allow_list`, `deny_list` or `approval_list` that is not a list. Write a single
+`allow_list`, `deny_list` or `approval_list` that is not a list, or a policy block
+that is present but is not a mapping -- `tools: add`, a null `tools:`, or the
+same at `access:`, `tool_access:` or a `tool_access.member` entry (on a server,
+`tools:` may still be a list of tool schemas, each a mapping). Write a single
 pattern as `deny_list: [add]`. Before 2.25.0 an invalid field logged
 `invalid_tools_access_config` (or its group, member, tenant or `access`
 variant) and the gateway booted with **no policy** for that scope, so denied

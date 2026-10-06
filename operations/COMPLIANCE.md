@@ -14,8 +14,8 @@ Two environment variables control the compliance pipeline:
 
 | Variable | Required | Default | Description |
 | ---------- | ---------- | --------- | ------------- |
-| `MCP_COMPLIANCE_FORMAT` | Yes | _(unset)_ | Format to use: `cef`, `leef`, `jsonlines`, `json-lines`, `syslog`. Case-insensitive. |
-| `MCP_COMPLIANCE_OUTPUT` | No | stderr | File path to write output. When unset, lines go to stderr for container log collection. |
+| `MCP_COMPLIANCE_FORMAT` | Yes | _(unset)_ | Format to use: `cef`, `leef`, `jsonlines`, `json-lines`, `syslog`. Case-insensitive; since 2.25.0 surrounding whitespace is trimmed. Any other value refuses startup. |
+| `MCP_COMPLIANCE_OUTPUT` | No | stderr | File path to write output. When unset, lines go to stderr for container log collection. Since 2.25.0 a path that cannot be appended to refuses startup. |
 
 When `MCP_COMPLIANCE_FORMAT` is set, Hangar registers a second audit event
 handler that forwards `ToolInvocationCompleted`, `ToolInvocationFailed`,
@@ -30,14 +30,43 @@ or license key is required.
 
 ### Delivery failures
 
-The SIEM feed does not fail closed. Check for these at boot and in your log
-pipeline:
+_Since 2.25.0_ an export the gateway cannot perform refuses startup with a
+`ConfigurationError` naming the value
+([mcp-hangar#1701](https://github.com/mcp-hangar/mcp-hangar/issues/1701)):
 
-- An unrecognised `MCP_COMPLIANCE_FORMAT` logs `unknown_compliance_format` at
-  warning and the gateway starts with no compliance export at all.
-- A record the exporter cannot write (for example, the directory in
-  `MCP_COMPLIANCE_OUTPUT` does not exist) is logged as `Failed to write ... line`
-  at error and dropped; the tool call is still served.
+```text
+Unknown MCP_COMPLIANCE_FORMAT 'cefx'; expected one of: cef, json-lines, jsonlines, leef, syslog
+MCP_COMPLIANCE_OUTPUT '/var/log/hangar/audit.cef' cannot be appended to: [Errno 2] No such file or directory: ...
+```
+
+So does a set `MCP_COMPLIANCE_FORMAT` whose exporter cannot be imported. Fix
+the format, create the output directory writable by the gateway's user, or
+unset `MCP_COMPLIANCE_OUTPUT` to export to stderr. To run with no SIEM export,
+unset `MCP_COMPLIANCE_FORMAT`.
+
+A write that fails after startup -- the directory removed, the disk full -- does
+not stop the gateway or refuse calls. The record is dropped and:
+
+- counted in `mcp_hangar_compliance_export_failures_total`, labelled `format`
+  (`cef`, `leef`, `jsonlines`, `syslog`) and `reason` (`not_found`,
+  `permission_denied`, `is_a_directory`, `no_space`, `os_error`);
+- logged once per burst: `compliance_export_write_failed` at error on the
+  first failure, `compliance_export_write_recovered` with the number `dropped`
+  when a write succeeds again;
+- reported in a `compliance_export` field, `status: degraded`, on
+  `/health/ready` (without the file path, and still `200`) and on
+  [`hangar_health`](../reference/tools.md#hangar_health) (with the path, and
+  the tool's own `status` turns `degraded`).
+
+Alert on the counter: readiness does not drain a replica whose SIEM feed is
+broken, by design.
+
+__Before 2.25.0 the feed did not fail closed.__ An unrecognised
+`MCP_COMPLIANCE_FORMAT` logged `unknown_compliance_format` at warning, an
+exporter that could not be imported logged `compliance_exporter_unavailable`,
+and the gateway started with no compliance export at all. A record the exporter
+could not write was logged at error and dropped, with no metric. An export
+from such a gateway can be missing records without saying so.
 
 A successful start logs `compliance_exporter_registered` with the format and
 output.

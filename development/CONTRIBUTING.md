@@ -41,7 +41,6 @@ mcp-hangar/
 │   ├── approvals/        # Human-in-the-loop approval gate for tool calls
 │   ├── bootstrap/        # DI composition root, module loading
 │   ├── compliance/       # SIEM export (CEF, LEEF, JSON-lines)
-│   ├── integrations/     # Partner integrations (Langfuse adapter)
 │   ├── domain/           # DDD domain layer (see below)
 │   ├── application/      # Application layer (see below)
 │   ├── infrastructure/   # Infrastructure adapters (see below)

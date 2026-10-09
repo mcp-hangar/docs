@@ -292,13 +292,16 @@ probe behind `BackstopEnforceable` looks for a policy-enforcing API (Cilium,
 Calico, Antrea, AWS VPC CNI, Kube-OVN, OVN-Kubernetes) and, failing that, for
 a known CNI agent DaemonSet (`azure-npm`, `calico-node`, `canal`, `cilium`,
 `kube-ovn-cni`, `kube-router`, `ovnkube-node`, `weave-net`); it re-asks at most
-every five minutes. Since operator 0.17.6 the same verdict also drives the
+once every five minutes. Since operator 0.17.6 the same verdict also drives the
 MCPServer `NetworkPolicyApplied` condition and the namespace default-deny
 Warning (see
 [Kubernetes: NetworkPolicy enforcement status](KUBERNETES.md#networkpolicy-enforcement-status)).
-The agent check lists DaemonSets, which the chart grants (`apps/daemonsets`
-`get`, `list`) from chart 0.12.19; with an older chart, a cluster whose only
-enforcer ships no CRD reads `Unknown`. If your CNI enforces NetworkPolicy and
+The agent check lists DaemonSets, which the Helm chart grants (`apps/daemonsets`
+`get`, `list`) from chart 0.12.19; the operator repository's own RBAC manifests
+already carry it. With an older chart the list is refused, so every cluster
+that serves none of those APIs reads `Unknown` -- one with no enforcer as well
+as one whose enforcer ships no CRD -- and the `False` / unenforced states and
+their Warnings never fire. If your CNI enforces NetworkPolicy and
 the probe does not recognize it, start the operator with
 `--networkpolicy-enforcement=enforced`; the flag now applies to all three
 writers. It changes only what status reports: the policies are written either

@@ -569,8 +569,11 @@ cluster with no NetworkPolicy enforcement. Install an enforcing CNI, or accept
 the gap knowingly. If your CNI enforces NetworkPolicy but the probe does not
 recognize it, start the operator with `--networkpolicy-enforcement=enforced`.
 The probe recognizes a CNI that ships no CRD (kube-router, Azure NPM, Weave
-Net) by its agent DaemonSet, which needs the `apps/daemonsets` read grant in
-chart 0.12.19 and later; without it such a cluster reads `Unknown`.
+Net) by its agent DaemonSet, which needs the `apps/daemonsets` read grant the
+Helm chart carries from 0.12.19. With an older chart the probe cannot list
+DaemonSets, so any cluster without a recognized policy API reads `Unknown` /
+`PolicyWrittenUnverified` -- including one with no enforcer at all -- and
+neither `NetworkPolicyUnenforced` nor `DefaultDenyUnenforced` is emitted.
 
 ## Monitoring
 
@@ -705,7 +708,9 @@ after an operator upgrade:**
   a discovery re-sync -- until the same update fixes it. Metadata and status
   updates still go through.
 - The per-field rules (durations, `cidr`, `expectedTools`, the length limits)
-  are re-checked on Kubernetes 1.30+ only when that field changes. A stored bad
+  are re-checked on Kubernetes 1.30+ only when that field changes; before 1.30
+  there is no ratcheting, so a stored violation of any rule refuses every spec
+  change until the same update fixes it. A stored bad
   `cidr` or `expectedTools` entry can still block the controller's status write
   when it copies the capabilities into `status.capabilities` for the first
   time.

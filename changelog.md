@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.26](https://github.com/mcp-hangar/docs/compare/v1.2.25...v1.2.26) (2026-10-09)
+
+
+### Changed
+
+* **guides:** document operator 0.17.5 egress, discovery and pod changes ([#418](https://github.com/mcp-hangar/docs/issues/418)) ([7b45f26](https://github.com/mcp-hangar/docs/commit/7b45f260d0451afca95c9796e53519944e152732))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#419](https://github.com/mcp-hangar/docs/issues/419)) ([028a6f3](https://github.com/mcp-hangar/docs/commit/028a6f390a01b00aa35e5e55aef387e0e8388d55))
+
 ## [1.2.25](https://github.com/mcp-hangar/docs/compare/v1.2.24...v1.2.25) (2026-10-06)
 
 

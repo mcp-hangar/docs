@@ -178,15 +178,21 @@ what a policy refuses on the way in:
      -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
    ```
 
-   Expected -- compiled, backstop in place and observed to be enforced, not
-   degraded (the order of the lines may differ):
+   Expected -- compiled, backstop in place and observed to be enforced, L7
+   policy taken by core, not degraded (the order of the lines may differ):
 
    ```text
    Compiled=True (Compiled)
    BackstopApplied=True (BackstopApplied)
    BackstopEnforceable=True (EnforcerObserved)
+   L7Delivered=True (Delivered)
    Degraded=False (NotDegraded)
    ```
+
+   `L7Delivered` arrived in operator 0.17.5. `False` with `CoreAuthRejected`,
+   `CoreUnreachable` or `PushFailed` means core refused the push (the policy is
+   then also `Degraded=True` / `L7PushFailed`); `Unknown` / `CoreIntegrationOff`
+   means the operator runs without `--hangar-url`.
 
 2. Prove the network backstop. From a pod behind the policy, the allow-listed
    host answers and any other host times out, while DNS still resolves:
@@ -227,8 +233,9 @@ connection), a policy's per-upstream `tools`/`arguments` rules are flattened
 together. If you need host-specific tool rules kept apart, use separate policies.
 
 The whole design is **fail-closed by construction**: deny-default + a generated
-backstop + a `Degraded` condition mean a policy that cannot compile its backstop
-is *visibly unsafe* rather than silently permissive. Deleting the policy clears
+backstop + a `Degraded` condition mean a policy that cannot compile its backstop,
+or whose L7 rules core refused, is *visibly unsafe* rather than silently
+permissive. Deleting the policy clears
 the L7 rules from the core.
 
 ## Key Config Reference
@@ -242,7 +249,7 @@ the L7 rules from the core.
 | `spec.upstreams[].tools.allow/deny/requireApproval` | list of globs | — | Precedence: **deny > requireApproval (held for approval) > allow > defaultAction** |
 | `spec.upstreams[].arguments.deny.secretPatterns` | list | — | Named secret-pattern groups to reject |
 | `spec.upstreams[].arguments.deny.maxPayloadBytes` | integer | — | Reject argument payloads larger than this |
-| `spec.networkBackstop.generate` | bool | `true` | Emit the L3/L4 backstop |
+| `spec.networkBackstop.generate` | bool | `true` | Emit the L3/L4 backstop. `false` drops only the backstop; the L7 rules are still delivered (operator 0.17.5) |
 | `spec.networkBackstop.flavor` | `Auto` \| `Cilium` \| `Vanilla` | `Auto` | Backstop implementation |
 
 ## What's Next

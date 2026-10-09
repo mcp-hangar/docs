@@ -20,7 +20,7 @@ The trust boundary is explicit: **a policy without the network backstop is a sug
 ## Prerequisites
 
 - The operator, with the `MCPEgressPolicy` CRD installed. The `MCPEgressPolicy` reconciler shipped in operator **v0.14.0**; v0.13.0 shipped the rest of the enforcement roadmap.
-- The target namespace should be opted into egress enforcement with the label `mcp-hangar.io/enforce-egress=true`, so the namespace default-deny is in place and the backstop has something to build on.
+- The target namespace should be opted into egress enforcement with the label `mcp-hangar.io/enforce-egress=true`, so the namespace default-deny is in place and the backstop has something to build on. See [Governed Namespaces](KUBERNETES.md#governed-namespaces) for how the operator keeps that default-deny in place.
 - **For FQDN upstreams:** a cluster running **Cilium**. A vanilla `NetworkPolicy` cannot match on DNS names, so hostname upstreams are only enforceable under the Cilium flavor (see [Backstop flavors](#backstop-flavors)).
 - **For L7 enforcement** (tool-call / argument rules): the operator must be run with `--hangar-url` pointing at the core, so it can deliver the compiled policy to the data plane. Without it, only the L3/L4 backstop is applied.
 
@@ -58,14 +58,26 @@ $ kubectl -n prod get mcpegresspolicy gh-only \
     -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
 Compiled=True (Compiled)
 BackstopApplied=True (BackstopApplied)
+BackstopEnforceable=True (EnforcerObserved)
+L7Delivered=True (Delivered)
 Degraded=False (NotDegraded)
+```
+
+`kubectl get` shows the backstop's enforcement and the L7 delivery as columns:
+
+```
+$ kubectl -n prod get mcpegresspolicies
+NAME      MODE      BACKSTOP   L7     TARGET   DEFAULT   AGE
+gh-only   Enforce   Enforcing  True   srv      Deny      2m
 ```
 
 A pod behind this policy reaches `api.github.com` (HTTP 200) but not any other host (connection times out), while DNS still resolves.
 
 ### Governing a group
 
-`targetRef.kind: MCPServerGroup` applies one policy to every member of a group. The operator resolves the group's member servers and scopes the backstop to all of them (`mcp-hangar.io/provider In [members]`):
+`targetRef.kind: MCPServerGroup` applies one policy to every member of a group. The operator resolves the group's member servers and scopes the backstop to all of them (`mcp-hangar.io/provider In [members]`).
+
+Since operator 0.17.5 the policy follows membership as it changes: a server that starts matching the group's selector is added to the backstop and gets the L7 policy pushed within seconds, one that stops matching is dropped, and a server deleted and recreated under the same name gets its L7 policy back. A group selector edited to match nothing removes the backstop and reports `TargetNotFound`. Earlier releases resolved members once per reconcile, so a later member ran without the policy until the next resync.
 
 ```yaml
 apiVersion: mcp-hangar.io/v1alpha2
@@ -131,7 +143,7 @@ spec:
 
 | Field | Type | Default | Description |
 | ------- | ------ | --------- | ------------- |
-| `generate` | bool | `true` | Emit the L3/L4 backstop. `false` removes it (the policy then relies on the namespace default-deny alone). |
+| `generate` | bool | `true` | Emit the L3/L4 backstop. `false` removes it (the policy then relies on the namespace default-deny alone); the L7 rules are still delivered to core and reported on `L7Delivered`. |
 | `flavor` | `Auto` \| `Cilium` \| `Vanilla` | `Auto` | Backstop implementation. |
 
 ## Backstop flavors
@@ -168,7 +180,9 @@ Globs are case-sensitive for determinism (`get_*` does not match `GET_user`).
 
 **Argument scanning** rejects a tool call whose arguments contain a configured secret pattern or exceed `maxPayloadBytes`. A secret or oversized payload **denies the call even when the tool itself is allowed** — deny always wins. Arguments that cannot be serialized for inspection also fail closed.
 
-**How the L7 policy is delivered.** The operator compiles the policy's per-upstream `tools`/`arguments` rules into a single per-server policy — the union of the upstreams' allow/deny/require-approval globs and secret-pattern groups, and the most restrictive (smallest) `maxPayloadBytes` — and pushes it to the core (requires `--hangar-url`). The core enforces it at the tool-invocation chokepoint: a denied call raises before it reaches the upstream; an approval-gated call is blocked pending approval. Deleting the policy clears it from the core.
+**How the L7 policy is delivered.** The operator compiles the policy's per-upstream `tools`/`arguments` rules into a single per-server policy — the union of the upstreams' allow/deny/require-approval globs and secret-pattern groups, and the most restrictive (smallest) `maxPayloadBytes` — and pushes it to the core (requires `--hangar-url`). The core enforces it at the tool-invocation chokepoint: a denied call raises before it reaches the upstream; an approval-gated call is blocked pending approval. Deleting the policy clears it from the core. Whether every target server accepted the push is reported on the `L7Delivered` condition (see [Status conditions](#status-conditions)).
+
+The L7 half does not depend on the backstop. Since operator 0.17.5 a policy with `networkBackstop.generate: false` still has its rules pushed; earlier releases stopped at the backstop decision and delivered nothing. A `generate: false` policy in `Enforce` mode written on the assumption that only its backstop mattered will start blocking, or routing to approval, the tool calls its rules name. A `generate: false` policy whose target does not exist reports `Compiled=False` / `TargetNotFound` and `Degraded=True`.
 
 ### Secret-pattern groups
 
@@ -193,13 +207,22 @@ misspelt `github-token` passes `kubectl apply` and is refused at delivery.
 
 ## Surviving a gateway restart
 
-The operator delivers the L7 policy when it reconciles the `MCPEgressPolicy`,
-and not again until its next reconcile. Nothing about a gateway restart
-triggers one: a restart changes neither the CR nor the NetworkPolicy the
-operator watches. So whatever the gateway does not keep across a restart is
-**not enforced from the restart until that reconcile**, which can be hours, and
-the CR goes on reporting `Compiled` throughout. The L3/L4 backstop is not
-affected; it lives in the cluster, not in the gateway.
+The operator delivers the L7 policy when it reconciles the `MCPEgressPolicy`.
+Since operator 0.17.4 it also delivers every policy again when a gateway pod
+becomes Ready -- a new pod, a container restarted in place, or every Ready
+gateway pod when the operator itself starts. It finds gateway pods with
+`--hangar-gateway-selector` (default `app.kubernetes.io/name=mcp-hangar`, the
+mcp-hangar chart's label; empty disables it). A selector that matches no pod
+makes this a no-op, and the operator logs an error-level line saying so. With
+more than one gateway replica and no shared backend, the push goes through the
+`--hangar-url` Service and reaches whichever replica it routes to, not
+necessarily the one that restarted.
+
+Where the re-delivery does not reach -- an older operator, a selector that
+matches nothing, a replica the Service did not route to -- whatever the gateway
+does not keep across a restart is **not enforced from the restart until the
+next reconcile**, which can be hours. The L3/L4 backstop is not affected; it
+lives in the cluster, not in the gateway.
 
 Whether the gateway keeps the policy depends only on how it stores its fleet
 (core 2.22.1 and later):
@@ -251,12 +274,16 @@ drops the policy on restart shows it on every reconcile.
 | ----------- | --------- |
 | `Compiled` | The policy was structurally compiled. |
 | `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`). |
-| `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), or `TargetNotFound`. |
+| `BackstopEnforceable` | Whether anything in the cluster enforces the written backstop: `True` / `EnforcerObserved` when the operator finds a policy-enforcing API or a known CNI agent, `False` / `NoEnforcerObserved` when it finds neither (`status.backstopEnforcement: Unenforced`; the `Backstop` column of `kubectl get`). |
+| `L7Delivered` | Whether core took the compiled L7 policy (operator 0.17.5). `True` / `Delivered` once every target server accepted the push; `True` / `DeliveredNotPersisted` when core took it but has no persistence backend (see [Surviving a gateway restart](#surviving-a-gateway-restart)); `False` / `CoreAuthRejected`, `CoreUnreachable` or `PushFailed`, naming the server whose push failed; `Unknown` / `CoreIntegrationOff` when the operator runs without `--hangar-url`. Shown as the `L7` column of `kubectl get mcpegresspolicies`. |
+| `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), `TargetNotFound`, `EnforcementNotObserved` (nothing observed to enforce the backstop), or `L7PushFailed` (`L7Delivered=False`). |
+
+`Compiled` and `BackstopApplied` say nothing about core. Before operator 0.17.5 a policy whose L7 push core refused -- an API key without `policy:write`, a core that was down, a payload core rejected -- read `Compiled=True` and `Degraded=False`, with a Warning Event as the only trace. It now reads `L7Delivered=False` and `Degraded=True` / `L7PushFailed`, so an alert on `Degraded` may fire on a policy that has been undelivered since it was created. Fix the key's permissions or core's reachability; the next reconcile clears it.
 
 ## Limitations and notes
 
-- **L7 needs core integration.** The tool-call / argument rules are enforced only when the operator runs with `--hangar-url`; otherwise a policy applies its L3/L4 backstop but its L7 rules are not delivered.
-- **The CR does not report whether the gateway still holds the L7 policy.** `Compiled` means the operator compiled and delivered it, not that the gateway kept it. A gateway without durable storage drops it on restart until the next reconcile; see [Surviving a gateway restart](#surviving-a-gateway-restart). To see what a gateway holds right now, `GET /api/mcp_servers/{id}/l7_policy`.
+- **L7 needs core integration.** The tool-call / argument rules are enforced only when the operator runs with `--hangar-url`; otherwise a policy applies its L3/L4 backstop, its L7 rules are not delivered, and it reports `L7Delivered=Unknown` / `CoreIntegrationOff`.
+- **The CR does not report whether the gateway still holds the L7 policy.** `L7Delivered=True` means core accepted the last push, not that the gateway kept it. A gateway without durable storage drops it on restart until it is delivered again; see [Surviving a gateway restart](#surviving-a-gateway-restart). To see what a gateway holds right now, `GET /api/mcp_servers/{id}/l7_policy`.
 - **FQDN enforcement requires Cilium.** Under other CNIs, list upstreams as CIDRs, or accept that hostname upstreams are denied (fail closed) and surfaced via `Degraded`.
 - **L7 rules are merged per server.** Because the core enforces one policy per server (not per upstream connection), a policy's upstream `tools`/`arguments` rules are flattened together (see [above](#l7-semantics)). Scope host-specific tool rules with separate policies if you need them kept apart.
 - **`requireApproval` needs the approval gate to be interactive** — since core 2.11.0 a gated call blocks on the approval gate (typed pending approval, `approval:resolve` chokepoint, dispatch-time revalidation), delivered on the default `event_stream` channel when nothing else is configured; on a deployment with the gate turned off (`approvals: {enabled: false}`) it fails closed, as it always did. `Audit` mode records the would-be verdict and never asks a human.

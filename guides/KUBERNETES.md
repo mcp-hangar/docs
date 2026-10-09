@@ -310,14 +310,58 @@ apiVersion: mcp-hangar.io/v1alpha2
 kind: MCPDiscoverySource
 metadata:
   name: config-mcp-servers
+  namespace: mcp-servers
 spec:
   type: ConfigMap
   refreshInterval: "1m"
 
   configMapRef:
-    name: mcp-server-definitions
-    namespace: mcp-config
+    name: mcp-server-definitions   # read from the source's own namespace
 ```
+
+The ConfigMap holds a map of entries under the key `providers.yaml` (or the
+key `configMapRef.key` names). Each entry becomes an `MCPServer` named
+`<source>-<entry>` in the source's namespace:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-server-definitions
+  namespace: mcp-servers
+data:
+  providers.yaml: |
+    math:
+      mode: container
+      image: registry.example.com/your-org/math-mcp:1.0.0
+      command: ["python", "-m", "math_server"]
+      args: ["--port", "8080"]
+    search:
+      mode: remote
+      endpoint: http://search.mcp-servers.svc:8080
+```
+
+A `mode: container` entry carries its `image`, `command` and `args` into the
+server's spec (operator 0.17.5; earlier releases dropped them, and the server
+was marked `Dead`). `providerTemplate.spec` is the default and a field the
+entry sets wins. A container entry with no image, and no
+`providerTemplate.spec.image` to fall back on, is not created: the source
+lists it in `status.discoveredProviders` with `managed: false` and the reason
+in `error`, and reports `Synced=False` with reason `PartialFailure`.
+
+Whoever can write the ConfigMap chooses the image, command and arguments that
+run in the source's namespace, so treat write access to it like permission to
+create pods there.
+
+**A ConfigMap source reads only its own namespace.** Since operator 0.17.5,
+`configMapRef.namespace` must be empty or the source's own namespace. With the
+admission webhook on, creating a source that points elsewhere, or changing its
+reference to another namespace, is rejected. With the webhook off (the chart
+default), the controller reads nothing and creates nothing: the source reports
+`Synced=False` and `Ready=False` with reason `CrossNamespaceRefused`, a message
+naming both namespaces, and a Warning Event with the same reason. Servers such
+a source created before the upgrade are left running. Copy the ConfigMap into
+the source's namespace and drop `configMapRef.namespace`, or delete the source.
 
 ## Security
 
@@ -356,6 +400,72 @@ spec:
   containerSecurityContext:
     readOnlyRootFilesystem: false  # If mcp_server needs writable fs
 ```
+
+### ServiceAccount Token
+
+Since operator 0.17.5, provider pods do not mount a ServiceAccount token: the
+operator writes `automountServiceAccountToken: false` on every pod it builds.
+Before that, each pod got the namespace's default ServiceAccount token, a
+bearer credential for the API server that an egress `NetworkPolicy` does not
+reliably block.
+
+A server that talks to the Kubernetes API, or uses an in-cluster client
+library, opts in. Pair it with a dedicated ServiceAccount that carries only the
+RBAC the server needs:
+
+```yaml
+apiVersion: mcp-hangar.io/v1alpha2
+kind: MCPServer
+metadata:
+  name: k8s-inspector
+spec:
+  mode: container
+  image: registry.example.com/your-org/k8s-inspector:1.0.0
+  serviceAccountName: k8s-inspector
+  automountServiceAccountToken: true
+```
+
+Without the opt-in such a server fails with "unable to load in-cluster
+configuration" or a `401` from the API server. Existing pods keep their mount
+until their next rollout.
+
+### Governed Namespaces
+
+A namespace labelled `mcp-hangar.io/enforce-egress=true` is opted into the
+operator's egress enforcement. Two controls apply there; the
+[Egress Policy guide](EGRESS_POLICY.md) covers the per-server policies built on
+top of them.
+
+**Namespace default-deny.** The operator writes a `NetworkPolicy` named
+`mcp-default-deny-egress` that denies egress to every pod in the namespace
+except DNS. Since operator 0.17.5 it is owned by the Namespace and watched: a
+deleted policy is recreated and an edited one restored within seconds, and it
+is garbage-collected with the namespace. A policy of that name the operator
+did not write -- owned by another controller, or created by hand without the
+`app.kubernetes.io/managed-by: mcp-hangar-operator` label -- is neither adopted
+nor overwritten. The operator emits a Warning Event `DefaultDenyNotOwned` on
+the Namespace, checks again every five minutes, and applies its own policy only
+once the foreign one is gone; until then the namespace has whatever egress that
+policy allows. Removing the namespace label deletes only the operator's own
+policy.
+
+**Pod-registration webhook.** With `webhook.enabled` and
+`webhook.podRegistration.enabled` set in the chart (both off by default), a pod
+labelled `mcp-hangar.io/provider=<name>` is admitted only when an `MCPServer`
+of that name exists in the namespace. Since operator 0.17.5 (chart 0.12.18,
+which lists `UPDATE` on the rule) the webhook also gates pod updates, and the
+label is immutable once a pod is admitted:
+
+| Write on an admitted pod | Result |
+| --- | --- |
+| Add `mcp-hangar.io/provider` | Denied |
+| Change it to another name | Denied |
+| Remove it | Allowed; the pod leaves the server's egress allow-policy |
+| Any update that leaves the label as it was | Allowed, so a pod whose `MCPServer` was deleted can still be cleaned up |
+
+Before 0.17.5 a pod admitted without the label could be labelled into a
+registered server afterwards and inherit that server's egress. Create the pod
+with the label instead.
 
 ### RBAC
 
@@ -524,8 +634,17 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 **Discovery not finding MCP servers:**
 
 - Verify namespace labels match selector
-- Check MCPDiscoverySource status
+- Check MCPDiscoverySource status: `CrossNamespaceRefused` means a ConfigMap
+  source points at another namespace; `PartialFailure` names the entries in
+  `status.discoveredProviders[].error`
 - Review operator logs for discovery errors
+
+**MCP server fails with "unable to load in-cluster configuration" or a `401`
+after an operator upgrade:**
+
+- Since operator 0.17.5 provider pods mount no ServiceAccount token. Set
+  `automountServiceAccountToken: true` on the server; see
+  [ServiceAccount Token](#serviceaccount-token).
 
 ## API Reference
 
@@ -546,6 +665,7 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 | `podSecurityContext` | object | No | secure defaults | Pod-level security context (`corev1.PodSecurityContext`) |
 | `containerSecurityContext` | object | No | secure defaults | Container-level security context (`corev1.SecurityContext`) |
 | `serviceAccountName` | string | No | - | ServiceAccount |
+| `automountServiceAccountToken` | bool | No | `false` | Mount the ServiceAccount token into the pod (operator 0.17.5; earlier releases always mounted it) |
 | `nodeSelector` | map | No | - | Node selection |
 | `tolerations` | array | No | - | Tolerations |
 | `capabilities.network` | object | No | - | Declared egress; feeds the generated `NetworkPolicy` |

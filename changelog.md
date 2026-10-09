@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.27](https://github.com/mcp-hangar/docs/compare/v1.2.26...v1.2.27) (2026-10-09)
+
+
+### Changed
+
+* **guides:** document operator 0.17.6 validation and enforcement-status changes ([#421](https://github.com/mcp-hangar/docs/issues/421)) ([24e4afd](https://github.com/mcp-hangar/docs/commit/24e4afdbbe1feb3edd7c0a0523bbf436281618fc))
+
 ## [1.2.26](https://github.com/mcp-hangar/docs/compare/v1.2.25...v1.2.26) (2026-10-09)
 
 

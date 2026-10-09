@@ -363,6 +363,13 @@ naming both namespaces, and a Warning Event with the same reason. Servers such
 a source created before the upgrade are left running. Copy the ConfigMap into
 the source's namespace and drop `configMapRef.namespace`, or delete the source.
 
+Since operator 0.17.6 the apiserver refuses a `type: ConfigMap` source with no
+`configMapRef`, and refuses a change to an existing server's `mode` (see
+[Validation](#validation)). An entry that switches an existing server from
+`container` to `remote`, or back, is therefore not applied: the source records
+the refused update in `status.discoveredProviders[].error` on every sync until
+you delete that `MCPServer`, and the next sync recreates it in the new mode.
+
 ## Security
 
 ### Pod Security
@@ -447,7 +454,11 @@ nor overwritten. The operator emits a Warning Event `DefaultDenyNotOwned` on
 the Namespace, checks again every five minutes, and applies its own policy only
 once the foreign one is gone; until then the namespace has whatever egress that
 policy allows. Removing the namespace label deletes only the operator's own
-policy.
+policy. Since operator 0.17.6, when the operator creates or repairs this policy
+in a cluster where nothing is observed to enforce NetworkPolicy, it emits a
+Warning Event `DefaultDenyUnenforced` on the Namespace. The policy is still
+written. A probe that cannot tell emits nothing; see
+[NetworkPolicy Enforcement Status](#networkpolicy-enforcement-status).
 
 **Pod-registration webhook.** With `webhook.enabled` and
 `webhook.podRegistration.enabled` set in the chart (both off by default), a pod
@@ -491,6 +502,9 @@ rules:
   - apiGroups: [networking.k8s.io]
     resources: [networkpolicies]
     verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [apps]
+    resources: [daemonsets]   # enforcement probe; chart 0.12.19 and later
+    verbs: [get, list]
 ```
 
 ### Network Policies
@@ -521,6 +535,45 @@ spec:
             matchLabels:
               mcp-hangar.io/core: "true"
 ```
+
+### NetworkPolicy Enforcement Status
+
+An `MCPServer` that declares `capabilities.network` gets a per-server egress
+`NetworkPolicy`, and its `NetworkPolicyApplied` condition reports on it. A
+NetworkPolicy restricts nothing unless the cluster's CNI enforces it, and
+writing one succeeds either way. Since operator 0.17.6 the condition says
+`True` only when something is observed to enforce it, using the same probe as
+the `MCPEgressPolicy` `BackstopEnforceable` condition (see
+[Egress Policy: Status conditions](EGRESS_POLICY.md#status-conditions)):
+
+| Probe verdict | `NetworkPolicyApplied` |
+| --- | --- |
+| Enforcer observed | `True` / `PolicyApplied`; the message names the enforcer |
+| No enforcer observed | `False` / `PolicyWrittenUnenforced`, plus one `NetworkPolicyUnenforced` Warning Event when the condition enters this state |
+| Probe could not tell | `Unknown` / `PolicyWrittenUnverified` |
+
+Before 0.17.6 the condition read `True` / `PolicyApplied` as soon as the policy
+was written, including on CNIs that do not enforce NetworkPolicy (kindnet,
+flannel, a vcluster without policy sync). The policy is still written in every
+case. The other reasons are unchanged: `False` / `NoPolicyNeeded` when no
+network capabilities are declared, and `False` / `EgressWithheldUnpinnedImage`
+for an unpinned image in a governed namespace.
+
+A server reading `PolicyWrittenUnenforced` or `PolicyWrittenUnverified` is not
+recorded as a `capability_drift` violation: the policy exists, and the
+condition carries the enforcement gap. A server whose policy is missing still
+is.
+
+An alert or readiness gate on `NetworkPolicyApplied=True` now fires on a
+cluster with no NetworkPolicy enforcement. Install an enforcing CNI, or accept
+the gap knowingly. If your CNI enforces NetworkPolicy but the probe does not
+recognize it, start the operator with `--networkpolicy-enforcement=enforced`.
+The probe recognizes a CNI that ships no CRD (kube-router, Azure NPM, Weave
+Net) by its agent DaemonSet, which needs the `apps/daemonsets` read grant the
+Helm chart carries from 0.12.19. With an older chart the probe cannot list
+DaemonSets, so any cluster without a recognized policy API reads `Unknown` /
+`PolicyWrittenUnverified` -- including one with no enforcer at all -- and
+neither `NetworkPolicyUnenforced` nor `DefaultDenyUnenforced` is emitted.
 
 ## Monitoring
 
@@ -646,18 +699,45 @@ after an operator upgrade:**
   `automountServiceAccountToken: true` on the server; see
   [ServiceAccount Token](#serviceaccount-token).
 
+**Every spec change to an MCPServer is refused after an operator upgrade:**
+
+- Since operator 0.17.6 the CRD validates without the webhook (see
+  [Validation](#validation)). The `image` and `endpoint` rules apply to the
+  whole `spec`, so a stored container server with no `image`, or a remote one
+  with a bad `endpoint`, refuses any spec change -- `replicas`, `kubectl scale`,
+  a discovery re-sync -- until the same update fixes it. Metadata and status
+  updates still go through.
+- The per-field rules (durations, `cidr`, `expectedTools`, the length limits)
+  are re-checked on Kubernetes 1.30+ only when that field changes; before 1.30
+  there is no ratcheting, so a stored violation of any rule refuses every spec
+  change until the same update fixes it. A stored bad
+  `cidr` or `expectedTools` entry can still block the controller's status write
+  when it copies the capabilities into `status.capabilities` for the first
+  time.
+- Find container servers with no image:
+
+  ```bash
+  kubectl get mcpservers -A -o json | jq -r '.items[] | select(.spec.mode == "container" and ((.spec.image // "") == "")) | .metadata.namespace + "/" + .metadata.name'
+  ```
+
+**`spec.mode is immutable` or `spec.targetRef is immutable`:**
+
+- Since operator 0.17.6 neither `MCPServer.spec.mode` nor
+  `MCPEgressPolicy.spec.targetRef` can be changed. Delete the object and create
+  it again with the new value.
+
 ## API Reference
 
 ### MCPServer Spec
 
 | Field | Type | Required | Default | Description |
 | ------- | ------ | ---------- | --------- | ------------- |
-| `mode` | string | Yes | - | `container` or `remote` |
-| `image` | string | For container | - | Container image |
-| `endpoint` | string | For remote | - | HTTP endpoint URL |
+| `mode` | string | Yes | - | `container` or `remote`. Immutable since operator 0.17.6 |
+| `image` | string | For container | - | Container image, at most 1024 characters |
+| `endpoint` | string | For remote | - | Absolute `http` or `https` URL with a host, at most 2048 characters |
 | `replicas` | int | No | `1` | Desired replicas (0 = cold) |
-| `startupTimeout` | duration | No | - | Startup timeout. Accepted but not acted on; the optional validating webhook (`webhook.enabled`, off by default) rejects a negative value |
-| `shutdownGracePeriod` | duration | No | `30s` | Pod termination grace period |
+| `startupTimeout` | duration | No | - | Startup timeout. Accepted but not acted on; must be a non-negative duration |
+| `shutdownGracePeriod` | duration | No | `30s` | Pod termination grace period; must be a non-negative duration |
 | `resources` | object | No | - | Resource requirements |
 | `env` | array | No | - | Environment variables |
 | `volumes` | array | No | - | Pod volumes (`corev1.Volume`) |
@@ -668,8 +748,8 @@ after an operator upgrade:**
 | `automountServiceAccountToken` | bool | No | `false` | Mount the ServiceAccount token into the pod (operator 0.17.5; earlier releases always mounted it) |
 | `nodeSelector` | map | No | - | Node selection |
 | `tolerations` | array | No | - | Tolerations |
-| `capabilities.network` | object | No | - | Declared egress; feeds the generated `NetworkPolicy` |
-| `capabilities.tools` | object | No | - | `maxCount` / `expectedTools`; drives violation events |
+| `capabilities.network` | object | No | - | Declared egress; feeds the generated `NetworkPolicy`. An egress `cidr` must be an IPv4 CIDR such as `10.0.0.0/8` or an IPv6 one such as `fd00::/8` |
+| `capabilities.tools` | object | No | - | `maxCount` / `expectedTools`; drives violation events. `expectedTools` holds at most 256 non-empty, unique names of at most 256 characters |
 | `capabilities.enforcementMode` | string | No | `alert` | `alert`, `block` or `quarantine` |
 
 ### MCPServer Status
@@ -684,7 +764,33 @@ after an operator upgrade:**
 | `lastStartedAt` | time | Last start time |
 | `lastHealthCheck` | time | Last health check |
 | `consecutiveFailures` | int | Failure count |
-| `conditions` | array | Status conditions |
+| `conditions` | array | Status conditions, including `NetworkPolicyApplied` (see [NetworkPolicy Enforcement Status](#networkpolicy-enforcement-status)) |
+
+### Validation
+
+Since operator 0.17.6 the CRDs carry the rules that used to live only in the
+validating webhooks, which are off by default (`webhook.enabled: false`). The
+apiserver now refuses, on create and update and whether or not the webhook
+runs:
+
+- An `MCPServer` with `mode: container` and no `image`, or `mode: remote` and
+  no `endpoint`, or an `endpoint` that is not an absolute `http`/`https` URL
+  with a host.
+- A negative or unparseable `startupTimeout` or `shutdownGracePeriod`.
+- An `expectedTools` list with an empty or duplicate entry, more than 256
+  entries, or an entry longer than 256 characters.
+- An egress `cidr` that is not an IPv4 CIDR or an IPv6 CIDR (the IPv6 form is
+  checked for its shape and prefix length only), and an `image` longer than
+  1024 or an `endpoint` longer than 2048 characters.
+- An `MCPDiscoverySource` with `type: ConfigMap` and no `configMapRef`.
+- A change to `MCPServer.spec.mode`, or to `MCPEgressPolicy.spec.targetRef`.
+  Delete the object and create it again instead.
+
+Objects stored before the upgrade that break a rule stay readable and are not
+rewritten, but may refuse later updates; see
+[Troubleshooting](#common-issues). The webhook, when enabled, keeps only the
+checks the schema cannot express (annotation opt-ins, the cross-namespace
+ConfigMap reference, filter regular expressions) and its warnings.
 
 ## Examples
 

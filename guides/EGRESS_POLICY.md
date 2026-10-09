@@ -119,11 +119,18 @@ spec:
 | Field | Type | Default | Description |
 | ------- | ------ | --------- | ------------- |
 | `mode` | `Audit` \| `Enforce` | `Audit` | `Audit` observes violations; `Enforce` blocks. Audit-default gives a Gatekeeper-style adoption path. |
-| `targetRef.kind` | `MCPServer` \| `MCPServerGroup` | — | What the policy attaches to. A group applies the policy to every member server. |
-| `targetRef.name` | string | — | Referent name, resolved in the policy's namespace. |
+| `targetRef.kind` | `MCPServer` \| `MCPServerGroup` | — | What the policy attaches to. A group applies the policy to every member server. Immutable since operator 0.17.6 (see below). |
+| `targetRef.name` | string | — | Referent name, resolved in the policy's namespace. Immutable since operator 0.17.6 (see below). |
 | `defaultAction` | `Deny` \| `Allow` | `Deny` | Outcome for a tool name that no `upstreams[].tools` rule matches. |
 | `upstreams[]` | list | — | The allow-list. With `defaultAction: Deny`, an empty list denies everything except the DNS/backstop paths. |
 | `networkBackstop` | object | generate/Auto | Controls the generated L3/L4 backstop (below). |
+
+**`targetRef` cannot be changed.** Since operator 0.17.6 the CRD carries a CEL
+rule that refuses any update to `spec.targetRef`, whether or not the validating
+webhook runs (it is off by default). To govern a different server or group,
+delete the policy and create one for the new target. Earlier releases accepted
+the edit. `mode`, `defaultAction` and the rest of the spec can still be edited
+in place.
 
 ### `upstreams[]`
 
@@ -274,11 +281,31 @@ drops the policy on restart shows it on every reconcile.
 | ----------- | --------- |
 | `Compiled` | The policy was structurally compiled. |
 | `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`). |
-| `BackstopEnforceable` | Whether anything in the cluster enforces the written backstop: `True` / `EnforcerObserved` when the operator finds a policy-enforcing API or a known CNI agent, `False` / `NoEnforcerObserved` when it finds neither (`status.backstopEnforcement: Unenforced`; the `Backstop` column of `kubectl get`). |
+| `BackstopEnforceable` | Whether anything in the cluster enforces the written backstop: `True` / `EnforcerObserved` when the operator finds a policy-enforcing API or a known CNI agent, `False` / `NoEnforcerObserved` when it finds neither (`status.backstopEnforcement: Unenforced`; the `Backstop` column of `kubectl get`), `Unknown` / `EnforcementUnverified` when it could not tell, for example because it may not list DaemonSets (`status.backstopEnforcement: Unverified`). |
 | `L7Delivered` | Whether core took the compiled L7 policy (operator 0.17.5). `True` / `Delivered` once every target server accepted the push; `True` / `DeliveredNotPersisted` when core took it but has no persistence backend (see [Surviving a gateway restart](#surviving-a-gateway-restart)); `False` / `CoreAuthRejected`, `CoreUnreachable` or `PushFailed`, naming the server whose push failed; `Unknown` / `CoreIntegrationOff` when the operator runs without `--hangar-url`. Shown as the `L7` column of `kubectl get mcpegresspolicies`. |
 | `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), `TargetNotFound`, `EnforcementNotObserved` (nothing observed to enforce the backstop), or `L7PushFailed` (`L7Delivered=False`). |
 
 `Compiled` and `BackstopApplied` say nothing about core. Before operator 0.17.5 a policy whose L7 push core refused -- an API key without `policy:write`, a core that was down, a payload core rejected -- read `Compiled=True` and `Degraded=False`, with a Warning Event as the only trace. It now reads `L7Delivered=False` and `Degraded=True` / `L7PushFailed`, so an alert on `Degraded` may fire on a policy that has been undelivered since it was created. Fix the key's permissions or core's reachability; the next reconcile clears it.
+
+**One enforcement probe for every NetworkPolicy the operator writes.** The
+probe behind `BackstopEnforceable` looks for a policy-enforcing API (Cilium,
+Calico, Antrea, AWS VPC CNI, Kube-OVN, OVN-Kubernetes) and, failing that, for
+a known CNI agent DaemonSet (`azure-npm`, `calico-node`, `canal`, `cilium`,
+`kube-ovn-cni`, `kube-router`, `ovnkube-node`, `weave-net`); it re-asks at most
+once every five minutes. Since operator 0.17.6 the same verdict also drives the
+MCPServer `NetworkPolicyApplied` condition and the namespace default-deny
+Warning (see
+[Kubernetes: NetworkPolicy enforcement status](KUBERNETES.md#networkpolicy-enforcement-status)).
+The agent check lists DaemonSets, which the Helm chart grants (`apps/daemonsets`
+`get`, `list`) from chart 0.12.19; the operator repository's own RBAC manifests
+already carry it. With an older chart the list is refused, so every cluster
+that serves none of those APIs reads `Unknown` -- one with no enforcer as well
+as one whose enforcer ships no CRD -- and the `False` / unenforced states and
+their Warnings never fire. If your CNI enforces NetworkPolicy and
+the probe does not recognize it, start the operator with
+`--networkpolicy-enforcement=enforced`; the flag now applies to all three
+writers. It changes only what status reports: the policies are written either
+way.
 
 ## Limitations and notes
 

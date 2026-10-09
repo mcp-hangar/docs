@@ -114,7 +114,9 @@ the per-request pipeline. It applies only in namespaces labeled
 version is `v1alpha2`. See [ADR-013](../adr/ADR-013-egress-policy-enforcement-model.md).
 
 - **Pod-registration webhook** — denies a pod that claims to be an MCP server
-  unless a registered `MCPServer` CR exists (validating, fail-closed).
+  unless a registered `MCPServer` CR exists (validating, fail-closed). Since
+  operator 0.17.5 it also gates pod updates: the `mcp-hangar.io/provider`
+  label cannot be added or changed once a pod is admitted.
 - **CR validation** — validates `MCPServer` / policy custom resources on
   create/update.
 - **Image-digest pinning** — requires `image@sha256:...`; modes off/warn/block.
@@ -124,7 +126,8 @@ version is `v1alpha2`. See [ADR-013](../adr/ADR-013-egress-policy-enforcement-mo
   server pod may reach. FQDN upstreams require the Cilium flavor.
 - **MCPEgressPolicy controller** — compiles an `MCPEgressPolicy` CR and pushes the
   L7 policy down to the core engine, where it is enforced at the tool-invocation
-  chokepoint (control #12 above).
+  chokepoint (control #12 above). Whether core accepted the push is reported on
+  the policy's `L7Delivered` condition (operator 0.17.5).
 
 **End-to-end L7 egress enforcement is shipped.** The core L7 engine and REST
 intake arrived in 1.6.0; the operator's MCPEgressPolicy controller compiles a

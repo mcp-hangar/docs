@@ -557,7 +557,10 @@ was written, including on CNIs that do not enforce NetworkPolicy (kindnet,
 flannel, a vcluster without policy sync). The policy is still written in every
 case. The other reasons are unchanged: `False` / `NoPolicyNeeded` when no
 network capabilities are declared, and `False` / `EgressWithheldUnpinnedImage`
-for an unpinned image in a governed namespace.
+for an unpinned image in a governed namespace. Since operator 0.17.7 adding or
+removing the `mcp-hangar.io/enforce-egress` label reconciles every MCPServer in
+the namespace within seconds; before, an unpinned server's egress was withheld
+or restored only at its next poll, up to ten minutes later.
 
 A server reading `PolicyWrittenUnenforced` or `PolicyWrittenUnverified` is not
 recorded as a `capability_drift` violation: the policy exists, and the
@@ -567,7 +570,8 @@ is.
 An alert or readiness gate on `NetworkPolicyApplied=True` now fires on a
 cluster with no NetworkPolicy enforcement. Install an enforcing CNI, or accept
 the gap knowingly. If your CNI enforces NetworkPolicy but the probe does not
-recognize it, start the operator with `--networkpolicy-enforcement=enforced`.
+recognize it, start the operator with `--networkpolicy-enforcement=enforced`
+(chart value `operator.networkPolicyEnforcement`, chart 0.12.21 and later).
 The probe recognizes a CNI that ships no CRD (kube-router, Azure NPM, Weave
 Net) by its agent DaemonSet, which needs the `apps/daemonsets` read grant the
 Helm chart carries from 0.12.19. With an older chart the probe cannot list

@@ -159,9 +159,11 @@ The network backstop is what guarantees the data plane cannot be bypassed. The o
 
 - **`Vanilla`** — a standard `NetworkPolicy`: default-deny egress on the target's pods, allowing DNS plus any upstream whose `host` is a **literal IP/CIDR**. A vanilla `NetworkPolicy` cannot match on FQDNs, so hostname upstreams are **failed closed** (denied, never opened to "any destination") and surfaced as `Degraded/FQDNUpstreamsUnenforceable`.
 - **`Cilium`** — a `CiliumNetworkPolicy` with `toFQDNs`, which **does** enforce hostname allow-lists. The DNS rule carries an L7 DNS-proxy rule so Cilium learns the resolved IPs and admits only traffic to the allow-listed names. CIDR upstreams become `toCIDR`.
-- **`Auto`** (default) — Cilium if the `CiliumNetworkPolicy` CRD is installed, otherwise Vanilla.
+- **`Auto`** (default) — Cilium if the `CiliumNetworkPolicy` CRD is installed and a `cilium` agent DaemonSet runs, otherwise Vanilla.
 
-If `Cilium` is requested on a cluster without the CRD, the operator applies the Vanilla floor and reports `Degraded/CiliumUnavailable` — it fails closed, never open.
+If `Cilium` is requested on a cluster without the CRD, the operator applies the Vanilla floor and reports `Degraded/CiliumUnavailable`; if the CRD is installed but no `cilium` agent is observed, it applies the Vanilla floor and reports `Degraded/CiliumAgentNotObserved`. Either way it fails closed, never open.
+
+Since operator 0.17.7 the CRD alone is not taken as Cilium. The Cilium CRDs survive `cilium uninstall` unless purged, and on such a cluster earlier releases picked the Cilium flavor, wrote a `CiliumNetworkPolicy` nobody reads, deleted the `NetworkPolicy` the running CNI enforces and reported `Enforcing`. Now `Auto` moves such a policy to Vanilla on its next reconcile and deletes the stale `CiliumNetworkPolicy`. Hostname upstreams, which only the Cilium flavor can allow, are then denied and reported; they were never enforced there. Recognizing the agent needs the DaemonSet read grant (chart 0.12.19 and later): without it a real Cilium cluster cannot be confirmed and `Auto` falls back to Vanilla too, so upgrade the chart with the operator.
 
 ## L7 semantics
 
@@ -283,16 +285,18 @@ drops the policy on restart shows it on every reconcile.
 | `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`). |
 | `BackstopEnforceable` | Whether anything in the cluster enforces the written backstop: `True` / `EnforcerObserved` when the operator finds a policy-enforcing API or a known CNI agent, `False` / `NoEnforcerObserved` when it finds neither (`status.backstopEnforcement: Unenforced`; the `Backstop` column of `kubectl get`), `Unknown` / `EnforcementUnverified` when it could not tell, for example because it may not list DaemonSets (`status.backstopEnforcement: Unverified`). |
 | `L7Delivered` | Whether core took the compiled L7 policy (operator 0.17.5). `True` / `Delivered` once every target server accepted the push; `True` / `DeliveredNotPersisted` when core took it but has no persistence backend (see [Surviving a gateway restart](#surviving-a-gateway-restart)); `False` / `CoreAuthRejected`, `CoreUnreachable` or `PushFailed`, naming the server whose push failed; `Unknown` / `CoreIntegrationOff` when the operator runs without `--hangar-url`. Shown as the `L7` column of `kubectl get mcpegresspolicies`. |
-| `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), `TargetNotFound`, `EnforcementNotObserved` (nothing observed to enforce the backstop), or `L7PushFailed` (`L7Delivered=False`). |
+| `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), `CiliumAgentNotObserved` (Cilium requested, CRD present, no `cilium` agent observed; operator 0.17.7 and later), `TargetNotFound`, `EnforcementNotObserved` (nothing observed to enforce the backstop), or `L7PushFailed` (`L7Delivered=False`). |
 
 `Compiled` and `BackstopApplied` say nothing about core. Before operator 0.17.5 a policy whose L7 push core refused -- an API key without `policy:write`, a core that was down, a payload core rejected -- read `Compiled=True` and `Degraded=False`, with a Warning Event as the only trace. It now reads `L7Delivered=False` and `Degraded=True` / `L7PushFailed`, so an alert on `Degraded` may fire on a policy that has been undelivered since it was created. Fix the key's permissions or core's reachability; the next reconcile clears it.
 
 **One enforcement probe for every NetworkPolicy the operator writes.** The
-probe behind `BackstopEnforceable` looks for a policy-enforcing API (Cilium,
-Calico, Antrea, AWS VPC CNI, Kube-OVN, OVN-Kubernetes) and, failing that, for
+probe behind `BackstopEnforceable` looks for a policy-enforcing API (Calico,
+Antrea, AWS VPC CNI, Kube-OVN, OVN-Kubernetes) and, failing that, for
 a known CNI agent DaemonSet (`azure-npm`, `calico-node`, `canal`, `cilium`,
 `kube-ovn-cni`, `kube-router`, `ovnkube-node`, `weave-net`); it re-asks at most
-once every five minutes. Since operator 0.17.6 the same verdict also drives the
+once every five minutes. Cilium is recognized by its agent only: before
+operator 0.17.7 the `CiliumNetworkPolicy` CRD alone counted, and it outlives
+an uninstall. Since operator 0.17.6 the same verdict also drives the
 MCPServer `NetworkPolicyApplied` condition and the namespace default-deny
 Warning (see
 [Kubernetes: NetworkPolicy enforcement status](KUBERNETES.md#networkpolicy-enforcement-status)).
@@ -303,9 +307,12 @@ that serves none of those APIs reads `Unknown` -- one with no enforcer as well
 as one whose enforcer ships no CRD -- and the `False` / unenforced states and
 their Warnings never fire. If your CNI enforces NetworkPolicy and
 the probe does not recognize it, start the operator with
-`--networkpolicy-enforcement=enforced`; the flag now applies to all three
-writers. It changes only what status reports: the policies are written either
-way.
+`--networkpolicy-enforcement=enforced` (chart value
+`operator.networkPolicyEnforcement`, chart 0.12.21 and later); the flag now
+applies to all three writers. It changes only what status reports: the
+policies are written either way. Since operator 0.17.7 it no longer stands in
+for the agent check: the backstop flavor is chosen from the DaemonSets actually
+running, whatever the flag says.
 
 ## Limitations and notes
 

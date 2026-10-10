@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.28](https://github.com/mcp-hangar/docs/compare/v1.2.27...v1.2.28) (2026-10-10)
+
+
+### Changed
+
+* **guides:** document operator 0.17.7 Cilium detection and namespace label watch ([#424](https://github.com/mcp-hangar/docs/issues/424)) ([96c6be9](https://github.com/mcp-hangar/docs/commit/96c6be96a32c3bb5f2e20d8e820600d49d102bf2))
+* **guides:** document operator 0.17.8 and 0.17.9 RBAC, DNS and core-call changes ([#426](https://github.com/mcp-hangar/docs/issues/426)) ([b2d2973](https://github.com/mcp-hangar/docs/commit/b2d297322c85e328db89611f5fea375b676ca594))
+
 ## [1.2.27](https://github.com/mcp-hangar/docs/compare/v1.2.26...v1.2.27) (2026-10-09)
 
 

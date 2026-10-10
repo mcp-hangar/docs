@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.29](https://github.com/mcp-hangar/docs/compare/v1.2.28...v1.2.29) (2026-10-10)
+
+
+### Changed
+
+* **guides:** document operator 0.17.10 secure metrics and on/off replicas ([#427](https://github.com/mcp-hangar/docs/issues/427)) ([0170a47](https://github.com/mcp-hangar/docs/commit/0170a47282fc909f54c2b5a073e9fd7ed09b140d))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#429](https://github.com/mcp-hangar/docs/issues/429)) ([12b687a](https://github.com/mcp-hangar/docs/commit/12b687aaa05c377d6f752a2290421b1b03a0fc82))
+
 ## [1.2.28](https://github.com/mcp-hangar/docs/compare/v1.2.27...v1.2.28) (2026-10-10)
 
 

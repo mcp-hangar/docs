@@ -113,6 +113,21 @@ resources:
     memory: 128Mi
 ```
 
+**Talking to core.** With `hangar.url` set, each call the operator makes to
+core (server health and tools, L7 policy push) gives up after 5 seconds, retries
+included, since operator 0.17.8. Before, a core that accepted connections and
+never answered held a call for about 43 seconds. A core slower than that is
+reported like an unreachable one and asked again on the next requeue. The
+MCPServer and MCPEgressPolicy controllers also run four reconciles at once
+(`--max-concurrent-reconciles`, default 4), so one server waiting on core no
+longer holds up the others, pod create and delete included.
+
+**Memory.** Since operator 0.17.9 discovery reads ConfigMaps and Services
+straight from the API server instead of caching every one in the cluster, and
+cached objects are kept without their `managedFields`. Pods are still cached
+cluster-wide: the operator watches both its provider pods and the core gateway
+pods.
+
 ## MCPServer
 
 ### Basic MCP Server
@@ -443,6 +458,20 @@ operator's egress enforcement. Two controls apply there; the
 [Egress Policy guide](EGRESS_POLICY.md) covers the per-server policies built on
 top of them.
 
+**Where DNS may go.** Every policy the operator writes allows DNS (port 53)
+only to named resolvers, by default the `k8s-app=kube-dns` pods in
+`kube-system`. If your cluster resolves elsewhere, pods in governed namespaces
+lose DNS: it fails closed. Two settings add resolvers:
+
+| Operator flag (chart value) | Use it for | Example |
+| --- | --- | --- |
+| `--dns-egress-selectors` (`operator.dnsEgressSelectors`), operator 0.17.9 and later | Resolver pods that are not kube-dns: OpenShift/OKD, or a custom resolver Deployment. Each entry is `<namespace>/<key>=<value>[,...]` with at least one label. | `openshift-dns/dns.operator.openshift.io/daemonset-dns=default` |
+| `--dns-egress-cidrs` (`operator.dnsEgressCIDRs`, chart 0.12.21 and later) | A resolver reached at a node-local address, such as NodeLocal DNSCache. Not for a Service ClusterIP: CNIs match `ipBlock` after the ClusterIP is translated, so name the pods instead. | `169.254.20.10/32` |
+
+Both apply to the per-server policy, the namespace default-deny and the Vanilla
+`MCPEgressPolicy` backstop; only `--dns-egress-selectors` also reaches the
+Cilium backstop.
+
 **Namespace default-deny.** The operator writes a `NetworkPolicy` named
 `mcp-default-deny-egress` that denies egress to every pod in the namespace
 except DNS. Since operator 0.17.5 it is owned by the Namespace and watched: a
@@ -497,7 +526,7 @@ rules:
     resources: [pods]
     verbs: [get, list, watch, create, update, patch, delete]
   - apiGroups: [""]
-    resources: [secrets, configmaps]
+    resources: [configmaps]   # ConfigMap discovery sources
     verbs: [get, list, watch]
   - apiGroups: [networking.k8s.io]
     resources: [networkpolicies]
@@ -506,6 +535,12 @@ rules:
     resources: [daemonsets]   # enforcement probe; chart 0.12.19 and later
     verbs: [get, list]
 ```
+
+Since operator 0.17.9 and chart 0.12.24 the role grants no `secrets`,
+`serviceaccounts` or `pods/status`: nothing in the operator reads them (a pod's
+secret and service-account references are resolved by the kubelet), and the
+`secrets` grant was cluster-wide read on every Secret. The leader-election Role
+is `leases` and `events` only.
 
 ### Network Policies
 

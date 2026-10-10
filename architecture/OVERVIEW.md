@@ -117,9 +117,18 @@ version is `v1alpha2`. See [ADR-013](../adr/ADR-013-egress-policy-enforcement-mo
   unless a registered `MCPServer` CR exists (validating, fail-closed). Since
   operator 0.17.5 it also gates pod updates: the `mcp-hangar.io/provider`
   label cannot be added or changed once a pod is admitted.
-- **CR validation** — validates `MCPServer` / policy custom resources on
-  create/update.
+- **CR validation** — the structural rules on `MCPServer`, `MCPDiscoverySource`
+  and `MCPEgressPolicy` (a container server needs an image and a remote one an
+  HTTP(S) endpoint, durations are non-negative, CIDRs are well formed, a
+  server's `spec.mode` and a policy's `spec.targetRef` are immutable) are CRD
+  schema and CEL rules. The apiserver enforces them with or without the
+  webhook (operator 0.17.6). The optional validating webhook keeps only what
+  needs an annotation or a cluster fact: the wildcard-egress opt-in, the
+  image-digest policy, the cross-namespace ConfigMap check and regexp
+  compilation for discovery sources, and admission warnings. `MCPEgressPolicy`
+  has no webhook.
 - **Image-digest pinning** — requires `image@sha256:...`; modes off/warn/block.
+  Needs the webhook enabled.
   (Distinct from the request-path *tool-schema* digest pin — different digest,
   different plane.)
 - **Default-deny egress + L3/L4 network backstop** — restricts which hosts a

@@ -229,6 +229,13 @@ spec:
 Nothing scales a `Cold` server up on a request: neither the operator nor core
 changes `replicas`. Set `replicas: 1` to start it.
 
+`replicas` is an on/off switch: a server runs at most one pod. Since operator
+0.17.10 the CRD accepts only `0` or `1` and serves no scale subresource, so
+`kubectl scale` and an HPA or KEDA ScaledObject aimed at an MCPServer are
+refused. Before, values up to 10 and `kubectl scale` were accepted and still ran
+one pod. A stored object with a higher value keeps working on Kubernetes 1.30+
+as long as an update leaves `replicas` unchanged.
+
 **Idle shutdown is core's, not the CR's.** Hangar stops an idle backend on
 `idle_ttl_s`; a server it discovers in the cluster takes core's create default
 of 300s. The `MCPServer` spec has no idle field, and the discovery-entry TTL
@@ -534,6 +541,12 @@ rules:
   - apiGroups: [apps]
     resources: [daemonsets]   # enforcement probe; chart 0.12.19 and later
     verbs: [get, list]
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]           # secure metrics; chart 0.12.26 and later
+    verbs: [create]
+  - apiGroups: [authorization.k8s.io]
+    resources: [subjectaccessreviews]   # secure metrics; chart 0.12.26 and later
+    verbs: [create]
 ```
 
 Since operator 0.17.9 and chart 0.12.24 the role grants no `secrets`,
@@ -618,7 +631,13 @@ neither `NetworkPolicyUnenforced` nor `DefaultDenyUnenforced` is emitted.
 
 ### Prometheus Metrics
 
-The operator exposes metrics at `:8080/metrics`:
+The operator exposes metrics at `:8080/metrics`. Since operator 0.17.10
+(chart 0.12.26) the endpoint serves HTTPS with a self-signed certificate and
+admits only a bearer token the API server authenticates and authorizes for
+`get` on the `/metrics` URL; anything else gets 401 or 403. Before, it served
+plain HTTP to any pod that could reach it, including server names, states and
+reconcile errors. `--metrics-secure=false` (chart value
+`operator.metrics.secure: false`) restores plain HTTP.
 
 | Metric | Type | Description |
 | -------- | ------ | ------------- |
@@ -632,7 +651,25 @@ The operator exposes metrics at `:8080/metrics`:
 
 The chart creates one with `serviceMonitor.enabled=true` (and, with
 `prometheusRule.enabled=true`, a PrometheusRule of its own for reconcile errors
-and a down operator). By hand:
+and a down operator). It scrapes HTTPS with Prometheus's own ServiceAccount
+token, so bind that account to the chart's `<release>-metrics-reader`
+ClusterRole:
+
+```yaml
+operator:
+  metrics:
+    readers:
+      - name: prometheus-k8s     # your Prometheus ServiceAccount
+        namespace: monitoring
+networkPolicy:
+  metricsFrom:                   # optional: only the monitoring namespace
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+```
+
+An unbound Prometheus gets 403 after the upgrade: the metrics are still
+produced, just unread. By hand:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -647,6 +684,10 @@ spec:
   endpoints:
     - port: metrics
       interval: 30s
+      scheme: https
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig:
+        insecureSkipVerify: true   # the certificate is self-signed
 ```
 
 ### Alerts
@@ -743,8 +784,8 @@ after an operator upgrade:**
 - Since operator 0.17.6 the CRD validates without the webhook (see
   [Validation](#validation)). The `image` and `endpoint` rules apply to the
   whole `spec`, so a stored container server with no `image`, or a remote one
-  with a bad `endpoint`, refuses any spec change -- `replicas`, `kubectl scale`,
-  a discovery re-sync -- until the same update fixes it. Metadata and status
+  with a bad `endpoint`, refuses any spec change -- `replicas`, a discovery
+  re-sync -- until the same update fixes it. Metadata and status
   updates still go through.
 - The per-field rules (durations, `cidr`, `expectedTools`, the length limits)
   are re-checked on Kubernetes 1.30+ only when that field changes; before 1.30
@@ -774,7 +815,7 @@ after an operator upgrade:**
 | `mode` | string | Yes | - | `container` or `remote`. Immutable since operator 0.17.6 |
 | `image` | string | For container | - | Container image, at most 1024 characters |
 | `endpoint` | string | For remote | - | Absolute `http` or `https` URL with a host, at most 2048 characters |
-| `replicas` | int | No | `1` | Desired replicas (0 = cold) |
+| `replicas` | int | No | `1` | `1` runs the server, `0` stops it (Cold); nothing else since operator 0.17.10 |
 | `startupTimeout` | duration | No | - | Startup timeout. Accepted but not acted on; must be a non-negative duration |
 | `shutdownGracePeriod` | duration | No | `30s` | Pod termination grace period; must be a non-negative duration |
 | `resources` | object | No | - | Resource requirements |
@@ -796,7 +837,7 @@ after an operator upgrade:**
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `state` | string | Cold, Initializing, Ready, Degraded, Dead |
-| `replicas` | int | Current replicas |
+| `replicas` | int | Pods that exist, 0 or 1 (written since operator 0.17.10) |
 | `readyReplicas` | int | Ready replicas |
 | `toolsCount` | int | Available tools |
 | `tools` | array | Tool names |

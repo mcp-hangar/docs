@@ -242,6 +242,19 @@ of 300s. The `MCPServer` spec has no idle field, and the discovery-entry TTL
 annotation (`mcp-hangar.io/ttl`) is a different quantity — how long core keeps
 an entry it has stopped seeing.
 
+### Pod Restarts
+
+A container-mode server whose pod fails is restarted after 10 s, 20 s, 40 s and
+80 s, then every 10 minutes while it keeps failing (operator 0.17.12). A spec
+change resets the count, and `status.consecutiveFailures` stops at 5. Before
+0.17.12 the pod came back at once after each failure and, after five failures,
+was never restarted until the server was edited.
+
+A pod that exits with status 0 is restarted too, with the server
+`Initializing` and condition `Progressing/PodExited`. `Cold` means only
+`replicas: 0`; its `Ready` condition says to set `replicas` to 1 (operator
+0.17.18).
+
 ## MCPServerGroup
 
 A group is a **status aggregator**: it selects `MCPServer`s by label, counts
@@ -266,6 +279,19 @@ spec:
     minHealthyPercentage: 50
     unhealthyThreshold: 3
 ```
+
+The group's status counts its members by state: `readyCount`, `degradedCount`,
+`deadCount`, `coldCount` (members with `replicas: 0`) and, since operator
+0.17.18, `initializingCount` for members that are starting or have no state
+yet. Before 0.17.18 those were counted as cold, so a group mid-rollout read as
+idle. `status.providers` lists each member's name, namespace and state; it no
+longer carries `lastHealthCheck` (read that on the `MCPServer`), because
+copying it made every member probe rewrite the group.
+
+A group takes no finalizer since operator 0.17.18, so deleting one does not
+wait for a running operator. The operator removes the finalizer from groups
+an older release created. Its `spec.selector` is required by the CRD schema;
+the group admission webhook that re-checked it is gone.
 
 Load balancing across members of a Hangar *group* is a core feature
 (`config.yaml` / `POST /api/groups`), on a different object. The operator does
@@ -392,6 +418,22 @@ Since operator 0.17.6 the apiserver refuses a `type: ConfigMap` source with no
 the refused update in `status.discoveredProviders[].error` on every sync until
 you delete that `MCPServer`, and the next sync recreates it in the new mode.
 
+An entry whose generated name `<source>-<entry>` is not a valid Kubernetes name
+(uppercase, `/`, longer than 63 characters) is not created and is listed in
+`status.discoveredProviders` with the reason, instead of failing at create
+time (operator 0.17.14). Since operator 0.17.17 the apiserver refuses a
+`refreshInterval` that is not a non-negative duration such as `5m`; before, a
+value like `banana` was stored and then broke the operator's decoding of that
+source.
+
+Deleting a source deletes the servers it owns. An `Additive` source with
+`ownership.controller: false` does not own them, and since operator 0.17.14
+its servers stay when it is deleted, still labelled
+`mcp-hangar.io/managed-by: <source>`.
+
+A discovery refresh emits a `SyncCompleted` Event only when the sync outcome
+changes, and `SyncStarted` is gone (operator 0.17.15).
+
 ## Security
 
 ### Pod Security
@@ -402,13 +444,31 @@ All MCP server pods run with secure defaults:
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 65534
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
 containerSecurityContext:
+  runAsNonRoot: true
   readOnlyRootFilesystem: true
   allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
+  seccompProfile:
+    type: RuntimeDefault
 ```
+
+Since operator 0.17.13 the values you set are laid over these defaults field by
+field. A server that sets only `fsGroup` keeps `runAsNonRoot` and the seccomp
+profile; to turn a default off, set that field explicitly. A `capabilities`
+block without its own `drop` list keeps `drop: [ALL]`. Before 0.17.13 a partial
+value replaced the defaults whole.
+
+With no `spec.resources`, the container requests `50m` CPU and `64Mi` memory
+(no limits), so the pod is Burstable rather than BestEffort; a ResourceQuota
+on requests counts them. An image referenced by tag gets
+`imagePullPolicy: Always`, and a digest-pinned one (`@sha256:`) keeps
+`IfNotPresent`, so pin by digest if nodes cannot always reach the registry.
 
 The two fields mirror Kubernetes' own split: `podSecurityContext` is
 `corev1.PodSecurityContext` and applies to the pod, `containerSecurityContext`
@@ -627,6 +687,26 @@ DaemonSets, so any cluster without a recognized policy API reads `Unknown` /
 `PolicyWrittenUnverified` -- including one with no enforcer at all -- and
 neither `NetworkPolicyUnenforced` nor `DefaultDenyUnenforced` is emitted.
 
+The per-server policy is named `mcp-provider-<server>-egress`. Since operator
+0.17.14 the operator leaves alone a NetworkPolicy of that name that is not its
+own (controlled by something else, or with neither a controller nor the
+`app.kubernetes.io/managed-by: mcp-hangar-operator` label). The server reports
+`NetworkPolicyApplied=False/PolicyNameTaken` with one `PolicyNameTaken`
+Warning, and its egress policy is not applied until the other policy is
+renamed or removed.
+
+### Capability Violations
+
+A tool count over `capabilities.tools` limits and a per-server NetworkPolicy
+that is missing are recorded as capability violations. Since
+operator 0.17.17 a violation is recorded when it starts, and again only if it
+clears and returns: one `status.violations` entry, one increment of
+`mcp_operator_capability_violations_total` and one `ViolationDetected` Warning
+per occurrence. The `ViolationDetected` condition's message lists what is
+still active (`Active violations: <type>, ...`), so alert on the condition for
+a violation that persists; before 0.17.17 the counter and the Warning repeated
+on every reconcile.
+
 ## Monitoring
 
 ### Prometheus Metrics
@@ -731,7 +811,19 @@ kubectl describe mcpserver my-mcp-server -n mcp-servers
 
 # Check conditions
 kubectl get mcpserver my-mcp-server -o jsonpath='{.status.conditions}'
+
+# Filter server-side (Kubernetes 1.31+, operator 0.17.18)
+kubectl get mcpservers -A --field-selector status.state=Dead
+kubectl get mcpegresspolicies -A --field-selector spec.mode=Enforce
 ```
+
+`MCPServer` selects on `spec.mode` and `status.state`, `MCPEgressPolicy` on
+`spec.mode` and `spec.targetRef.kind`. An older apiserver answers
+`field label not supported`.
+
+Since operator 0.17.15 Events mark changes rather than polls: a remote server
+warns when it becomes unhealthy or unreachable, not every 10 seconds, and a
+healthy one no longer logs "is ready" every 5 minutes.
 
 ### Check Operator Logs
 
@@ -846,6 +938,20 @@ after an operator upgrade:**
 | `consecutiveFailures` | int | Failure count |
 | `conditions` | array | Status conditions, including `NetworkPolicyApplied` (see [NetworkPolicy Enforcement Status](#networkpolicy-enforcement-status)) |
 
+`status.phase` was declared but never written, and is removed in operator
+0.17.18. Read `state` or the `Ready` condition.
+
+### MCPServerGroup Status
+
+| Field | Type | Description |
+| ------- | ------ | ------------- |
+| `providerCount` | int | Members matching the selector |
+| `readyCount` / `degradedCount` / `deadCount` | int | Members in that state |
+| `coldCount` | int | Members with `replicas: 0` |
+| `initializingCount` | int | Members starting or with no state yet (operator 0.17.18) |
+| `providers` | array | Each member's `name`, `namespace` and `state` |
+| `conditions` | array | `Ready`, `Degraded`, `Available` |
+
 ### Validation
 
 Since operator 0.17.6 the CRDs carry the rules that used to live only in the
@@ -862,7 +968,9 @@ runs:
 - An egress `cidr` that is not an IPv4 CIDR or an IPv6 CIDR (the IPv6 form is
   checked for its shape and prefix length only), and an `image` longer than
   1024 or an `endpoint` longer than 2048 characters.
-- An `MCPDiscoverySource` with `type: ConfigMap` and no `configMapRef`.
+- An `MCPDiscoverySource` with `type: ConfigMap` and no `configMapRef`, or
+  (operator 0.17.17) a `refreshInterval` that is not a non-negative duration.
+- An `MCPServerGroup` with no `spec.selector`.
 - A change to `MCPServer.spec.mode`, or to `MCPEgressPolicy.spec.targetRef`.
   Delete the object and create it again instead.
 

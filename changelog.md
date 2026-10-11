@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.30](https://github.com/mcp-hangar/docs/compare/v1.2.29...v1.2.30) (2026-10-10)
+
+
+### Changed
+
+* **architecture:** say which CR rules the apiserver enforces and which need the webhook ([#430](https://github.com/mcp-hangar/docs/issues/430)) ([f2b86c9](https://github.com/mcp-hangar/docs/commit/f2b86c902103de5d6b2a12d7e9b672d4e3b8bead))
+
 ## [1.2.29](https://github.com/mcp-hangar/docs/compare/v1.2.28...v1.2.29) (2026-10-10)
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.31](https://github.com/mcp-hangar/docs/compare/v1.2.30...v1.2.31) (2026-10-11)
+
+
+### Changed
+
+* **kubernetes:** describe operator 0.17.12 to 0.17.18 behaviour ([#434](https://github.com/mcp-hangar/docs/issues/434)) ([c8a1efe](https://github.com/mcp-hangar/docs/commit/c8a1efefb8d70ac0bdff2739fd64b1ea9c835c97))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#432](https://github.com/mcp-hangar/docs/issues/432)) ([e5d0e27](https://github.com/mcp-hangar/docs/commit/e5d0e27d6689eab9669b92c36fb7883b729464ed))
+
 ## [1.2.30](https://github.com/mcp-hangar/docs/compare/v1.2.29...v1.2.30) (2026-10-10)
 
 

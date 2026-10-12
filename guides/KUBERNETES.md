@@ -1002,8 +1002,24 @@ runs:
 Objects stored before the upgrade that break a rule stay readable and are not
 rewritten, but may refuse later updates; see
 [Troubleshooting](#common-issues). The webhook, when enabled, keeps only the
-checks the schema cannot express (annotation opt-ins, the cross-namespace
-ConfigMap reference, filter regular expressions) and its warnings.
+checks the schema cannot express (the cross-namespace ConfigMap reference,
+filter regular expressions) and its warnings.
+
+Since operator 0.17.22 (chart 0.12.38) the two rules that read an annotation
+are ValidatingAdmissionPolicies, also enforced with the webhook off. The chart
+installs them by default (`admissionPolicies.enabled`):
+
+- An egress rule with `host: "*"`, or a `cidr` or `host` of prefix length 0
+  (`0.0.0.0/0`, `::/0`), is refused unless the `MCPServer` carries
+  `hangar.io/allow-unrestricted-egress: "true"`.
+- A container image without `@sha256:` draws a warning (`warn`, the default),
+  is refused (`block`) or passes (`off`), per `operator.imageDigestPolicy`. A
+  server opts out with `hangar.io/allow-mutable-image: "true"`.
+
+Updates are ratcheted: an existing server that breaks a rule can still be
+labelled, reconciled and deleted, and is judged again only when its image,
+egress or the matching annotation changes. `admissionPolicies.namespaceSelector`
+limits both rules to matching namespaces.
 
 ## Examples
 

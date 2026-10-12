@@ -65,7 +65,7 @@ Every route requires a permission when authentication is enabled; the
 | `POST` | `/api/mcp_servers` | Create a new MCP server |
 | `GET` | `/api/mcp_servers/{id}` | Get MCP server details |
 | `PUT`/`PATCH` | `/api/mcp_servers/{id}` | Update MCP server configuration |
-| `DELETE` | `/api/mcp_servers/{id}` | Delete a MCP server (stops it first) |
+| `DELETE` | `/api/mcp_servers/{id}` | Delete a MCP server (stops it first); `409 declared_in_config` for a server the configuration declares (2.26.0+) |
 | `POST` | `/api/mcp_servers/{id}/start` | Start a MCP server |
 | `POST` | `/api/mcp_servers/{id}/stop` | Stop a MCP server |
 | `POST` | `/api/mcp_servers/{id}/block` | Block a MCP server |

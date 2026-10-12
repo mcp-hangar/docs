@@ -204,6 +204,14 @@ spec:
   startupTimeout: "30s"
 ```
 
+A remote CR describes a server that core already has, usually from its
+`config.yaml`. Since operator 0.17.20, deleting the CR leaves that server in
+core and emits a `DeregistrationSkipped` Event. Before, deleting the CR
+removed the server from core until the next reload. The operator deletes a
+remote server from core only if it registered that server itself, which it
+marks with the annotation `mcp-hangar.io/registered-by: operator`. Core 2.26.0
+also refuses to delete a server its configuration declares, with `409`.
+
 Circuit breaking lives in core (`config.yaml`), not on the CR. The operator's
 own consecutive-failure cap before it marks a server Degraded is a constant, not
 a setting.
@@ -533,7 +541,7 @@ lose DNS: it fails closed. Two settings add resolvers:
 | Operator flag (chart value) | Use it for | Example |
 | --- | --- | --- |
 | `--dns-egress-selectors` (`operator.dnsEgressSelectors`), operator 0.17.9 and later | Resolver pods that are not kube-dns: OpenShift/OKD, or a custom resolver Deployment. Each entry is `<namespace>/<key>=<value>[,...]` with at least one label. | `openshift-dns/dns.operator.openshift.io/daemonset-dns=default` |
-| `--dns-egress-cidrs` (`operator.dnsEgressCIDRs`, chart 0.12.21 and later) | A resolver reached at a node-local address, such as NodeLocal DNSCache. Not for a Service ClusterIP: CNIs match `ipBlock` after the ClusterIP is translated, so name the pods instead. | `169.254.20.10/32` |
+| `--dns-egress-cidrs` (`operator.dnsEgressCIDRs`, chart 0.12.21 and later) | A resolver reached at a node-local address, such as NodeLocal DNSCache on the host network. Not for a Service ClusterIP: CNIs match `ipBlock` after the ClusterIP is translated, so name the pods instead. Not read by the Cilium backstop; for NodeLocal on Cilium see the [egress policy guide](EGRESS_POLICY.md). | `169.254.20.10/32` |
 
 Both apply to the per-server policy, the namespace default-deny and the Vanilla
 `MCPEgressPolicy` backstop; only `--dns-egress-selectors` also reaches the
@@ -616,6 +624,11 @@ secret and service-account references are resolved by the kubelet), and the
 is `leases` and `events` only.
 
 ### Network Policies
+
+The NetworkPolicies and CiliumNetworkPolicies the operator owns are written
+with Server-Side Apply under the field manager `mcp-hangar-operator` (operator
+0.17.20 and later). A label or annotation another tool adds to them survives a
+reconcile; the operator restores only the fields it sets.
 
 Restrict MCP server communication:
 

@@ -205,6 +205,15 @@ Stops the MCP server if running, then removes it from the registry.
 {"mcp_server_id": "math", "deleted": true}
 ```
 
+**Response 409** (2.26.0 and later): the server is declared in the gateway's
+configuration file. Such a delete used to last only until the next reload or
+restart. The server keeps running. Remove it from the configuration and
+reload, or stop it with `POST /mcp_servers/{mcp_server_id}/stop`.
+
+```json
+{"error": "declared_in_config", "mcp_server_id": "math", "detail": "McpServer math is declared in the gateway configuration; ..."}
+```
+
 ### Start MCP Server
 
 ```

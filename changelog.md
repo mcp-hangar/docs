@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.32](https://github.com/mcp-hangar/docs/compare/v1.2.31...v1.2.32) (2026-10-12)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#436](https://github.com/mcp-hangar/docs/issues/436)) ([58ac812](https://github.com/mcp-hangar/docs/commit/58ac812d5b039ba2b4b079b7f8cee4441bdbd4ce))
+* **guides:** document container-mode servers as a Deployment for operator 0.17.21 ([#442](https://github.com/mcp-hangar/docs/issues/442)) ([6930ea1](https://github.com/mcp-hangar/docs/commit/6930ea1dff4c37f77132599ff35c4179b5f5f39c))
+* **guides:** NodeLocal DNS on Cilium, the DNS deny, SSA and delete semantics for operator 0.17.20 and core 2.26.0 ([#440](https://github.com/mcp-hangar/docs/issues/440)) ([e22d12f](https://github.com/mcp-hangar/docs/commit/e22d12f675eb064f2b163fb7dcd90955920abd86))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#435](https://github.com/mcp-hangar/docs/issues/435)) ([052abb8](https://github.com/mcp-hangar/docs/commit/052abb8f423756219944bd1d2a5b95a513a1be27))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#438](https://github.com/mcp-hangar/docs/issues/438)) ([5861f07](https://github.com/mcp-hangar/docs/commit/5861f07b6cd040117839cc5a834fa969baa71151))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#441](https://github.com/mcp-hangar/docs/issues/441)) ([08e166b](https://github.com/mcp-hangar/docs/commit/08e166ba02518498eb34ddfb89c9dddff04761cc))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#443](https://github.com/mcp-hangar/docs/issues/443)) ([004cfbe](https://github.com/mcp-hangar/docs/commit/004cfbeb17c7a8d62752eb9d70856c53f56694ff))
+
 ## [1.2.31](https://github.com/mcp-hangar/docs/compare/v1.2.30...v1.2.31) (2026-10-11)
 
 

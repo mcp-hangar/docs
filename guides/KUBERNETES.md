@@ -1018,7 +1018,10 @@ installs them by default (`admissionPolicies.enabled`):
 
 Updates are ratcheted: an existing server that breaks a rule can still be
 labelled, reconciled and deleted, and is judged again only when its image,
-egress or the matching annotation changes. `admissionPolicies.namespaceSelector`
+egress or the matching annotation changes. Use operator 0.17.23 (chart
+0.12.39) or newer: in 0.17.22 the wildcard-egress policy re-judged any spec
+change, so a server stored before it with wildcard egress and no opt-in was
+refused even a `replicas` or endpoint update. `admissionPolicies.namespaceSelector`
 limits both rules to matching namespaces.
 
 ## Examples

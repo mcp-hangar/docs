@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.33](https://github.com/mcp-hangar/docs/compare/v1.2.32...v1.2.33) (2026-10-12)
+
+
+### Changed
+
+* **guides:** describe the operator's admission policies for wildcard egress and image digests ([#445](https://github.com/mcp-hangar/docs/issues/445)) ([c4f4038](https://github.com/mcp-hangar/docs/commit/c4f403813c5e0b0654494a97ae704763a9277aea))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#444](https://github.com/mcp-hangar/docs/issues/444)) ([8c3586f](https://github.com/mcp-hangar/docs/commit/8c3586f8f6f5bcc9357aef2e3aa7df8157dccbe8))
+
 ## [1.2.32](https://github.com/mcp-hangar/docs/compare/v1.2.31...v1.2.32) (2026-10-12)
 
 

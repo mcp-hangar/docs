@@ -146,9 +146,9 @@ unchanged today. Read once, pin by digest.
 | Artifact | Version | Digest | Signed |
 | --- | --- | --- | --- |
 | Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `2.26.0` | `sha256:2774b17117518c246f780903dd10d4afdd4df50a6400c140b79dc5b3f55396a3` | ✅ |
-| Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.17.19` | `sha256:c9b6fa2b6777a2d3d6d1182d03e4a2afaeacc7808a6f17af0d170f2a0348c72d` | ✅ |
+| Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.17.20` | `sha256:49ff74458799eca33b43b742de49becfed0edf2dff44253032cd48d63ecaef30` | ✅ |
 | Chart `charts/mcp-hangar` (appVersion `2.26.0`) | `0.15.32` | `sha256:83fb43bcd859fc250cf275cf820a9b7ccaafd8cb9ff56459a49cc78c05702ed4` | ✅ |
-| Chart `charts/mcp-hangar-operator` (appVersion `0.17.19`) | `0.12.35` | `sha256:dfa62a71b3292115f8d19f4f735c5b14f4c378cf65feddcb20e2d2023529abf1` | ✅ |
+| Chart `charts/mcp-hangar-operator` (appVersion `0.17.20`) | `0.12.36` | `sha256:736e180c1b2f8e87affe708348f73fbbb54ec71acb29bd4d16bc9cd84a733795` | ✅ |
 <!-- END generated: released-artifacts -->
 
 Superseded (do not use): operator image `0.12.0`/`0.12.1`

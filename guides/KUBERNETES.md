@@ -252,16 +252,28 @@ an entry it has stopped seeing.
 
 ### Pod Restarts
 
-A container-mode server whose pod fails is restarted after 10 s, 20 s, 40 s and
-80 s, then every 10 minutes while it keeps failing (operator 0.17.12). A spec
-change resets the count, and `status.consecutiveFailures` stops at 5. Before
-0.17.12 the pod came back at once after each failure and, after five failures,
-was never restarted until the server was edited.
+Since operator 0.17.21, a container-mode server runs as a Deployment named
+`mcp-provider-<name>`, with `replicas` 0 or 1 and the `Recreate` strategy, so
+two pods never serve one name to core. Kubelet restarts a crashed server with
+its own CrashLoopBackOff. The MCPServer then shows `Dead`, with the
+container's waiting reason (`CrashLoopBackOff`, `ImagePullBackOff`, ...) on its
+`Ready` condition. `status.consecutiveFailures` follows the pod's restart
+count and stops at 5. A spec change replaces the pod through the Deployment
+and resets the count. `kubectl rollout restart deploy/mcp-provider-<name>`
+works, and the operator keeps the annotation it sets.
 
-A pod that exits with status 0 is restarted too, with the server
-`Initializing` and condition `Progressing/PodExited`. `Cold` means only
-`replicas: 0`; its `Ready` condition says to set `replicas` to 1 (operator
-0.17.18).
+Pod names are generated, so select a server's pod by label,
+`mcp-hangar.io/provider=<name>`. `status.podName` shows the current one. On
+the upgrade to 0.17.21, the operator deletes the pod an earlier version
+created and the Deployment starts a new one, so each server restarts once. The
+chart's ClusterRole must grant `deployments` in `apps`. Chart 0.12.36 and later
+does.
+
+Before 0.17.21 the operator created the pod itself and restarted a failed one
+after 10 s, 20 s, 40 s and 80 s, then every 10 minutes (0.17.12 to 0.17.20).
+
+`Cold` means only `replicas: 0`. The Deployment stays, scaled to zero, and the
+`Ready` condition says to set `replicas` to 1.
 
 ## MCPServerGroup
 
@@ -848,7 +860,7 @@ kubectl logs -n mcp-hangar deployment/mcp-hangar-operator -f
 
 **MCP Server stuck in Initializing:**
 
-- Check pod logs: `kubectl logs mcp-provider-<name> -n <namespace>`
+- Check pod logs: `kubectl logs deploy/mcp-provider-<name> -n <namespace>` (operator 0.17.21 and later; earlier, the pod was named `mcp-provider-<name>`)
 - Verify image exists and is pullable
 - Check resource limits
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.34](https://github.com/mcp-hangar/docs/compare/v1.2.33...v1.2.34) (2026-10-12)
+
+
+### Changed
+
+* **guides:** note that the wildcard-egress ratchet needs operator 0.17.23 ([#448](https://github.com/mcp-hangar/docs/issues/448)) ([520c1eb](https://github.com/mcp-hangar/docs/commit/520c1eb3905c22a5f16922bfe9cc4753e41649ba))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#447](https://github.com/mcp-hangar/docs/issues/447)) ([45a099b](https://github.com/mcp-hangar/docs/commit/45a099b569cee6d1aaf6b89a2ec3bb5339bb04d1))
+
 ## [1.2.33](https://github.com/mcp-hangar/docs/compare/v1.2.32...v1.2.33) (2026-10-12)
 
 

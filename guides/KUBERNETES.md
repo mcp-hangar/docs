@@ -241,6 +241,12 @@ Registration needs two things from core:
 A start that fails, such as a mistyped Service name, leaves the CR Degraded with
 reason `StartFailed`, retried every 10 seconds.
 
+For a container-mode server, `spec.healthPath` (operator 0.17.27) names the
+path core's discovery probes on its pod, stamped as `mcp-hangar.io/health-path`.
+Unset, core probes `/health`, and core 2.27.1 or newer falls back to an MCP
+`initialize` on `/mcp` when that answers 404, so a server without a health
+endpoint is registered rather than quarantined.
+
 Circuit breaking lives in core (`config.yaml`), not on the CR. The operator's
 own consecutive-failure cap before it marks a server Degraded is a constant, not
 a setting.

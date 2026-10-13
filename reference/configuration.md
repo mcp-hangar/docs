@@ -89,6 +89,9 @@ If you want an endpoint checked, register it through the REST API instead of the
 file. The reasoning is recorded in
 [ADR-021](../adr/ADR-021-config-file-endpoints-outside-the-ssrf-policy.md).
 
+From 2.27.0, [`ssrf.trusted_networks`](#ssrf) lets the API register an endpoint
+in a private network the deployment names, such as a Kubernetes Service range.
+
 ### `tools` dual format
 
 The `tools` key accepts two formats depending on intent.
@@ -1336,6 +1339,41 @@ http:
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
 | `graceful_shutdown_timeout_s` | `int` | *(unset)* | How long `serve --http` waits for in-flight requests once told to stop, before cancelling them. Unset waits without a bound. Must be a positive integer. Read when the HTTP server starts, so a reload checks it but does not apply it |
+
+## `ssrf`
+
+```yaml
+ssrf:
+  trusted_networks: ["10.96.0.0/12"]
+```
+
+| Key | Type | Default | Description |
+| ----- | ------ | --------- | ------------- |
+| `trusted_networks` | `list[str]` | `[]` | Private networks (CIDRs) that a remote endpoint registered through `POST /api/mcp_servers` may resolve into. An address in a private range passes only inside one of them. Both the registration check and the per-request connect-time check read the list, so a reload that narrows it refuses the next connection. Since 2.27.0 |
+
+Without the section, the API refuses every private endpoint, as before. The
+Kubernetes operator needs it to register a `mode: remote` MCPServer whose
+endpoint is an in-cluster Service; list the cluster's Service range.
+
+- **Who it applies to:** every caller allowed to register a server
+  (`mcp_servers:write`), not only the operator. Keep the list as narrow as the
+  servers need.
+- **What the Service range holds:** the kube-apiserver's ClusterIP and every
+  other Service in the cluster. Add the pod range only for headless Services.
+- **What it never covers:** loopback, link-local (the cloud metadata endpoint
+  among it) and the unspecified ranges are refused at startup and on reload,
+  and so is a CIDR with host bits set (`10.96.0.1/12`). A name that resolves
+  to a trusted and an untrusted private address is refused.
+- **Endpoints declared in `config.yaml`:** not affected; see
+  [`mode: remote` and the SSRF policy](#mode-remote-and-the-ssrf-policy).
+
+With the Helm chart, set it through `extraConfig`:
+
+```yaml
+extraConfig:
+  ssrf:
+    trusted_networks: ["10.96.0.0/12"]
+```
 
 ## `relay_tasks_enabled`
 

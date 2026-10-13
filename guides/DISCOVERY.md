@@ -239,6 +239,14 @@ discovery:
     quarantine_on_failure: true
 ```
 
+`require_health_check` asks an HTTP server's health path before registering
+it: `mcp-hangar.io/health-path` on a Kubernetes pod, `/health` by default.
+Since 2.27.1 a 404 there is not a failure by itself: the check then sends an
+MCP `initialize` to the server's MCP path (`mcp-hangar.io/path`, default
+`/mcp`) and passes on a JSON-RPC result. A server that serves only MCP no longer
+needs `require_health_check: false`. A 5xx or a timeout on the health path
+still fails the check, with no fallback.
+
 These apply to every source. Rules that only one kind of infrastructure
 understands — Kubernetes namespaces, and whatever a third-party source cares
 about — belong to that source; see

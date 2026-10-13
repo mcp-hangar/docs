@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.36](https://github.com/mcp-hangar/docs/compare/v1.2.35...v1.2.36) (2026-10-13)
+
+
+### Changed
+
+* **guides:** describe how operator 0.17.26 registers remote MCPServers with core ([#456](https://github.com/mcp-hangar/docs/issues/456)) ([122c028](https://github.com/mcp-hangar/docs/commit/122c028f4d388b5cf7f7b5a641376714d47ab7d7))
+* **reference:** document ssrf.trusted_networks and the 2.27.0 upgrade ([#454](https://github.com/mcp-hangar/docs/issues/454)) ([64867e9](https://github.com/mcp-hangar/docs/commit/64867e95e94589d0749a932a0688961d0ce83e70))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#458](https://github.com/mcp-hangar/docs/issues/458)) ([e4fe4c4](https://github.com/mcp-hangar/docs/commit/e4fe4c4cd49fa9888cb7716a2003c9dabc620510))
+
 ## [1.2.35](https://github.com/mcp-hangar/docs/compare/v1.2.34...v1.2.35) (2026-10-13)
 
 

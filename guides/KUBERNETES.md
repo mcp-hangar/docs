@@ -204,13 +204,42 @@ spec:
   startupTimeout: "30s"
 ```
 
-A remote CR describes a server that core already has, usually from its
-`config.yaml`. Since operator 0.17.20, deleting the CR leaves that server in
-core and emits a `DeregistrationSkipped` Event. Before, deleting the CR
-removed the server from core until the next reload. The operator deletes a
-remote server from core only if it registered that server itself, which it
-marks with the annotation `mcp-hangar.io/registered-by: operator`. Core 2.26.0
-also refuses to delete a server its configuration declares, with `409`.
+A remote CR either mirrors a server core already has, usually from its
+`config.yaml`, or, since operator 0.17.26 (chart 0.12.42), declares one core does
+not have yet.
+
+- **Core already has the name:** the CR mirrors it. The operator reports its
+  health and never changes or deletes it; deleting the CR emits a
+  `DeregistrationSkipped` Event. Core 2.26.0 also refuses to delete a server its
+  configuration declares, with `409`.
+- **Core does not have the name:** the operator registers the server with
+  `POST /api/mcp_servers/`, starts it once, and reports Ready only after the
+  start succeeds. Deleting the CR removes it from core. A changed
+  `spec.endpoint` removes and registers it again, since core cannot change an
+  endpoint.
+
+Core keys servers by name across the whole cluster, while a CR is namespaced.
+The operator records which MCPServer registered each name as a Lease
+`mcp-server-<name>` in its own namespace, claimed before core is asked. A CR in
+another namespace with the same name is Degraded with reason `NameTaken`, and
+deleting it leaves the other server alone. The annotation
+`mcp-hangar.io/registered-by: operator`, which operators 0.17.20 to 0.17.25 read,
+no longer decides anything: anyone able to edit a CR could set it.
+
+Registration needs two things from core:
+
+- **A trusted network.** Core refuses a private endpoint, an in-cluster Service
+  included, unless its network is in `ssrf.trusted_networks` (core 2.27.0; see
+  the [configuration reference](../reference/configuration.md#ssrf)). Until then
+  the CR is Degraded with reason `EndpointNotTrusted`. List the Service range;
+  every caller allowed to register servers can then reach it.
+- **A role that may register.** With auth on, the operator's API key needs
+  `mcp_servers:write` to register and `mcp_servers:lifecycle` to start and
+  deregister. `provider-admin` has neither, and the CR is then Degraded with
+  reason `RegistrationForbidden`.
+
+A start that fails, such as a mistyped Service name, leaves the CR Degraded with
+reason `StartFailed`, retried every 10 seconds.
 
 Circuit breaking lives in core (`config.yaml`), not on the CR. The operator's
 own consecutive-failure cap before it marks a server Degraded is a constant, not

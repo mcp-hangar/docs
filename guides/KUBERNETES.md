@@ -1024,6 +1024,14 @@ change, so a server stored before it with wildcard egress and no opt-in was
 refused even a `replicas` or endpoint update. `admissionPolicies.namespaceSelector`
 limits both rules to matching namespaces.
 
+Since operator 0.17.24 (chart 0.12.40) the policies are the only enforcement:
+the webhook dropped its copies of both rules, so with
+`admissionPolicies.enabled=false`, or `config/admissionpolicy` left out of a
+kustomize overlay, neither rule exists, webhook or not. The operator flags
+`--webhook-annotation-rules` and `--image-digest-policy` are accepted and
+ignored, and a later release removes them; set the digest level in the params
+ConfigMap (the chart's `operator.imageDigestPolicy`).
+
 ## Examples
 
 See [config/samples/](https://github.com/mcp-hangar/mcp-hangar-operator/tree/main/config/samples) in the operator repository for complete examples.

@@ -125,7 +125,8 @@ version is `v1alpha2`. See [ADR-013](../adr/ADR-013-egress-policy-enforcement-mo
   webhook (operator 0.17.6). The two rules that read an annotation, the
   wildcard-egress opt-in (`hangar.io/allow-unrestricted-egress`) and the
   image-digest policy, are ValidatingAdmissionPolicies since operator 0.17.22,
-  so the apiserver enforces them with the webhook off as well. The optional
+  so the apiserver enforces them with the webhook off as well; since 0.17.24
+  they are the only enforcement of those two rules. The optional
   validating webhook keeps the cross-namespace ConfigMap check and regexp
   compilation for discovery sources, and admission warnings. `MCPEgressPolicy`
   has no webhook.

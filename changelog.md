@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.35](https://github.com/mcp-hangar/docs/compare/v1.2.34...v1.2.35) (2026-10-13)
+
+
+### Changed
+
+* **guides:** say the admission policies are the only wildcard-egress and digest enforcement ([#450](https://github.com/mcp-hangar/docs/issues/450)) ([420930d](https://github.com/mcp-hangar/docs/commit/420930d89c51522aa0d59123da1364860a56b555))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#451](https://github.com/mcp-hangar/docs/issues/451)) ([a6ca0d7](https://github.com/mcp-hangar/docs/commit/a6ca0d7228d7e33bc7f879210eff5b5f4d037128))
+
 ## [1.2.34](https://github.com/mcp-hangar/docs/compare/v1.2.33...v1.2.34) (2026-10-12)
 
 

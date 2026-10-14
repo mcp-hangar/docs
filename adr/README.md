@@ -203,13 +203,10 @@ probed module can still change.
 
 ### [ADR-026](ADR-026-stdio-is-an-authenticated-transport.md): Stdio Is an Authenticated Transport, and the Config Names Its Principal
 
-Identity reaches Hangar through ASGI middleware, which a stdio process never
-enters, so a local caller has no identity and the fail-closed front door
-projects zero tools to it. Declares the spawning process the trust boundary --
-the OS user launched it -- and lets `auth.stdio.principal` name the caller it
-implies, with no credential checked because none exists to check. Absent the
-block, behavior is unchanged. Default role `viewer`: read-only, and deliberately
-without `tool:invoke`, which gates `hangar_call` rather than the flat path.
+Superseded by ADR-028. The process-spawn trust boundary and declared stdio
+identity remain: HTTP never borrows that principal. The built-in default
+`viewer` role is read-only. ADR-028 replaces the old claim that the flat path
+omits invocation authorization.
 
 ### [ADR-027](ADR-027-egress-is-a-trust-mode-not-a-preset.md): `egress` Is a Trust Mode, Not a Preset of the Front Door
 
@@ -228,21 +225,15 @@ one parameter per difference. The mode is defined by how it treats a caller with
 no tenant. `flat` is a front-door key, refused under `egress`. Existing `egress`
 deployments migrate nothing.
 
-### [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md): On a Front Door, the Tool-Access Policy Is the Invoke Gate for Upstream Tools
+### [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md): One Invoke Authorization Contract for HTTP and Stdio
 
-With auth on, `hangar_call` requires `tool:invoke` for each call. The flat path
-applies the governed projection and the executor gates, and no RBAC permission.
-Once core#1370 serves both on one front door, an HTTP `viewer` could call a tool
-by its flat name and be refused it through `hangar_call`.
-
-Decided: on a front door, `hangar_call` may name only what the caller's flat
-projection holds, with denied answered like missing. It passes the same executor
-gates and no `tool:invoke`. `egress` keeps `tool:invoke`. The continuation tools
-are out of scope: they stay off the front door and keep `tool:invoke`, because
-nothing else binds a continuation to its caller.
-
-The cost is that a front door enforces no per-principal tool grant. An operator
-moving from `egress` has to express that restriction as tenant policy instead.
+With auth enabled, flat calls and `hangar_call` require the configured
+authorizer's approval for `tool:invoke`; HTTP can use OPA fallback after RBAC
+denies. A declared stdio principal uses its declared built-in roles, with
+`viewer` read-only. Tool-access policy further narrows an authorized call.
+Auth-disabled behavior remains explicit, and HTTP never borrows stdio identity.
+Core #1623 shipped the shared gate in 2.24.0; release evidence is not a
+production probe.
 
 ### [ADR-029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md): One Enrichment Boundary and a Bounded Decision Vocabulary for Traces
 
@@ -275,19 +266,3 @@ specification, see [ADR_AGENTS.md](https://github.com/mcp-hangar/mcp-hangar/blob
 
 - [How to propose a new ADR](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/internal/ADR_AGENTS.md#2-when-to-write-an-adr)
 - [ADR governance and formatting rules](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/internal/ADR_AGENTS.md)
-
-## Invoke authorization reconciliation
-
-ADR-028 supersedes ADR-026 while preserving its stdio identity boundary.
-With authentication enabled, HTTP and declared stdio principals share the
-`tool:invoke` gate; the default `viewer` role remains read-only. HTTP never
-borrows the stdio principal. Core #1623 shipped this contract in 2.24.0;
-[the implementation](https://github.com/mcp-hangar/mcp-hangar/pull/1623) is
-release evidence, not a deployment probe.
-
-## Trust-mode reconciliation
-
-ADR-027 retains separate egress and front-door no-tenant rules. Invocation
-authorization is shared as recorded in ADR-028; it is not the difference between modes.
-`tool_projection.flat` and the find/call surface remain future work in
-[core #1370](https://github.com/mcp-hangar/mcp-hangar/issues/1370).

@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.37](https://github.com/mcp-hangar/docs/compare/v1.2.36...v1.2.37) (2026-10-14)
+
+
+### Changed
+
+* **guides:** a policy on a remote target reports NotApplicable, not Enforcing ([#467](https://github.com/mcp-hangar/docs/issues/467)) ([8f4f71e](https://github.com/mcp-hangar/docs/commit/8f4f71e5931b75ce35767f35d4deab73903c9369))
+* **guides:** bring over upgrade notes for the latest release ([#469](https://github.com/mcp-hangar/docs/issues/469)) ([1e261ab](https://github.com/mcp-hangar/docs/commit/1e261ab9f2dc312b80f7fa4b2b1a620e4259bdc4))
+* **guides:** describe the discovery initialize fallback and spec.healthPath ([#465](https://github.com/mcp-hangar/docs/issues/465)) ([c99f0bf](https://github.com/mcp-hangar/docs/commit/c99f0bf9513b3c69f290b8e0c9def504d2f9ae3a))
+* **guides:** say the core chart needs an auth mode to become Ready ([#468](https://github.com/mcp-hangar/docs/issues/468)) ([1aa56e2](https://github.com/mcp-hangar/docs/commit/1aa56e243c0188a7434672b18c913689943dafb6))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#470](https://github.com/mcp-hangar/docs/issues/470)) ([d634c70](https://github.com/mcp-hangar/docs/commit/d634c7021704259a4bd300a4ca0b7ffaa66921b7))
+
 ## [1.2.36](https://github.com/mcp-hangar/docs/compare/v1.2.35...v1.2.36) (2026-10-13)
 
 

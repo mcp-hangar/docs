@@ -1,6 +1,6 @@
 # ADR-007: Langfuse Integration for LLM Observability
 
-**Status:** Accepted
+**Status:** Deprecated
 **Date:** 2026-01-12
 **Authors:** MCP Hangar Team
 

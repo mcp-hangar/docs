@@ -17,14 +17,14 @@ taxonomy, and formatting conventions.
 | [004](ADR-004-sep-1766-digest-pinning.md) | Preemptive Implementation of SEP-1766 (Digest Pinning) and SEP-1763 (Interceptor Framework) | Accepted (partial → [010](ADR-010-retire-agent-cloud-tier.md)) | 2026-05-01 |
 | [005](ADR-005-sep-1763-interceptor-compliance.md) | SEP-1763 Interceptor Framework Compliance | Superseded by [010](ADR-010-retire-agent-cloud-tier.md) | 2026-05-01 |
 | [006](ADR-006-tetragon.md) | Runtime Enforcement Strategy -- Tetragon-First, Pluggable Backend | Superseded by [010](ADR-010-retire-agent-cloud-tier.md) | 2026-05-10 |
-| [007](ADR-007-langfuse-integration.md) | Langfuse Integration for LLM Observability | Accepted | 2026-01-12 |
+| [007](ADR-007-langfuse-integration.md) | Langfuse Integration for LLM Observability | Deprecated | 2026-01-12 |
 | [008](ADR-008-tasks-relay-only.md) | Task Governance is Relay-Only -- Hangar is a Task Relay, Not a Task Executor | Accepted (partial → [014](ADR-014-tasks-relay-with-governance.md)) | 2026-07-02 |
 | [009](ADR-009-independent-release-topology.md) | Independent Release Topology -- Core, Operator Image, Agent Image, and OCI Helm Charts Release on Their Own SemVer | Accepted (partial → [010](ADR-010-retire-agent-cloud-tier.md)) | 2026-07-14 |
 | [010](ADR-010-retire-agent-cloud-tier.md) | Retire the Agent + Hangar Cloud Product Tier | Accepted | 2026-07-16 |
 | [011](ADR-011-single-source-of-truth-cross-repo-facts.md) | Single Source of Truth for Cross-Repo Facts | Accepted | 2026-07-18 |
 | [012](ADR-012-interceptor-sep-pin-tracking-policy.md) | Interceptor SEP-Pin Tracking Policy | Accepted | 2026-07-18 |
 | [013](ADR-013-egress-policy-enforcement-model.md) | Egress Policy Enforcement Model (MCPEgressPolicy) | Accepted | 2026-07-18 |
-| [014](ADR-014-tasks-relay-with-governance.md) | Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute | Accepted (partial → [015](ADR-015-vendored-task-wire.md)) | 2026-07-20 |
+| [014](ADR-014-tasks-relay-with-governance.md) | Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute | Accepted | 2026-07-20 |
 | [015](ADR-015-vendored-task-wire.md) | The Tasks Wire is Vendored -- `mcp_types.Task*` is a Fossil, Not a Moving Target | Accepted | 2026-07-28 |
 | [016](ADR-016-approval-resolution-chokepoint.md) | Approval Resolution Has One Authorized Chokepoint, and Core Knows No Vendors | Accepted | 2026-07-29 |
 | [017](ADR-017-approval-input-request-namespace.md) | Pending Approvals Use `io.mcp-hangar/approval`, and Carry No Requested Schema | Accepted | 2026-07-29 |
@@ -39,7 +39,7 @@ taxonomy, and formatting conventions.
 | [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Superseded by [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | 2026-09-03 |
 | [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Accepted | 2026-09-12 |
 | [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | One Invoke Authorization Contract for HTTP and Stdio | Accepted | 2026-09-13 |
-| [029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md) | One Enrichment Boundary and a Bounded Decision Vocabulary for Traces | Proposed | 2026-09-19 |
+| [029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md) | One Enrichment Boundary and a Bounded Decision Vocabulary for Traces | Accepted | 2026-09-19 |
 
 ## Summaries
 
@@ -96,10 +96,10 @@ in MCP-semantic policy compilation rather than kernel-level hooks.
 
 ### [ADR-007](ADR-007-langfuse-integration.md): Langfuse Integration for LLM Observability
 
-Integrates with Langfuse through a Port/Adapter pattern (ObservabilityPort
-with LangfuseObservabilityAdapter) to provide LLM-specific observability
-(cost tracking, prompt correlation, quality evaluation) as an optional
-dependency alongside existing OpenTelemetry infrastructure telemetry.
+The dedicated Langfuse adapter was removed in core 2.25.0 by
+[core #1734](https://github.com/mcp-hangar/mcp-hangar/pull/1734). ADR-007 is
+Deprecated; vendor-neutral OTLP export remains supported. Its accepted body
+is preserved as historical context.
 
 ### [ADR-008](ADR-008-tasks-relay-only.md): Task Governance is Relay-Only -- Hangar is a Task Relay, Not a Task Executor
 
@@ -170,18 +170,11 @@ a policy without the backstop is a suggestion. From epic #53.
 
 ### [ADR-014](ADR-014-tasks-relay-with-governance.md): Tasks are Relayed With Governance -- Hangar Interposes Task Lifecycle, It Still Does Not Execute
 
-**Accepted.** Partially supersedes
-ADR-008. Two facts changed since the relay-only decision: the SDK v2 beta
-(mcp 2.0.0b2, spike #547) promotes Tasks out of `experimental` into a first-class
-negotiated extension (clearing ADR-008 trigger (b)), and the built-but-dormant
-governance stack (#319/#320/#321/#322) is stranded. Decision: **relay-with-governance**
-— Hangar relays upstream-created tasks and interposes governance (ownership, digest
-re-verification, consent) at the proxy/store seam, recording `task_id`→provenance as an
-append-only event chain (ADR-002). It still does **not** execute: no task creation, no
-scheduler, no worker→main-loop bridge. Lifts only ADR-008's "relay-only *permanently*"
-and "do not build yet"; carries the rest forward. Build the seam now (trigger (b) met),
-activate per-upstream on first real task; behavior is unchanged until then. Unblocks the
-p1-high consent gate #322. Answers PR #368's objections point by point.
+Hangar relays upstream tasks with ownership, digest and consent governance;
+it never becomes a task executor. ADR-015 corrects the historical SDK wire
+premise. ADR-015 records reactivation through core #645;
+`tests/unit/test_the_task_relay_kill_switch.py` checks the enabled/default-on
+path and capability advertising. The switch can deliberately disable relay.
 
 ### [ADR-015](ADR-015-vendored-task-wire.md): The Tasks Wire is Vendored -- `mcp_types.Task*` is a Fossil, Not a Moving Target
 
@@ -291,3 +284,11 @@ ADR-027 retains separate egress and front-door no-tenant rules. Invocation
 RBAC is shared as recorded in ADR-028; it is not the difference between modes.
 `tool_projection.flat` and the find/call surface remain future work in
 [core #1370](https://github.com/mcp-hangar/mcp-hangar/issues/1370).
+
+## Trace contract reconciliation
+
+ADR-029 records the bounded, vendor-neutral enrichment contract shipped
+across core 2.22.0 and 2.24.0. Its 2.21.0 context is historical, and the
+dedicated Langfuse adapter is retired without retiring OTLP.
+[Core #1288](https://github.com/mcp-hangar/mcp-hangar/issues/1288) still tracks
+peer-event causality; acceptance of the ADR does not close that work.

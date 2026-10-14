@@ -1,14 +1,20 @@
 # ADR-029: One Enrichment Boundary and a Bounded Decision Vocabulary for Traces
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-09-19
 **Authors:** MCP Hangar Team
 
 ## Context
 
+The analysis below records the historical 2.21.0 baseline that motivated this
+contract. The enrichment and bounded decision vocabulary subsequently shipped
+across 2.22.0 and 2.24.0; the old missing-path descriptions are not claims about
+today's serving paths. Acceptance of this contract is separate from completion
+of each instrumentation task, including peer-event causality (mcp-hangar/mcp-hangar#1288).
+
 Hangar's traces became structurally correct in 2.19 (#1308–#1331): one request is one trace entered through the mcp SDK's SERVER span, `batch.call.<tool>` nests under `batch.execute`, the upstream CLIENT span carries its own carriers and outcome, the concurrency wait is measured on its own, caught failures end in ERROR with a bounded `error.type`, and export is proven end to end against a real OTLP receiver (#1293).
 
-What traces still cannot do is explain *decisions*: why a gate refused, which backend was chosen, what an L7 policy said, or how background work relates to the call that caused it. Every task that would add this (#1278, #1285, #1286, #1295, #1297, #1279, #1281, #1288, #1296) needs the same answers first. Without one contract, each would invent its own.
+What traces still cannot do is explain *decisions*: why a gate refused, which backend was chosen, what an L7 policy said, or how background work relates to the call that caused it. Every task that would add this (#1278, #1285, #1286, #1295, #1297, #1279, #1281, mcp-hangar/mcp-hangar#1288, #1296) needs the same answers first. Without one contract, each would invent its own.
 
 The state of the published 2.21.0 wheel, re-checked on `main`, that forces the decision:
 
@@ -40,7 +46,7 @@ The state of the published 2.21.0 wheel, re-checked on `main`, that forces the d
 ### 2. Parent versus link
 
 - **Parent** only when the child's work runs synchronously on behalf of the parent, within the same request lifetime.
-- **Link** when: many waiters share one cause (single-flight cold start, #1279); the work outlives the request (governed tasks, #1281); the cause is on another instance (tailed peer events, #1288); the cause is a timer or scheduler (#1296); an inbound carrier names a different trace than the ambient span (already implemented, #1316).
+- **Link** when: many waiters share one cause (single-flight cold start, #1279); the work outlives the request (governed tasks, #1281); the cause is on another instance (tailed peer events, mcp-hangar/mcp-hangar#1288); the cause is a timer or scheduler (#1296); an inbound carrier names a different trace than the ambient span (already implemented, #1316).
 - **Never:** `correlation_id` as a parent; a span held open across a multi-hour task; an invented parent or link when the origin is unknown or malformed.
 
 ### 3. The SDK SERVER span is the request-entry span, not necessarily the trace root
@@ -54,7 +60,12 @@ Hangar never opens a parallel request span. The SDK's SERVER span is where a req
 - `BatchExecutor._execute_call`'s `batch.call.<tool>` span is the single enrichment point for MCP tool calls; batch and flat-tool invocations both pass through it. Caller and tenant attributes come only from the bound identity context, never from baggage, and unknown values are omitted. The per-gate outcome summary lives here.
 - Management and REST commands that do not reach the executor get the dispatch span of #1297, with the same outcome vocabulary.
 - **`TracedMcpServerService` is retired** (#1278 deletes it). Reviving it would rebuild a parallel pipeline on a path nothing constructs.
-- **Relationship to [ADR-007](ADR-007-langfuse-integration.md):** nothing in it is superseded. Its port and adapter design stands, and the Langfuse adapter is driven from this boundary rather than from the decorator its Key Design Decision 2 describes. That decorator is retired in implementation by #1278; the ADR that prescribed it keeps its status. Its port shape is unchanged — an adapter may receive process-local invocation data — but every emission that leaves the process is subordinate to the #1276 data-handling contract, which decides what an adapter is permitted to send. The Langfuse scrub defaults currently contradict each other on that point (#1534); this ADR does not depend on which way that is resolved.
+- **Vendor-neutral export replaces the removed Langfuse adapter.** The
+  process-local enrichment boundary is not a vendor SDK adapter. Core mcp-hangar/mcp-hangar#1734
+  removed that adapter and its settings in 2.25.0; ADR-007 is Deprecated.
+  Langfuse consumes the existing OTLP trace export like another receiver.
+  Every emitted value remains subordinate to the #1276 data-handling contract.
+  This record neither revives the adapter nor reintroduces its scrub settings.
 
 ### 5. A bounded decision vocabulary under `hangar.`
 
@@ -129,7 +140,7 @@ A decision made inside an aggregate leaves through a narrow domain port with a n
 
 ### 8. Causal envelope
 
-- **Stored** as an optional bounded value: the W3C `traceparent` string of the originating span, as data and never as an SDK object — the event `metadata` column (#1288), the task ledger entry (#1281), the timer payload (#1296).
+- **Stored** as an optional bounded value: the W3C `traceparent` string of the originating span, as data and never as an SDK object — the event `metadata` column (mcp-hangar/mcp-hangar#1288), the task ledger entry (#1281), the timer payload (#1296).
 - **Consumed** by opening a new span with one link to that origin. Many waiters produce many links, never one shared parent.
 - **Missing or malformed origin:** no link.
 - **Replication.** Tailed delivery stays projection-only ([ADR-020](ADR-020-high-availability.md) §4). Replicating trace context never replays effects.
@@ -162,7 +173,7 @@ What the rules above produce on the paths that exist today. Each row is the cont
 
 ### Positive
 
-One boundary, one vocabulary and one parent/link rule unblock #1278, #1285, #1286, #1295, #1297 and #1279, #1281, #1288, #1296 — none has to invent its own. Denials stop inflating error rates on the spans Hangar owns, and the first refusing gate becomes queryable by name. Recording each gate as a span event means a call's full decision history survives instead of the last gate overwriting the rest. Five implementers can take #1278, #1285, #1286, #1295 and #1297 and produce compatible telemetry without another semantic decision. The dead path ADR-007 pointed at is retired rather than revived.
+One boundary, one vocabulary and one parent/link rule unblock #1278, #1285, #1286, #1295, #1297 and #1279, #1281, mcp-hangar/mcp-hangar#1288, #1296 — none has to invent its own. Denials stop inflating error rates on the spans Hangar owns, and the first refusing gate becomes queryable by name. Recording each gate as a span event means a call's full decision history survives instead of the last gate overwriting the rest. Five implementers can take #1278, #1285, #1286, #1295 and #1297 and produce compatible telemetry without another semantic decision. The dead path ADR-007 pointed at is retired rather than revived.
 
 ### Negative
 

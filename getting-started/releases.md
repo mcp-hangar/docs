@@ -70,6 +70,14 @@ helm install mcp-hangar-operator \
   oci://ghcr.io/mcp-hangar/charts/mcp-hangar-operator --version <version>
 ```
 
+The core chart needs an auth mode: core refuses to serve HTTP on a non-loopback
+address without authentication, so a bare `helm install mcp-hangar` never becomes
+Ready. Add `--set auth.enabled=true --set auth.allow_anonymous=false --set
+auth.api_key.enabled=true`, or `--set config.unsafeNoAuth=true` for a local trial on a
+cluster nobody else can reach. The
+[chart README](https://github.com/mcp-hangar/helm-charts/blob/main/mcp-hangar/README.md)
+runs both on kind in CI.
+
 Inspect a chart before installing:
 
 ```bash

@@ -46,9 +46,13 @@ requires. HTTP does not consume the stdio declaration.
 ### 2. Apply one invocation authorization rule
 
 When authentication/authorization is enabled, every upstream invocation on
-the flat front-door path and through `hangar_call` requires `tool:invoke`.
-A missing or anonymous principal is refused; the declared stdio principal is
-authorized against its declared built-in roles.
+the flat front-door path and through `hangar_call` requires approval by the
+configured authorizer for `tool:invoke`. A missing or anonymous principal is
+refused. HTTP bootstrap can use `CombinedAuthorizer(require_both=False)`:
+RBAC is checked first, but an OPA allow after an RBAC denial also authorizes
+the call (`opa_override`). An RBAC role grant is therefore not a universal
+prerequisite. The declared stdio principal is authorized against its declared
+built-in roles; that restriction does not constrain HTTP's authorizer.
 
 The shared authorization check is `_authorize_calls`; the flat path reaches
 it through `_authorize_flat_call`. The authorization layer remains outside
@@ -59,17 +63,19 @@ That does not bypass tool-access policy, withdrawal, digest pins, approval,
 L7 policy or other configured governance controls. In particular, disabling
 auth does not create the tenant a front-door caller needs.
 
-The `viewer` role remains read-only and lacks `tool:invoke`. Under enabled
-auth it cannot invoke an upstream merely because stdio declares it or a
-catalogue exposes the tool. A deployment needing invocation grants an
-appropriate role explicitly. This ADR does not widen the default role.
+The built-in `viewer` role remains read-only and lacks `tool:invoke`. Under
+enabled auth, a declared stdio principal with only `viewer` cannot invoke an
+upstream merely because stdio declares it or a catalogue exposes the tool;
+its declaration must name an appropriate built-in role. This ADR does not
+widen the default role or prevent HTTP's configured authorizer from approving
+a call through OPA.
 
 ### 3. Tool-access policy narrows an authorized call
 
-A role grant does not override server, group, member or tenant policy.
-Withdrawal, digest enforcement, approvals and the remaining runtime controls
-still apply. A tool-access allow is likewise not a substitute for a role grant
-when auth is enabled.
+Approval by the configured authorizer does not override server, group,
+member or tenant policy. Withdrawal, digest enforcement, approvals and the
+remaining runtime controls still apply. A tool-access allow is likewise not
+a substitute for authorizer approval when auth is enabled.
 
 Tools hidden by policy remain indistinguishable from missing names for ordinary
 callers. The refusal path must preserve the non-disclosure contract in
@@ -99,8 +105,9 @@ continuation tools on a surface that currently excludes them.
 
 ### Negative
 
-- An enabled-auth local deployment declaring only `viewer` cannot invoke
-  upstream tools. Examples promising invocation must grant it explicitly.
+- An enabled-auth declared stdio principal with only the built-in `viewer`
+  role cannot invoke upstream tools. Examples promising invocation must name
+  an appropriate built-in role.
 - The config file can declare a privileged stdio identity; its filesystem
   permissions cannot be replaced by checking a secret in that same file.
 - Auth-disabled deployments retain a different authorization posture, which

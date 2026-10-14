@@ -234,9 +234,11 @@ Registration needs two things from core:
   the CR is Degraded with reason `EndpointNotTrusted`. List the Service range;
   every caller allowed to register servers can then reach it.
 - **A role that may register.** With auth on, the operator's API key needs
-  `mcp_servers:write` to register and `mcp_servers:lifecycle` to start and
-  deregister. `provider-admin` has neither, and the CR is then Degraded with
-  reason `RegistrationForbidden`.
+  `mcp_servers:write` to register, `mcp_servers:lifecycle` to start and
+  deregister, and `policy:write` to deliver egress policy. Only `admin` holds
+  all three. `provider-admin` lacks the first two, and the CR is then Degraded
+  with reason `RegistrationForbidden`; `developer` lacks `policy:write`, and
+  the policy push gets `403`.
 
 A start that fails, such as a mistyped Service name, leaves the CR Degraded with
 reason `StartFailed`, retried every 10 seconds.

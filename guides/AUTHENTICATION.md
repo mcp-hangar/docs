@@ -170,10 +170,17 @@ The `provider:*` family is the pre-rename vocabulary and the REST API authorizes
 against `mcp_servers:*` instead, so those entries currently grant nothing over
 the API. That is why `provider-admin` gained `providers:read` and `policy:write`
 in 2.2.0: without them it could not make a single call the Kubernetes operator
-makes, and an operator key had to be `developer` or `admin`. **`provider-admin`
-is now the least-privilege role for an operator API key** — it can read servers
-and deliver compiled egress policy, and cannot create, delete or restart a
-server through the API.
+makes, and an operator key had to be `developer` or `admin`. `provider-admin`
+suffices for an operator that only reads servers and delivers compiled egress
+policy.
+
+An operator that registers remote servers (operator 0.17.26 and later) needs
+three permissions: `mcp_servers:write` to register, `mcp_servers:lifecycle` to
+start and deregister, and `policy:write` to deliver egress policy. Only `admin`
+holds all three: `developer` has the first two and the policy push gets `403`,
+`provider-admin` has the last and registration gets `403`. Until core has a
+narrower built-in role ([core#1827](https://github.com/mcp-hangar/mcp-hangar/issues/1827)),
+an operator key that registers servers is an `admin` key.
 
 `approval:resolve` is the permission that decides an approval. From 2.0.0 it is
 enforced, so a caller without it receives `403` where it previously received

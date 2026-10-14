@@ -88,7 +88,7 @@ One call passes many gates. A scalar attribute holds one value per key, so the l
 | --- | --- |
 | `hangar.gate.decision` | `hangar.gate.name`, `hangar.gate.outcome`, optional `hangar.gate.reason`, optional `hangar.gate.revision` |
 
-A deferred digest pin therefore records `{name=digest_pin, outcome=deferred}` and, on the same span, later records `{name=digest_pin, outcome=allow|deny|error}`. Neither overwrites the other.
+A deferred digest pin therefore records `{name=digest_pin, outcome=deferred}` and, on the same span, later records `{name=deferred_digest_pin, outcome=allow|deny|error}`. Neither overwrites the other.
 
 The call's summary is separate and scalar. It never carries a history.
 

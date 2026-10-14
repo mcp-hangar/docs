@@ -42,7 +42,7 @@ create a tenant or override this policy decision.
 
 When auth is enabled, both invoke entry paths require `tool:invoke`, as
 ADR-028 specifies. Auth-disabled behavior is also governed by ADR-028.
-Invocation RBAC is not a difference between these modes.
+Invocation authorization is not a difference between these modes.
 
 Management visibility remains a principal/permission decision under ADR-022.
 Permission to manage a gateway does not imply that the principal has the

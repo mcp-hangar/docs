@@ -36,9 +36,9 @@ taxonomy, and formatting conventions.
 | [023](ADR-023-mcp-registry-listing.md) | The MCP Registry Entry Describes a Package, Not a Service | Accepted | 2026-08-16 |
 | [024](ADR-024-approval-hold-belongs-on-a-tool-call.md) | A Human Approval Hold Belongs on a Tool Call, Not on a Fetch | Accepted | 2026-08-23 |
 | [025](ADR-025-header-selectors-must-not-match-unvalidated-headers.md) | A Header Selector Must Not Match a Header Nobody Validated | Accepted | 2026-08-29 |
-| [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Accepted | 2026-09-03 |
+| [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Superseded by [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | 2026-09-03 |
 | [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Proposed | 2026-09-12 |
-| [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | On a Front Door, the Tool-Access Policy Is the Invoke Gate for Upstream Tools | Proposed | 2026-09-13 |
+| [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | One Invoke Authorization Contract for HTTP and Stdio | Accepted | 2026-09-13 |
 | [029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md) | One Enrichment Boundary and a Bounded Decision Vocabulary for Traces | Proposed | 2026-09-19 |
 
 ## Summaries
@@ -275,3 +275,12 @@ specification, see [ADR_AGENTS.md](https://github.com/mcp-hangar/mcp-hangar/blob
 
 - [How to propose a new ADR](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/internal/ADR_AGENTS.md#2-when-to-write-an-adr)
 - [ADR governance and formatting rules](https://github.com/mcp-hangar/mcp-hangar/blob/main/docs/internal/ADR_AGENTS.md)
+
+## Invoke authorization reconciliation
+
+ADR-028 supersedes ADR-026 while preserving its stdio identity boundary.
+With authentication enabled, HTTP and declared stdio principals share the
+`tool:invoke` gate; the default `viewer` role remains read-only. HTTP never
+borrows the stdio principal. Core #1623 shipped this contract in 2.24.0;
+[the implementation](https://github.com/mcp-hangar/mcp-hangar/pull/1623) is
+release evidence, not a deployment probe.

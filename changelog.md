@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.38](https://github.com/mcp-hangar/docs/compare/v1.2.37...v1.2.38) (2026-10-14)
+
+
+### Changed
+
+* **architecture:** correct the egress trust-mode rationale ([#473](https://github.com/mcp-hangar/docs/issues/473)) ([66a53d6](https://github.com/mcp-hangar/docs/commit/66a53d688d77df58b124afd1601bb04ad21c5ff7))
+* **architecture:** rebuild the ADR decision register ([#475](https://github.com/mcp-hangar/docs/issues/475)) ([11742fb](https://github.com/mcp-hangar/docs/commit/11742fb2a1f10c40f13baeb4f2542c6328557518))
+* **architecture:** reconcile export and task-relay history ([#474](https://github.com/mcp-hangar/docs/issues/474)) ([5d1e678](https://github.com/mcp-hangar/docs/commit/5d1e6789153de03224bc6608da795c3b93469e2b))
+* **architecture:** reconcile shared invoke authorization ([#472](https://github.com/mcp-hangar/docs/issues/472)) ([d94a3af](https://github.com/mcp-hangar/docs/commit/d94a3afd9df7fc44ac120aad5f757682e1d60763))
+* **guides:** bring over upgrade notes for the latest release ([#476](https://github.com/mcp-hangar/docs/issues/476)) ([d21a6c2](https://github.com/mcp-hangar/docs/commit/d21a6c23224b9532a1ffb85e1d357837c089c231))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#477](https://github.com/mcp-hangar/docs/issues/477)) ([e097ef6](https://github.com/mcp-hangar/docs/commit/e097ef6832c8018dd50d6625dfd94f871d5dc891))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#479](https://github.com/mcp-hangar/docs/issues/479)) ([20cee08](https://github.com/mcp-hangar/docs/commit/20cee0884a45c856e1779a93bd5e329d348e304b))
+
 ## [1.2.37](https://github.com/mcp-hangar/docs/compare/v1.2.36...v1.2.37) (2026-10-14)
 
 

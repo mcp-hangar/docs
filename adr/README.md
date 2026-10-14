@@ -281,7 +281,7 @@ release evidence, not a deployment probe.
 ## Trust-mode reconciliation
 
 ADR-027 retains separate egress and front-door no-tenant rules. Invocation
-RBAC is shared as recorded in ADR-028; it is not the difference between modes.
+authorization is shared as recorded in ADR-028; it is not the difference between modes.
 `tool_projection.flat` and the find/call surface remain future work in
 [core #1370](https://github.com/mcp-hangar/mcp-hangar/issues/1370).
 

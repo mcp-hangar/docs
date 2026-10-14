@@ -282,12 +282,23 @@ drops the policy on restart shows it on every reconcile.
 | Condition | Meaning |
 | ----------- | --------- |
 | `Compiled` | The policy was structurally compiled. |
-| `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`). |
+| `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`, and `False` with `RemoteTargetHasNoPods` when the target is a `mode: remote` server, operator 0.17.28). |
 | `BackstopEnforceable` | Whether anything in the cluster enforces the written backstop: `True` / `EnforcerObserved` when the operator finds a policy-enforcing API or a known CNI agent, `False` / `NoEnforcerObserved` when it finds neither (`status.backstopEnforcement: Unenforced`; the `Backstop` column of `kubectl get`), `Unknown` / `EnforcementUnverified` when it could not tell, for example because it may not list DaemonSets (`status.backstopEnforcement: Unverified`). |
 | `L7Delivered` | Whether core took the compiled L7 policy (operator 0.17.5). `True` / `Delivered` once every target server accepted the push; `True` / `DeliveredNotPersisted` when core took it but has no persistence backend (see [Surviving a gateway restart](#surviving-a-gateway-restart)); `False` / `CoreAuthRejected`, `CoreUnreachable` or `PushFailed`, naming the server whose push failed; `Unknown` / `CoreIntegrationOff` when the operator runs without `--hangar-url`. Shown as the `L7` column of `kubectl get mcpegresspolicies`. |
 | `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), `CiliumAgentNotObserved` (Cilium requested, CRD present, no `cilium` agent observed; operator 0.17.7 and later), `TargetNotFound`, `EnforcementNotObserved` (nothing observed to enforce the backstop), or `L7PushFailed` (`L7Delivered=False`). |
 
 `Compiled` and `BackstopApplied` say nothing about core. Before operator 0.17.5 a policy whose L7 push core refused -- an API key without `policy:write`, a core that was down, a payload core rejected -- read `Compiled=True` and `Degraded=False`, with a Warning Event as the only trace. It now reads `L7Delivered=False` and `Degraded=True` / `L7PushFailed`, so an alert on `Degraded` may fire on a policy that has been undelivered since it was created. Fix the key's permissions or core's reachability; the next reconcile clears it.
+
+**A remote target has no backstop.** A `mode: remote` server runs no pod; core dials
+its address, so its traffic leaves from the gateway pod, and a NetworkPolicy
+selecting the server's pods would select nothing. Before operator 0.17.28 the policy
+reported `BackstopApplied=True` and `backstopEnforcement: Enforcing` over exactly
+that. Now it writes no backstop (and removes one left behind), reports
+`BackstopApplied=False` with reason `RemoteTargetHasNoPods` and
+`backstopEnforcement: NotApplicable`, and still delivers the L7 rules to core. For
+a remote target they are the only enforcement; the network path is controlled by the
+gateway pod's own egress policy. A group reads `NotApplicable` only when every member
+is remote.
 
 **One enforcement probe for every NetworkPolicy the operator writes.** The
 probe behind `BackstopEnforceable` looks for a policy-enforcing API (Calico,

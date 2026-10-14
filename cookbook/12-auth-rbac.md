@@ -162,7 +162,7 @@ Built-in roles:
 | Role | Can do |
 | ------ | -------- |
 | `admin` | Everything |
-| `provider-admin` | Read servers and deliver compiled egress policy (`policy:write`); cannot create, delete, start or stop a server through the API. The least-privilege role for a Kubernetes operator API key. |
+| `provider-admin` | Read servers and deliver compiled egress policy (`policy:write`); cannot create, delete, start or stop a server through the API. Enough for an operator that only delivers policy; one that registers remote servers needs `admin` today (see the authentication guide). |
 | `developer` | Invoke tools, read and manage server state. Cannot touch egress policy. |
 | `viewer` | Read-only access |
 | `auditor` | Read-only access to audit logs and metrics |

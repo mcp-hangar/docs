@@ -44,7 +44,7 @@ When auth is enabled, both invoke entry paths require `tool:invoke`, as
 ADR-028 specifies. Auth-disabled behavior is also governed by ADR-028.
 Invocation authorization is not a difference between these modes.
 
-Management visibility remains a principal/permission decision under ADR-022.
+On the front door, management visibility remains a principal/permission decision under ADR-022.
 Permission to manage a gateway does not imply that the principal has the
 tenant needed for front-door upstream invocation.
 

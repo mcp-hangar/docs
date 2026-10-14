@@ -210,20 +210,13 @@ omits invocation authorization.
 
 ### [ADR-027](ADR-027-egress-is-a-trust-mode-not-a-preset.md): `egress` Is a Trust Mode, Not a Preset of the Front Door
 
-Asks whether a front door with `tool_projection.flat: []` (core#1370) is just
-`egress`, which would make the two modes one mode with a parameter. Read from the
-2.19.1 wheel, it is not. The modes differ in three ways:
-
-- A caller with no tenant gets the policy without a tenant layer under
-  `egress`, and is denied upstream tools under `front_door`.
-- `egress`'s invoke path, `hangar_call`, requires `tool:invoke`, and the flat
-  path does not.
-- The surface differs.
-
-Keeping `egress` a mode of its own is chosen over a preset, which would need
-one parameter per difference. The mode is defined by how it treats a caller with
-no tenant. `flat` is a front-door key, refused under `egress`. Existing `egress`
-deployments migrate nothing.
+The modes differ in their no-tenant policy: egress resolves policy without a
+tenant layer, while front door denies upstream tools without a tenant.
+Invocation authorization is shared under ADR-028. On the front door,
+management visibility follows the principal's permissions under ADR-022.
+`tool_projection.flat` and the find/call surface remain future work in
+[core #1370](https://github.com/mcp-hangar/mcp-hangar/issues/1370); the future
+projection option does not turn egress into a front-door preset.
 
 ### [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md): One Invoke Authorization Contract for HTTP and Stdio
 

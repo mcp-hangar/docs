@@ -37,7 +37,7 @@ taxonomy, and formatting conventions.
 | [024](ADR-024-approval-hold-belongs-on-a-tool-call.md) | A Human Approval Hold Belongs on a Tool Call, Not on a Fetch | Accepted | 2026-08-23 |
 | [025](ADR-025-header-selectors-must-not-match-unvalidated-headers.md) | A Header Selector Must Not Match a Header Nobody Validated | Accepted | 2026-08-29 |
 | [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Superseded by [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | 2026-09-03 |
-| [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Proposed | 2026-09-12 |
+| [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Accepted | 2026-09-12 |
 | [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | One Invoke Authorization Contract for HTTP and Stdio | Accepted | 2026-09-13 |
 | [029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md) | One Enrichment Boundary and a Bounded Decision Vocabulary for Traces | Proposed | 2026-09-19 |
 
@@ -284,3 +284,10 @@ With authentication enabled, HTTP and declared stdio principals share the
 borrows the stdio principal. Core #1623 shipped this contract in 2.24.0;
 [the implementation](https://github.com/mcp-hangar/mcp-hangar/pull/1623) is
 release evidence, not a deployment probe.
+
+## Trust-mode reconciliation
+
+ADR-027 retains separate egress and front-door no-tenant rules. Invocation
+RBAC is shared as recorded in ADR-028; it is not the difference between modes.
+`tool_projection.flat` and the find/call surface remain future work in
+[core #1370](https://github.com/mcp-hangar/mcp-hangar/issues/1370).

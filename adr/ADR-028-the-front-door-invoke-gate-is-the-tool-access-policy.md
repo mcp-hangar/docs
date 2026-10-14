@@ -1,207 +1,152 @@
-# ADR-028: On a Front Door, the Tool-Access Policy Is the Invoke Gate for Upstream Tools
+# ADR-028: One Invoke Authorization Contract for HTTP and Stdio
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-09-13
 **Authors:** MCP Hangar Team
 
 ## Context
 
-[ADR-027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) recorded that the two
-paths to an upstream tool authorize a call differently. Paths and line numbers
-below are in the published `mcp-hangar` 2.19.1 wheel, relative to the
-`mcp_hangar/` package.
+The first proposal gave the front door's tool-access policy sole responsibility
+for invocation and omitted `tool:invoke`. It matched an omission in the flat
+call path, not an intended exception to role-based authorization. Core
+[mcp-hangar#1623](https://github.com/mcp-hangar/mcp-hangar/pull/1623), released in
+2.24.0, repaired that omission and applied the same invocation authorization to
+flat calls and `hangar_call`, including a declared stdio principal.
 
-**`hangar_call`** validates each call against the fleet, then runs
-`_authorize_calls`, then hands the batch to `BatchExecutor`.
+[ADR-026](ADR-026-stdio-is-an-authenticated-transport.md) correctly chose the
+spawning process as the stdio authentication boundary. Its explanation that
+`tool:invoke` decides nothing on stdio is no longer true when auth is enabled.
+This decision supersedes ADR-026, carries its identity boundary and defaults
+forward, and records the authorization rule the repaired implementation serves.
+It does not grant additional roles or change an existing configuration.
 
-- **Validation.** It checks that the named server or group and the named tool
-  exist, and it runs before any authorization (`server/tools/batch/__init__.py:490`).
-- **`_authorize_calls`** is called at `:518`.
-  - With auth off, it allows every call (`:131`-`:132`).
-  - With auth on, it refuses the whole batch when the principal is missing or
-    anonymous (`:144`). Otherwise it requires `tool:invoke` per call, with the
-    bare tool name as the resource id, and fails closed (`:163`-`:189`).
-  - `tests/live/test_t2_auth.py` pins this over HTTP: a `viewer` is refused and a
-    `developer` is not.
-
-**The flat front-door path** resolves the requested name against the caller's
-flat map before anything else. That map is built by `_build_flat_map` from the
-governed decision, `is_governed_allowed`, which applies the tool-access policy
-and the withdrawal scopes with each group member collapsed into its group. It
-also applies two header filters: `x-mcp-header` annotations must be valid, and
-the operator's `header_exposure` block must allow the tool.
-
-A name outside the map is `-32601`. A denied item is answered exactly like a
-missing one, which keeps the front door from being a cross-tenant enumeration
-oracle (`mcp-hangar#905`). A name inside the map dispatches through its group
-(`fastmcp_server/flat_tool_projection.py:944`), and then `BatchExecutor` runs
-its gates (`server/tools/batch/executor.py:1795`-`:1808`).
-
-None of those steps checks an RBAC permission.
-
-The two paths are served in different modes today, so no surface shows both.
-`mcp-hangar#1370` changes that. Its default front-door surface is
-`hangar_find`, `hangar_call` and the management tools a caller is permitted,
-with `tool_projection.flat` as the opt-in, so one front door would carry both
-rules.
-
-An HTTP principal holding `viewer`, which lacks `tool:invoke`, could then call a
-tool by its flat name and be refused the same tool through `hangar_call`. A
-discovery tool that lists what the projection holds would show tools that
-`hangar_call` then refuses. [ADR-022](ADR-022-the-management-surface-is-what-the-caller-may-call.md)
-set the rule that shown means callable for the management surface. The same
-reasoning applies here.
-
-On stdio, `tool:invoke` decides nothing today
-([ADR-026](ADR-026-stdio-is-an-authenticated-transport.md)):
-
-- With auth off, `_authorize_calls` allows every call.
-- With auth on, it looks for the principal on an HTTP request that a pipe never
-  carries, so it refuses a stdio caller as anonymous.
-
-The split is therefore an HTTP concern.
-
-Two properties of `tool:invoke` matter for what replaces it.
-
-- **A grant is per tool name, not per server.** A permission names a resource id
-  (`domain/value_objects/security.py:141`, matched at `:151`-`:166`), and
-  `_authorize_calls` passes the bare tool name as that id. A grant therefore
-  covers that name on every server, while the tool-access policy is keyed by
-  server, group and tenant, never by principal.
-- **Continuations are not bound by it.** `hangar_fetch_continuation` and
-  `hangar_delete_continuation` hand back the tail of a truncated `hangar_call`
-  result. They are gated by `tool:invoke` against every resource id, and they
-  accept a grant held within any tenant
-  (`server/tools/tool_permissions.py:111`, `:352`). The cache stores the
-  response under its continuation id alone
-  (`infrastructure/truncation/memory_cache.py:82`,
-  `infrastructure/truncation/redis_cache.py:84`). So `tool:invoke` limits who
-  may redeem an id, and nothing binds a continuation to the caller that
-  produced it.
-
-The flat path never hands a continuation id out. It returns only the call's
-result (`fastmcp_server/flat_tool_projection.py:997`). Only `hangar_call`'s
-result formatting carries the id (`server/tools/batch/executor.py:1782`-`:1783`),
-and its docstring tells the client to redeem it with `hangar_fetch_continuation`
-(`server/tools/batch/__init__.py:410`-`:412`).
+HTTP has a credential-bearing request. Stdio has no request or credential
+channel: the OS-authenticated session spawns a child, and the configuration
+declares the principal that boundary implies. Authentication and authorization
+remain separate questions on both transports.
 
 ## Decision
 
-### 1. On a front door, `hangar_call` is gated exactly as a flat call is
+### 1. Resolve identity from the serving transport
 
-In `front_door`, a call that `hangar_call` carries to an upstream tool passes
-three gates:
+HTTP uses the authenticated principal on that request. A request with no
+principal never borrows the declared stdio principal.
 
-- **It may name only what the caller's flat projection holds.** That is the same
-  map, built by the same generation (`mcp-hangar#1367`), with each group member
-  collapsed into its group. Any other target gets the answer a missing tool
-  gets, and a denied target is indistinguishable from a missing one.
-- **It then passes the same `BatchExecutor` gates** as a flat call.
-- **It does not pass `_authorize_calls`,** so `tool:invoke` is not required.
+Stdio uses `auth.stdio.principal`, when configured, with no credential checked
+over the pipe. The declaration requires an id and tenant_id; its roles default
+to `[viewer]`. Anyone who can modify that configuration can change its
+declared identity, so file ownership and permissions remain part of the trust
+boundary. The declaration cannot be revoked by token expiry; changing it
+requires restarting the process.
 
-`_authorize_calls` also refuses an anonymous caller. On a front door the
-resolver's no-tenant deny (`mcp-hangar#236`) does that instead. The deny holds
-because a tenant reaches the identity context from only two places: an
-authenticated principal (`fastmcp_server/asgi.py:139`-`:152`) or a declared
-stdio principal (ADR-026). Anything that adds a third place has to preserve this.
+Without the declaration, stdio acquires no identity from this mechanism.
+A front-door caller without a tenant is denied upstream tools, as ADR-027
+requires. HTTP does not consume the stdio declaration.
 
-With those three gates, one rule decides:
+### 2. Apply one invocation authorization rule
 
-- what the flat surface lists;
-- what a discovery tool such as `hangar_find` may list;
-- what either path will call.
+When authentication/authorization is enabled, every upstream invocation on
+the flat front-door path and through `hangar_call` requires approval by the
+configured authorizer for `tool:invoke`. A missing or anonymous principal is
+refused. HTTP bootstrap can use `CombinedAuthorizer(require_both=False)`:
+RBAC is checked first, but an OPA allow after an RBAC denial also authorizes
+the call (`opa_override`). An RBAC role grant is therefore not a universal
+prerequisite. The declared stdio principal is authorized against its declared
+built-in roles; that restriction does not constrain HTTP's authorizer.
 
-That is ADR-022's rule that shown means callable, applied to the invoke path.
+The shared authorization check is `_authorize_calls`; the flat path reaches
+it through `_authorize_flat_call`. The authorization layer remains outside
+the executor's governance chain, and neither serving path may omit it.
 
-### 2. `egress` keeps `_authorize_calls`
+When auth is explicitly disabled, the existing authorization bypass remains.
+That does not bypass tool-access policy, withdrawal, digest pins, approval,
+L7 policy or other configured governance controls. In particular, disabling
+auth does not create the tenant a front-door caller needs.
 
-In `egress`, `hangar_call` is unchanged. There it is the only invoke path, and
-`tool:invoke` is the only per-principal control over which upstream tools a
-principal may call. The tool-access policy there is keyed by tenant, and a caller
-in `egress` may carry no tenant at all (ADR-027).
+The built-in `viewer` role remains read-only and lacks `tool:invoke`. Under
+enabled auth, a declared stdio principal with only `viewer` cannot invoke an
+upstream merely because stdio declares it or a catalogue exposes the tool;
+its declaration must name an appropriate built-in role. This ADR does not
+widen the default role or prevent HTTP's configured authorizer from approving
+a call through OPA.
 
-### Scope: continuation tools are not upstream tools
+### 3. Tool-access policy narrows an authorized call
 
-This decision covers calls to upstream tools. `hangar_fetch_continuation` and
-`hangar_delete_continuation` are outside it. They keep `tool:invoke`, and the
-front door does not project them, as today.
+Approval by the configured authorizer does not override server, group,
+member or tenant policy. Withdrawal, digest enforcement, approvals and the
+remaining runtime controls still apply. A tool-access allow is likewise not
+a substitute for authorizer approval when auth is enabled.
 
-Removing `tool:invoke` from them would leave the continuation id as the whole
-control. Binding a continuation to its caller is a separate change, and this
-decision does not make it.
+Tools hidden by policy remain indistinguishable from missing names for ordinary
+callers. The refusal path must preserve the non-disclosure contract in
+mcp-hangar#905; documenting authorization must not introduce enumeration.
+
+### 4. Management authorization remains distinct
+
+A management operation uses its `TOOL_PERMISSIONS` entry. The front door's
+management listing follows those permissions, as ADR-022 specifies. A stdio
+principal receives no management permission solely from the transport.
+
+This ADR does not choose the permission for `hangar_find`, implement the new
+front-door surface, or introduce `tool_projection.flat`. Those changes remain
+in mcp-hangar#1370/#1373. It does not change continuation ownership or expose
+continuation tools on a surface that currently excludes them.
 
 ## Consequences
 
 ### Positive
 
-- On a front door, listing and calling follow one rule. No path calls a target
-  the surface did not list, and none refuses by permission a target it did.
-- A declared stdio principal is unaffected. `tool:invoke` never decided a stdio
-  call.
-- Nothing a deployment runs today changes. No front door serves `hangar_call`
-  yet, and `egress` is untouched. The rule takes effect with the surface
-  `mcp-hangar#1370` introduces.
+- Invocation authorization has the same meaning over HTTP and stdio and on
+  the flat and batch entry paths.
+- The process-spawn trust boundary remains explicit without adding a
+  credential that the same local user could read from configuration.
+- Roles and tenant policy retain separate, testable responsibilities.
+- The documented contract agrees with the security repair shipped in 2.24.0.
 
 ### Negative
 
-- **A front door enforces no per-principal tool grant.** A custom role that
-  grants `tool:invoke` on some tool names governs nothing there. The flat path
-  never honoured such a grant, so no running front door loses anything.
-  - An operator who moves from `egress` to `front_door` with such roles does
-    lose it, and the gateway does not say so.
-  - The translation is not one-to-one. The grant is by bare tool name across
-    every server, while tenant policy is per server.
-  - The upgrade note for `mcp-hangar#1370`'s surface has to say both.
-- **`hangar_call` authorizes differently by mode:** `tool:invoke` in `egress`,
-  not on a front door. The same principal making the same call can be allowed by
-  one gateway and refused by another.
-- **The agent role ADR-022 recommends grants nothing on a front door.** That
-  role holds `tool:invoke` and nothing else. ADR-022 also kept `hangar_call` off
-  the front door as "the `egress` way in". `mcp-hangar#1370` reverses that, and
-  this decision assumes the reversal.
-- **Truncated results become unredeemable on a front door.** Once `hangar_call`
-  is served there, a truncated result will carry a continuation id for a tool the
-  front door does not serve. A front-door client still cannot fetch the rest of a
-  truncated result, and it will now be told how to try.
+- An enabled-auth declared stdio principal with only the built-in `viewer`
+  role cannot invoke upstream tools. Examples promising invocation must name
+  an appropriate built-in role.
+- The config file can declare a privileged stdio identity; its filesystem
+  permissions cannot be replaced by checking a secret in that same file.
+- Auth-disabled deployments retain a different authorization posture, which
+  must be described explicitly rather than inferred from transport names.
 
 ### Neutral
 
-- On a front door, which tools a caller may use varies per tenant and never per
-  principal within a tenant. That was already true of the flat path, and this
-  decision extends it to `hangar_call`.
+- The default role stays `viewer`; this record adds no implicit grant.
+- The same policy can still produce different runtime outcomes because of
+  health, budgets or approval state. Authorization parity does not promise
+  execution success.
 
 ## Alternatives Considered
 
-### 1. Require `tool:invoke` on the flat path as well
+### 1. Tool-access policy alone on the front door
 
-- **Rejected**: It is the stricter rule, and it keeps per-principal grants
-  working. It also changes what every running HTTP front door does: a principal
-  without `tool:invoke` loses every upstream tool it can call today. The control
-  it preserves has never been enforced on a front door.
+Rejected. This was the earlier ADR-028 proposal. A viewer could invoke through
+the flat path while the same role was refused through `hangar_call`, the
+security defect repaired by mcp-hangar#1623.
 
-### 2. Keep both rules
+### 2. Exempt stdio from authorization when auth is enabled
 
-- **Rejected**: One surface would list tools that one of its paths refuses.
+Rejected. Process spawning establishes identity; it does not grant every
+operation to that identity. The declared principal already has roles.
 
-### 3. Give the tool-access policy a per-principal scope
+### 3. Add a shared credential to the stdio config
 
-- **Deferred**: It would bring per-principal restriction back to the front door
-  inside a single rule. Nobody has asked for it, and it is a change to the policy
-  model rather than to the invoke gate.
+Rejected. It would authenticate a file to the user who can already read and
+modify that file, without strengthening the spawn boundary.
 
 ## References
 
-- Epic: `mcp-hangar#1370`. The question this follows from: `mcp-hangar#1371`.
-  The projection that `hangar_call` names from: `mcp-hangar#1367`.
-- Evidence: the `mcp-hangar` 2.19.1 wheel from PyPI, cited in Context. Tests:
-  `tests/live/test_t2_auth.py` (`hangar_call` refuses a `viewer` over HTTP).
-- The fail-closed default for a caller with no tenant: `mcp-hangar#236`. A
-  denied item answered like a missing one: `mcp-hangar#905`.
-- Related decisions:
-  [ADR-022](ADR-022-the-management-surface-is-what-the-caller-may-call.md)
-  (shown means callable; `hangar_call` and the continuation tools are the invoke
-  path),
-  [ADR-026](ADR-026-stdio-is-an-authenticated-transport.md) (the stdio principal
-  and its `viewer` default),
-  [ADR-027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) (row 8: the two
-  paths authorize differently).
+- [ADR-026](ADR-026-stdio-is-an-authenticated-transport.md), superseded here.
+- [ADR-022](ADR-022-the-management-surface-is-what-the-caller-may-call.md).
+- [ADR-027](ADR-027-egress-is-a-trust-mode-not-a-preset.md).
+- [mcp-hangar#1623](https://github.com/mcp-hangar/mcp-hangar/pull/1623):
+  invocation parity and declared stdio roles, released in 2.24.0.
+- [mcp-hangar#1631](https://github.com/mcp-hangar/mcp-hangar/pull/1631):
+  management authorization for the declared stdio principal.
+- `tests/unit/test_the_flat_call_checks_tool_invoke.py`.
+- `tests/live/test_t0_stdio_tool_invoke.py` and
+  `tests/live/test_t2_front_door_tool_invoke.py`.

@@ -36,9 +36,9 @@ taxonomy, and formatting conventions.
 | [023](ADR-023-mcp-registry-listing.md) | The MCP Registry Entry Describes a Package, Not a Service | Accepted | 2026-08-16 |
 | [024](ADR-024-approval-hold-belongs-on-a-tool-call.md) | A Human Approval Hold Belongs on a Tool Call, Not on a Fetch | Accepted | 2026-08-23 |
 | [025](ADR-025-header-selectors-must-not-match-unvalidated-headers.md) | A Header Selector Must Not Match a Header Nobody Validated | Accepted | 2026-08-29 |
-| [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Accepted | 2026-09-03 |
+| [026](ADR-026-stdio-is-an-authenticated-transport.md) | Stdio Is an Authenticated Transport, and the Config Names Its Principal | Superseded by [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | 2026-09-03 |
 | [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Proposed | 2026-09-12 |
-| [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | On a Front Door, the Tool-Access Policy Is the Invoke Gate for Upstream Tools | Proposed | 2026-09-13 |
+| [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | One Invoke Authorization Contract for HTTP and Stdio | Accepted | 2026-09-13 |
 | [029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md) | One Enrichment Boundary and a Bounded Decision Vocabulary for Traces | Proposed | 2026-09-19 |
 
 ## Summaries
@@ -203,13 +203,10 @@ probed module can still change.
 
 ### [ADR-026](ADR-026-stdio-is-an-authenticated-transport.md): Stdio Is an Authenticated Transport, and the Config Names Its Principal
 
-Identity reaches Hangar through ASGI middleware, which a stdio process never
-enters, so a local caller has no identity and the fail-closed front door
-projects zero tools to it. Declares the spawning process the trust boundary --
-the OS user launched it -- and lets `auth.stdio.principal` name the caller it
-implies, with no credential checked because none exists to check. Absent the
-block, behavior is unchanged. Default role `viewer`: read-only, and deliberately
-without `tool:invoke`, which gates `hangar_call` rather than the flat path.
+Superseded by ADR-028. The process-spawn trust boundary and declared stdio
+identity remain: HTTP never borrows that principal. The built-in default
+`viewer` role is read-only. ADR-028 replaces the old claim that the flat path
+omits invocation authorization.
 
 ### [ADR-027](ADR-027-egress-is-a-trust-mode-not-a-preset.md): `egress` Is a Trust Mode, Not a Preset of the Front Door
 
@@ -228,21 +225,15 @@ one parameter per difference. The mode is defined by how it treats a caller with
 no tenant. `flat` is a front-door key, refused under `egress`. Existing `egress`
 deployments migrate nothing.
 
-### [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md): On a Front Door, the Tool-Access Policy Is the Invoke Gate for Upstream Tools
+### [ADR-028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md): One Invoke Authorization Contract for HTTP and Stdio
 
-With auth on, `hangar_call` requires `tool:invoke` for each call. The flat path
-applies the governed projection and the executor gates, and no RBAC permission.
-Once core#1370 serves both on one front door, an HTTP `viewer` could call a tool
-by its flat name and be refused it through `hangar_call`.
-
-Decided: on a front door, `hangar_call` may name only what the caller's flat
-projection holds, with denied answered like missing. It passes the same executor
-gates and no `tool:invoke`. `egress` keeps `tool:invoke`. The continuation tools
-are out of scope: they stay off the front door and keep `tool:invoke`, because
-nothing else binds a continuation to its caller.
-
-The cost is that a front door enforces no per-principal tool grant. An operator
-moving from `egress` has to express that restriction as tenant policy instead.
+With auth enabled, flat calls and `hangar_call` require the configured
+authorizer's approval for `tool:invoke`; HTTP can use OPA fallback after RBAC
+denies. A declared stdio principal uses its declared built-in roles, with
+`viewer` read-only. Tool-access policy further narrows an authorized call.
+Auth-disabled behavior remains explicit, and HTTP never borrows stdio identity.
+Core #1623 shipped the shared gate in 2.24.0; release evidence is not a
+production probe.
 
 ### [ADR-029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md): One Enrichment Boundary and a Bounded Decision Vocabulary for Traces
 

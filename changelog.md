@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.40](https://github.com/mcp-hangar/docs/compare/v1.2.39...v1.2.40) (2026-10-15)
+
+
+### Changed
+
+* **guides:** prepare provider network deployment acceptance ([#483](https://github.com/mcp-hangar/docs/issues/483)) ([4464921](https://github.com/mcp-hangar/docs/commit/44649214f6632efe0d42f9ce507f8693c02d7653))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#484](https://github.com/mcp-hangar/docs/issues/484)) ([bae9031](https://github.com/mcp-hangar/docs/commit/bae9031d66694812fd20156a0862c5b736bb99f9))
+
 ## [1.2.39](https://github.com/mcp-hangar/docs/compare/v1.2.38...v1.2.39) (2026-10-15)
 
 

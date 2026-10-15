@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.39](https://github.com/mcp-hangar/docs/compare/v1.2.38...v1.2.39) (2026-10-15)
+
+
+### Changed
+
+* **guides:** say which core role an operator that registers servers needs ([#480](https://github.com/mcp-hangar/docs/issues/480)) ([0bee84f](https://github.com/mcp-hangar/docs/commit/0bee84f88817291155b5b33c1ed874cc0caa44d9))
+* **reference:** list every published chart release in the compatibility page ([#482](https://github.com/mcp-hangar/docs/issues/482)) ([45d105a](https://github.com/mcp-hangar/docs/commit/45d105a71a729684dbeb2a67623db104db67ca1e))
+
 ## [1.2.38](https://github.com/mcp-hangar/docs/compare/v1.2.37...v1.2.38) (2026-10-14)
 
 

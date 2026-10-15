@@ -1072,3 +1072,9 @@ ConfigMap (the chart's `operator.imageDigestPolicy`).
 ## Examples
 
 See [config/samples/](https://github.com/mcp-hangar/mcp-hangar-operator/tree/main/config/samples) in the operator repository for complete examples.
+
+## Provider network acceptance
+
+Before claiming gateway-only access or Audit/Enforce isolation on a deployment,
+complete the [provider network acceptance procedure](../operations/provider-network-acceptance.md).
+It records the actual selectors, CNI, packet probes, L7 decisions and rollback.

@@ -3,8 +3,11 @@
 # from the GHCR registry — the versions, digests, and chart appVersions are read
 # live, not hand-maintained (they drifted three times before this existed).
 #
-# Needs: gh (auth), crane, helm. Idempotent: rewrites only the block between the
-# `<!-- BEGIN/END generated: released-artifacts -->` markers; if nothing changed,
+# It also regenerates the "Chart release history" block: one row per published
+# chart version with its appVersion and kubeVersion, read from the charts.
+#
+# Needs: gh (auth), crane, helm. Idempotent: rewrites only the blocks between the
+# `<!-- BEGIN/END generated: ... -->` markers; if nothing changed,
 # the file is byte-identical and the caller opens no PR.
 set -euo pipefail
 
@@ -50,3 +53,43 @@ open(f, "w").write(pat.sub(lambda m: m.group(1) + table + m.group(2), s))
 PY
 
 echo "Regenerated released-artifacts table: core $core_v, operator $op_v, charts $cc_v/$co_v."
+
+# --- Chart release history -------------------------------------------------
+# Every published chart version, newest first, so a chart release can never be
+# missing from the page. The newest version read back from the registry must be
+# in the table, or nothing is written.
+chart_rows() {
+  local chart="$1" versions
+  versions="$(crane ls "$ORG/charts/$chart" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -rV)"
+  require "$versions" "$chart versions"
+  printf '%s\n' "$versions" | xargs -P 8 -I{} sh -c '
+    meta="$(helm show chart "oci://$1/charts/$2" --version "$3")" || exit 1
+    app="$(printf "%s\n" "$meta" | awk "/^appVersion:/{gsub(/[\"\047]/,\"\"); print \$2}")"
+    kube="$(printf "%s\n" "$meta" | awk "/^kubeVersion:/{gsub(/[\"\047]/,\"\"); print \$2}")"
+    printf "%s|%s|%s\n" "$3" "$app" "$kube"' _ "$ORG" "$chart" {} | sort -t'|' -k1,1rV
+}
+
+history_table() {
+  local chart="$1" rows
+  rows="$(chart_rows "$chart")"
+  printf '%s\n' "$rows" | head -1 | grep -q "^$2|" \
+    || { echo "::error::newest $chart $2 is missing from the history — refusing to write" >&2; exit 1; }
+  printf '| Chart version | appVersion | kubeVersion |\n| --- | --- | --- |\n'
+  printf '%s\n' "$rows" | awk -F'|' '{printf "| `%s` | `%s` | `%s` |\n", $1, $2, $3}'
+}
+
+CORE_HISTORY="$(history_table mcp-hangar "$cc_v")"
+OP_HISTORY="$(history_table mcp-hangar-operator "$co_v")"
+HISTORY="$(printf '**Chart `charts/mcp-hangar`**\n\n%s\n\n**Chart `charts/mcp-hangar-operator`**\n\n%s' "$CORE_HISTORY" "$OP_HISTORY")"
+
+HISTORY="$HISTORY" python3 - "$FILE" <<'PY'
+import os, re, sys
+f = sys.argv[1]
+s = open(f).read()
+pat = re.compile(r"(<!-- BEGIN generated: chart-release-history.*?-->\n).*?(\n<!-- END generated: chart-release-history -->)", re.S)
+if not pat.search(s):
+    sys.exit("::error::chart-release-history markers not found in " + f)
+open(f, "w").write(pat.sub(lambda m: m.group(1) + os.environ["HISTORY"] + m.group(2), s))
+PY
+
+echo "Regenerated chart release history."

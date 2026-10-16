@@ -153,6 +153,7 @@ Tokens with a missing, empty, non-string, or untrusted `iss` claim fail closed.
 | Role | Description | Permissions |
 | ------ | ------------- | ------------- |
 | `admin` | Full access | Everything |
+| `kubernetes-operator` | Role for the Kubernetes operator's API key: register, start and deregister servers, deliver egress policy | `mcp_servers:read/write/lifecycle`, `policy:read`, `policy:write` |
 | `provider-admin` | Manage servers, deliver egress policy, invoke tools | **`providers:read`**, `policy:read`, **`policy:write`**, `provider:*`, `group:*`, `discovery:read/trigger/approve`, `tool:invoke`, `tool:list`, `metrics:read`, **`approval:read`**, **`approval:resolve`** |
 | `developer` | Use tools, start servers on demand | `provider:read/list/start/load/load_verified/unload`, `providers:read/write/lifecycle`, `tool:invoke/list`, `group:read/list`, `discovery:read` |
 | `viewer` | Read-only | `providers:read`, `provider:read/list`, `tool:list`, `metrics:read`, `group:read/list`, `discovery:read` |
@@ -176,11 +177,13 @@ policy.
 
 An operator that registers remote servers (operator 0.17.26 and later) needs
 three permissions: `mcp_servers:write` to register, `mcp_servers:lifecycle` to
-start and deregister, and `policy:write` to deliver egress policy. Only `admin`
-holds all three: `developer` has the first two and the policy push gets `403`,
-`provider-admin` has the last and registration gets `403`. Until core has a
-narrower built-in role ([core#1827](https://github.com/mcp-hangar/mcp-hangar/issues/1827)),
-an operator key that registers servers is an `admin` key.
+start and deregister, and `policy:write` to deliver egress policy. From core
+2.28.0 the built-in `kubernetes-operator` role holds exactly those plus the two
+read permissions, and nothing else: no tool invocation, no groups, no discovery
+approval, no config reload. Use it for the operator's key. `developer` has the
+first two and the policy push gets `403`; `provider-admin` has the last and
+registration gets `403`. Lifecycle is not scoped per server, so the role can
+start servers it did not register.
 
 `approval:resolve` is the permission that decides an approval. From 2.0.0 it is
 enforced, so a caller without it receives `403` where it previously received

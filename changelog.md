@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.41](https://github.com/mcp-hangar/docs/compare/v1.2.40...v1.2.41) (2026-10-16)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#486](https://github.com/mcp-hangar/docs/issues/486)) ([06b8072](https://github.com/mcp-hangar/docs/commit/06b80722aef3f1af101105e7930da9e2b120abb5))
+* **guides:** name kubernetes-operator as the role for an operator key ([#488](https://github.com/mcp-hangar/docs/issues/488)) ([7347d54](https://github.com/mcp-hangar/docs/commit/7347d540dae8a7dddf4a57631a870912abaff121))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#487](https://github.com/mcp-hangar/docs/issues/487)) ([9688fd4](https://github.com/mcp-hangar/docs/commit/9688fd477f806afc9092d5e369f0cb9156a2bbe6))
+
 ## [1.2.40](https://github.com/mcp-hangar/docs/compare/v1.2.39...v1.2.40) (2026-10-15)
 
 

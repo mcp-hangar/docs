@@ -163,7 +163,7 @@ Built-in roles:
 | ------ | -------- |
 | `admin` | Everything |
 | `kubernetes-operator` | Register, start and deregister servers and deliver egress policy; nothing else. The role for an operator API key. |
-| `provider-admin` | Read servers and deliver compiled egress policy (`policy:write`); cannot create, delete, start or stop a server through the API. Enough for an operator that only delivers policy; one that registers remote servers uses `kubernetes-operator` (core 2.28.0 and later; see the authentication guide). |
+| `provider-admin` | Register, reconfigure, start, stop and remove servers, deliver compiled egress policy, manage groups and discovery (core 2.29.0 and later; before that it could not create, delete, start or stop a server). The narrow role for a Kubernetes operator's key is `kubernetes-operator`. |
 | `developer` | Invoke tools, read and manage server state. Cannot touch egress policy. |
 | `viewer` | Read-only access |
 | `auditor` | Read-only access to audit logs and metrics |

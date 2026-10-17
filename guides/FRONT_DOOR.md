@@ -149,7 +149,8 @@ and publish a domain event (`ToolWithdrawn` / `ToolRestored`).
 
 Both accept an optional JSON body with a `tenant_id`. Omitting it (or sending
 `null`) withdraws/restores **globally for all tenants**, which requires the
-`admin:*` grant: a global `developer` gets `403` without a `tenant_id`.
+`admin:*` grant from core 2.29.0: a global `developer` gets `403` without a
+`tenant_id`.
 Providing one scopes the action to that tenant. A caller whose grant is tenant-scoped acts on its own
 tenant only: omitting `tenant_id` means that tenant, and naming another is a
 `403`. The body may also carry `kind` -- `tool` (the default), `prompt` or

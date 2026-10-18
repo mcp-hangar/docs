@@ -1149,7 +1149,7 @@ These routes are gated on `policy:read` / `policy:write`, **not** on
 `mcp_servers:write`. The distinction is deliberate: `mcp_servers:write` is held
 by `developer`, and gating policy mutation on it let that role clear an egress
 policy. Among the built-in roles `policy:read` and `policy:write` are held by
-`admin` and `provider-admin` only.
+`admin`, `provider-admin` and `kubernetes-operator` only.
 
 ### Get L7 Policy
 

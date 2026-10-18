@@ -274,7 +274,7 @@ mcp-hangar add postgres --no-reload
 
 When adding a MCP server that requires configuration, you'll be prompted for:
 
-- **Secrets** (API keys, tokens): Hidden input, stored securely
+- **Secrets** (API keys, tokens): Hidden input. From core 2.29.0 the value is not written to the config file: the entry holds a `${NAME}` reference, `add` says which variable to set, and the file is created with mode `0600`. Before 2.29.0 the typed value was written into the file in clear text.
 - **Paths** (directories, files): Path validation
 - **Text** (URLs, names): Standard input
 

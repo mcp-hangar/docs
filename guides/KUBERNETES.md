@@ -237,7 +237,7 @@ Registration needs two things from core:
   `mcp_servers:write` to register, `mcp_servers:lifecycle` to start and
   deregister, and `policy:write` to deliver egress policy. The narrow role is
   `kubernetes-operator` (core 2.28.0 and later). `admin` holds all three, and so does
-  `provider-admin` from core 2.29.0; before that it lacked the first two and the CR
+  `provider-admin` from core 2.29.1; before that it lacked the first two and the CR
   was Degraded with reason `RegistrationForbidden`. `developer` lacks `policy:write`,
   and the policy push gets `403`.
 

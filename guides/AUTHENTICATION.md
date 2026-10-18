@@ -169,9 +169,9 @@ rename.
 
 The `provider:*` family is the pre-rename vocabulary and the REST API authorizes
 against `mcp_servers:*` instead, so those entries grant nothing over the API.
-Until core 2.29.0 `provider-admin` carried only those entries plus
+Until core 2.29.1 `provider-admin` carried only those entries plus
 `providers:read` and `policy:write`: it could read servers and deliver compiled
-egress policy but could not register, start or stop a server. From 2.29.0 it
+egress policy but could not register, start or stop a server. From 2.29.1 it
 holds `providers:write` and `providers:lifecycle` (reported as
 `mcp_servers:write` and `mcp_servers:lifecycle`) in place of the dead entries,
 so a key on it now registers, reconfigures, starts, stops and removes servers.
@@ -183,7 +183,7 @@ start and deregister, and `policy:write` to deliver egress policy. From core
 2.28.0 the built-in `kubernetes-operator` role holds exactly those plus the two
 read permissions, and nothing else: no tool invocation, no groups, no discovery
 approval, no config reload. Use it for the operator's key. `developer` has the
-first two and the policy push gets `403`. Before 2.29.0 `provider-admin` had only the
+first two and the policy push gets `403`. Before 2.29.1 `provider-admin` had only the
 last and registration got `403`; it now holds all three, plus tool invocation and
 groups, which the operator never uses. Lifecycle is not scoped per server, so the role can
 start servers it did not register.

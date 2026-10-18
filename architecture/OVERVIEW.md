@@ -90,6 +90,9 @@ Notes and honest caveats:
   `interceptors/list` endpoints are conformance-shaped no-ops. Do not treat
   interceptors as a live enforcement control. See
   [Interceptor Framework](INTERCEPTOR_FRAMEWORK.md).
+- **Every place a tool result is read or rewritten is inventoried** in
+  [Tool-result surfaces](TOOL_RESULT_SURFACES.md), ahead of the upstream
+  redesign of the `tools/call` result.
 - **The HITL gate (step 8) prompts a human and waits — from 2.1.0 only.** The
   control existed and was unit-tested from v1.6.0, but on every shipped build no
   config key could put a tool behind it, the gate service was never constructed,

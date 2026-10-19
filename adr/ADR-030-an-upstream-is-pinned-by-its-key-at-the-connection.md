@@ -1,6 +1,6 @@
 # ADR-030: An Upstream Is Pinned by Its Key at the Connection, and Attestation Is a Declared Source of the Key
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-19
 **Authors:** MCP Hangar Team
 

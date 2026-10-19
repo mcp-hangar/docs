@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.43](https://github.com/mcp-hangar/docs/compare/v1.2.42...v1.2.43) (2026-10-19)
+
+
+### Changed
+
+* **architecture:** adr-030 -- pin an upstream by its key at the connection ([#504](https://github.com/mcp-hangar/docs/issues/504)) ([7f8d3c8](https://github.com/mcp-hangar/docs/commit/7f8d3c884ed3b3abf3de304cf960256742bed409))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#501](https://github.com/mcp-hangar/docs/issues/501)) ([52691e7](https://github.com/mcp-hangar/docs/commit/52691e7812985a5a5c47610ec5321dafb4b4698c))
+* **reference:** review what a verdict establishes against 2.31.0 ([#502](https://github.com/mcp-hangar/docs/issues/502)) ([1ba3941](https://github.com/mcp-hangar/docs/commit/1ba394124002c4ffc8be9fe4d0d2b820a04e1a6e))
+
 ## [1.2.42](https://github.com/mcp-hangar/docs/compare/v1.2.41...v1.2.42) (2026-10-19)
 
 

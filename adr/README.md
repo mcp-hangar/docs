@@ -45,6 +45,14 @@ Implementation progress and release evidence are maintained below and in the lin
 | [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | One Invoke Authorization Contract for HTTP and Stdio | HTTP and stdio preserve their identity boundaries and share enabled-auth invoke authorization. |
 | [029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md) | One Enrichment Boundary and a Bounded Decision Vocabulary for Traces | One enrichment boundary emits bounded decisions with explicit causal and privacy contracts. |
 
+## Proposed records
+
+A Proposed record constrains nothing until it is accepted.
+
+| ADR | Title | Proposed decision |
+| --- | --- | --- |
+| [030](ADR-030-an-attested-upstream-is-pinned-by-its-key.md) | An Attested Upstream Is Pinned by Its Key at the Connection, Not Labelled in the Verdict | Every connection to a server declared `tls.attested: true` must end at a key whose SPKI digest is in the operator's pin list. |
+
 ## Historical and deprecated records
 
 | ADR | Title | Disposition |
@@ -90,11 +98,6 @@ This is a living evidence map, separate from immutable accepted decisions. A mer
 ## Open architecture decisions
 
 These issues are proposals, not numbered or accepted ADRs:
-
-- [ADR-030](ADR-030-an-attested-upstream-is-pinned-by-its-key.md)
-  (Proposed): an attested upstream is pinned by the SPKI digest of its
-  KBS-released key at the connection, not labelled in the verdict. It
-  constrains nothing until accepted.
 
 - [docs #461](https://github.com/mcp-hangar/docs/issues/461): one typed
   configuration model and validation policy. The model decision and a future

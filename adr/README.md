@@ -44,6 +44,7 @@ Implementation progress and release evidence are maintained below and in the lin
 | [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Egress remains a separate no-tenant policy mode; invocation authorization is shared. |
 | [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | One Invoke Authorization Contract for HTTP and Stdio | HTTP and stdio preserve their identity boundaries and share enabled-auth invoke authorization. |
 | [029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md) | One Enrichment Boundary and a Bounded Decision Vocabulary for Traces | One enrichment boundary emits bounded decisions with explicit causal and privacy contracts. |
+| [030](ADR-030-an-upstream-is-pinned-by-its-key-at-the-connection.md) | An Upstream Is Pinned by Its Key at the Connection, and Attestation Is a Declared Source of the Key | A remote upstream with a peer identity is reached only through a connection that ends at a listed key, checked in the TLS handshake; a KBS-attested origin of the keys is a declaration Hangar records, not verifies. |
 
 ## Historical and deprecated records
 
@@ -86,6 +87,7 @@ This is a living evidence map, separate from immutable accepted decisions. A mer
 | ADR-013 | L7 delivery and network-policy objects have implementation and reachability tests. | [Operator #327](https://github.com/mcp-hangar/mcp-hangar-operator/issues/327) tracks the ingress fence; [#325](https://github.com/mcp-hangar/mcp-hangar-operator/issues/325) tracks Audit-mode blocking. Do not infer an unbypassable deployment from object creation or status alone. [Docs #471](https://github.com/mcp-hangar/docs/issues/471) owns the guarantee reconciliation. |
 | ADR-019 / ADR-020 | [Core #1560](https://github.com/mcp-hangar/mcp-hangar/pull/1560) restores pushed L7 policy on durable restart paths. | [Core mcp-hangar/mcp-hangar#1306](https://github.com/mcp-hangar/mcp-hangar/issues/1306) retains deployment restart/redelivery acceptance. |
 | ADR-012 | Vendored schema and drift detection separate pinning from an automatic upstream update. | [Core #1158](https://github.com/mcp-hangar/mcp-hangar/issues/1158) retains the deliberate re-pin/hold decision. |
+| ADR-030 | None yet: the contract is accepted, nothing is implemented. | [Core #1937](https://github.com/mcp-hangar/mcp-hangar/issues/1937) tracks the implementation; the `issuance: kbs-attested` part also waits on [core #1936](https://github.com/mcp-hangar/mcp-hangar/issues/1936). Do not describe an upstream as key-pinned or attested before the epic ships. |
 
 ## Open architecture decisions
 

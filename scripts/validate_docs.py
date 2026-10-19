@@ -36,6 +36,10 @@ from pathlib import Path
 # (historical migration tables, example-only env vars, etc.). Keep this list
 # short and justified -- every entry is a check we are consciously skipping.
 ALLOWLIST: set[str] = {
+    # Proposed by ADR-030 (Proposed), which names the connection metric an
+    # attested upstream would record. It does not exist yet. Delete it when core
+    # ships the metric, or when ADR-030 is rejected.
+    "mcp_hangar_attested_upstream_connections_total",
     # Old tool names kept in migration / "before -> after" tables.
     "hangar_invoke",
     "hangar_batch",

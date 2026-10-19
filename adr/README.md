@@ -91,6 +91,11 @@ This is a living evidence map, separate from immutable accepted decisions. A mer
 
 These issues are proposals, not numbered or accepted ADRs:
 
+- [ADR-030](ADR-030-an-attested-upstream-is-pinned-by-its-key.md)
+  (Proposed): an attested upstream is pinned by the SPKI digest of its
+  KBS-released key at the connection, not labelled in the verdict. It
+  constrains nothing until accepted.
+
 - [docs #461](https://github.com/mcp-hangar/docs/issues/461): one typed
   configuration model and validation policy. The model decision and a future
   major-release decision are separate; this register does not approve 3.0.

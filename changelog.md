@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.42](https://github.com/mcp-hangar/docs/compare/v1.2.41...v1.2.42) (2026-10-19)
+
+
+### Changed
+
+* **architecture:** inventory every place Hangar reads or rewrites a tool result ([#497](https://github.com/mcp-hangar/docs/issues/497)) ([51a369f](https://github.com/mcp-hangar/docs/commit/51a369fedf6e1615d9f3016bc52b60b4e88bb843))
+* **guides:** bring over upgrade notes for the latest release ([#496](https://github.com/mcp-hangar/docs/issues/496)) ([5966acb](https://github.com/mcp-hangar/docs/commit/5966acbf14eace1b7690e87ec0bb2299c164666d))
+* **guides:** describe provider-admin by what it holds from 2.29.1 ([#494](https://github.com/mcp-hangar/docs/issues/494)) ([c47560f](https://github.com/mcp-hangar/docs/commit/c47560fde0f3f4b9b15db9a8bd74c060b1fe64bd))
+* **guides:** say a fleet-wide withdraw or restore needs the admin grant ([#493](https://github.com/mcp-hangar/docs/issues/493)) ([f3b4ef1](https://github.com/mcp-hangar/docs/commit/f3b4ef1035b9e6daccfeb35c74816dd90d6dd873))
+* **reference:** re-verify what a verdict establishes against 2.29.1 ([#498](https://github.com/mcp-hangar/docs/issues/498)) ([18e97e3](https://github.com/mcp-hangar/docs/commit/18e97e3c587179a1bcb992adeeed64b904286cc6))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#490](https://github.com/mcp-hangar/docs/issues/490)) ([bfe966c](https://github.com/mcp-hangar/docs/commit/bfe966c0259c724fd4b1479dd3d97bd1f7877411))
+* **reference:** say add writes a secret reference, not the value ([#495](https://github.com/mcp-hangar/docs/issues/495)) ([6075d3e](https://github.com/mcp-hangar/docs/commit/6075d3ed5cc1f05ed091524f5032670f4c9848d9))
+
 ## [1.2.41](https://github.com/mcp-hangar/docs/compare/v1.2.40...v1.2.41) (2026-10-16)
 
 

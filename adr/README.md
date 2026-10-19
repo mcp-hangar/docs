@@ -51,7 +51,7 @@ A Proposed record constrains nothing until it is accepted.
 
 | ADR | Title | Proposed decision |
 | --- | --- | --- |
-| [030](ADR-030-an-attested-upstream-is-pinned-by-its-key.md) | An Attested Upstream Is Pinned by Its Key at the Connection, Not Labelled in the Verdict | Every connection to a server declared `tls.attested: true` must end at a key whose SPKI digest is in the operator's pin list. |
+| [030](ADR-030-an-upstream-is-pinned-by-its-key-at-the-connection.md) | An Upstream Is Pinned by Its Key at the Connection, and Attestation Is a Declared Source of the Key | Every connection to a server with a peer identity must end at a key whose SPKI digest is in its key list; a KBS-attested origin of the keys is a declaration Hangar records, not verifies. |
 
 ## Historical and deprecated records
 

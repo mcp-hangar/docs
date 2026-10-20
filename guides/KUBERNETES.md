@@ -983,6 +983,9 @@ after an operator upgrade:**
 | `automountServiceAccountToken` | bool | No | `false` | Mount the ServiceAccount token into the pod (operator 0.17.5; earlier releases always mounted it) |
 | `nodeSelector` | map | No | - | Node selection |
 | `tolerations` | array | No | - | Tolerations |
+| `runtimeClassName` | string | No | cluster default | RuntimeClass of the provider pod, for gVisor, Kata or a confidential VM. The class must exist; the kubelet refuses a pod naming one that does not (operator 0.17.32) |
+| `tls.peerIdentity` | object | No | - | Pins the upstream by its key ([ADR-030](../adr/ADR-030-an-upstream-is-pinned-by-its-key-at-the-connection.md)): `keyRef` (the key lineage) and `spkiSha256` (1 to 16 pins, each `sha256:` and 64 lowercase hex characters), optionally `issuance: kbs-attested`, which on a container-mode server also requires `runtimeClassName`. A remote server then needs an `https` endpoint. The operator (0.17.32) registers it with core only over an `https` `hangar.url` and with a core that lists the `peer_identity` capability (2.32.0). A container-mode server's pod is reached at `https://<pod IP>:8080` and is not discovered. Core does not yet record a declared `issuance`, so the operator does not register a server that declares one |
+| `tls.maxConnectionAge` | duration | No | `1h` in core | How long one connection serves before a fresh handshake checks the key again; only with `tls.peerIdentity` |
 | `capabilities.network` | object | No | - | Declared egress; feeds the generated `NetworkPolicy`. An egress `cidr` must be an IPv4 CIDR such as `10.0.0.0/8` or an IPv6 one such as `fd00::/8` |
 | `capabilities.tools` | object | No | - | `maxCount` / `expectedTools`; drives violation events. `expectedTools` holds at most 256 non-empty, unique names of at most 256 characters |
 | `capabilities.enforcementMode` | string | No | `alert` | `alert`, `block` or `quarantine` |

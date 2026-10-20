@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.45](https://github.com/mcp-hangar/docs/compare/v1.2.44...v1.2.45) (2026-10-20)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#509](https://github.com/mcp-hangar/docs/issues/509)) ([99200f9](https://github.com/mcp-hangar/docs/commit/99200f95606704dad52dcc85a6b718981185b36b))
+* **guides:** list runtimeClassName and the tls block in the MCPServer spec table ([#508](https://github.com/mcp-hangar/docs/issues/508)) ([0a0bb3a](https://github.com/mcp-hangar/docs/commit/0a0bb3a8a1a40a86e3f4e6e1b5cb5dc52fe5ee03))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#510](https://github.com/mcp-hangar/docs/issues/510)) ([ef52796](https://github.com/mcp-hangar/docs/commit/ef527960c3571923b0f30a76644a7e75b8c40d24))
+
 ## [1.2.44](https://github.com/mcp-hangar/docs/compare/v1.2.43...v1.2.44) (2026-10-20)
 
 

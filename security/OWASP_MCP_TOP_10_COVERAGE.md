@@ -17,7 +17,7 @@ This page is deliberately honest about scope. Hangar is a **policy enforcement p
 | MCP06 | Intent Flow Subversion | **Out of scope (by design)** | Intent/prompt semantics are not parsed. Approval gates offer a human checkpoint, not intent detection |
 | MCP07 | Insufficient Authentication & Authorization | **Partial** | RFC 8707 / RFC 9728, JWT/OIDC + JWKS, per-tenant scoping, approval gates, end-to-end identity propagation. Open: `oidc.clock_skew_leeway_seconds` is not parsed ([mcp-hangar#1654](https://github.com/mcp-hangar/mcp-hangar/issues/1654)) |
 | MCP08 | Lack of Audit and Telemetry | **Covered** | Identity-attributed audit trail per tool call, including calls a gate refuses; SIEM export (CEF, LEEF 2.0, RFC 5424 syslog, JSON-lines); Prometheus metrics; K8s events |
-| MCP09 | Shadow MCP Servers | **Partial** | Registry of `MCPServer` resources, admission validation of their spec, per-server egress NetworkPolicy, plus a pod-registration webhook (operator `v0.13.0`) in namespaces labelled `mcp-hangar.io/enforce-egress=true`. It keys on the pod's own `mcp-hangar.io/provider` label, so it catches misconfiguration, not concealment; since `v0.17.5` that label cannot be added or changed after admission |
+| MCP09 | Shadow MCP Servers | **Partial** | Registry of `MCPServer` resources, admission validation of their spec, per-server egress NetworkPolicy, plus a pod-registration webhook (operator `v0.13.0`) in namespaces labelled `mcp-hangar.io/enforce-egress=true`. It keys on the pod's own `mcp-hangar.io/provider` label, so it catches misconfiguration, not concealment; since `v0.17.5` that label cannot be added or changed after admission. Since core `2.32.0` a server pinned by its key refuses a TLS peer without a listed key, so such a peer cannot answer in its place |
 | MCP10 | Context Injection & Over-Sharing | **Out of scope (by design)** | Prompt/context content is not inspected. Per-tenant scoping + audit limit blast radius but do not detect context injection |
 
 ## Covered
@@ -40,7 +40,9 @@ This page is deliberately honest about scope. Hangar is a **policy enforcement p
 
 The webhook rejects a pod carrying `mcp-hangar.io/provider=<name>` when no `MCPServer` of that name exists in the namespace; a pod without that label is admitted as "not an MCP-server pod". Before operator `v0.17.5` the check ran on pod creation only, so an admitted unlabelled pod could be labelled into a registered server afterwards and inherit that server's egress. Since `v0.17.5` (with chart `0.12.18`, which lists `UPDATE` on the rule) the webhook also gates updates: adding or changing the label on an admitted pod is denied, removing it is allowed. It therefore catches a provider pointed at a server nobody registered — a misconfiguration — rather than a workload that never announces itself, which is what *shadow* means. What constrains that one is the default-deny egress at L3/L4, not admission.
 
-So read MCP09 coverage as "registry, scoped egress, and a gate against mislabelled providers in opted-in namespaces", not "shadow MCP prevented".
+Since core `2.32.0` (operator `0.17.32` for Kubernetes), a server can be pinned by its key ([ADR-030](../adr/ADR-030-an-upstream-is-pinned-by-its-key-at-the-connection.md)). Hangar accepts the connection only when the TLS peer presents a key on the server's list, so a pod that inherits a registered server's address, or answers in its place without a listed key, is refused in the handshake. This covers the servers that declare a key list and nothing else. It does not find a server nobody registered, and a holder of a listed key, a stolen one included, is accepted until the key is removed.
+
+So read MCP09 coverage as "registry, scoped egress, a gate against mislabelled providers in opted-in namespaces, and a key check for key-pinned servers", not "shadow MCP prevented".
 
 ## Out of scope by design
 

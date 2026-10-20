@@ -146,7 +146,7 @@ unchanged today. Read once, pin by digest.
 | --- | --- | --- | --- |
 | Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `2.31.0` | `sha256:02c7592d0b1b12b0949c3f24ddfd0358e2621213bc99cfd5c35fe7c14c3d1a21` | ✅ |
 | Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.17.30` | `sha256:aa49a9f9840039b554ceb5b999d1e56b822d0e38c3d0a2d7bb8bed53df8d7c53` | ✅ |
-| Chart `charts/mcp-hangar` (appVersion `2.30.0`) | `0.15.39` | `sha256:f6be89e9911e478218dafada472dbee0840d5ad5c2a0a6679c194b985aaed079` | ✅ |
+| Chart `charts/mcp-hangar` (appVersion `2.31.0`) | `0.15.40` | `sha256:eb59219e78bad827ebc9deb20ff3de9ba033d240ecb9c26d31a2b5d166892ea1` | ✅ |
 | Chart `charts/mcp-hangar-operator` (appVersion `0.17.29`) | `0.12.47` | `sha256:8c9d2046c11b66b8f11d7d2f44e1efa9c2f8a95a5abd6bc1f289ef2c38c3e41a` | ✅ |
 <!-- END generated: released-artifacts -->
 
@@ -161,6 +161,7 @@ the compatibility matrix above names only the newest chart per core minor.
 
 | Chart version | appVersion | kubeVersion |
 | --- | --- | --- |
+| `0.15.40` | `2.31.0` | `>=1.25.0-0` |
 | `0.15.39` | `2.30.0` | `>=1.25.0-0` |
 | `0.15.38` | `2.29.0` | `>=1.25.0-0` |
 | `0.15.37` | `2.28.0` | `>=1.25.0-0` |

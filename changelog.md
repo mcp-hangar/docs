@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.47](https://github.com/mcp-hangar/docs/compare/v1.2.46...v1.2.47) (2026-10-21)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#514](https://github.com/mcp-hangar/docs/issues/514)) ([21754c6](https://github.com/mcp-hangar/docs/commit/21754c697474e01e4c31e7d215da7576e9d87a69))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#515](https://github.com/mcp-hangar/docs/issues/515)) ([2f8e40f](https://github.com/mcp-hangar/docs/commit/2f8e40f728c8b387d71517799d1037279f57c7dd))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#517](https://github.com/mcp-hangar/docs/issues/517)) ([6353b49](https://github.com/mcp-hangar/docs/commit/6353b4984b930181ada2b362b3b109531e24db76))
+
 ## [1.2.46](https://github.com/mcp-hangar/docs/compare/v1.2.45...v1.2.46) (2026-10-20)
 
 

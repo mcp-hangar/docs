@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.50](https://github.com/mcp-hangar/docs/compare/v1.2.49...v1.2.50) (2026-10-21)
+
+
+### Changed
+
+* **guides:** document spec.initData, its digests and the render dry-run (operator 0.17.34) ([#524](https://github.com/mcp-hangar/docs/issues/524)) ([55947f1](https://github.com/mcp-hangar/docs/commit/55947f1acd9afba1dec58475aefee8033cdb7f40))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#526](https://github.com/mcp-hangar/docs/issues/526)) ([e51fef4](https://github.com/mcp-hangar/docs/commit/e51fef41a545e4dfbfdeb3a7d72cbb6095a64167))
+
 ## [1.2.49](https://github.com/mcp-hangar/docs/compare/v1.2.48...v1.2.49) (2026-10-21)
 
 

@@ -44,7 +44,8 @@ Implementation progress and release evidence are maintained below and in the lin
 | [027](ADR-027-egress-is-a-trust-mode-not-a-preset.md) | `egress` Is a Trust Mode, Not a Preset of the Front Door | Egress remains a separate no-tenant policy mode; invocation authorization is shared. |
 | [028](ADR-028-the-front-door-invoke-gate-is-the-tool-access-policy.md) | One Invoke Authorization Contract for HTTP and Stdio | HTTP and stdio preserve their identity boundaries and share enabled-auth invoke authorization. |
 | [029](ADR-029-one-enrichment-boundary-and-a-bounded-decision-vocabulary.md) | One Enrichment Boundary and a Bounded Decision Vocabulary for Traces | One enrichment boundary emits bounded decisions with explicit causal and privacy contracts. |
-| [030](ADR-030-an-upstream-is-pinned-by-its-key-at-the-connection.md) | An Upstream Is Pinned by Its Key at the Connection, and Attestation Is a Declared Source of the Key | A remote upstream with a peer identity is reached only through a connection that ends at a listed key, checked in the TLS handshake; a KBS-attested origin of the keys is a declaration Hangar records, not verifies. |
+| [030](ADR-030-an-upstream-is-pinned-by-its-key-at-the-connection.md) | An Upstream Is Pinned by Its Key at the Connection, and Attestation Is a Declared Source of the Key | A remote upstream with a peer identity is reached only through a connection that ends at a listed key, checked in the TLS handshake; a KBS-attested origin of the keys is a declaration Hangar records, not verifies. How a `kbs-attested` key is provisioned and what its release is bound to is decided by [ADR-031](ADR-031-a-kbs-attested-key-is-bound-to-code-identity-through-init-data.md). |
+| [031](ADR-031-a-kbs-attested-key-is-bound-to-code-identity-through-init-data.md) | A kbs-attested Key Is Bound to Code Identity Through Init-Data, and the Kubernetes Operator Only Carries It | Proposed. `kbs-attested` declares code identity in an appraised TEE, not instance identity: a KBS released the key against the whole init-data hash. The Kubernetes operator copies `spec.initData` verbatim, publishes its digests, and refuses tagged images, Secret-sourced env and host-supplied volumes on such a server. |
 
 ## Historical and deprecated records
 
@@ -72,6 +73,7 @@ Some later records replace only part of an earlier design while the rest remains
 | ADR-014 | ADR-015 | Corrects the SDK wire premise and governs the served task wire. |
 | ADR-019 | ADR-020 | Adds the shared-storage coordination contract. |
 | ADR-026 | ADR-028 | Carries forward stdio identity and records the repaired invoke authorization. |
+| ADR-030 | ADR-031 | Replaces §2's `kbs-attested` provisioning premise and T26, and narrows Guarantee A for `kbs-attested` from the workload to code identity, which weakens §4(a) for that value. The key pin and every other part of ADR-030 remain. |
 
 ## Implementation evidence and remaining work
 
@@ -87,7 +89,7 @@ This is a living evidence map, separate from immutable accepted decisions. A mer
 | ADR-013 | L7 delivery and network-policy objects have implementation and reachability tests. | [Operator #327](https://github.com/mcp-hangar/mcp-hangar-operator/issues/327) tracks the ingress fence; [#325](https://github.com/mcp-hangar/mcp-hangar-operator/issues/325) tracks Audit-mode blocking. Do not infer an unbypassable deployment from object creation or status alone. [Docs #471](https://github.com/mcp-hangar/docs/issues/471) owns the guarantee reconciliation. |
 | ADR-019 / ADR-020 | [Core #1560](https://github.com/mcp-hangar/mcp-hangar/pull/1560) restores pushed L7 policy on durable restart paths. | [Core mcp-hangar/mcp-hangar#1306](https://github.com/mcp-hangar/mcp-hangar/issues/1306) retains deployment restart/redelivery acceptance. |
 | ADR-012 | Vendored schema and drift detection separate pinning from an automatic upstream update. | [Core #1158](https://github.com/mcp-hangar/mcp-hangar/issues/1158) retains the deliberate re-pin/hold decision. |
-| ADR-030 | None yet: the contract is accepted, nothing is implemented. | [Core #1937](https://github.com/mcp-hangar/mcp-hangar/issues/1937) tracks the implementation; the `issuance: kbs-attested` part also waits on [core #1936](https://github.com/mcp-hangar/mcp-hangar/issues/1936). Do not describe an upstream as key-pinned or attested before the epic ships. |
+| ADR-030 / ADR-031 | The key pin shipped in core 2.32.0 (2.32.1 corrects the pin's encoding and the mixed-version guards) and operator 0.17.32; the two-replica cases run nightly in core `tests/live`. Core records a declared `issuance` from [core #1998](https://github.com/mcp-hangar/mcp-hangar/pull/1998). | `issuance: kbs-attested` waits on ADR-031: [operator #358](https://github.com/mcp-hangar/mcp-hangar-operator/issues/358) (admission), the CRD and operator work it names, and the end-to-end run [core #1950](https://github.com/mcp-hangar/mcp-hangar/issues/1950). |
 
 ## Open architecture decisions
 

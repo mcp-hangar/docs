@@ -1,4 +1,4 @@
-<!-- verified-against: 2.32.1 -->
+<!-- verified-against: 2.33.0 -->
 
 # Key-Pinned Upstreams
 
@@ -122,6 +122,7 @@ A key-pinned server's upstream identity is `peer-key:<key_ref>`, not `remote:htt
 
 - **A refusal** carries `observed_peer_spki`, the key the peer presented. A refused cold start is a `ToolCallRefused`, exported as status `denied` with reason `upstream_peer_key_mismatch`. A refusal on a warm connection is a `ToolInvocationFailed`, exported as status `error` with `failure_code: upstream_peer_key_mismatch`.
 - **A served call** carries `upstream_peer_spki`, the verified key of the connection that served it.
+- **A declared issuance.** From 2.33.0 a call to a server that declares `issuance` carries it as `declared_key_issuance`, in JSON-lines, LEEF, syslog and OTLP; CEF has no free field for it. It records what the configuration declares, never a verification.
 - **Exports.** JSON-lines, LEEF, syslog and OTLP carry each field under its own format's name. CEF carries the one key a record has as `fileHash`, with `fileType` saying which (`UpstreamTlsKeyVerified` or `UpstreamTlsKeyRefused`); the refusal's code is in `reason`.
 - **`mcp-hangar why`** shows a refused key next to the keys the configuration file lists now.
 - **`mcp_hangar_upstream_peer_key_connections_total{mcp_server,outcome}`** counts handshakes, `verified` or `refused`, the GET stream's included. From 2.32.1 `mcp_server` is the server's id. 2.32.0 labelled it with the endpoint's host.
@@ -139,11 +140,11 @@ From 2.32.1, too, the built-in roles in force are the running release's own. A 2
 
 `issuance: kbs-attested` declares that a Key Broker Service released each listed key only to a guest on appraised TEE hardware whose init-data hash was the one bound to that key. That is code identity, not instance identity: any guest launched with the same init-data on accepted hardware receives the key ([ADR-031](../adr/ADR-031-a-kbs-attested-key-is-bound-to-code-identity-through-init-data.md)). Hangar records the declaration and verifies none of it.
 
-**Not available yet.**
+**What each release supports.**
 
-- Core 2.32.1 refuses `issuance` at load. Accepting and recording it (mcp-hangar#1998) is merged for the next release.
-- The operator accepts `issuance` in the CRD and registers no server that declares it.
-- Operator 0.17.34 carries `spec.initData` into the pod and holds a `kbs-attested` server to its rules (see [KUBERNETES.md](KUBERNETES.md)). It registers such a server only with a core that lists the `declared_key_issuance` capability, which no released core does yet.
+- Core 2.33.0 accepts `issuance`, records it on each call as `declared_key_issuance`, and lists the `declared_key_issuance` capability. Core 2.32.1 and older refuse it at load.
+- Operators before 0.17.34 accept `issuance` in the CRD and register no server that declares it.
+- Operator 0.17.34 carries `spec.initData` into the pod and holds a `kbs-attested` server to its rules (see [KUBERNETES.md](KUBERNETES.md)). It registers such a server only with a core that lists the `declared_key_issuance` capability, 2.33.0 or newer.
 
 What follows is the provisioner's part, which Hangar cannot see or check. Every item is a condition of the declaration being true.
 

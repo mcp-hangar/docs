@@ -1,0 +1,154 @@
+<!-- verified-against: 2.32.1 -->
+
+# Key-Pinned Upstreams
+
+> **New to this?** [Pin an MCP server by its key](https://mcp-hangar.io/learn/pin-an-mcp-server-by-its-key) is the concept behind this page, and [Stop a rescheduled pod from answering as your MCP server](https://mcp-hangar.io/learn/stop-a-rescheduled-pod-from-answering-as-your-mcp-server) walks through it on one machine.
+
+A remote MCP server can be pinned by its TLS key ([ADR-030](../adr/ADR-030-an-upstream-is-pinned-by-its-key-at-the-connection.md)). Hangar then accepts a connection to it only when the peer presents one of the listed keys, and it checks this inside the TLS handshake, before the first request byte. This page is the operator's reference: where a key list is declared, what each place needs, and how to rotate, observe and upgrade. Core supports it from 2.32.0, the operator from 0.17.32.
+
+## The key list
+
+A peer identity is a `key_ref`, which names the key lineage and survives rotation, and a list of key pins:
+
+```yaml
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: https://payments.payments.svc:8443/mcp
+    tls:
+      peer_identity:
+        key_ref: payments-tls
+        spki_sha256:
+          - sha256:06eeb57619607484302cf6ffa9ff03c37dd97cf0a5582b3712acd5a1a84e3901
+      max_connection_age: 1h
+```
+
+- **A pin** is `sha256:` followed by 64 lowercase hex characters: the SHA-256 of the certificate's DER `SubjectPublicKeyInfo`, as the certificate encodes it. Read it from the certificate the upstream serves:
+
+  ```bash
+  echo "sha256:$(openssl x509 -in server.crt -pubkey -noout \
+    | openssl pkey -pubin -outform der | openssl dgst -sha256 -hex | awk '{print $NF}')"
+  ```
+
+  From 2.32.1 this matches for an EC key written with explicit curve parameters too (mcp-hangar#1982); 2.32.0 refused one. Prefer named curves anyway: PKIX forbids explicit parameters (RFC 5480), and with the `openssl` macOS ships that takes `-pkeyopt ec_param_enc:named_curve`.
+- **The endpoint** must be `https`. The key replaces the certificate chain and the hostname as the identity: Hangar requires TLS 1.3 and consults no CA, so a self-signed certificate is fine.
+- **`max_connection_age`** (seconds, or `90s`, `30m`, `1h`; default `1h`) bounds how long one connection pool serves. When it expires, the pool is replaced and every new connection handshakes against the current list. It is refused on a server without a peer identity.
+- **`issuance`** is not accepted by core yet. ADR-030 names `issuance: kbs-attested`, a key a Key Broker Service released only to an attested guest. Core refuses the key at load, rather than accepting a declaration it does not act on. See [Attested keys](#attested-keys).
+
+## Where a key list is declared
+
+### The configuration file
+
+A server the file declares carries its key list as above. The file is the operator-trusted source of the servers it declares, so no API permission is involved. A replica reloading the file applies a changed list.
+
+A release before 2.32.0 ignores `tls.peer_identity` and serves such a server as a plain one, without checking its key. Do not ship the file to a replica older than 2.32.0.
+
+### The REST API
+
+`POST /api/mcp_servers` with a `tls` block creates a key-pinned server, and `PUT /api/mcp_servers/{id}` changes its list or endpoint. A key-pinned server registered over the API needs:
+
+- **Durable storage.** `persistence.backend` must be `sqlite` (one gateway) or `postgresql` (several replicas). The server's name and `key_ref` are recorded there, in the peer-key name record, and that is how replicas learn of a changed list. Without durable storage the declaration is refused.
+- **The permission.** Setting or changing a peer identity, changing a key-pinned server's endpoint, deleting it, and forgetting its name (`DELETE /api/mcp_servers/{id}/peer_identity`) all need `mcp_servers:peer_identity`, on top of what the route already needs (`mcp_servers:lifecycle` for a delete). Of the built-in roles, only `admin` and `kubernetes-operator` hold it; a custom role can be granted it. `mcp_servers:write` is not enough. Under OPA, allow action `peer_identity` on resource type `mcp_servers`.
+- **Authentication.** With authentication disabled, any client of the API can set or change a key list. A key list decides which upstream a call may reach, so run authentication wherever lists are set over the API.
+- **The SSRF policy.** An endpoint set over the API is checked against it. A key-pinned server is usually reached at a private address, so list the networks it may resolve into:
+
+  ```yaml
+  ssrf:
+    trusted_networks:
+      - "10.96.0.0/12"    # Services, for a remote server addressed by a .svc name
+      - "10.244.0.0/16"   # pods, for a mode: container server reached at its pod IP
+  ```
+
+  Otherwise every such endpoint is refused with `ssrf_blocked`. Loopback can never be trusted this way.
+
+A name keeps its key after its server is deleted, so it cannot come back as a plain server. A create under a recorded name succeeds only with that `key_ref` and the permission. Forgetting the name is a separate act, after the delete.
+
+### The Kubernetes operator
+
+The `MCPServer` CRD carries the same declaration:
+
+```yaml
+apiVersion: mcp-hangar.io/v1alpha2
+kind: MCPServer
+metadata:
+  name: payments
+spec:
+  mode: remote
+  endpoint: https://payments.payments.svc:8443/mcp
+  tls:
+    peerIdentity:
+      keyRef: payments-tls
+      spkiSha256:
+        - sha256:06eeb57619607484302cf6ffa9ff03c37dd97cf0a5582b3712acd5a1a84e3901
+    maxConnectionAge: 1h
+```
+
+The apiserver refuses a malformed pin, a missing `keyRef` and an `http` endpoint. For `mode: container`, the operator runs the pod and registers it at `https://<pod IP>:8080`. The pod gets no discovery annotations, and it must serve TLS on port 8080 with a listed key.
+
+The operator registers a key-pinned server only when all of these hold. Each failure below is condition `Degraded` on the CR, with its reason:
+
+| Requirement | Reason when it fails |
+| --- | --- |
+| Core lists `peer_identity` in `capabilities` of `GET /api/system/` (core 2.32.0 or newer) | `PeerIdentityNotCarried` |
+| `hangar.url` is `https://` | `PeerIdentityNotCarried` |
+| No `issuance` is declared | `PeerIdentityNotCarried` |
+| The operator's core API key holds `kubernetes-operator` | `RegistrationForbidden` |
+| Core has durable storage | `RegistrationFailed` |
+| The endpoint is inside `ssrf.trusted_networks` | `EndpointNotTrusted` |
+
+Two cases do not appear as `Degraded`:
+
+- **A private CA.** When a private CA signed core's certificate, set `hangar.tls.ca.secretName` or `hangar.tls.ca.configMapName` in the operator chart (the operator's `--hangar-ca-file`). Without it the operator cannot read core's capabilities, the reconcile fails and is retried, and the CR gets no condition for it. Read the operator's log.
+- **A `mode: container` server on an operator with no core to register with** (no `--hangar-url`) is held: its pod is not created, and the CR reads `Ready=False` with reason `PeerIdentityNotCarried`.
+
+See [KUBERNETES.md](KUBERNETES.md) for the rest of the `MCPServer` fields.
+
+## Rotating a key
+
+The list is a set, so rotation is two edits:
+
+1. Add the next key beside the current one, then roll out the workload with the new key.
+2. Remove the old key.
+
+A single update cannot replace the whole list under the same `key_ref`: a list that shares no key with the stored one is refused, so a typo cannot cut every trusted key at once. A new `key_ref` starts a new lineage, and its list need share nothing with the old one. It also changes the server's identity (below).
+
+Every replica applies a changed list. It replaces its copy of the server with a cold one built from the stored row, and the old copy's connections close. A key removed from the list is trusted until that change reaches the replica.
+
+## Identity and digest pins
+
+A key-pinned server's upstream identity is `peer-key:<key_ref>`, not `remote:https://host:port`. Digest pins bound to it survive an endpoint change and a rotation within the lineage. Giving an existing server a peer identity, or changing its `key_ref`, changes its identity, so record its pins again with `mcp-hangar pin --write`.
+
+## Observing it
+
+- **A refusal** carries `observed_peer_spki`, the key the peer presented. A refused cold start is a `ToolCallRefused`, exported as status `denied` with reason `upstream_peer_key_mismatch`. A refusal on a warm connection is a `ToolInvocationFailed`, exported as status `error` with `failure_code: upstream_peer_key_mismatch`.
+- **A served call** carries `upstream_peer_spki`, the verified key of the connection that served it.
+- **Exports.** JSON-lines, LEEF, syslog and OTLP carry each field under its own format's name. CEF carries the one key a record has as `fileHash`, with `fileType` saying which (`UpstreamTlsKeyVerified` or `UpstreamTlsKeyRefused`); the refusal's code is in `reason`.
+- **`mcp-hangar why`** shows a refused key next to the keys the configuration file lists now.
+- **`mcp_hangar_upstream_peer_key_connections_total{mcp_server,outcome}`** counts handshakes, `verified` or `refused`, the GET stream's included. From 2.32.1 `mcp_server` is the server's id. 2.32.0 labelled it with the endpoint's host.
+
+## Several replicas, and upgrades
+
+Declare a key-pinned server over the API, or from the operator, only once every replica runs 2.32.0 or newer. A release before 2.32.0 does not read the row, so it does not serve the server. Its create, though, knows nothing of the name record.
+
+- **From 2.32.1** the database refuses that create. The first 2.32.1 replica to start installs a trigger on the configuration table, which refuses a live row under a recorded name that does not carry the recorded `key_ref` (mcp-hangar#1987).
+- **On 2.32.0 alone** nothing does, and the older replica can rewrite the row as a plain server and serve it unpinned.
+
+From 2.32.1, too, the built-in roles in force are the running release's own. A 2.31.0 replica starting on a shared auth store no longer takes `mcp_servers:peer_identity` away from `kubernetes-operator` on the 2.32.1 replicas (mcp-hangar#1988). A 2.32.0 replica still reads the stored role, so it can still lose it. The two-replica cases run nightly in the live tier, against PostgreSQL and with the published 2.31.0 beside the current release.
+
+## Attested keys
+
+`issuance: kbs-attested` declares that the key was released by a Key Broker Service only to an attested Confidential Containers guest. Hangar would record the declaration and verify none of it (ADR-030 §2). It is not available yet:
+
+- core refuses the key at load (mcp-hangar#1953);
+- the operator accepts it in the CRD and registers no server that declares it.
+
+How to provision the key in a KBS, and read its public half there, will be added here once the premise is confirmed (mcp-hangar#1936).
+
+## What a key pin does not establish
+
+A key pin proves that the connection ended at a listed key. It does not prove how the key came to be listed:
+
+- whoever holds `mcp_servers:peer_identity`, or writes the configuration file, can list a key they control;
+- a stolen key that is on the list is trusted until it is removed.
+
+See [What a Verdict Establishes](../security/VERDICT_LIMITS.md).

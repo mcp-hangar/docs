@@ -137,12 +137,32 @@ From 2.32.1, too, the built-in roles in force are the running release's own. A 2
 
 ## Attested keys
 
-`issuance: kbs-attested` declares that the key was released by a Key Broker Service only to an attested Confidential Containers guest. Hangar would record the declaration and verify none of it (ADR-030 §2). It is not available yet:
+`issuance: kbs-attested` declares that a Key Broker Service released each listed key only to a guest on appraised TEE hardware whose init-data hash was the one bound to that key. That is code identity, not instance identity: any guest launched with the same init-data on accepted hardware receives the key ([ADR-031](../adr/ADR-031-a-kbs-attested-key-is-bound-to-code-identity-through-init-data.md), Proposed). Hangar records the declaration and verifies none of it.
 
-- core refuses the key at load (mcp-hangar#1953);
-- the operator accepts it in the CRD and registers no server that declares it.
+**Not available yet.**
 
-How to provision the key in a KBS, and read its public half there, will be added here once the premise is confirmed (mcp-hangar#1936).
+- Core 2.32.1 refuses `issuance` at load. Accepting and recording it (mcp-hangar#1998) is merged for the next release.
+- The operator accepts `issuance` in the CRD and registers no server that declares it.
+- The carriage of `spec.initData` waits on ADR-031.
+
+What follows is the provisioner's part, which Hangar cannot see or check. Every item is a condition of the declaration being true.
+
+- **The key.** Generate the key pair yourself and upload the private key as a KBS resource (`POST /kbs/v0/resource/<repo>/<type>/<tag>`). Keep no copy, and list the SPKI of the public half with `key_ref` naming the resource path. A KBS resource cannot be read back by an admin, so there is no other source of the SPKI. Never take it from the running pod.
+- **The resource policy.** Release the resource only when all three hold:
+  - the evidence is from a TEE, not Trustee's sample evidence;
+  - the guest TCB has an affirming appraisal against your reference values;
+  - the init-data hash equals the hash of the whole document you bound to the key.
+
+  A rule over the parsed init-data claims does not qualify: Trustee drops the agent policy's rules from them.
+- **The agent policy**, carried in the init-data. Generate it with Kata's `genpolicy` from the exact Deployment the pod is rendered with. Keep its defaults, which refuse `ExecProcess`, `ReadStream`, `WriteStream` and `SetPolicy`, and keep `AllowRequestsFailingPolicy := false`. Refusing `ReadStream` also stops `kubectl logs`, so logs leave by the workload's own channel.
+- **The init-data.** Name the `key_ref` in it, so each key lineage has its own hash, and put no secret in it: it is public on the CR and on the pod. The hash covers the raw bytes, so a YAML `|` versus `|-` changes it.
+- **Rotation.**
+  1. List the next key beside the current one.
+  2. Overwrite the resource.
+  3. Roll the pod.
+  4. Remove the old key.
+
+  Nobody keeps the overwritten key, so a bad next key is fixed by rotating forward.
 
 ## What a key pin does not establish
 

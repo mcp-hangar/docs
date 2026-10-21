@@ -137,13 +137,13 @@ From 2.32.1, too, the built-in roles in force are the running release's own. A 2
 
 ## Attested keys
 
-`issuance: kbs-attested` declares that a Key Broker Service released each listed key only to a guest on appraised TEE hardware whose init-data hash was the one bound to that key. That is code identity, not instance identity: any guest launched with the same init-data on accepted hardware receives the key ([ADR-031](../adr/ADR-031-a-kbs-attested-key-is-bound-to-code-identity-through-init-data.md), Proposed). Hangar records the declaration and verifies none of it.
+`issuance: kbs-attested` declares that a Key Broker Service released each listed key only to a guest on appraised TEE hardware whose init-data hash was the one bound to that key. That is code identity, not instance identity: any guest launched with the same init-data on accepted hardware receives the key ([ADR-031](../adr/ADR-031-a-kbs-attested-key-is-bound-to-code-identity-through-init-data.md)). Hangar records the declaration and verifies none of it.
 
 **Not available yet.**
 
 - Core 2.32.1 refuses `issuance` at load. Accepting and recording it (mcp-hangar#1998) is merged for the next release.
 - The operator accepts `issuance` in the CRD and registers no server that declares it.
-- The carriage of `spec.initData` waits on ADR-031.
+- The operator does not yet carry `spec.initData` (ADR-031, being implemented).
 
 What follows is the provisioner's part, which Hangar cannot see or check. Every item is a condition of the declaration being true.
 

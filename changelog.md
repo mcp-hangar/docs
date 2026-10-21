@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.49](https://github.com/mcp-hangar/docs/compare/v1.2.48...v1.2.49) (2026-10-21)
+
+
+### Changed
+
+* **architecture:** adr-031 -- a kbs-attested key is bound to code identity through init-data, and the operator only carries it ([#522](https://github.com/mcp-hangar/docs/issues/522)) ([44a72e5](https://github.com/mcp-hangar/docs/commit/44a72e58efa5403601ae454b885badfd68221721))
+* **architecture:** adr-031 -- mark accepted ([#523](https://github.com/mcp-hangar/docs/issues/523)) ([8387585](https://github.com/mcp-hangar/docs/commit/838758571c3588b8d8117f47b0a767226186803b))
+* **guides:** add the key-pinned upstreams guide and its verdict row ([#520](https://github.com/mcp-hangar/docs/issues/520)) ([37e7945](https://github.com/mcp-hangar/docs/commit/37e7945c4b41513c7cc3a7b1fbb7c621d729f191))
+
 ## [1.2.48](https://github.com/mcp-hangar/docs/compare/v1.2.47...v1.2.48) (2026-10-21)
 
 

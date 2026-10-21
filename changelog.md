@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.46](https://github.com/mcp-hangar/docs/compare/v1.2.45...v1.2.46) (2026-10-20)
+
+
+### Changed
+
+* **reference:** note what a key pin closes for OWASP MCP09 ([#512](https://github.com/mcp-hangar/docs/issues/512)) ([fdfcad8](https://github.com/mcp-hangar/docs/commit/fdfcad873f8408a0ab97426f5bf0e6695e61de36))
+
 ## [1.2.45](https://github.com/mcp-hangar/docs/compare/v1.2.44...v1.2.45) (2026-10-20)
 
 

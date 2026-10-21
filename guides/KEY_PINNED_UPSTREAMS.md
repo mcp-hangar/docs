@@ -48,7 +48,7 @@ A release before 2.32.0 ignores `tls.peer_identity` and serves such a server as 
 `POST /api/mcp_servers` with a `tls` block creates a key-pinned server, and `PUT /api/mcp_servers/{id}` changes its list or endpoint. A key-pinned server registered over the API needs:
 
 - **Durable storage.** `persistence.backend` must be `sqlite` (one gateway) or `postgresql` (several replicas). The server's name and `key_ref` are recorded there, in the peer-key name record, and that is how replicas learn of a changed list. Without durable storage the declaration is refused.
-- **The permission.** Setting or changing a peer identity, changing a key-pinned server's endpoint, deleting it, and forgetting its name (`DELETE /api/mcp_servers/{id}/peer_identity`) all need `mcp_servers:peer_identity`. Only `admin` and `kubernetes-operator` hold it. `mcp_servers:write` is not enough. Under OPA, allow action `peer_identity` on resource type `mcp_servers`.
+- **The permission.** Setting or changing a peer identity, changing a key-pinned server's endpoint, deleting it, and forgetting its name (`DELETE /api/mcp_servers/{id}/peer_identity`) all need `mcp_servers:peer_identity`, on top of what the route already needs (`mcp_servers:lifecycle` for a delete). Of the built-in roles, only `admin` and `kubernetes-operator` hold it; a custom role can be granted it. `mcp_servers:write` is not enough. Under OPA, allow action `peer_identity` on resource type `mcp_servers`.
 - **Authentication.** With authentication disabled, any client of the API can set or change a key list. A key list decides which upstream a call may reach, so run authentication wherever lists are set over the API.
 - **The SSRF policy.** An endpoint set over the API is checked against it. A key-pinned server is usually reached at a private address, so list the networks it may resolve into:
 
@@ -85,16 +85,21 @@ spec:
 
 The apiserver refuses a malformed pin, a missing `keyRef` and an `http` endpoint. For `mode: container`, the operator runs the pod and registers it at `https://<pod IP>:8080`. The pod gets no discovery annotations, and it must serve TLS on port 8080 with a listed key.
 
-The operator registers a key-pinned server only when all of these hold. Each failure is condition `Degraded` on the CR, with its reason:
+The operator registers a key-pinned server only when all of these hold. Each failure below is condition `Degraded` on the CR, with its reason:
 
 | Requirement | Reason when it fails |
 | --- | --- |
 | Core lists `peer_identity` in `capabilities` of `GET /api/system/` (core 2.32.0 or newer) | `PeerIdentityNotCarried` |
-| `hangar.url` is `https://`; for a private CA, `hangar.tls.ca` names the Secret or ConfigMap holding it | `PeerIdentityNotCarried` |
+| `hangar.url` is `https://` | `PeerIdentityNotCarried` |
 | No `issuance` is declared | `PeerIdentityNotCarried` |
 | The operator's core API key holds `kubernetes-operator` | `RegistrationForbidden` |
 | Core has durable storage | `RegistrationFailed` |
 | The endpoint is inside `ssrf.trusted_networks` | `EndpointNotTrusted` |
+
+Two cases do not appear as `Degraded`:
+
+- **A private CA.** When a private CA signed core's certificate, set `hangar.tls.ca.secretName` or `hangar.tls.ca.configMapName` in the operator chart (the operator's `--hangar-ca-file`). Without it the operator cannot read core's capabilities, the reconcile fails and is retried, and the CR gets no condition for it. Read the operator's log.
+- **A `mode: container` server on an operator with no core to register with** (no `--hangar-url`) is held: its pod is not created, and the CR reads `Ready=False` with reason `PeerIdentityNotCarried`.
 
 See [KUBERNETES.md](KUBERNETES.md) for the rest of the `MCPServer` fields.
 
@@ -115,9 +120,9 @@ A key-pinned server's upstream identity is `peer-key:<key_ref>`, not `remote:htt
 
 ## Observing it
 
-- **A refusal** ends the call with `failure_code: upstream_peer_key_mismatch`, and the record carries `observed_peer_spki`, the key the peer presented. A refused cold start is a `ToolCallRefused` (`denied`, reason `upstream_peer_key_mismatch`). A refusal on a warm connection is a `ToolInvocationFailed` with status `error` and the same `failure_code`.
+- **A refusal** carries `observed_peer_spki`, the key the peer presented. A refused cold start is a `ToolCallRefused`, exported as status `denied` with reason `upstream_peer_key_mismatch`. A refusal on a warm connection is a `ToolInvocationFailed`, exported as status `error` with `failure_code: upstream_peer_key_mismatch`.
 - **A served call** carries `upstream_peer_spki`, the verified key of the connection that served it.
-- **Exports.** The JSON-lines, CEF, LEEF, syslog and OTLP exporters carry both fields, each under its own format's name.
+- **Exports.** JSON-lines, LEEF, syslog and OTLP carry each field under its own format's name. CEF carries the one key a record has as `fileHash`, with `fileType` saying which (`UpstreamTlsKeyVerified` or `UpstreamTlsKeyRefused`); the refusal's code is in `reason`.
 - **`mcp-hangar why`** shows a refused key next to the keys the configuration file lists now.
 - **`mcp_hangar_upstream_peer_key_connections_total{mcp_server,outcome}`** counts handshakes, `verified` or `refused`, the GET stream's included. From 2.32.1 `mcp_server` is the server's id. 2.32.0 labelled it with the endpoint's host.
 
@@ -128,7 +133,7 @@ Declare a key-pinned server over the API, or from the operator, only once every 
 - **From 2.32.1** the database refuses that create. The first 2.32.1 replica to start installs a trigger on the configuration table, which refuses a live row under a recorded name that does not carry the recorded `key_ref` (mcp-hangar#1987).
 - **On 2.32.0 alone** nothing does, and the older replica can rewrite the row as a plain server and serve it unpinned.
 
-From 2.32.1, too, the built-in roles in force are the running release's own. A 2.31.0 replica starting on a shared auth store no longer takes `mcp_servers:peer_identity` away from `kubernetes-operator` on the others (mcp-hangar#1988). The two-replica cases run nightly in the live tier, against PostgreSQL and with the published 2.31.0 beside the current release.
+From 2.32.1, too, the built-in roles in force are the running release's own. A 2.31.0 replica starting on a shared auth store no longer takes `mcp_servers:peer_identity` away from `kubernetes-operator` on the 2.32.1 replicas (mcp-hangar#1988). A 2.32.0 replica still reads the stored role, so it can still lose it. The two-replica cases run nightly in the live tier, against PostgreSQL and with the published 2.31.0 beside the current release.
 
 ## Attested keys
 

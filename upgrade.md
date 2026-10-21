@@ -4,6 +4,10 @@ title: Upgrade Guide
 
 This guide covers user-visible migration steps between MCP Hangar releases.
 
+## Upgrade to 2.33.0
+
+Nothing to do. A key-pinned server may now declare `tls.peer_identity.issuance: kbs-attested`, which core records and does not verify; see [Key-Pinned Upstreams](guides/KEY_PINNED_UPSTREAMS.md#attested-keys). Operator 0.17.34 registers such a server only with core 2.33.0 or newer.
+
 ## Upgrade to 2.32.1
 
 ### Remote servers' HTTP metrics are labelled with the server id

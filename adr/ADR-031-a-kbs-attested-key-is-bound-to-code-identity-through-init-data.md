@@ -1,6 +1,6 @@
 # ADR-031: A kbs-attested Key Is Bound to Code Identity Through Init-Data, and the Kubernetes Operator Only Carries It
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-21
 **Authors:** MCP Hangar Team
 

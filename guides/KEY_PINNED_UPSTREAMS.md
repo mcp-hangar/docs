@@ -143,7 +143,7 @@ From 2.32.1, too, the built-in roles in force are the running release's own. A 2
 
 - Core 2.32.1 refuses `issuance` at load. Accepting and recording it (mcp-hangar#1998) is merged for the next release.
 - The operator accepts `issuance` in the CRD and registers no server that declares it.
-- The operator does not yet carry `spec.initData` (ADR-031, being implemented).
+- Operator 0.17.34 carries `spec.initData` into the pod and holds a `kbs-attested` server to its rules (see [KUBERNETES.md](KUBERNETES.md)). It registers such a server only with a core that lists the `declared_key_issuance` capability, which no released core does yet.
 
 What follows is the provisioner's part, which Hangar cannot see or check. Every item is a condition of the declaration being true.
 
@@ -154,8 +154,8 @@ What follows is the provisioner's part, which Hangar cannot see or check. Every 
   - the init-data hash equals the hash of the whole document you bound to the key.
 
   A rule over the parsed init-data claims does not qualify: Trustee drops the agent policy's rules from them.
-- **The agent policy**, carried in the init-data. Generate it with Kata's `genpolicy` from the exact Deployment the pod is rendered with. Keep its defaults, which refuse `ExecProcess`, `ReadStream`, `WriteStream` and `SetPolicy`, and keep `AllowRequestsFailingPolicy := false`. Refusing `ReadStream` also stops `kubectl logs`, so logs leave by the workload's own channel.
-- **The init-data.** Name the `key_ref` in it, so each key lineage has its own hash, and put no secret in it: it is public on the CR and on the pod. The hash covers the raw bytes, so a YAML `|` versus `|-` changes it.
+- **The agent policy**, carried in the init-data. Generate it with Kata's `genpolicy` from the exact Deployment the pod is rendered with. Get that Deployment from the operator image of the release you run: `kubectl get mcpserver NAME -o yaml | docker run --rm -i ghcr.io/mcp-hangar/mcp-hangar-operator:<version> render`. Feed it the stored object, because the pod template carries its generation. A change to the operator's rendering ships with an upgrade note, and means generating the policy again. Keep its defaults, which refuse `ExecProcess`, `ReadStream`, `WriteStream` and `SetPolicy`, and keep `AllowRequestsFailingPolicy := false`. Refusing `ReadStream` also stops `kubectl logs`, so logs leave by the workload's own channel.
+- **The init-data.** Name the `key_ref` in it, so each key lineage has its own hash, and put no secret in it: it is public on the CR and on the pod. The hash covers the raw bytes, so a YAML `|` versus `|-` changes it. Bind the hash the operator reports in `status.initDataDigests` (`sha256` for SNP, `sha384` for TDX), not one computed from your source file.
 - **Rotation.**
   1. List the next key beside the current one.
   2. Overwrite the resource.

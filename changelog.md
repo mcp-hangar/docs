@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.51](https://github.com/mcp-hangar/docs/compare/v1.2.50...v1.2.51) (2026-10-21)
+
+
+### Changed
+
+* **guides:** bring the key-pin guide, the verdict limits and the upgrade guide to core 2.33.0 ([#528](https://github.com/mcp-hangar/docs/issues/528)) ([6e5db54](https://github.com/mcp-hangar/docs/commit/6e5db546b6dcc9420fe18976759709bb801fea6b))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#527](https://github.com/mcp-hangar/docs/issues/527)) ([fa458f9](https://github.com/mcp-hangar/docs/commit/fa458f97e5feb5dd98e6cbda280acf44a0952af7))
+
 ## [1.2.50](https://github.com/mcp-hangar/docs/compare/v1.2.49...v1.2.50) (2026-10-21)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.53](https://github.com/mcp-hangar/docs/compare/v1.2.52...v1.2.53) (2026-10-22)
+
+
+### Changed
+
+* **guides:** record what genpolicy needs to generate a kbs-attested agent policy ([#532](https://github.com/mcp-hangar/docs/issues/532)) ([678c5fd](https://github.com/mcp-hangar/docs/commit/678c5fd502c20c5a187c671cda2ceb5d362df17c))
+
 ## [1.2.52](https://github.com/mcp-hangar/docs/compare/v1.2.51...v1.2.52) (2026-10-22)
 
 

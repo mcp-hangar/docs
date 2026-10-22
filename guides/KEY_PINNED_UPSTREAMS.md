@@ -156,6 +156,12 @@ What follows is the provisioner's part, which Hangar cannot see or check. Every 
 
   A rule over the parsed init-data claims does not qualify: Trustee drops the agent policy's rules from them.
 - **The agent policy**, carried in the init-data. Generate it with Kata's `genpolicy` from the exact Deployment the pod is rendered with. Get that Deployment from the operator image of the release you run: `kubectl get mcpserver NAME -o yaml | docker run --rm -i ghcr.io/mcp-hangar/mcp-hangar-operator:<version> render`. Feed it the stored object, because the pod template carries its generation. A change to the operator's rendering ships with an upgrade note, and means generating the policy again. Keep its defaults, which refuse `ExecProcess`, `ReadStream`, `WriteStream` and `SetPolicy`, and keep `AllowRequestsFailingPolicy := false`. Refusing `ReadStream` also stops `kubectl logs`, so logs leave by the workload's own channel.
+
+  The policy goes into the init-data, so it exists before the CR does. Render the manifest you are about to apply with `metadata.generation: 1`, which is what a fresh object is stored with. With kata 4.2.0's `genpolicy`, measured end to end in the operator's T26 run:
+
+  - It refuses four fields the operator renders for a kbs-attested pod: `automountServiceAccountToken`, `runAsNonRoot` on the pod and on the container, and the pod's `seccompProfile`. Remove each from the rendered Deployment only where it holds the safe value (`false`, `true`, `RuntimeDefault`). The policy pins the UID and GID itself, and the container keeps its own `seccompProfile`. Do not pass `-s`, which silences every field `genpolicy` does not model.
+  - With the image pulled in the guest, `genpolicy` cannot read the user from the image. Set `runAsUser` and `runAsGroup` in `spec.podSecurityContext`.
+  - Its default settings expect OCI 1.1.0. A current containerd sends 1.3.0, and the guest then refuses the sandbox. Add the matching `drop-in-examples/20-oci-*` file to `genpolicy-settings.d`, and pass the settings directory with `-j`.
 - **The init-data.** Name the `key_ref` in it, so each key lineage has its own hash, and put no secret in it: it is public on the CR and on the pod. The hash covers the raw bytes, so a YAML `|` versus `|-` changes it. Bind the hash the operator reports in `status.initDataDigests` (`sha256` for SNP, `sha384` for TDX), not one computed from your source file.
 - **Rotation.**
   1. List the next key beside the current one.

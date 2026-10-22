@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.52](https://github.com/mcp-hangar/docs/compare/v1.2.51...v1.2.52) (2026-10-22)
+
+
+### Changed
+
+* **reference:** give a declared kbs-attested issuance its own verdict row ([#530](https://github.com/mcp-hangar/docs/issues/530)) ([218eee2](https://github.com/mcp-hangar/docs/commit/218eee245da024e549052b772c329f17c3559f9b))
+
 ## [1.2.51](https://github.com/mcp-hangar/docs/compare/v1.2.50...v1.2.51) (2026-10-21)
 
 

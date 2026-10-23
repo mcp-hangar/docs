@@ -392,7 +392,7 @@ List the tools available on a MCP server or group. Tool access filtering (allow_
 | `predefined` | `bool` | Whether tools are predefined (not discovered at runtime) |
 | `tools` | `list[object]` | Tools with `name`, `description`, `inputSchema`, `digest` (the SEP-1766 SHA-256 fingerprint of the tool's schema, the value [digest pinning](configuration.md#digest-pinning) compares) |
 
-For a group, the response carries `group: true` in place of `predefined`, and lists the tools of the member the group's strategy selects, starting it if it is cold. It has no `state`, except `"dead"` with an empty `tools` list when the selected member is dead. A group with no member in rotation, such as one whose members were all stopped, answers `no_healthy_members_in_group: <id>`: `hangar_start` the group first.
+For a group, the response carries `group: true` in place of `predefined`, and lists the tools a call from you through the group would be allowed: each name is decided on every member a call for your tenant may be routed to (the member you are pinned to alone, otherwise every member in rotation), and listed only when all of them allow it. The catalogue is read from a member already in rotation; a listing selects none and starts none. It has no `state`, except `"dead"` with an empty `tools` list when the routable members are all dead. A group with no member in rotation, such as one whose members were all stopped, answers an empty `tools` list: `hangar_start` or `hangar_warm` the group first.
 
 **Example:**
 
@@ -410,7 +410,7 @@ For a group, the response carries `group: true` in place of `predefined`, and li
 }
 ```
 
-Errors: `unknown_mcp_server: <id>`, `no_healthy_members_in_group: <id>` (both `error_type: ValueError`)
+Errors: `unknown_mcp_server: <id>` (`error_type: ValueError`)
 
 ### `hangar_details` {#hangar_details}
 

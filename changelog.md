@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.2.55](https://github.com/mcp-hangar/docs/compare/v1.2.54...v1.2.55) (2026-10-25)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#558](https://github.com/mcp-hangar/docs/issues/558)) ([5dff156](https://github.com/mcp-hangar/docs/commit/5dff15630aa50aba73eb405a71f10d30e1186970))
+* **guides:** correct server lifecycle, breaker and rate-limit docs for 2.34.2 ([#547](https://github.com/mcp-hangar/docs/issues/547)) ([3aa7eec](https://github.com/mcp-hangar/docs/commit/3aa7eec49e89443910601322fc83b566cfc5a5ba))
+* **guides:** correct the websocket and facade api guides ([#556](https://github.com/mcp-hangar/docs/issues/556)) ([78ecea3](https://github.com/mcp-hangar/docs/commit/78ecea332a18bef2147bc423452f2d1ceb8a9e3f))
+* **guides:** update compliance export and observability docs for 2.34.2 ([#553](https://github.com/mcp-hangar/docs/issues/553)) ([2357d80](https://github.com/mcp-hangar/docs/commit/2357d809de14d5055406b77b1a8343cad8873793))
+* **guides:** update digest and key pin docs for 2.34.2 ([#555](https://github.com/mcp-hangar/docs/issues/555)) ([7b1d304](https://github.com/mcp-hangar/docs/commit/7b1d3043663262f098181e152bbf48dea5942a19))
+* **guides:** update discovery and interceptor docs for 2.34.2 ([#551](https://github.com/mcp-hangar/docs/issues/551)) ([ae75cf2](https://github.com/mcp-hangar/docs/commit/ae75cf2cba90551586d547c2ea108f3a05f2f600))
+* **guides:** update front-door, replica and reload docs for 2.34.2 ([#552](https://github.com/mcp-hangar/docs/issues/552)) ([ae51d17](https://github.com/mcp-hangar/docs/commit/ae51d174bb4ddd6ccb1e00d4c0a315dd5567413d))
+* **guides:** websocket subscription is live from accept ([#550](https://github.com/mcp-hangar/docs/issues/550)) ([41dd4ad](https://github.com/mcp-hangar/docs/commit/41dd4ad7f8d5d05ae655eec533885f95ee3a540c))
+* **reference:** authentication and roles for 2.34.2 ([#541](https://github.com/mcp-hangar/docs/issues/541)) ([5a2039c](https://github.com/mcp-hangar/docs/commit/5a2039c73a0df5ab3dd73b2e4431ddd6a6ac866b))
+* **reference:** configuration keys for 2.34.2 ([#549](https://github.com/mcp-hangar/docs/issues/549)) ([14466c9](https://github.com/mcp-hangar/docs/commit/14466c9a387890e987a954ea51f3fcf61599f852))
+* **reference:** document the hot_loading trust keys ([#546](https://github.com/mcp-hangar/docs/issues/546)) ([da2921e](https://github.com/mcp-hangar/docs/commit/da2921e1859d66afb8075ec7cadcb47eeda2f074))
+* **reference:** re-check the security audit pages against 2.34.2 ([#542](https://github.com/mcp-hangar/docs/issues/542)) ([313166d](https://github.com/mcp-hangar/docs/commit/313166df254327424b592a4e2240d5811a06d21f))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#559](https://github.com/mcp-hangar/docs/issues/559)) ([61eb942](https://github.com/mcp-hangar/docs/commit/61eb94217c714306e2fa06a2f504b323c1e9b816))
+* **reference:** rest api for 2.34.2 ([#544](https://github.com/mcp-hangar/docs/issues/544)) ([c577655](https://github.com/mcp-hangar/docs/commit/c57765588c690f17d75e6c3c8484eac953e938b6))
+* **reference:** server, host and command environment variables for 2.34.2 ([#545](https://github.com/mcp-hangar/docs/issues/545)) ([e9a070c](https://github.com/mcp-hangar/docs/commit/e9a070cf548c6c94c36f78c0b62785f5981f2f84))
+* **reference:** tool_projection keys, pin values and tls peer identity ([#548](https://github.com/mcp-hangar/docs/issues/548)) ([2e132f8](https://github.com/mcp-hangar/docs/commit/2e132f8200821c3464f3f31ce782d8e2ffaffad4))
+* **reference:** update the cli reference for 2.34.2 ([#554](https://github.com/mcp-hangar/docs/issues/554)) ([3224156](https://github.com/mcp-hangar/docs/commit/322415659a1647dfce336b2d64b194e6d207f609))
+* **reference:** update the tools reference for 2.34.2 ([#543](https://github.com/mcp-hangar/docs/issues/543)) ([d4e6068](https://github.com/mcp-hangar/docs/commit/d4e60680bc375a86fd2e72b38f50a2a2cd7b4590))
+
 ## [1.2.54](https://github.com/mcp-hangar/docs/compare/v1.2.53...v1.2.54) (2026-10-25)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-hangar/docs",
-  "version": "1.2.54",
+  "version": "1.2.55",
   "description": "Public documentation for MCP Hangar",
   "files": [
     "**/*.md",

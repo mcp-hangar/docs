@@ -313,6 +313,12 @@ audit record.
 
 A deployment that writes no `headers.*` selectors cannot observe any of this.
 
+**How a selector matches.** The header name is matched case-insensitively, as
+HTTP header names are: `Mcp-Param-Region` and `mcp-param-region` are the same
+selector. The value is matched case-sensitively, with shell-style globs: a
+selector allowing `eu` does not match a request whose header (and body) say
+`EU`. List every spelling you mean to accept, or a glob such as `[eE][uU]`.
+
 **Refusing the call is a separate opt-in.**
 
 ```yaml

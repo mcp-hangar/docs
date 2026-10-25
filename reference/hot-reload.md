@@ -28,11 +28,12 @@ On those versions, name the file with `--config` or `MCP_CONFIG`.
 | --------- | --------- | ---------- |
 | File polling | up to 5s (configurable) | Default |
 | File watcher (watchdog) | ~1s | Only when the `watchdog` package is installed |
-| SIGHUP signal | Immediate | Scripted deployments, CI/CD |
+| SIGHUP signal | Immediate, in the background | Scripted deployments, CI/CD |
 | MCP tool | Immediate | Interactive reload from AI assistant |
 | `POST /api/config/reload` | Immediate | HTTP mode, REST API |
 
 All reload operations are **atomic**: changes are validated before application. Invalid configuration is rejected; current config preserved.
+*Since 2.34.2* reloads also run **one at a time**, whoever asks: a `POST /api/config/reload`, a `hangar_reload_config` call, the file watcher or SIGHUP that arrives while another reload runs waits for it (logged as `config_reload_waiting`), then applies to the configuration that one left and returns its own result. A graceful reload can hold the next one for up to its 30 s drain.
 A file that changes `tool_access.mode` is refused the same way: the mode needs a restart.
 Since 2.25.0 so is a file with an invalid `tools:` or `access:` policy field, or a policy list that is not a list: the previous policy stays in force ([Configuration](configuration.md#tools-dual-format)).
 
@@ -67,6 +68,16 @@ instead, with a 1s debounce.
 
 Standard Unix reload pattern. Does not terminate the process.
 
+*Since 2.34.2* the signal only queues the reload; a thread of its own runs it,
+gracefully, so the gateway keeps answering requests while it applies. A request
+sent right after `kill -HUP` can therefore still see the old configuration. A
+script that sends SIGHUP and then checks the result should wait for the
+`config_reload_completed_via_signal` (or `config_reload_failed_via_signal`) log
+line, or use `POST /api/config/reload`, which answers once the reload has
+applied. Signals that arrive while a reload runs are folded into one more
+reload. Before 2.34.2 the reload ran on the thread serving requests, and every
+request, `/health/live` included, waited for it.
+
 ```bash
 # Find process
 pgrep -f "mcp-hangar serve"
@@ -86,6 +97,12 @@ Reload from Claude Desktop or any MCP client:
 hangar_reload_config()                    # Graceful reload
 hangar_reload_config(graceful=false)      # Immediate shutdown
 ```
+
+`graceful` (the default) waits, up to 30 seconds in all, for the calls in flight
+to the servers the reload stops or rebuilds, then stops them. `graceful=false`
+stops them at once, and those calls fail (for example with
+`tool_error: client_closed`). Since 2.28.0; before it both values stopped the
+servers at once.
 
 **Response:**
 
@@ -117,10 +134,22 @@ curl -X POST http://127.0.0.1:8000/api/config/reload
 
 | Scenario | Behavior | Final State |
 | ---------- | ---------- | ------------- |
-| **Added** | Registered but not started | `COLD` |
-| **Removed** | Stopped gracefully, then removed | (deleted) |
-| **Modified** | Old stopped, new registered | `COLD` |
+| **Added** | Registered. On `front_door`, then started (see below) | `COLD`; on `front_door` `READY` once started |
+| **Removed** | Stopped (gracefully by default), then removed | (deleted) |
+| **Modified** | Old stopped, new registered. On `front_door`, then started | `COLD`; on `front_door` `READY` once started |
 | **Unchanged** | No action taken | Preserved |
+
+*Since 2.34.2*, with `tool_access.mode: front_door`, a reload starts each server
+it adds and each server whose settings it changed, right after the reload
+applies, on a background thread, as boot starts every configured server. That
+is how their tools reach `tools/list`; before 2.34.2 they stayed `COLD`, and
+their tools were not served until a restart. A server that fails to start is
+logged as `front_door_reload_warmup_failed` with its error type, and the others
+still start; the reload itself reports success either way. Servers the reload
+keeps unchanged are not restarted, and a server restored `dead` is not started.
+A reload can therefore launch subprocesses or containers, or open connections
+to remote servers. In `egress` mode a reload starts nothing, and servers start
+on first use.
 
 ### Compared Fields
 
@@ -179,7 +208,8 @@ mcp_servers:
     command: [npx, -y, "@modelcontextprotocol/server-filesystem", "/home/user/documents"]
 ```
 
-**Result:** `math` unchanged, `filesystem` added in `COLD` state.
+**Result:** `math` unchanged, `filesystem` added in `COLD` state. On a
+`front_door` gateway it is then started, and its tools are listed.
 
 ### Update MCP Server
 
@@ -299,6 +329,9 @@ config_reload:
 | `config_reload_worker_started` | Worker initialized |
 | `config_file_modified_detected` | File change detected (polling mode) |
 | `reload_signal_received` | SIGHUP received |
+| `config_reload_completed_via_signal` / `config_reload_failed_via_signal` | A SIGHUP reload finished |
+| `config_reload_waiting` | A reload waits for one already running |
+| `front_door_reload_warmup_complete` / `front_door_reload_warmup_failed` | `front_door`: the servers a reload added or changed were started, or one failed to |
 | `triggering_config_reload` | Reload initiated |
 | `configuration_reloaded` | Reload successful |
 | `configuration_reload_failed` | Reload failed |
@@ -317,7 +350,7 @@ config_reload:
 | `tool_access.mode` change refused | Restart the gateway |
 | Hot-loaded MCP servers unaffected | Use `hangar_unload` to manage separately |
 | Only `mcp_servers` (with groups and their policies), `tool_access.required_catalogue`, `execution`, `headers.param_validation`, `resource_links`, `interceptors` and `ui_resources` are applied | Restart the gateway for any other section (`auth`, `event_store`, `logging`, ...) |
-| In-flight requests | Completed before MCP server stops (graceful mode) |
+| In-flight requests | Completed before MCP server stops in graceful mode, for up to 30 s in all; failed at once with `graceful=false` |
 
 ## Troubleshooting
 
@@ -367,6 +400,6 @@ hangar_start(mcp_server="my-mcp-server")
 | --------------- | ---------------- |
 | Validation before apply | Invalid config rejected |
 | Atomic operations | All-or-nothing semantics |
-| Graceful shutdown | Active requests complete first |
+| Graceful stop | In-flight calls to a server being stopped complete first, for up to 30 s |
 | Audit trail | All reloads logged with source |
 | File permissions | Ensure config not world-writable |

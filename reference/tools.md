@@ -265,9 +265,9 @@ Reload configuration from disk, applying MCP server additions, removals, and upd
 
 | Parameter | Type | Default | Description |
 | ----------- | ------ | --------- | ------------- |
-| `graceful` | `bool` | `true` | Accepted and recorded on the `ConfigurationReloadRequested` event. Both values stop removed and modified MCP servers at once: `true` does not wait for in-flight calls |
+| `graceful` | `bool` | `true` | `true` waits, up to 30 s in all, for the calls in flight to the MCP servers the reload stops or rebuilds, then stops them; `false` stops them at once and those calls fail. Recorded on the `ConfigurationReloadRequested` event (`force` is its inverse). Since 2.28.0 |
 
-**Side Effects:** Stops removed/modified MCP servers, registers new MCP servers, updates changed MCP servers.
+**Side Effects:** Stops removed/modified MCP servers, registers new MCP servers, updates changed MCP servers. On `front_door`, then starts the added and changed servers in the background. A call made while another reload runs waits for it. See [Hot-Reload](hot-reload.md).
 
 **Returns:**
 

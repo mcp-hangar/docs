@@ -15,7 +15,12 @@ with `-L` arrives intact). Using the trailing slash avoids the round trip. The
 same applies to `/api/groups/`, `/api/tools/`, `/api/config/` and
 `/api/system/`.
 
-All responses are JSON. Domain errors are **nested**:
+Responses are JSON, with one exception: a path or method the API does not
+serve is answered by the web framework as plain text (`404 Not Found`,
+`405 Method Not Allowed`) when authentication is off. With authentication on,
+an authenticated request to such a path or method matches no entry in the
+route table and is refused first, with `403` `AccessDeniedError` and the
+reason `route has no permission mapping`. Domain errors are **nested**:
 
 ```json
 {"error": {"code": "<ExceptionType>", "message": "<description>", "details": {"field": "..."} }}
@@ -39,8 +44,13 @@ middleware before the handler chain:
 
 Request-body checks made inside a handler answer `400` with a flat code, e.g.
 `{"error": "missing_fields", "detail": "required field(s) absent: group_id"}`,
-`{"error": "invalid_body", ...}` or `{"error": "invalid_mode", ...}`. The
-approvals routes use a flat `{"error": "<message>"}` throughout.
+`{"error": "invalid_body", ...}` or `{"error": "invalid_mode", ...}`. *Since
+2.34.2* a body that is not JSON at all, or is JSON but not an object, answers
+`400 invalid_body` on the routes that need one: server create and update,
+groups, discovery sources, L7 policy, auth and approval resolution. Before, a
+body that did not parse was a `500` there. Routes whose body is optional (stop,
+config reload and backup, admin tools, key revocation) ignore one that does not
+parse. The approvals routes use a flat `{"error": "<message>"}` throughout.
 
 ## Required permissions
 
@@ -50,9 +60,11 @@ a route missing from it is denied. A refusal is `403` with `AccessDeniedError`.
 | Route | Permission |
 | ------- | ------------ |
 | `GET /mcp_servers`, `/mcp_servers/{id}` and its `tools`, `tools/history`, `health`, `logs` | `mcp_servers:read` |
-| `POST /mcp_servers`, `PUT`/`PATCH /mcp_servers/{id}` | `mcp_servers:write` |
-| `DELETE /mcp_servers/{id}` | `mcp_servers:write` and `mcp_servers:lifecycle` |
-| `POST /mcp_servers/{id}/start`, `/stop`, `/block`; `/sessions/{id}/suspend`; `/admin/tools/...` | `mcp_servers:lifecycle` |
+| `POST /mcp_servers`, `PUT`/`PATCH /mcp_servers/{id}` | `mcp_servers:write`; also `mcp_servers:local_launch` to register a server that is not `remote`, or to set `env` on one (2.34.2+); also `mcp_servers:peer_identity` for a `tls.peer_identity` |
+| `DELETE /mcp_servers/{id}` | `mcp_servers:write` and `mcp_servers:lifecycle`; also `mcp_servers:peer_identity` for a key-pinned server |
+| `DELETE /mcp_servers/{id}/peer_identity` | `mcp_servers:peer_identity` |
+| `POST /mcp_servers/{id}/start`, `/stop`, `/block`; `/sessions/{id}/suspend`; `/admin/tools/.../withdraw`, `/restore` | `mcp_servers:lifecycle`; a withdraw or restore for every tenant (no `tenant_id`) also needs `admin` (`*:*`) |
+| `GET /admin/tools/pins` | `audit:read` |
 | `GET /mcp_servers/{id}/l7_policy` | `policy:read` |
 | `POST`/`PUT`/`DELETE /mcp_servers/{id}/l7_policy` | `policy:write` |
 | `GET /groups`, `/groups/{id}` | `group:read` |
@@ -133,6 +145,17 @@ POST /mcp_servers
 | `idle_ttl_s` | int | No | `300` | Idle timeout in seconds |
 | `health_check_interval_s` | int | No | `60` | Health check interval |
 | `description` | string | No | -- | Human-readable description |
+| `tls` | dict | No | -- | Remote only: `peer_identity` and `max_connection_age`. With `peer_identity` the server is key-pinned, needs `mcp_servers:peer_identity` and an `https` endpoint, and may omit `endpoint` |
+
+*Since 2.34.2* a `mode` other than `remote` -- `subprocess`, `docker`,
+`container`, or a value Hangar does not recognise -- also needs
+`mcp_servers:local_launch`, which `admin` and `provider-admin` hold and
+`developer` and `kubernetes-operator` do not; without it the route answers
+`403`. See [Authentication](../guides/AUTHENTICATION.md#built-in-roles).
+
+*Since 2.34.2* a `remote` server's `endpoint` must be an `http` or `https` URL
+with a host; anything else (`file:///...`, a bare host name) is `422
+ValidationError`. Before, it was stored and failed at every start.
 
 The registration's provenance is always recorded as `api`; a `source` field in
 the body is ignored. A body without `mcp_server_id` or `mode` is `400
@@ -161,9 +184,10 @@ GET /mcp_servers/{mcp_server_id}
 ```
 
 **Response 200:** MCP Server detail object: `mcp_server_id`, `state`, `mode`,
-`alive`, `tools` (full tool objects), `health` (the object
-[Get MCP Server Health](#get-mcp-server-health) returns), `idle_time`, `meta`
-and `dead`.
+`alive`, `tools` (tool objects, a withheld one shown as in
+[Get MCP Server Tools](#get-mcp-server-tools)), `health` (the object
+[Get MCP Server Health](#get-mcp-server-health) returns), `idle_time`, `meta`,
+`provenance` and `dead`.
 
 **Response 404:** MCP Server not found.
 
@@ -184,6 +208,15 @@ Both `PUT` and `PATCH` are accepted and behave identically (partial update).
 | `env` | dict | New environment variables (replaces existing) |
 | `idle_ttl_s` | int | New idle timeout |
 | `health_check_interval_s` | int | New health check interval |
+| `endpoint` | string | New endpoint of a remote server; `null` clears it, which only a key-pinned server may have |
+| `tls` | dict | New `tls` block of a remote server (`peer_identity`, `max_connection_age`) |
+
+Setting `env` on a server that is not `remote` also needs
+`mcp_servers:local_launch` (2.34.2+). Changing `endpoint` or `tls` needs a
+durable configuration store, and on a key-pinned server, or adding a peer
+identity, `mcp_servers:peer_identity`. An `endpoint` must be an `http` or
+`https` URL with a host (`422` otherwise, 2.34.2+). A server declared in the
+configuration file answers `409 declared_in_config`.
 
 **Response 200:**
 
@@ -212,6 +245,24 @@ reload, or stop it with `POST /mcp_servers/{mcp_server_id}/stop`.
 
 ```json
 {"error": "declared_in_config", "mcp_server_id": "math", "detail": "McpServer math is declared in the gateway configuration; ..."}
+```
+
+### Forget a Peer-Key Name
+
+```
+DELETE /mcp_servers/{mcp_server_id}/peer_identity
+```
+
+A key-pinned server's name keeps its peer-key record after the server is
+deleted, so the name cannot come back as a plain server. This route removes
+that record. It needs `mcp_servers:peer_identity`, and the server must already
+be deleted: while it exists the route answers `422 PeerKeyNameTaken`, and a name
+with no record is `404`.
+
+**Response 200:**
+
+```json
+{"mcp_server_id": "payments", "forgotten": true}
 ```
 
 ### Start MCP Server
@@ -284,6 +335,19 @@ GET /mcp_servers/{mcp_server_id}/tools
 `mcp-hangar pin` computes. `pinned_digest` is present only when the tool has an
 all-tenants pin (`tool_projection.pins`); a per-tenant pin is not shown here.
 See [Digest Pinning](configuration.md#digest-pinning).
+
+A tool a model is not shown is listed as its `name`, `digest`, `pinned_digest`
+when it has one, and `withheld`, with no `description` and no `inputSchema`:
+
+- `"digest_drift"` (2.30.0+): it drifted from a pin under
+  `digest_enforcement: block`, for any tenant;
+- `"withdrawn"` (2.34.2+): it is withdrawn for every tenant, on the server or a
+  group that owns it, or `tool_projection.new_tools: withhold` is set and the
+  pins do not admit it for every tenant. A tool pinned for some tenants only is
+  shown withheld here too, because this route answers for no tenant. A
+  withdrawal for some tenants only is not marked.
+
+Read `withheld` before `description` or `inputSchema`.
 
 ### Get MCP Server Health
 
@@ -559,11 +623,14 @@ POST /discovery/sources
 {"source_id": "...", "registered": true}
 ```
 
-Keep the `source_id` from this response. A source registered here is recorded
-and answers the per-source routes (`/scan`, `/enable`, `PUT`, `DELETE`), but it
-is not one of the sources the discovery cycle runs, so *List Sources* does not
-show it. A `mode` other than `additive` or `authoritative` is `400
-invalid_mode`.
+The source is built and added to the running discovery cycle, so *List
+Sources* shows it under the returned `source_id` and the cycle scans it. The
+cycle holds one source per type and the id is derived from the type, so a type
+already held -- from the configuration or an earlier call -- is `422
+ValidationError` (`A '<type>' discovery source is already held; update it
+instead of registering another`), as is a type that is unknown or whose
+dependencies are not installed. A `mode` other than `additive` or
+`authoritative` is `400 invalid_mode`.
 
 ### Update Source
 
@@ -651,12 +718,12 @@ GET /discovery/quarantined
 POST /discovery/approve/{name}
 ```
 
-Approves a **quarantined** MCP server. A name that is pending but not
-quarantined is not approved by this route.
+Approves a quarantined MCP server, or one pending approval because its source
+has `auto_register: false` (the ones `GET /discovery/pending` lists).
 
 **Response 200:** `{"approved": true, "mcp_server": "...", "status": "registered"}` on success. A
-name not in quarantine also answers `200`, with
-`{"approved": false, "mcp_server": "...", "error": "McpServer not found in quarantine"}`.
+name in neither place also answers `200`, with
+`{"approved": false, "mcp_server": "...", "error": "McpServer not found in quarantine or pending"}`.
 
 ### Reject MCP Server
 
@@ -664,10 +731,10 @@ name not in quarantine also answers `200`, with
 POST /discovery/reject/{name}
 ```
 
-Rejects a quarantined MCP server.
+Rejects a quarantined or pending MCP server.
 
 **Response 200:** `{"rejected": true, "mcp_server": "..."}`, or `"rejected": false` with the
-same `error` when the name is not in quarantine.
+same `error` when the name is in neither place.
 
 ---
 
@@ -680,8 +747,12 @@ GET /config
 ```
 
 Returns the MCP server records the durable configuration repository holds --
-the registrations a persistence backend keeps across a restart -- with
-sensitive fields stripped. It is not the running configuration: on a gateway
+the registrations a persistence backend keeps across a restart -- redacted.
+*Since 2.34.2* the redaction reaches every level: a value under a sensitive key
+name (`env` entries such as `API_KEY` or `DB_PASSWORD` included) and a
+credential-shaped value are replaced. Before 2.34.2 only top-level keys were
+checked, so every server's `env` was served as stored. It is not the running
+configuration: on a gateway
 without a durable persistence backend it answers `{"config": {}}`. For the
 running state use [Export Config](#export-config).
 
@@ -743,14 +814,14 @@ Creates a rotating backup of the current configuration.
 ```
 
 The backup is written **next to the configuration file** as `<config>.bak1`,
-rotating older ones to `.bak2` and beyond. The file this route (and
-[Config Diff](#config-diff)) reads is the one named by the `MCP_CONFIG`
-environment variable, or `config.yaml` in the process's working directory when
-that is unset -- not the `--config` argument, and not the file the gateway
-booted from. Since 2.25.0 `serve` falls back to
-`~/.config/mcp-hangar/config.yaml` when neither is present, and these two
-routes do not follow it. Setting `MCP_CONFIG` rather than passing `--config`
-makes all three agree. The returned `path` is relative when that name is.
+rotating older ones to `.bak2` and beyond. *Since 2.29.0* the file this route
+(and [Config Diff](#config-diff)) reads is the one the gateway was started
+with, as for reload; `MCP_CONFIG`, or `config.yaml` in the working directory,
+is only the fallback for a gateway built from a dict, which has no file. A
+`config_path` field in the body (or, for the diff, a `config_path` query
+parameter) is refused with `422`. Before 2.29.0 both routes read `MCP_CONFIG`
+or `./config.yaml` whatever `--config` said, and took a caller-supplied
+`config_path`. The returned `path` is relative when that name is.
 
 That directory has to be writable by the process, and in the published
 container image it is not: `/app` is owned by root and the gateway runs as
@@ -759,7 +830,8 @@ container image it is not: `/app` is owned by root and the gateway runs as
 *Since 2.5.0* that answers **503** with the reason --
 `could not write the backup beside 'config.yaml': Permission denied` -- rather
 than a bare `500` and `An internal server error occurred.`. Mount a writable
-directory and point `MCP_CONFIG` at the file in it if you need this endpoint.
+directory and start the gateway with its configuration file in it if you need
+this endpoint.
 
 ### Config Diff
 
@@ -767,7 +839,11 @@ directory and point `MCP_CONFIG` at the file in it if you need this endpoint.
 GET /config/diff
 ```
 
-Compares on-disk configuration with current in-memory state.
+Compares on-disk configuration with current in-memory state. *Since 2.34.2*
+both sides are redacted as [Get Config](#get-config) redacts, before the diff
+is computed, so neither `diff` nor `on_disk` nor `in_memory` carries a secret
+value. Before, the on-disk side was served after `${VAR}` interpolation,
+secrets included.
 
 **Response 200:**
 
@@ -804,14 +880,20 @@ GET /system
       "manages_fleet": true,
       "storage_is_shareable": false,
       "rate_limits_are_per_instance": true
-    }
+    },
+    "capabilities": ["peer_identity", "declared_key_issuance"]
   }
 }
 ```
 
 The counter is `total_invocations`, not `total_tool_calls`. `instance` is
 present from 2.5.0 and describes the replica that answered -- see
-[Running more than one replica](../cookbook/25-multiple-replicas.md).
+[Running more than one replica](../cookbook/25-multiple-replicas.md). With a
+coordination lease keeper, `instance` also carries `management_lease`
+(`holder`, `generation`, `expires_in_s`, `my_lease_ttl_s`), or `null` while no
+lease is seen. `capabilities` names what a client may rely on this core to
+enforce: `peer_identity` (key-pinned servers, 2.32.0+) and
+`declared_key_issuance`.
 
 ### Get Current User
 
@@ -824,8 +906,11 @@ Returns the current authentication status. Used by the SPA to check whether a us
 **Response 200:**
 
 ```json
-{"authenticated": true, "principal": {"id": "...", "type": "user"}}
+{"authenticated": true, "principal": {"id": "service:my-app", "type": "service_account"}}
 ```
+
+`type` is `service_account` for an API-key principal and `user` for an OIDC
+identity.
 
 ---
 
@@ -844,14 +929,16 @@ Lists all tools across all MCP servers (used by the supervisor to sync tool inve
 ```json
 {
   "tools": [
-    {"mcp_server_id": "math", "tool_name": "add", "description": "Add two numbers", "input_schema": "{'type': 'object', ...}", "digest": "e84e846a...", "pinned_digest": "e84e846a..."}
+    {"mcp_server_id": "math", "tool_name": "add", "description": "Add two numbers", "input_schema": {"type": "object", "properties": {"a": {"type": "number"}}}, "digest": "e84e846a...", "pinned_digest": "e84e846a..."}
   ]
 }
 ```
 
-`input_schema` is a string -- the schema rendered as Python text, not a JSON
-object; use [Get MCP Server Tools](#get-mcp-server-tools) for a parseable
-`inputSchema`. `digest` and `pinned_digest` are as described there. Only
+`input_schema` is the tool's input schema as a JSON object (since 2.28.0).
+`digest` and `pinned_digest` are as described there. A withheld tool carries
+`withheld` (`"digest_drift"`, or `"withdrawn"` since 2.34.2) and no
+`description` or `input_schema`, as on
+[Get MCP Server Tools](#get-mcp-server-tools). Only
 servers whose tools are known appear: a `cold` server without predefined tools
 contributes nothing until it has started.
 
@@ -900,7 +987,8 @@ Removes a session from the suspended registry.
 ## Auth Management
 
 Every route here requires the `admin` role. With authentication disabled they
-are not wired and answer `503`.
+are not wired and answer `503`, with the generic `InternalServerError` body;
+`GET /auth/permissions` is a static list and answers `200` either way.
 
 *Since 2.25.0* the actor of every change -- the creator of a key or role, the
 revoker, the assigner, the updater, the deleter -- is the principal that
@@ -934,8 +1022,10 @@ POST /auth/keys
 {"key_id": "...", "raw_key": "mcp_...", "principal_id": "...", "name": "...", "created_by": "user:alice", "expires_at": null, "warning": "Save this key now - it cannot be retrieved later!"}
 ```
 
-`created_by` is the caller's principal id. A body missing `principal_id` or
-`name` is a `500`, not a validation error.
+`created_by` is the caller's principal id. *Since 2.34.2* a body missing
+`principal_id` or `name` is `400 missing_fields` (before, a `500`), an
+`expires_at` without a UTC offset is read as UTC, and one that does not parse
+is `422 ValidationError`.
 
 !!! warning
     The `raw_key` is returned only once. Store it securely.
@@ -964,7 +1054,8 @@ GET /auth/keys
 | `include_revoked` | query | bool | No | Include revoked keys (default `true`) |
 
 **Response 200:** `{"principal_id": "...", "keys": [{"key_id", "name", "created_at", "expires_at", "last_used_at", "revoked"}], "total": 1, "active": 1}`.
-Without `principal_id` the list is empty.
+Without `principal_id` the route answers `400` with
+`{"error": {"code": "ValidationError", "message": "principal_id is required"}}`.
 
 ### List All Roles
 
@@ -1239,9 +1330,11 @@ policy, so a restart keeps the policy cleared either way.
 ## Admin Tools
 
 Runtime tool withdrawal/restore. Requires `mcp_servers:lifecycle`, which the
-built-in `admin` and `developer` roles hold. A grant held only within a tenant
-acts on its own tenant: omitting `tenant_id` means that tenant, and naming
-another is `403`.
+built-in `admin`, `provider-admin`, `developer` and `kubernetes-operator` roles
+hold. *Since 2.29.0* a withdrawal or restore for every tenant -- no
+`tenant_id` -- also needs `admin` (`*:*`), so a global `developer` gets `403`
+unless it names a tenant. A grant held only within a tenant acts on its own
+tenant: omitting `tenant_id` means that tenant, and naming another is `403`.
 
 ### Withdraw Tool
 
@@ -1262,7 +1355,7 @@ withdrawal when it reads the event, within one tail interval.
 
 | Field | Type | Default | Description |
 | ------- | ------ | --------- | ------------- |
-| `tenant_id` | string | `null` | Tenant to withdraw for. Omit/null withdraws globally for all tenants. |
+| `tenant_id` | string | `null` | Tenant to withdraw for. Omit/null withdraws for all tenants (needs `admin`) |
 | `kind` | string | `"tool"` | `tool`, `prompt` or `resource`; anything else is `400 invalid_kind`. A resource is named by its uri, slashes included |
 
 **Response 200:**
@@ -1283,7 +1376,7 @@ Removes a runtime withdrawal (config-declared withdrawals persist independently)
 
 | Field | Type | Default | Description |
 | ------- | ------ | --------- | ------------- |
-| `tenant_id` | string | `null` | Tenant to restore. Omit/null removes the entire runtime entry. |
+| `tenant_id` | string | `null` | Tenant to restore. Omit/null removes the entire runtime entry (needs `admin`) |
 | `kind` | string | `"tool"` | As for withdraw |
 
 **Response 200:**
@@ -1291,6 +1384,26 @@ Removes a runtime withdrawal (config-declared withdrawals persist independently)
 ```json
 {"restored": true, "mcp_server": "math", "tool": "add", "kind": "tool", "tenant_id": null}
 ```
+
+### Tool Pin History
+
+```
+GET /admin/tools/pins?tool={name}&server={id}
+```
+
+The recorded and revoked pins of one tool, oldest first, read from the event
+store. `tool` is required (`400` without it); `server` narrows it to one server.
+Needs `audit:read`. A grant held only within a tenant sees the pins recorded
+for its own tenant, and not those for all tenants. Without an event store the
+route answers `503`.
+
+**Response 200:**
+
+```json
+{"tool": "add", "pins": [{"event": "recorded", "occurred_at": 1774260930.5, "mcp_server_id": "math", "tool": "add", "tenant_id": null, "sha256": "e84e...", "source": "config", "previous_sha256": null, "upstream": null, "structure_sha256": "...", "description_sha256": "...", "approved_by": "config"}]}
+```
+
+A `revoked` entry carries `revoked_by` in place of the last five fields.
 
 ---
 
@@ -1389,6 +1502,16 @@ works on a `pip` or `uv` install as well as in the image. Before 2.25.0 only
 the image installed a WebSocket library; on a `pip` install the upgrade was
 answered `404` and uvicorn logged `No supported WebSocket library detected`
 ([mcp-hangar#1676](https://github.com/mcp-hangar/mcp-hangar/issues/1676)).
+
+Credentials go in the upgrade request's headers. A client that cannot set
+headers may pass a JWT as `?token=<jwt>`, read as `Authorization: Bearer <jwt>`
+when neither that header nor the API-key header is present; an API key is not
+accepted this way. A token in the URL can land in the access logs of any proxy
+on the path.
+
+The subscription is live from the moment the connection is accepted: events
+published before the client's first `subscribe` message are queued and
+filtered when they are sent, not dropped.
 
 See the [WebSockets guide](../guides/WEBSOCKETS.md) for connection details.
 

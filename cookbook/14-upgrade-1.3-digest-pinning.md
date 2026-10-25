@@ -150,12 +150,13 @@ printf 'mcp_servers: {}\n' > /tmp/hangar-1.3-cookbook/config.yaml
    Expected output:
 
    ```text
-   "io.mcp-hangar.validator"
-   "io.mcp-hangar.mutator"
+   "io.mcp-hangar/validator"
+   "io.mcp-hangar/mutator"
    ```
 
-   *Since 2.0.0* the default response uses these reverse-DNS names; v1.2.1 to
-   v1.6.x answered `mcp-hangar-validator` and `mcp-hangar-mutator`.
+   *Since 2.29.1* the response uses these SEP-2133 names. From 2.0.0 to 2.29.0
+   it answered `io.mcp-hangar.validator` and `io.mcp-hangar.mutator`, and v1.2.1
+   to v1.6.x `mcp-hangar-validator` and `mcp-hangar-mutator`.
 
 1. Exercise every pinned MCP server
 
@@ -327,8 +328,8 @@ configuration reaches it: a configured pin is enforced in its server's
 ## What's Next
 
 Keep `/interceptors/list` clients up to date. Since v1.2.1, Hangar returns two
-distinct interceptor names; since 2.0.0 they are `io.mcp-hangar.validator` and
-`io.mcp-hangar.mutator`. See
+distinct interceptor names; since 2.29.1 they are `io.mcp-hangar/validator` and
+`io.mcp-hangar/mutator`. See
 [15 -- Interceptor Discovery](15-interceptor-discovery.md).
 
 For the full background, see

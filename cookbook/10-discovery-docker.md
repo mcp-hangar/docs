@@ -71,21 +71,21 @@ discovery:                               # NEW: discovery configuration
 
    ```json
    {"pending": [{"name": "docker-math", "source_type": "docker", "mode": "http",
-                 "connection_info": {"host": "172.17.0.3", "port": 8080,
-                                     "endpoint": "http://172.17.0.3:8080"},
+                 "connection_info": {"host": "172.17.0.3", "port": 8080, "path": "/mcp",
+                                     "endpoint": "http://172.17.0.3:8080/mcp"},
                  "metadata": {"container_id": "...", "container_name": "my-mcp-server",
                               "image": "my-mcp-server:latest", "status": "running",
-                              "group": null, "runtime_addresses": ["172.17.0.3"]},
+                              "runtime_addresses": ["172.17.0.3"]},
                  "fingerprint": "...", "discovered_at": "...", "last_seen_at": "...",
                  "ttl_seconds": 90, "is_expired": false}]}
    ```
 
    The key is `source_type`, not `source`. The endpoint is the container's
-   published host port when it has one (`-p`), otherwise its network IP, and it
-   carries **no path**: in 2.24.0 the Docker source has no label for one, so a
-   server that serves MCP at `/mcp` (the SDK default) answers the first call
-   with `MCP initialization failed: HTTP error: 404`. The Kubernetes source
-   has `mcp-hangar.io/path` for exactly this; the Docker source does not yet.
+   published host port when it has one (`-p`), otherwise its network IP, plus
+   the `mcp.hangar.path` label, `/mcp` by default. Before 2.28.0 the Docker
+   source had no path label and the endpoint carried no path, so a server that
+   serves MCP at `/mcp` answered the first call with
+   `MCP initialization failed: HTTP error: 404`.
 
 5. Approve the MCP server:
 
@@ -93,19 +93,19 @@ discovery:                               # NEW: discovery configuration
    curl -X POST http://localhost:8000/api/discovery/approve/docker-math
    ```
 
-   In 2.24.0 this route approves only a server in **quarantine** (`GET
-   /api/discovery/quarantined`), not one in the pending queue. For the pending
-   server above it answers `200` with:
-
    ```json
-   {"approved":false,"mcp_server":"docker-math","error":"McpServer not found in quarantine"}
+   {"approved": true, "mcp_server": "docker-math", "status": "registered"}
    ```
 
-   Until that is fixed, a server held by `auto_register: false` cannot be
-   approved, and `auto_register: true` is the only way to register it.
+   The route approves a server in the pending queue, held by
+   `auto_register: false`, or in **quarantine** (`GET
+   /api/discovery/quarantined`), where it failed validation. A name in neither
+   answers `"approved": false` with
+   `"error": "McpServer not found in quarantine or pending"`. Before 2.28.0 it
+   looked in quarantine only, so a pending server could not be approved.
 
-6. Verify it's registered. With `auto_register: true` the server appears
-   without approval, registered in `remote` mode:
+6. Verify it's registered, in `remote` mode. With `auto_register: true` it
+   appears here without the approval step:
 
    ```bash
    curl http://localhost:8000/api/mcp_servers/
@@ -118,12 +118,14 @@ discovery:                               # NEW: discovery configuration
                      "description": "Discovered from docker"}]}
    ```
 
-   `mcp-hangar status` does not show it: in 2.24.0 that command cannot reach a
-   running gateway and only reads `config.yaml`.
+   `mcp-hangar status` shows it too when it reaches the gateway: it asks
+   `MCP_HANGAR_URL`, else `MCP_HTTP_HOST` (default `127.0.0.1`) on
+   `MCP_HTTP_PORT` or ports 8000 and 8080, and falls back to `config.yaml`
+   alone when nothing answers.
 
 ## What Just Happened
 
-The Docker discovery source connects to the Docker socket and lists containers with `mcp.hangar.enabled=true` labels. In `additive` mode, it only adds new MCP servers -- never removes existing ones. With `auto_register: false`, discovered MCP servers go to a pending queue for manual approval. Omit the key and they are registered on discovery: the default is `true`.
+The Docker discovery source connects to the Docker socket and lists containers with `mcp.hangar.enabled=true` labels, stopped and never-started ones included. In `additive` mode, it only adds new MCP servers -- never removes existing ones. With `auto_register: false`, discovered MCP servers go to a pending queue for manual approval. Omit the key and they are registered on discovery: the default is `true`.
 
 Set `auto_register: true` if you trust all labeled containers and want zero-touch registration.
 
@@ -145,7 +147,8 @@ for the same rule stated in full, and
 | `discovery.refresh_interval_s` | int | `30` | Seconds between scans |
 | `discovery.auto_register` | bool | **`true`** | Register a discovered server without approval. The default registers -- set it to `false`, as this recipe does, if you want the pending queue |
 | `discovery.sources[].type` | string | -- | `docker`, `filesystem`, `kubernetes`, `entrypoint` |
-| `discovery.sources[].mode` | string | `additive` | `additive` (add only) or `authoritative` (add and remove) |
+| `discovery.sources[].mode` | string | `additive` | `additive` (add only) or `authoritative` (add, and remove a server no longer reported once its TTL has passed; see [Discovery Modes](../guides/DISCOVERY.md#discovery-modes)) |
+| `discovery.sources[].allowed_mount_paths` | list | -- | Docker only: host directories a `mcp.hangar.volumes` label may mount from |
 
 ### Docker Labels
 
@@ -155,8 +158,13 @@ for the same rule stated in full, and
 | `mcp.hangar.name` | No | Container name | MCP Server name |
 | `mcp.hangar.mode` | No | `container` | `container` (Hangar runs the image) or `http`/`sse` (Hangar connects to the running container) |
 | `mcp.hangar.port` | No | `8080` | Container port, for `http`/`sse` mode |
-| `mcp.hangar.group` | No | -- | Recorded in the discovered server's `metadata.group` |
-| `mcp.hangar.ttl` | No | `90` | Seconds the discovery stays valid without being seen again |
+| `mcp.hangar.path` | No | `/mcp` | The MCP endpoint's path, for `http`/`sse` mode |
+| `mcp.hangar.ttl` | No | `90` | Seconds an `authoritative` source keeps the server after it stops being reported |
+| `mcp.hangar.read-only` | No | `true` | `container` mode: read-only root filesystem; `"false"` opts out |
+| `mcp.hangar.volumes` | No | -- | `container` mode: comma-separated mounts, honoured only under the source's `allowed_mount_paths`; otherwise the container is not registered |
+| `mcp.hangar.command` | No | -- | `container` mode: accepted, but not passed to the container today |
+
+There is no `group` label.
 
 ## What's Next
 

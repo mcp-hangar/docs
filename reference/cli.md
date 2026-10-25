@@ -352,7 +352,7 @@ Bare `mcp-hangar` accepts only the [global options](#global-options); pass
 | -------- | ------- | ------ | --------- | -------------- | ------------- |
 | `--config` | `-c` | PATH | [the shared rule](#default-locations) | - | Path to config.yaml file. Overrides the global `--config`, which overrides `MCP_CONFIG` |
 | `--http` | - | FLAG | false | `MCP_MODE=http` | Run in HTTP mode |
-| `--host` | - | TEXT | 0.0.0.0 | `MCP_HTTP_HOST` | HTTP server host |
+| `--host` | - | TEXT | 127.0.0.1 | `MCP_HTTP_HOST` | HTTP server host |
 | `--port` | `-p` | INT | 8000 | `MCP_HTTP_PORT` | HTTP server port |
 | `--log-file` | - | PATH | - | - | Path to log file |
 | `--log-level` | - | TEXT | INFO | `MCP_LOG_LEVEL` | Log level |
@@ -381,10 +381,10 @@ mcp-hangar serve --http --host 127.0.0.1 --port 8080
 ```
 
 > **Binding a non-loopback host requires authentication.** When `--host` is
-> anything other than a loopback address (e.g. the default `0.0.0.0`), Hangar
+> anything other than a loopback address (e.g. `0.0.0.0`), Hangar
 > refuses to start unless authentication is configured (`auth`) or the
 > `--unsafe-no-auth` flag is passed to explicitly accept an unauthenticated
-> listener. A loopback bind (`--host 127.0.0.1`) is exempt. This prevents
+> listener. A loopback bind (`--host 127.0.0.1`, the default since 2.28.0) is exempt. This prevents
 > accidentally exposing an unauthenticated gateway on a routable interface.
 
 ### HTTP Endpoints
@@ -793,7 +793,7 @@ event_store:
 | ---------- | ------------- | --------- |
 | `MCP_CONFIG` | Path to configuration file | - |
 | `MCP_MODE` | Server mode (`stdio` or `http`) | `stdio` |
-| `MCP_HTTP_HOST` | HTTP server host | `0.0.0.0` |
+| `MCP_HTTP_HOST` | HTTP server host | `127.0.0.1` |
 | `MCP_HTTP_PORT` | HTTP server port | `8000` |
 | `MCP_LOG_LEVEL` | Log level | `INFO` |
 | `MCP_JSON_LOGS` | Enable JSON logging | `false` |

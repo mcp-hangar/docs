@@ -142,6 +142,8 @@ auth:
   role_assignments:                # a validated token grants nothing by itself
     - principal: "group:agents"    # from the token's `groups` claim
       role: service-account        # invoke tools; no hangar_* management tools
+      # Removing a line revokes its grant at the next boot (2.34.2+). With more
+      # than one issuer, set allowed_tenants per issuer and use tenant:<id> scopes.
 
   # Storage is chosen once, below, for every persisted concern. On 2.4.0 and
   # earlier it was picked here instead -- `storage: {driver: sqlite, path: ...}`
@@ -395,11 +397,14 @@ For *egress*, Hangar now ships a built-in, deny-by-default L7 policy engine --
 upstreams a server may reach and which tool calls and arguments it may make, so
 outbound tool invocation is no longer ungoverned (see the
 [Egress Policy guide](../guides/EGRESS_POLICY.md) for its trust boundary and the
-network backstop it depends on). What is still *not* claimed is a composed
-*inbound* authorization gate from an external general-purpose policy engine: an
-external engine (OPA) can be wired in as an *optional, future* layer, but the
-runtime does not today enforce a composed "RBAC **and** OPA must both allow"
-decision, so do not present OPA as a required second gate. Physical/host
+network backstop it depends on). OPA can be wired in as an *optional* inbound layer
+(`auth.opa`). By default it does not add a gate: it is asked only when RBAC
+denies, and its allow overrides that deny with no tenant scope, so it can admit
+more than RBAC does (boot logs `opa_may_widen_rbac`). Since 2.34.2
+`auth.opa.require_both: true` makes it a second gate -- RBAC **and** OPA must
+both allow, and while OPA cannot be reached nothing is allowed -- so present OPA as
+a second gate only with that key set. See
+[Authentication](../guides/AUTHENTICATION.md#5-decide-whether-opa-may-widen-rbac). Physical/host
 security and the managed database's own hardening are external-infrastructure.
 
 ## Launch Checklist

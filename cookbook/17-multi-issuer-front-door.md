@@ -262,8 +262,21 @@ Per-issuer claim mappings inherit from the top level. issuer-b overrides
 `groups_claim: roles`, but it omits `tenant_claim`, so it inherits
 `tenant_claim: tenant_id` from `auth.oidc`. Both issuers therefore resolve the
 tenant from `tenant_id` into `CallerIdentity.tenant_id`, which the front-door
-access resolver uses to apply the member-scope policy -- exactly as in Recipe
-16. Hangar remains a resource server throughout: it **validates** these JWTs, it
+access resolver uses to apply the member-scope policy -- exactly as in
+Recipe 16.
+
+`allowed_tenants` binds each issuer to the tenants it may name. Without it,
+issuer-b could sign a token whose `tenant_id` is `tenant:a`, and Hangar would
+treat the caller as tenant a. With it (core 2.34.2 and later), such a token is
+refused with `401`, as is a token from a bound issuer that names no tenant.
+With an entry left unbound, boot logs `oidc_issuers_not_bound_to_tenants` once,
+naming the open issuers. The binding
+covers tenant-scoped roles only: a role granted at scope `global` to a subject
+or `group:<name>` reaches a token with that subject or group from either
+issuer, so grant OIDC users and groups `tenant:<id>` roles in a recipe like
+this one.
+
+Hangar remains a resource server throughout: it **validates** these JWTs, it
 does not issue them, mint refresh tokens, or perform dynamic client
 registration.
 

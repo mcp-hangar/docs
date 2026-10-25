@@ -838,16 +838,35 @@ hot_loading:
   cache:
     ttl_s: 3600
     max_entries: 1000
+  trusted_namespaces: ["io.github.acme/"]
+  allow_force_unverified: false
+  inherit_env: []
+  secrets:
+    allow:
+      "io.github.acme/weather": [WEATHER_API_KEY]
 ```
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | `true` | Enable runtime loading from the registry |
+| `trusted_namespaces` | `list[str]` | `[]` | Registry name prefixes whose entries are verified. Matching is case-sensitive and by whole segment: a missing trailing `/` is added, so `io.github.acme/` matches `io.github.acme/weather` but not `io.github.acmeevil/weather` or `io.github.acme.labs/weather`. An empty prefix, whitespace, `*` or `//` refuses the configuration. Empty: every entry is unverified and refused |
+| `allow_force_unverified` | `bool` | `false` | Whether the `force_unverified` argument of `hangar_load` may load an entry that is not verified. `false`: the argument is ignored. Anything but a YAML boolean refuses the configuration |
+| `inherit_env` | `list[str]` | `[]` | Variable names a hot-loaded server takes from the gateway's environment, on top of a fixed base (`PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE`, `TZ`, `TMPDIR`, `TMP`, `TEMP` and the Windows equivalents). Nothing else is inherited: list a proxy, a CA bundle or `UV_*`/`npm_config_*` settings here if `uvx` or `npx` need them |
+| `secrets.allow` | `dict[str, list[str]]` | `{}` | Exact registry name -> the variables that server may receive. A variable its entry asks for and that is not listed is reported missing and never looked up. A listed one is read from the gateway's environment, then `~/.config/mcp-hangar/secrets/<registry name>/<NAME>`, then `~/.config/mcp-hangar/secrets/<NAME>`. Two keys that differ only in case refuse the configuration |
 | `registry.base_url` | `str` | `https://registry.modelcontextprotocol.io/v0` | Registry API base URL |
 | `registry.timeout_s` | `float` | `10.0` | Registry request timeout in seconds |
 | `registry.max_retries` | `int` | `3` | Retry attempts for registry requests |
 | `cache.ttl_s` | `int` | `3600` | TTL for cached registry lookups, in seconds |
 | `cache.max_entries` | `int` | `1000` | Maximum entries in the registry lookup cache |
+
+*Since 2.30.0* the four trust keys are the operator's decisions about what a
+registry entry, written by whoever published it, may get; each defaults to
+refusing. They apply at startup and on every reload, and each load reads the
+ones in force. An absent section trusts nothing and binds no secret. A
+hot-loaded server runs as the gateway's user, so `trusted_namespaces` is the
+boundary: the server can read whatever that user can, whatever Hangar hands it.
+Statically configured servers are unaffected by `inherit_env` and
+`secrets.allow`.
 
 ## `event_store`
 

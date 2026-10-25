@@ -6,8 +6,16 @@
 
 `rate(mcp_hangar_batch_calls_total{result="failure"}) / rate(mcp_hangar_batch_calls_total)`
 is above 20% — `hangar_call` batches in which no call succeeded. A batch with some
-successes counts as `partial`, not `failure`. A call refused by a gate counts like a
-failed one, so a one-call batch to a denied tool is a `failure`.
+successes counts as `partial`, not `failure`. A call refused by a gate inside the
+executor (tool access, digest pin, circuit breaker, egress policy) counts like a
+failed one, so a one-call batch to a tool the access policy denies is a `failure`.
+
+The counter does not see `tool:invoke` authorization denials. They are decided
+before the executor runs, so a batch whose every call was denied that way is not
+counted at all, and a mixed batch is labelled from the calls that ran. A flood of
+unauthorized `hangar_call` batches does not raise this ratio: look for
+`AuthorizationDenied` in the batch responses and for `hangar_call_authorization_denied`
+in the logs instead.
 
 ## Diagnose
 

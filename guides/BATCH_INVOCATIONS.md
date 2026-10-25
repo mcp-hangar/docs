@@ -55,7 +55,7 @@ hangar_call(
     max_concurrency: int = 10,   # Max parallel invocations (1-50)
     timeout: float = 60.0,       # Global timeout in seconds (1-300)
     fail_fast: bool = False,     # Abort on first error
-    max_attempts: int = 1,       # Total attempts per call including retries (1-10)
+    max_attempts: int | None = None,  # Total attempts per call including retries (1-10)
 ) -> dict
 ```
 
@@ -67,7 +67,7 @@ hangar_call(
 | `max_concurrency` | `int` | 10 | Maximum parallel workers (1-50) |
 | `timeout` | `float` | 60.0 | Global timeout for entire batch (1-300s) |
 | `fail_fast` | `bool` | False | If True, abort remaining calls on first error |
-| `max_attempts` | `int` | 1 | Total attempts per call including retries (1-10; the default 1 means no retry unless a `retry:` block is configured) |
+| `max_attempts` | `int \| None` | `None` | Total attempts per call including retries (1-10). Omitted: the configured `retry:` policy, or one attempt when none is configured. `1`: exactly one attempt, whatever is configured |
 
 **Call specification:**
 
@@ -168,8 +168,9 @@ results = hangar_call(
 ```
 
 `fail_fast` acts on failures at execution time. A call naming an unknown server
-or tool fails [validation](#validation) instead, and then no call in the batch
-runs at all, with or without `fail_fast`.
+fails [validation](#validation) instead, and then no call in the batch runs at
+all, with or without `fail_fast`. So does an unknown tool on a server whose tool
+list is known; on a group or a cold server it fails at execution, as below.
 
 ### Per-Call Timeouts
 
@@ -211,7 +212,11 @@ results = hangar_call(calls=[
 Batch validation is **eager** - the entire batch is validated before any execution:
 
 - MCP Server existence
-- Tool existence (for MCP servers with predefined tools)
+- Tool existence, only on a server whose tool list is already known: one that
+  has started, or that declares its tools in the configuration. On a group, or
+  a cold server with no declared tools, an unknown tool is not caught here: the
+  batch runs, and that call fails with `error_type: "ToolNotFoundError"` and
+  `error` `Tool not found: <tool>`
 - `arguments` present and a dictionary (not checked against the tool's schema)
 - Batch size limits
 - Timeout bounds
@@ -242,13 +247,16 @@ hangar_call(calls=[
 
 ### Retry Behavior
 
-When `max_attempts > 1`:
+When a call retries -- a `retry:` block is configured, or `max_attempts` is
+above 1:
 
 - Retries use exponential backoff
-- A `retry:` block in the configuration sets the attempts, and applies even
-  when the caller leaves `max_attempts` at its default of 1. A caller's
-  `max_attempts` of 2 or more can lower the configured count, never raise it
-  (see [Configuration](../reference/configuration.md#retry))
+- A `retry:` block in the configuration sets the attempts, and applies when the
+  caller omits `max_attempts`. An explicit `max_attempts: 1` is exactly one
+  attempt, whatever is configured (since 2.29.0; before it, `1` was the default
+  and still got the configured retries). A caller's `max_attempts` of 2 or more
+  can lower the configured count, never raise it; with no `retry:` block it
+  sets the attempts (see [Configuration](../reference/configuration.md#retry))
 - Only transient errors trigger retry (timeout, network errors, malformed JSON)
 - Permanent errors (validation, MCP server not found) do not retry
 - Each call retries independently within the batch
@@ -315,6 +323,16 @@ mcp_hangar_batch_truncations_total{reason="batch_budget"}
 mcp_hangar_batch_circuit_breaker_rejections_total{mcp_server="..."}
 mcp_hangar_batch_cancellations_total{reason="timeout|fail_fast"}
 ```
+
+`mcp_hangar_batch_calls_total`, the size and the duration histograms are
+recorded by the executor, so they describe the calls that reached it. A call
+refused by `tool:invoke` authorization never does: a batch in which every call
+was refused that way records nothing in them, and a mixed batch is labelled from
+the calls that ran, so one allowed success plus one authorization denial counts
+as `success` while the response says `success: false`. A call refused by a gate
+inside the executor (tool access, digest pin, circuit breaker, egress policy)
+counts as a failed call. `validation_error` counts batches refused at
+validation, before any call ran.
 
 ## Configuration
 

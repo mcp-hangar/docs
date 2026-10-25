@@ -12,12 +12,16 @@ MCP Hangar exposes its validator and mutator capabilities through
 validate or mutate before sending traffic through it.
 
 The interceptor framework shipped in v1.2.0, and since v1.2.1 the two interceptor
-entries have distinct names. *Since 2.0.0* they are reverse-DNS identifiers:
+entries have distinct names. *Since 2.29.1* they are SEP-2133 identifiers,
+`{vendor-prefix}/{extension-name}`:
 
-- `io.mcp-hangar.validator`
-- `io.mcp-hangar.mutator`
+- `io.mcp-hangar/validator`
+- `io.mcp-hangar/mutator`
 
-From v1.2.1 to v1.6.x they were `mcp-hangar-validator` and `mcp-hangar-mutator`.
+From 2.0.0 to 2.29.0 the default listing named them `io.mcp-hangar.validator`
+and `io.mcp-hangar.mutator`, with a dot, and from v1.2.1 to v1.6.x
+`mcp-hangar-validator` and `mcp-hangar-mutator`. The listing answers only the
+new names; `interceptor/invoke` still accepts the older ones as aliases.
 
 If your client still assumes one shared `mcp-hangar` name, it can overwrite one
 entry with the other or fail uniqueness validation.
@@ -75,7 +79,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
    {
      "interceptors": [
        {
-         "name": "io.mcp-hangar.validator",
+         "name": "io.mcp-hangar/validator",
          "version": "2.24.0",
          "type": "validator",
          "supportedEvents": ["tools/call", "tools/list"],
@@ -83,7 +87,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
          "trustBoundary": "host"
        },
        {
-         "name": "io.mcp-hangar.mutator",
+         "name": "io.mcp-hangar/mutator",
          "version": "2.24.0",
          "type": "mutator",
          "supportedEvents": ["tools/call"],
@@ -121,8 +125,8 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
 
    ```json
    [
-     "io.mcp-hangar.mutator",
-     "io.mcp-hangar.validator"
+     "io.mcp-hangar/mutator",
+     "io.mcp-hangar/validator"
    ]
    ```
 
@@ -131,7 +135,7 @@ No MCP servers are required. `/interceptors/list` describes Hangar itself.
    ```bash
    curl -s http://localhost:8000/interceptors/list | jq -e '
      any(.interceptors[];
-       .name == "io.mcp-hangar.validator" and
+       .name == "io.mcp-hangar/validator" and
        .type == "validator" and
        (.supportedEvents | index("tools/list")) and
        (.modes | index("audit"))
@@ -166,10 +170,10 @@ interceptor extension -- the header
 `MCP-Interceptor-Ext: io.modelcontextprotocol/interceptors`, or
 `?ext=io.modelcontextprotocol/interceptors` on the GET -- receives the newer
 shape instead: `type` is `validation` or `mutation`, events move into a
-`hooks` array with a `phase`, and `modes` becomes a single `mode`. In 2.24.0
-that shape still names the entries `mcp-hangar-validator` and
-`mcp-hangar-mutator`, so a client that reads both shapes must not assume one
-name per interceptor.
+`hooks` array with a `phase`, and `modes` becomes a single `mode`. Up to 2.29.0
+that shape named the entries `mcp-hangar-validator` and
+`mcp-hangar-mutator`. Since 2.29.1 both shapes use the same two names, one per
+interceptor.
 
 ## Key Config Reference
 

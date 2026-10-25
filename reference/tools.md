@@ -309,7 +309,7 @@ Load a MCP server from the MCP registry at runtime. Hot-loaded MCP servers are e
 | Parameter | Type | Default | Description |
 | ----------- | ------ | --------- | ------------- |
 | `name` | `str` | required | Registry name of the MCP server |
-| `force_unverified` | `bool` | `false` | Load unverified MCP servers without confirmation |
+| `force_unverified` | `bool` | `false` | Load an entry outside the operator's `hot_loading.trusted_namespaces`. Ignored unless the operator set `hot_loading.allow_force_unverified: true` |
 | `allow_tools` | `list[str] \| None` | `None` | Fnmatch patterns for allowed tools |
 | `deny_tools` | `list[str] \| None` | `None` | Fnmatch patterns for denied tools |
 | `approval_tools` | `list[str] \| None` | `None` | Fnmatch patterns for tools that stay visible but wait for a human approval before each call. Refused when the deployment has no approval gate |
@@ -331,7 +331,7 @@ The primary success response:
 | `tools` | `list[str]` | Available tool names |
 | `warnings` | `list[str]` | Present only when there is something to warn about |
 
-Other possible `status` values, each with a `message`: `"ambiguous"` (several registry entries match the name, listed in `matches`), `"not_found"` (no match in the registry), `"missing_secrets"` (required secrets not configured, with `mcp_server_name`, a `missing` list and `instructions`), `"unverified"` (MCP server not verified, with `mcp_server_name` and `instructions`; use `force_unverified` to override), `"already_loaded"` (with the existing `mcp_server_id`), `"failed"` (hot-loading is not configured, no installable package or runtime for this server, or `approval_tools` asked for with no approval gate configured).
+Other possible `status` values, each with a `message`: `"ambiguous"` (several registry entries match the name, listed in `matches`), `"not_found"` (no match in the registry), `"missing_secrets"` (required secrets not configured, with `mcp_server_name`, a `missing` list and `instructions`), `"unverified"` (MCP server not verified, with `mcp_server_name` and `instructions`; `force_unverified` overrides it only where `hot_loading.allow_force_unverified` is `true`), `"already_loaded"` (with the existing `mcp_server_id`), `"failed"` (hot-loading is not configured, no installable package or runtime for this server, or `approval_tools` asked for with no approval gate configured).
 
 A short name often matches several registry entries: `filesystem` and `time` both answer `"ambiguous"`. Pass a name from `matches`.
 

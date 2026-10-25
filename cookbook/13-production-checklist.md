@@ -15,8 +15,8 @@
 
 ## Reliability
 
-- [ ] Health checks enabled on all MCP servers (`health_check_interval_s`; in
-      2.24.0 every server is checked on the worker's 60 s cycle whatever the value says)
+- [ ] Health checks enabled on all MCP servers (`health_check_interval_s`; before
+      2.28.0 every server was checked on the worker's 60 s cycle whatever the value said)
 - [ ] Circuit breaker thresholds tuned (`max_consecutive_failures`)
 - [ ] MCP Server groups configured for critical MCP servers (at least 2 members)
 - [ ] `min_healthy` set to match your SLA requirements
@@ -45,7 +45,7 @@
 
 ## Configuration
 
-- [ ] Config file checked with `mcp-hangar config check config.yaml`, which reports keys nothing reads (it does not validate values)
+- [ ] Config file checked with `mcp-hangar config check config.yaml`, which reports keys nothing reads and values the gateway would refuse at boot
 - [ ] Hot-reload tested via the `add`/`remove` API and via `SIGHUP` (graceful config reload)
 - [ ] Environment-specific configs separated (dev/staging/prod)
 

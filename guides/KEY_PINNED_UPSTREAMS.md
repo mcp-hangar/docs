@@ -33,7 +33,7 @@ mcp_servers:
   From 2.32.1 this matches for an EC key written with explicit curve parameters too (mcp-hangar#1982); 2.32.0 refused one. Prefer named curves anyway: PKIX forbids explicit parameters (RFC 5480), and with the `openssl` macOS ships that takes `-pkeyopt ec_param_enc:named_curve`.
 - **The endpoint** must be `https`. The key replaces the certificate chain and the hostname as the identity: Hangar requires TLS 1.3 and consults no CA, so a self-signed certificate is fine.
 - **`max_connection_age`** (seconds, or `90s`, `30m`, `1h`; default `1h`) bounds how long one connection pool serves. When it expires, the pool is replaced and every new connection handshakes against the current list. It is refused on a server without a peer identity.
-- **`issuance`** is not accepted by core yet. ADR-030 names `issuance: kbs-attested`, a key a Key Broker Service released only to an attested guest. Core refuses the key at load, rather than accepting a declaration it does not act on. See [Attested keys](#attested-keys).
+- **`issuance`** (optional) declares how the listed keys were released. The one value is `kbs-attested`, a key a Key Broker Service released only to an attested guest (ADR-030, ADR-031). Since 2.33.0 core accepts it and records it on each call as `declared_key_issuance`; it verifies none of it. Core 2.32.1 and older refuse the key at load. See [Attested keys](#attested-keys).
 
 ## Where a key list is declared
 
@@ -91,7 +91,7 @@ The operator registers a key-pinned server only when all of these hold. Each fai
 | --- | --- |
 | Core lists `peer_identity` in `capabilities` of `GET /api/system/` (core 2.32.0 or newer) | `PeerIdentityNotCarried` |
 | `hangar.url` is `https://` | `PeerIdentityNotCarried` |
-| No `issuance` is declared | `PeerIdentityNotCarried` |
+| No `issuance` is declared, or core lists `declared_key_issuance` in `capabilities` (core 2.33.0 or newer) | `PeerIdentityNotCarried` |
 | The operator's core API key holds `kubernetes-operator` | `RegistrationForbidden` |
 | Core has durable storage | `RegistrationFailed` |
 | The endpoint is inside `ssrf.trusted_networks` | `EndpointNotTrusted` |

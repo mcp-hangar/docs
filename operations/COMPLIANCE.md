@@ -73,26 +73,29 @@ output.
 
 ## Format reference
 
-The examples below are records written by core 2.24.0 for a call to `add` on a
-server named `math` by an API-key principal `user:developer`.
+The examples below are records written by core 2.34.2 for a call to `add` on a
+server named `math` by the principal `user:developer` (principal type `user`,
+role `developer`), and for that server's state change from `cold` to `ready`.
 
 ### CEF (Common Event Format)
 
 ```text
-CEF:0|MCP Hangar|MCP Hangar|0.15.0|101|Tool Invocation Completed|1|rt=1791142564436 dvchost=mcp-hangar act=ToolInvocationCompleted cs1=math cs1Label=ProviderID suser=user:developer spriv=developer flexString1=math flexString1Label=RouteBackend cs5=add cs5Label=ToolName cn1=0.34 cn1Label=DurationMs
+CEF:0|MCP Hangar|MCP Hangar|2.34.2|101|Tool Invocation Completed|1|rt=1792940002270 dvchost=mcp-hangar act=ToolInvocationCompleted cs1=math cs1Label=ProviderID suser=user:developer spriv=developer flexString1=math flexString1Label=RouteBackend suid=user:developer flexString2=user flexString2Label=CallerType cs5=add cs5Label=ToolName cn1=0.31 cn1Label=DurationMs
+CEF:0|MCP Hangar|MCP Hangar|2.34.2|202|Provider State Changed|3|rt=1792940002270 dvchost=mcp-hangar act=ProviderStateChanged cs1=math cs1Label=ProviderID msg=cold -> ready
 ```
 
 Signature IDs: `101` completed, `102` failed, `103` denied, `202` state change.
-The device-version field is a fixed `0.15.0`, not the running release. A CEF
-state-change record names the server (`cs1`) but not the old and new state;
-the other three formats carry both.
+The device-version field is the running release. A CEF state-change record
+carries the transition in `msg` (`cold -> ready`). Before 2.27.3 the device
+version was a fixed `0.15.0` and a CEF state change named only the server.
 
 Compatible with ArcSight, Splunk, QRadar, and any CEF-aware SIEM.
 
 ### LEEF 2.0 (IBM QRadar)
 
 ```text
-LEEF:2.0|MCP Hangar|MCP Hangar|0.15.0|101|\tdevTime=Oct 04 2026 19:38:29\tproto=tool\tusrName=user:developer\trole=developer\taction=add\tduration=0.31\tsrc=math\trouteBackend=math
+LEEF:2.0|MCP Hangar|MCP Hangar|2.34.2|101|\tdevTime=Oct 25 2026 14:53:22\tproto=tool\tusrName=user:developer\trole=developer\taction=add\tduration=0.31\tcallerType=user\tcallerId=user:developer\tsrc=math\trouteBackend=math
+LEEF:2.0|MCP Hangar|MCP Hangar|2.34.2|202|\tdevTime=Oct 25 2026 14:53:22\tproto=provider\toldState=cold\tnewState=ready\tsrc=math
 ```
 
 Tab-delimited extensions following the LEEF 2.0 specification (`\t` above
@@ -101,7 +104,8 @@ stands for a tab). Event IDs match the CEF signature IDs.
 ### JSON-lines
 
 ```json
-{"timestamp": "2026-10-04T19:38:33.384109+00:00", "event_type": "ToolInvocationCompleted", "provider_id": "math", "route_backend": "math", "tool_name": "add", "status": "success", "duration_ms": 0.31, "user_id": "user:developer", "caller_roles": "developer"}
+{"timestamp": "2026-10-25T14:53:22.271027+00:00", "event_type": "ToolInvocationCompleted", "provider_id": "math", "route_backend": "math", "tool_name": "add", "status": "success", "duration_ms": 0.31, "user_id": "user:developer", "caller_roles": "developer", "caller_type": "user", "caller_id": "user:developer"}
+{"timestamp": "2026-10-25T14:53:22.271050+00:00", "event_type": "ProviderStateChanged", "provider_id": "math", "from_state": "cold", "to_state": "ready"}
 ```
 
 One JSON object per line; a field with no value is left out. Fields are listed
@@ -110,7 +114,8 @@ under [Exported fields](#exported-fields).
 ### RFC 5424 syslog
 
 ```text
-<134>1 2026-10-04T19:38:37.282099Z gateway-host mcp-hangar 92463 101 [mcp@49152 provider="math" routeBackend="math" tool="add" status="success" duration="0.46" user="user:developer" roles="developer"] Tool add on provider math success
+<134>1 2026-10-25T14:53:22.271068Z gateway-host mcp-hangar 21649 101 [mcp@49152 provider="math" routeBackend="math" tool="add" status="success" duration="0.31" user="user:developer" roles="developer" callerType="user" callerId="user:developer"] Tool add on provider math success
+<132>1 2026-10-25T14:53:22.271090Z gateway-host mcp-hangar 21649 202 [mcp@49152 provider="math" fromState="cold" toState="ready"] Provider math state changed from cold to ready
 ```
 
 Facility `local0`; severity informational for a completed call, error for a
@@ -120,8 +125,9 @@ rsyslog, syslog-ng, and Fluentd syslog inputs.
 
 ## Examples
 
-`serve --http` binds `0.0.0.0` by default, which refuses to start without
-authentication; the examples bind loopback for a local run with auth off.
+`serve --http` binds `127.0.0.1` by default (since 2.29.0); the examples name
+it for a local run with auth off. A non-loopback host refuses to start without
+authentication.
 Create the output directory first (see [Delivery failures](#delivery-failures)).
 
 Start Hangar with CEF output to a file:
@@ -151,16 +157,24 @@ omitted.
 | Call duration (ms) | `duration_ms` | `cn1` | `duration` | `duration` |
 | Caller principal | `user_id` | `suser` | `usrName` | `user` |
 | Role that authorized the call | `caller_roles` | `spriv` | `role` | `roles` |
+| Caller type: `user`, `service` or `anonymous` | `caller_type` | `flexString2` (label `CallerType`) | `callerType` | `callerType` |
+| Caller id: the user id, else the agent id | `caller_id` | `suid` | `callerId` | `callerId` |
+| Cost, in hundredths of a cent | `cost_cents` | `cn2` (label `CostCents`) | `costCents` | `costCents` |
+| Pricing model | `cost_model` | (none) | `costModel` | `costModel` |
+| Input tokens | `cost_input_tokens` | `cn3` (label `CostInputTokens`) | `costInputTokens` | `costInputTokens` |
+| Output tokens | `cost_output_tokens` | `flexNumber1` (label `CostOutputTokens`) | `costOutputTokens` | `costOutputTokens` |
 | Session | `session_id` | `cs3` | `sessID` | `session` |
 | Tenant | `tenant_id` | `cs6` | `tenantID` | `tenant` |
 | Upstream error (the upstream JSON-RPC error code, e.g. `-1`) | `error_type` | `reason` | `reason` | `error` |
 | Refusing gate and its reason code | `gate`, `gate_reason` | `gate`, `gateReason` | `gate`, `gateReason` | `gate`, `gateReason` |
 | L7 verdict, mode, rule kind, policy id | `l7_verdict`, `l7_mode`, `l7_rule_kind`, `l7_policy_id` | `l7Verdict`, `l7Mode`, `l7RuleKind`, `l7PolicyId` | same as CEF | same as CEF |
 
-State-change records carry `from_state` / `to_state` (JSON-lines), `oldState` /
-`newState` (LEEF), and `fromState` / `toState` (syslog).
+State-change records carry `from_state` / `to_state` (JSON-lines), `msg`
+(`<from> -> <to>`, CEF), `oldState` / `newState` (LEEF), and `fromState` /
+`toState` (syslog).
 
-Not written by any of the four formats in 2.24.0, although the exporters accept
-them: caller type (`human`, `agent`, `service`, `anonymous`), caller id, and the
-cost-attribution fields (`cost_cents`, `cost_model`, `cost_input_tokens`,
-`cost_output_tokens`).
+The caller and cost fields are written by all four formats since 2.28.0; before
+it the exporters accepted them and wrote none. A call with no identity (auth
+off) carries no caller fields, and the cost fields appear only when a cost was
+attributed to the call. Every labelled CEF string slot is taken, so CEF has no
+field for the pricing model; the other three formats carry it.

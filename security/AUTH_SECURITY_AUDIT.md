@@ -104,8 +104,8 @@ Re-run against core 2.24.0 on 2026-10-04:
 
 Open defects in this audit's scope, as of 2.34.2:
 
-- `POST /api/auth/roles/assign` with a role name that does not exist, or a scope other than `global` or `tenant:<id>`, answers `500` rather than a `4xx`. Nothing is assigned. Not filed as an issue yet.
-- A declared `auth.stdio.principal` has its `roles` enforced only on a front door or with auth on. With auth off in `egress` mode every `hangar_*` management tool is allowed to it, whatever its roles; since 2.34.2 boot says so with `stdio_principal_roles_not_enforced`. Whether egress mode should enforce them is an open design question ([mcp-hangar/mcp-hangar#2079](https://github.com/mcp-hangar/mcp-hangar/issues/2079)).
+- `POST /api/auth/roles/assign` with a role name that does not exist, or a scope other than `global` or `tenant:<id>`, answers `500` rather than a `4xx`. Nothing is assigned.
+- A declared `auth.stdio.principal` has its `roles` enforced only on a front door or with auth on. With auth off in `egress` mode every `hangar_*` management tool is allowed to it, whatever its roles; since 2.34.2 boot says so with `stdio_principal_roles_not_enforced` ([mcp-hangar/mcp-hangar#2079](https://github.com/mcp-hangar/mcp-hangar/issues/2079)). Whether egress mode should enforce them is undecided.
 
 Fixed in 2.34.2. A gateway older than that still has them:
 

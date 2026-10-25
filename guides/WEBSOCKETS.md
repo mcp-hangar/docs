@@ -85,7 +85,7 @@ acknowledged. Before 2.28.0 events in the window were not delivered.
 match, such as a partial wildcard (`McpServer*`); they match nothing and are
 left out of `event_types` in the acknowledgement.
 
-You can update filters at any time by sending another `subscribe` message; it takes effect without an acknowledgement. Omit a key to not filter on that dimension (e.g., omit `mcp_server_ids` to receive events from all MCP servers). An `event_types` entry matches an event type exactly, and `"*"` matches every type.
+You can update filters at any time by sending another `subscribe` message; it takes effect without an acknowledgement. Omit a key to not filter on that dimension (e.g., omit `mcp_server_ids` to receive events from all MCP servers). An `event_types` entry matches an event type exactly, and `"*"` matches every type; any other wildcard matches nothing and is reported in `rejected_event_types`.
 
 ## Queue and Backpressure
 
@@ -101,7 +101,7 @@ After 55 seconds without an event, the server sends `{"type": "ping"}`. A client
 
 ## Authentication
 
-When auth is enabled, pass credentials via the initial HTTP upgrade headers. The connection needs `audit:read`. A subscriber whose `audit:read` is granted only within a tenant receives only events that name that tenant; the client cannot widen that with a filter.
+When auth is enabled, pass credentials via the initial HTTP upgrade headers. A client that cannot set headers may pass a JWT as `?token=<jwt>`, read as `Authorization: Bearer <jwt>` when neither that header nor the API-key header is present; an API key is not accepted this way, and a token in the URL can land in the access logs of any proxy on the path. The connection needs `audit:read`. A subscriber whose `audit:read` is granted only within a tenant receives only events that name that tenant; the client cannot widen that with a filter.
 
 ```bash
 websocat "ws://localhost:8000/api/ws/events" -H "X-API-Key: mcp_your_key_here"

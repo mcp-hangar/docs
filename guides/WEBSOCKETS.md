@@ -69,13 +69,14 @@ The server acknowledges with:
 {
   "type": "subscribed",
   "event_types": ["McpServerStateChanged"],
+  "rejected_event_types": [],
   "mcp_server_ids": ["math"]
 }
 ```
 
-The server waits for this first message, up to 5 seconds after accepting the connection, and only then starts streaming: events published before the first message arrives, or before the 5 seconds run out, are not delivered. Only the first `subscribe` is acknowledged.
+The subscription is live from the moment the connection is accepted. The server waits up to 5 seconds for the first message before it starts sending; events published in that window are queued and filtered by the first `subscribe` when they are sent, not dropped. Only the first `subscribe` is acknowledged. `rejected_event_types` lists the entries of `event_types` that match nothing -- a partial wildcard such as `"ToolApproval*"` -- and `event_types` in the acknowledgement holds only the accepted ones.
 
-You can update filters at any time by sending another `subscribe` message; it takes effect without an acknowledgement. Omit a key to not filter on that dimension (e.g., omit `mcp_server_ids` to receive events from all MCP servers). An `event_types` entry matches an event type exactly, and `"*"` matches every type.
+You can update filters at any time by sending another `subscribe` message; it takes effect without an acknowledgement. Omit a key to not filter on that dimension (e.g., omit `mcp_server_ids` to receive events from all MCP servers). An `event_types` entry matches an event type exactly, and `"*"` matches every type; any other wildcard matches nothing and is reported in `rejected_event_types`.
 
 ## Queue and Backpressure
 
@@ -91,7 +92,7 @@ After 55 seconds without an event, the server sends `{"type": "ping"}`. A client
 
 ## Authentication
 
-When auth is enabled, pass credentials via the initial HTTP upgrade headers. The connection needs `audit:read`. A subscriber whose `audit:read` is granted only within a tenant receives only events that name that tenant; the client cannot widen that with a filter.
+When auth is enabled, pass credentials via the initial HTTP upgrade headers. A client that cannot set headers may pass a JWT as `?token=<jwt>`, read as `Authorization: Bearer <jwt>` when neither that header nor the API-key header is present; an API key is not accepted this way, and a token in the URL can land in the access logs of any proxy on the path. The connection needs `audit:read`. A subscriber whose `audit:read` is granted only within a tenant receives only events that name that tenant; the client cannot widen that with a filter.
 
 ```bash
 websocat "ws://localhost:8000/api/ws/events" -H "X-API-Key: mcp_your_key_here"

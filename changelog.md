@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.56](https://github.com/mcp-hangar/docs/compare/v1.2.55...v1.2.56) (2026-10-25)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#561](https://github.com/mcp-hangar/docs/issues/561)) ([c40ba0f](https://github.com/mcp-hangar/docs/commit/c40ba0fce2a81603f995642bc28d01f412c43221))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#563](https://github.com/mcp-hangar/docs/issues/563)) ([06237e7](https://github.com/mcp-hangar/docs/commit/06237e78e3921c224c337d8ad45315e292786784))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#564](https://github.com/mcp-hangar/docs/issues/564)) ([8dfa69b](https://github.com/mcp-hangar/docs/commit/8dfa69b706cb4f6444a3ef1756e0f932890d1f86))
+* **reference:** why reads data/events.db for a config that names no store ([#560](https://github.com/mcp-hangar/docs/issues/560)) ([bcc152a](https://github.com/mcp-hangar/docs/commit/bcc152a798e96ce20a5519ee4886383c5784c793))
+
 ## [1.2.55](https://github.com/mcp-hangar/docs/compare/v1.2.54...v1.2.55) (2026-10-25)
 
 

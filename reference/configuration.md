@@ -49,7 +49,7 @@ mcp_servers:
 | `description` | `str` | -- | -- | Human-readable MCP server description |
 | `tools` | `list` or `dict` | -- | -- | Predefined tool schemas (list) or access policy (dict). See below. |
 | `auth` | `dict` | -- | -- | HTTP auth configuration (remote mode only) |
-| `tls` | `dict` | -- | -- | TLS for a `remote` upstream: `verify_ssl` (bool, default `true`) and `ca_cert_path` (a bundle to trust, for an upstream signed by your own CA). Both are honoured from 2.5.0; earlier releases accepted and discarded them |
+| `tls` | `dict` | -- | -- | TLS for a `remote` upstream: `verify_ssl` (bool, default `true`) and `ca_cert_path` (a bundle to trust, for an upstream signed by your own CA). Both are honoured from 2.5.0; earlier releases accepted and discarded them. Since 2.32.0 also `peer_identity` (`key_ref` and a `spki_sha256` key list: the server is pinned by its key, needs an `https://` endpoint, refuses `verify_ssl: false` and ignores `ca_cert_path`) and `max_connection_age`. See [Key-pinned upstreams](../guides/KEY_PINNED_UPSTREAMS.md) |
 | `http` | `dict` | -- | -- | HTTP transport configuration (remote mode only) |
 | `max_concurrency` | `int` | -- | >= 0 | Per-MCP server concurrency limit; `0` means no limit. Unset uses `execution.default_mcp_server_concurrency` |
 | `max_response_bytes` | `int` | -- | > 0 | Largest upstream response this server's transport reads before failing the call with `ResponseTooLarge`. Wins over `execution.max_response_bytes` and `MCP_MAX_RESPONSE_BYTES`. Anything but a positive integer refuses the config |
@@ -433,6 +433,35 @@ mcp_servers:
 | `tool_projection.digest_enforcement` | `str` | `block` | Per-MCP server mismatch handling: `audit`, `warn`, or `block` |
 | `tool_projection.pins` | `dict[str, str]` | `{}` | Tool name to 64-character lowercase SHA-256 digest pins applied to every caller |
 | `tool_projection.tenant_overrides.<tenant>.pins` | `dict[str, str]` | `{}` | The same, for one tenant; takes precedence over `tool_projection.pins` |
+| `tool_projection.upstream` | `str` | -- | The upstream identity the pins were taken from, as `mcp-hangar pin --write` writes it (2.28.0+). The pins hold only while the server points at that upstream; a different one is a mismatch whatever its tools say |
+| `tool_projection.new_tools` | `str` | `allow` | `withhold` or `allow` (2.28.0+). With `withhold`, on a scope that has pins, a tool the pins do not admit is withheld and a call of it is refused as withdrawn. A server with no pins has no baseline and withholds nothing. See below |
+| `tool_projection.withdrawn` | `list[str]` | `[]` | Tools withdrawn for every caller. Also accepted under `tenant_overrides.<tenant>`, for that tenant only |
+| `tool_projection.withdrawn_prompts` | `list[str]` | `[]` | Prompts withdrawn, the same way |
+| `tool_projection.withdrawn_resources` | `list[str]` | `[]` | Resources withdrawn, named by their upstream uri, the same way |
+
+Every key here is also accepted on a group's `tool_projection`.
+
+**Pin values.** A pin is the tool's 64-character hex SHA-256. *Since 2.34.2*
+uppercase hex and the `sha256:<hex>` spelling are read as the digest they name.
+Any other value is logged at ERROR as `invalid_config_digest_pin` and holds its
+tool as drifted: under `digest_enforcement: block` the tool is withheld until
+the pin is corrected (for example with `mcp-hangar pin --write`), and under
+`new_tools: withhold` such a pin admits nothing. `pins`,
+`tenant_overrides` and each `tenant_overrides.<tenant>` must be mappings; a list
+or a string there refuses the configuration at boot, on reload and in
+`mcp-hangar config check`. An empty key (`pins:` with nothing under it) pins
+nothing. Before 2.34.2 an unreadable pin, and a block of the wrong shape, were
+skipped without a word, leaving the tool unpinned.
+
+**`new_tools: withhold`.** The listings a model reads omit a tool the pins do
+not admit, and a call of it is refused with `ToolWithdrawnError` -- *since
+2.34.2* also on a cold server, before the server is started, and for a tool name
+the upstream does not serve at all. One `ToolAdmissionRequested` event names a
+tool waiting to be pinned, published once the server has started for another
+reason. The REST tool routes show such a tool as its name and digests with
+`withheld: "withdrawn"` ([REST reference](rest-api.md#get-mcp-server-tools)).
+Since 2.34.2 `new_tools: withhold` beside pins declared on a group withholds
+too, whether the call names the group or a member.
 
 Pins are independent per MCP server, and resolution is narrowest first: a pin
 declared for the calling tenant wins over one declared for all tenants.

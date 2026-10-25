@@ -445,8 +445,13 @@ Every key here is also accepted on a group's `tool_projection`.
 uppercase hex and the `sha256:<hex>` spelling are read as the digest they name.
 Any other value is logged at ERROR as `invalid_config_digest_pin` and holds its
 tool as drifted: under `digest_enforcement: block` the tool is withheld until
-the pin is corrected (for example with `mcp-hangar pin --write`), and under
-`new_tools: withhold` such a pin admits nothing. `pins`,
+the pin is corrected (for example with `mcp-hangar pin --write`); under `audit`
+or `warn` it reports drift on every re-check until fixed. Under
+`new_tools: withhold` such a pin admits nothing, and a server whose only pins are
+unreadable still has a baseline, so every other tool it serves is withheld too.
+A pin written in uppercase or as `sha256:<hex>` that used to be ignored now
+enforces, so a stale one withholds its tool under `block`; `mcp-hangar pin
+--check` shows it. `pins`,
 `tenant_overrides` and each `tenant_overrides.<tenant>` must be mappings; a list
 or a string there refuses the configuration at boot, on reload and in
 `mcp-hangar config check`. An empty key (`pins:` with nothing under it) pins
@@ -457,8 +462,9 @@ skipped without a word, leaving the tool unpinned.
 not admit, and a call of it is refused with `ToolWithdrawnError` -- *since
 2.34.2* also on a cold server, before the server is started, and for a tool name
 the upstream does not serve at all. One `ToolAdmissionRequested` event names a
-tool waiting to be pinned, published once the server has started for another
-reason. The REST tool routes show such a tool as its name and digests with
+tool waiting to be pinned when it appears in the server's catalogue; for a call
+refused on a cold server it is published only once something else starts the
+server. The REST tool routes show such a tool as its name and digests with
 `withheld: "withdrawn"` ([REST reference](rest-api.md#get-mcp-server-tools)).
 Since 2.34.2 `new_tools: withhold` beside pins declared on a group withholds
 too, whether the call names the group or a member.

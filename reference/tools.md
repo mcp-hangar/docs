@@ -28,9 +28,10 @@ Complete reference for the `hangar_*` MCP tools MCP Hangar serves to MCP clients
 | [`hangar_call`](#hangar_call) | Batch and Continuation | Invoke tools on MCP servers (single or batch) | May start cold MCP servers | `tool:invoke`, checked per call |
 | [`hangar_fetch_continuation`](#hangar_fetch_continuation) | Batch and Continuation | Fetch truncated response data | None (read-only) | `tool:invoke` |
 | [`hangar_delete_continuation`](#hangar_delete_continuation) | Batch and Continuation | Delete cached continuation data | Removes cached response | `tool:invoke` |
+| [`hangar_whoami`](#hangar_whoami) | Identity | Show the caller's principal, tenant, groups and roles | None (read-only) | None; needs an authenticated caller |
 
 The Permission column is the `resource:action` a caller needs when authentication is on. Every tool except
-`hangar_fetch_continuation` and `hangar_delete_continuation` needs it as a global grant: a role held only within
+`hangar_fetch_continuation`, `hangar_delete_continuation` and `hangar_whoami` needs it as a global grant: a role held only within
 a tenant does not reach them, because they act on the whole fleet. `hangar_call` checks `tool:invoke` for each
 call in the batch, so one batch can carry calls that run and calls that are refused.
 
@@ -41,28 +42,36 @@ what a client sees depends on the topology mode (`tool_access.mode`) and the tra
 
 | Surface | `tools/list` shows | Calling a tool the caller may not call |
 | --------- | -------------------- | ---------------------------------------- |
-| `egress`, HTTP | All 22 `hangar_*` tools, to every authenticated caller | `isError: true`, text `Not authorized to call '<tool>': <resource>:<action> permission required` |
-| `front_door`, HTTP | Only the `hangar_*` tools the caller may call. Never `hangar_call` or the continuation tools: there the upstream tools are listed under their own names instead | JSON-RPC error `-32601`, the same as an unknown tool |
-| stdio, no `auth.stdio.principal` | `egress`: all 22, each management tool refused with `Authentication required to call '<tool>'`. `front_door`: none | As above |
+| `egress`, HTTP | All 23 `hangar_*` tools, to every authenticated caller | `isError: true`, text `Not authorized to call '<tool>': <resource>:<action> permission required` |
+| `front_door`, HTTP | Only the `hangar_*` tools the caller may call, and `hangar_whoami` to every authenticated caller. Never `hangar_call` or the continuation tools: there the upstream tools are listed under their own names instead | JSON-RPC error `-32601`, the same as an unknown tool |
+| stdio, no `auth.stdio.principal` | `egress`: all 23, each management tool refused with `Authentication required to call '<tool>'`. `front_door`: none | As above |
 | stdio, with `auth.stdio.principal` | As over HTTP, decided on the declared principal's roles | As above |
 
 An HTTP request with no valid credential is refused with `401` before any tool runs. On `front_door` a caller
-holding the built-in `viewer` role sees nine tools: `hangar_list`, `hangar_status`, `hangar_details`,
-`hangar_tools`, `hangar_health`, `hangar_metrics`, `hangar_group_list`, `hangar_discovered` and `hangar_sources`.
+holding the built-in `viewer` role sees ten tools: `hangar_list`, `hangar_status`, `hangar_details`,
+`hangar_tools`, `hangar_health`, `hangar_metrics`, `hangar_group_list`, `hangar_discovered`, `hangar_sources` and
+`hangar_whoami`.
+
+**The `hangar_*` names are reserved on `front_door`.** *Since 2.34.2* an upstream tool named like one of the
+gateway's own tools (`hangar_status`, `hangar_whoami`, `hangar_call`, ...) is not projected: the gateway's tool
+keeps the name, and `flat_tool_name_reserved` is logged naming the server. Before 2.34.2 the name was listed twice
+and a call of it went to the upstream. In `egress` mode a tool is always named with its server, so nothing
+changes there.
 
 ## Error shapes
 
 A `hangar_*` tool fails in one of three ways:
 
-- **The tool ran and failed** (an unknown server, a bad continuation id). The call succeeds at the protocol
-  level (`isError: false`) and the result is the error payload every tool uses:
-  `{"error": "unknown_mcp_server: nope", "error_type": "ValueError", "details": {}}`. Read `error_type` to tell
-  it from a normal result.
+- **The tool ran and failed** (an unknown server, a bad continuation id). The result has `isError: true` and
+  is the error payload every tool uses:
+  `{"error": "unknown_mcp_server: nope", "error_type": "ValueError", "details": {}}`. Before 2.29.1 this payload
+  came with `isError: false`, so a client had to read `error_type` to tell it from a normal result.
 - **The call was refused before the tool ran**: authorization, or an invalid server id such as `bad id!`. The
   result has `isError: true` and one text block, `Error executing tool <tool>: <reason>`.
 - **On `front_door`, a tool not listed for the caller**: JSON-RPC error `-32601`.
 
-The `Errors:` lines below give the `error` text of the first kind.
+The first two both set `isError: true`; they differ by body, the three-key payload or one
+`Error executing tool ...` text block. The `Errors:` lines below give the `error` text of the first kind.
 
 ## Lifecycle
 
@@ -381,7 +390,7 @@ List the tools available on a MCP server or group. Tool access filtering (allow_
 | ----------- | ------ | --------- | ------------- |
 | `mcp_server` | `str` | required | MCP Server ID or Group ID |
 
-**Side Effects:** May start a cold MCP server to discover its tools. It lists a `dead` server, or a group's dead member, without starting it.
+**Side Effects:** May start a cold MCP server named directly, to discover its tools. It lists a `dead` server without starting it. A group's listing starts nothing.
 
 **Returns:**
 
@@ -390,9 +399,22 @@ List the tools available on a MCP server or group. Tool access filtering (allow_
 | `mcp_server` | `str` | MCP Server ID |
 | `state` | `str` | MCP server state |
 | `predefined` | `bool` | Whether tools are predefined (not discovered at runtime) |
-| `tools` | `list[object]` | Tools with `name`, `description`, `inputSchema`, `digest` (the SEP-1766 SHA-256 fingerprint of the tool's schema, the value [digest pinning](configuration.md#digest-pinning) compares) |
+| `tools` | `list[object]` | Tools with `name`, `description`, `inputSchema`, `digest` (the SEP-1766 SHA-256 fingerprint of the tool's schema, the value [digest pinning](configuration.md#digest-pinning) compares), and `pinned_digest` when a pin is declared |
 
-For a group, the response carries `group: true` in place of `predefined`, and lists the tools of the member the group's strategy selects, starting it if it is cold. It has no `state`, except `"dead"` with an empty `tools` list when the selected member is dead. A group with no member in rotation, such as one whose members were all stopped, answers `no_healthy_members_in_group: <id>`: `hangar_start` the group first.
+`pinned_digest` is the pin declared for the caller's tenant, or for all tenants, on this id or on the group member
+that served the listing; it is absent when none is. Under `digest_enforcement: warn` or `audit` a tool that drifted
+is listed and the two digests differ. Under `block` a drifted tool is not listed at all: a call of it is refused,
+and listing it would hand the model the drifted description. [`hangar_details`](#hangar_details) names it under
+`withheld_tools`.
+
+For a group, the response carries `group: true` in place of `predefined`. *Since 2.34.1* it lists a tool only when
+every member a call from this caller may be routed to allows it (the member the caller is pinned to alone,
+otherwise every member in rotation), and reads the catalogue a member in rotation already discovered: it selects
+no member, advances no load-balancing strategy and starts nothing. It has no `state`, except `"dead"` with an
+empty `tools` list when every routable member is dead. A group with no member in rotation, such as one whose
+members were all stopped, answers `{"mcp_server": "<group>", "group": true, "tools": []}`; `hangar_warm`, or a
+call through the group, brings a member into rotation. Before 2.34.1 a group listing selected and started a
+member, and a group with nobody in rotation answered `no_healthy_members_in_group: <id>`.
 
 **Example:**
 
@@ -410,7 +432,7 @@ For a group, the response carries `group: true` in place of `predefined`, and li
 }
 ```
 
-Errors: `unknown_mcp_server: <id>`, `no_healthy_members_in_group: <id>` (both `error_type: ValueError`)
+Errors: `unknown_mcp_server: <id>` (`error_type: ValueError`)
 
 ### `hangar_details` {#hangar_details}
 
@@ -433,8 +455,10 @@ For a MCP server:
 | `mcp_server_id` | `str` | MCP Server ID |
 | `state` | `str` | Current state |
 | `mode` | `str` | MCP Server mode |
+| `provenance` | `str` | How the server was registered: `human` (configuration, REST API or CLI) or `discovery` (a discovery source) |
 | `alive` | `bool` | Whether the MCP server process is running |
 | `tools` | `list[object]` | Tool list with schemas, filtered by the tool access policy |
+| `withheld_tools` | `list[object]` | Present only when a tool is withheld: each tool left out of `tools` and `hangar_tools` because it drifted from a pin under `digest_enforcement: block`, with `name`, `reason` (`digest_drift`), `digest` and `pinned_digest`, and never its description. Re-pinning (`mcp-hangar pin --write`) returns it |
 | `health` | `object` | Health tracking: `consecutive_failures`, `total_invocations`, `total_failures`, `success_rate`, `can_retry`, `last_success_ago` and `last_failure_ago` (seconds, or `null`) |
 | `idle_time` | `float \| None` | Seconds since last use |
 | `meta` | `object` | MCP Server metadata, such as `init_result`, `tools_count` and `started_at` |
@@ -465,7 +489,7 @@ For a group:
 
 // Response
 {
-  "mcp_server_id": "math", "state": "ready", "mode": "subprocess", "alive": true,
+  "mcp_server_id": "math", "state": "ready", "mode": "subprocess", "provenance": "human", "alive": true,
   "tools": [{"name": "add", "description": "Add two numbers", "inputSchema": {...}}],
   "health": {"consecutive_failures": 0, "total_invocations": 2, "total_failures": 0, "success_rate": 1.0,
              "can_retry": true, "last_success_ago": 16.0, "last_failure_ago": null},
@@ -536,6 +560,7 @@ Health summary of the replica that answers the call: MCP server state counts and
 | `replica` | `object` | The replica that answered: `instance_id`, `uptime_seconds`, `uptime` |
 | `scope` | `str` | Always `"replica"` |
 | `scope_note` | `str` | The same scope, stated in words |
+| `catalogue` | `object` | Present only on `front_door` with `tool_access.required_catalogue` in force: `complete`, `holds_readiness`, `required`, `missing`, `not_retried` (each unprojected server the retry will not start, with its dead reason) and `retry`. `/health/ready` reports the catalogue without the ids |
 | `compliance_export` | `object` | *(2.25.0)* Present only when `MCP_COMPLIANCE_OUTPUT` sends the compliance (SIEM) export to a file: `status` (`healthy`, or `degraded` from a failed write until one succeeds), `format`, `failures` since boot, `last_reason`, and the file path as `output`. `/health/ready` carries the same object without `output` and stays `200`. See [Compliance](../operations/COMPLIANCE.md) |
 
 **Example:**
@@ -877,9 +902,15 @@ Invoke tools on MCP servers. Supports single calls and parallel batch execution 
 | `max_concurrency` | `int` | `10` | 1--50 | Parallel workers for this batch |
 | `timeout` | `float` | `60` | 1--300 | Batch timeout in seconds |
 | `fail_fast` | `bool` | `false` | -- | Stop batch on first error |
-| `max_attempts` | `int` | `1` | 1--10 | Total attempts per call including retries |
+| `max_attempts` | `int \| None` | `None` | 1--10 | Total attempts per call including retries. See below |
 
 A value outside its range is clamped to the nearest bound, not rejected: `max_concurrency: 51` runs with 50. An empty `calls` list returns a successful batch with `total: 0`. More than 100 calls is a validation error.
+
+**`max_attempts`.** Omitted (`null`), each call retries under the gateway's configured `retry:` policy, and runs
+once when none is configured. An explicit `1` is exactly one attempt, whatever is configured: a caller whose tool
+is not idempotent can say so. With a `retry:` policy configured, `2`--`10` can only lower its attempt count, never
+raise it; with none, `2`--`10` retries up to that many attempts. Before 2.29.0 the default was `1` and an explicit
+`1` still got the configured retries.
 
 **Side Effects:** May start cold MCP servers. Executes tool calls on MCP servers.
 
@@ -897,11 +928,16 @@ A value outside its range is clamped to the nearest bound, not rejected: `max_co
 
 On validation failure -- an unknown server, a missing `arguments`, more than 100 calls -- nothing runs and the response is `{batch_id, success: false, error: "Validation failed", validation_errors}`, where `validation_errors` is a list of `{index, field, message}`, for example `{"index": 0, "field": "mcp_server", "message": "McpServer 'unknown' not found"}`.
 
+A tool name is checked at validation only on a server whose tool list is already known: one that has started, or
+that declares its tools in the configuration. There, an unknown tool is the validation error
+`Tool '<tool>' not found in mcp_server '<id>'`. On a group, or a cold server with no declared tools, the batch runs
+and that call alone fails with `error_type: "ToolNotFoundError"` and `error` `Tool not found: <tool>`.
+
 A call the caller may not make fails on its own, with `error_type: "AuthorizationDenied"` and `error` `Not authorized to invoke tool '<tool>': tool:invoke permission required`; the rest of the batch runs. A tool error the upstream reports, as a JSON-RPC error or an `isError` result, has `error_type: "ToolInvocationError"` and an `error` starting `tool_error:`.
 
 With truncation enabled, a result over the batch's size budget is cut and carries `truncated: true`, `truncated_reason` (for example `batch_budget_exceeded`), `original_size_bytes` and a `continuation_id` -- use `hangar_fetch_continuation` to retrieve the full data.
 
-When `max_attempts` is above 1, every result carries `retry_metadata`: `attempts` (a count), `retries` (a list, one entry per retry) and `total_time_ms`.
+When a call runs under a retry policy (a configured `retry:` block, or `max_attempts` above 1), its result carries `retry_metadata`: `attempts` (a count), `retries` (a list, one entry per retry) and `total_time_ms`.
 
 **Example:**
 
@@ -1004,3 +1040,46 @@ Returns `{deleted: false, continuation_id: "..."}` when the ID is not found. Ret
 ```
 
 Errors: `continuation_id is required` (`error_type: ValueError`) if `continuation_id` is empty. Like a fetch, a delete reaches only the caller's own continuations.
+
+## Identity
+
+### `hangar_whoami` {#hangar_whoami}
+
+Show who the gateway thinks the caller is: the principal, tenant, groups and the role bindings the authorizer
+decides it on. Use it when a call was refused and you need to know which identity and which roles it was judged by.
+It reads only the caller's own identity; there is no way to ask about another principal or tenant.
+
+**Parameters:** None.
+
+**Permission:** None, but the call needs an authenticated caller. With authentication off, or for an anonymous
+caller, there is no identity to report, and the call is refused with `isError: true` and the text
+`Error executing tool hangar_whoami: 'hangar_whoami' answers only an authenticated caller`. Over stdio, a declared
+`auth.stdio.principal` is an identity.
+
+**Side Effects:** None (read-only).
+
+**Returns:**
+
+| Field | Type | Description |
+| ------- | ------ | ------------- |
+| `principal` | `object` | `id` and `type` |
+| `tenant_id` | `str \| None` | The caller's tenant |
+| `groups` | `list[str]` | The caller's groups, sorted |
+| `roles` | `list[object]` | Each binding as `{role, scope}`, where `scope` is `global` or `tenant:<id>`. A role bound at `tenant:<id>` grants only within that tenant, so it does not admit a management tool, which acts on the whole fleet |
+| `opa_policy` | `str \| None` | `null`, or `may_admit_more` / `may_refuse_more` when an OPA policy can change what those roles decide |
+
+**Example:**
+
+```json
+// Request
+{}
+
+// Response
+{
+  "principal": {"id": "local-user", "type": "user"},
+  "tenant_id": "local",
+  "groups": [],
+  "roles": [{"role": "viewer", "scope": "global"}],
+  "opa_policy": null
+}
+```

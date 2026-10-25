@@ -174,9 +174,12 @@ recipe is about pins.
    +         refund: 9f2b1c0d...a17c
    ```
 
-   Make sure the value you paste is exactly 64 lowercase hex characters
-   (`[0-9a-f]{64}`). If it is not, Hangar warn-skips that pin when it loads the
-   config -- it does not crash, and the tool simply runs unpinned.
+   The value is 64 hex characters (`[0-9a-f]{64}`). Since 2.34.2 uppercase hex
+   and the `sha256:<hex>` spelling are read as the digest they name. Anything
+   else is logged at ERROR as `invalid_config_digest_pin` and holds the tool as
+   drifted, so under `digest_enforcement: block` it is withheld until the pin is
+   fixed; the rest of the config still loads. Before 2.34.2 such a pin was
+   warn-skipped and the tool ran unpinned.
 
    Reload the config (hot-reload if you have it wired up, otherwise restart):
 
@@ -268,9 +271,13 @@ Canonicalization Scheme, then SHA-256. The empty optional values `None`, `{}`,
 `[]`, and `""` are treated as absent, so a backend that sends an empty
 `annotations: {}` and one that omits it produce the same digest. The pin you
 store is exactly the value that canonical computation should yield for the
-approved schema. A pin that is not a 64-character lowercase hex string is
-warn-skipped at config load -- the rest of the config still loads, and that one
-tool runs unpinned.
+approved schema. A pin that is not a 64-character hex string (uppercase and
+`sha256:<hex>` are accepted since 2.34.2) is logged as
+`invalid_config_digest_pin` and holds its tool as drifted -- the rest of the
+config still loads, and under `block` that one tool is withheld until the pin is
+fixed. A `pins` or `tenant_overrides` block that is not a mapping refuses the
+configuration, at boot, on reload and in `mcp-hangar config check`. Before
+2.34.2 both were skipped and the tool ran unpinned.
 
 `digest_enforcement` decides what happens on a mismatch, and it is scoped per
 MCP server:

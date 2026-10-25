@@ -121,9 +121,9 @@ kubeconfig -- add `in_cluster: false` to the source.
    ```
 
    `k8s-math` is listed in `remote` mode, `cold` until its first call, with the
-   description `Discovered from kubernetes`. (`mcp-hangar status` cannot show it:
-   in 2.24.0 that command does not reach a running gateway and reads only
-   `config.yaml`.)
+   description `Discovered from kubernetes`. (`mcp-hangar status` shows it too
+   when it can reach the gateway, at `MCP_HANGAR_URL` or `127.0.0.1` on port
+   8000 or 8080.)
 
 5. Scale up and watch Hangar adapt:
 
@@ -133,7 +133,9 @@ kubeconfig -- add `in_cluster: false` to the source.
 
 ## What Just Happened
 
-The Kubernetes discovery source watches pods in the configured namespace matching the label selector. Pods with `mcp-hangar.io/enabled: "true"` annotations are registered as remote MCP servers. In `authoritative` mode, when a pod is deleted, the corresponding MCP server is deregistered.
+The Kubernetes discovery source watches pods in the configured namespace matching the label selector. Pods with `mcp-hangar.io/enabled: "true"` annotations are registered as remote MCP servers. In `authoritative` mode, when a pod is deleted, the corresponding MCP server is deregistered once its TTL (`mcp-hangar.io/ttl`, 90 s by default) has passed since the source last reported it (*since 2.34.2*; before it nothing was removed until a restart). A cycle in which the Kubernetes API cannot be reached removes nothing; a namespace whose pod listing fails while the API answers counts as empty. See [Discovery Modes](../guides/DISCOVERY.md#discovery-modes).
+
+*Since 2.34.2* the source registers only modes Hangar connects to: `http`, `sse` or `remote`. A pod annotated with any other `mcp-hangar.io/mode`, such as `subprocess` with `mcp-hangar.io/command`, would have Hangar run that command on its own host; it is skipped and logged once as `kubernetes_discovery_local_mode_refused`, unless the source sets `allow_local_modes: true`. Set that only when whoever can create pods in the watched namespaces is trusted to choose what Hangar runs.
 
 Two defaults are worth knowing before you take `namespaces` out of the config.
 Omitting it watches **every** namespace, not one — and whatever is watched, the
@@ -188,6 +190,7 @@ See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 | `discovery.sources[].in_cluster` | bool | `true` | Use the in-cluster service account; `false` uses your kubeconfig |
 | `discovery.sources[].allowed_namespaces` | list | -- | Namespaces a pod may be registered from; empty means "everything not denied" |
 | `discovery.sources[].denied_namespaces` | list | `[kube-system, default]` | Namespaces never registered from. Wins over the allowlist |
+| `discovery.sources[].allow_local_modes` | bool | `false` | Let a pod annotation choose a mode Hangar runs itself (`subprocess` and the like). Must be the boolean `true` |
 
 ### Kubernetes Annotations
 
@@ -195,10 +198,13 @@ See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 | ------------ | ---------- | --------- | ------------- |
 | `mcp-hangar.io/enabled` | Yes | -- | Must be `"true"` |
 | `mcp-hangar.io/name` | No | Pod name | MCP Server name |
-| `mcp-hangar.io/mode` | No | `http` | MCP Server mode |
+| `mcp-hangar.io/mode` | No | `http` | `http`, `sse` or `remote`; another mode is refused unless `allow_local_modes` |
 | `mcp-hangar.io/port` | No | `8080` | MCP Server port |
 | `mcp-hangar.io/path` | No | `/mcp` | Path of the MCP endpoint on the pod |
-| `mcp-hangar.io/group` | No | -- | Recorded in the discovered server's `metadata.group` |
+| `mcp-hangar.io/health-path` | No | `/health` | Path the registration health check asks first |
+| `mcp-hangar.io/ttl` | No | `90` | Seconds an `authoritative` source keeps the server after it stops being reported |
+
+There is no `group` annotation.
 
 ## What's Next
 

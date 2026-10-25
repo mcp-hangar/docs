@@ -32,7 +32,7 @@ mcp_servers:
 | Key | Type | Default | Range | Description |
 | ----- | ------ | --------- | ------- | ------------- |
 | `mode` | `str` | `"subprocess"` | subprocess, docker, container, remote, group | MCP Server mode. `container` is an alias of `docker`. `podman` is not a mode and refuses the config; select Podman with `MCP_CONTAINER_RUNTIME`. `group` is described under [`groups`](#groups). |
-| `command` | `list[str]` | -- | -- | Command for subprocess mode (required for subprocess) |
+| `command` | `list[str]` | -- | -- | Command for subprocess mode (required for subprocess). Its first element's base name must be on the executable allow-list -- `bun`, `deno`, `docker`, `node`, `npx`, `podman`, `python`, `python3`, `python3.11` to `python3.14`, `uv`, `uvx` -- or the launch is refused. `MCP_ALLOWED_COMMANDS` replaces the list |
 | `image` | `str` | -- | -- | Docker image for docker mode (required for docker) |
 | `endpoint` | `str` | -- | -- | HTTP endpoint for remote mode (required for remote) |
 | `env` | `dict[str, str]` | `{}` | -- | Environment variables passed to the MCP server process |
@@ -49,7 +49,7 @@ mcp_servers:
 | `description` | `str` | -- | -- | Human-readable MCP server description |
 | `tools` | `list` or `dict` | -- | -- | Predefined tool schemas (list) or access policy (dict). See below. |
 | `auth` | `dict` | -- | -- | HTTP auth configuration (remote mode only) |
-| `tls` | `dict` | -- | -- | TLS for a `remote` upstream: `verify_ssl` (bool, default `true`) and `ca_cert_path` (a bundle to trust, for an upstream signed by your own CA). Both are honoured from 2.5.0; earlier releases accepted and discarded them |
+| `tls` | `dict` | -- | -- | TLS for a `remote` upstream: `verify_ssl` (bool, default `true`) and `ca_cert_path` (a bundle to trust, for an upstream signed by your own CA). Both are honoured from 2.5.0; earlier releases accepted and discarded them. Since 2.32.0 also `peer_identity` (`key_ref` and a `spki_sha256` key list: the server is pinned by its key, needs an `https://` endpoint, refuses `verify_ssl: false` and ignores `ca_cert_path`) and `max_connection_age`. See [Key-pinned upstreams](../guides/KEY_PINNED_UPSTREAMS.md) |
 | `http` | `dict` | -- | -- | HTTP transport configuration (remote mode only) |
 | `max_concurrency` | `int` | -- | >= 0 | Per-MCP server concurrency limit; `0` means no limit. Unset uses `execution.default_mcp_server_concurrency` |
 | `max_response_bytes` | `int` | -- | > 0 | Largest upstream response this server's transport reads before failing the call with `ResponseTooLarge`. Wins over `execution.max_response_bytes` and `MCP_MAX_RESPONSE_BYTES`. Anything but a positive integer refuses the config |
@@ -59,9 +59,8 @@ mcp_servers:
 | `tool_projection` | `dict` | -- | -- | Digest pins. See [Digest Pinning](#digest-pinning) |
 | `header_exposure` | `dict` | -- | -- | See [Header Exposure](#header-exposure) |
 
-`network_mode` and `user` are read, but the 2.24.0 key check does not list
-them: each logs `unknown_config_key`, and `HANGAR_CONFIG_STRICT=1` and
-`mcp-hangar config check` refuse a file that sets one. Write `network` rather
+`network_mode` and `user` are in the key check since 2.28.0; before, each
+logged `unknown_config_key` and strict mode refused it. Write `network` rather
 than `network_mode`.
 
 ### `mode: remote` and the SSRF policy
@@ -265,7 +264,7 @@ approvals:
 | `enabled` | `bool` | `true` | Turn the gate off entirely. See the interaction with [`startup_checks`](#startup_checks) below |
 | `channel` | `str` | `event_stream` | Channel for any policy that does not name one |
 | `delivery.required` | `bool` | `false` | When `true`, a gated policy whose channel reaches nobody **refuses the boot** instead of logging at `ERROR` |
-| `<channel>` | `map` | -- | Settings for an installed delivery adapter, keyed by its channel name and passed to it as-is. The 2.24.0 key check knows only `slack` and `webhook` here; any other name logs `unknown_config_key` |
+| `<channel>` | `map` | -- | Settings for an installed delivery adapter, keyed by its channel name and passed to it as-is. Since 2.28.0 the key check accepts the block the configured `channel` names, beside `slack` and `webhook`; a block for any other name logs `unknown_config_key` |
 
 `dashboard` is an old name for `event_stream`; it still resolves, and logs
 `approval_delivery_channel_renamed`.
@@ -433,6 +432,41 @@ mcp_servers:
 | `tool_projection.digest_enforcement` | `str` | `block` | Per-MCP server mismatch handling: `audit`, `warn`, or `block` |
 | `tool_projection.pins` | `dict[str, str]` | `{}` | Tool name to 64-character lowercase SHA-256 digest pins applied to every caller |
 | `tool_projection.tenant_overrides.<tenant>.pins` | `dict[str, str]` | `{}` | The same, for one tenant; takes precedence over `tool_projection.pins` |
+| `tool_projection.upstream` | `str` | -- | The upstream identity the pins were taken from, as `mcp-hangar pin --write` writes it (2.28.0+). The pins hold only while the server points at that upstream; a different one is a mismatch whatever its tools say |
+| `tool_projection.new_tools` | `str` | `allow` | `withhold` or `allow` (2.28.0+). With `withhold`, on a scope that has pins, a tool the pins do not admit is withheld and a call of it is refused as withdrawn. A server with no pins has no baseline and withholds nothing. See below |
+| `tool_projection.withdrawn` | `list[str]` | `[]` | Tools withdrawn for every caller. Also accepted under `tenant_overrides.<tenant>`, for that tenant only |
+| `tool_projection.withdrawn_prompts` | `list[str]` | `[]` | Prompts withdrawn, the same way |
+| `tool_projection.withdrawn_resources` | `list[str]` | `[]` | Resources withdrawn, named by their upstream uri, the same way |
+
+Every key here is also accepted on a group's `tool_projection`.
+
+**Pin values.** A pin is the tool's 64-character hex SHA-256. *Since 2.34.2*
+uppercase hex and the `sha256:<hex>` spelling are read as the digest they name.
+Any other value is logged at ERROR as `invalid_config_digest_pin` and holds its
+tool as drifted: under `digest_enforcement: block` the tool is withheld until
+the pin is corrected (for example with `mcp-hangar pin --write`); under `audit`
+or `warn` it reports drift on every re-check until fixed. Under
+`new_tools: withhold` such a pin admits nothing, and a server whose only pins are
+unreadable still has a baseline, so every other tool it serves is withheld too.
+A pin written in uppercase or as `sha256:<hex>` that used to be ignored now
+enforces, so a stale one withholds its tool under `block`; `mcp-hangar pin
+--check` shows it. `pins`,
+`tenant_overrides` and each `tenant_overrides.<tenant>` must be mappings; a list
+or a string there refuses the configuration at boot, on reload and in
+`mcp-hangar config check`. An empty key (`pins:` with nothing under it) pins
+nothing. Before 2.34.2 an unreadable pin, and a block of the wrong shape, were
+skipped without a word, leaving the tool unpinned.
+
+**`new_tools: withhold`.** The listings a model reads omit a tool the pins do
+not admit, and a call of it is refused with `ToolWithdrawnError` -- *since
+2.34.2* also on a cold server, before the server is started, and for a tool name
+the upstream does not serve at all. One `ToolAdmissionRequested` event names a
+tool waiting to be pinned when it appears in the server's catalogue; for a call
+refused on a cold server it is published only once something else starts the
+server. The REST tool routes show such a tool as its name and digests with
+`withheld: "withdrawn"` ([REST reference](rest-api.md#get-mcp-server-tools)).
+Since 2.34.2 `new_tools: withhold` beside pins declared on a group withholds
+too, whether the call names the group or a member.
 
 Pins are independent per MCP server, and resolution is narrowest first: a pin
 declared for the calling tenant wins over one declared for all tenants.
@@ -632,7 +666,7 @@ discovery:
 | `auto_register` | `bool` | `true` | -- | Automatically register discovered MCP servers |
 | `sources` | `list[dict]` | `[]` | -- | Discovery source configurations (see below) |
 | `security` | `dict` | -- | -- | Security constraints for discovery |
-| `lifecycle` | `dict` | -- | -- | Lifecycle management for discovered MCP servers. Read, but missing from the 2.24.0 key check: it logs `unknown_config_key`, and strict mode and `config check` refuse it |
+| `lifecycle` | `dict` | -- | -- | Lifecycle management for discovered MCP servers. In the key check since 2.28.0; before, it logged `unknown_config_key` and strict mode refused it |
 
 ### `sources[]` entry
 
@@ -648,17 +682,34 @@ nothing.
 | Key | Type | Description |
 | ----- | ------ | ------------- |
 | `type` | `str` | Source type: `kubernetes`, `docker`, `filesystem`, `entrypoint`, or any type registered under the `mcp_hangar.discovery_sources` entry point group. An unregistered type **fails startup** |
-| `mode` | `str` | `additive` (only adds, the default) or `authoritative` (adds and removes). Any other value **fails startup** |
+| `mode` | `str` | `additive` (only adds, the default) or `authoritative` (adds and removes). Any other value **fails startup**. *Since 2.34.2* an authoritative source removes a server it stopped reporting once the server's TTL has passed since it was last seen. A source whose scan fails, or that cannot reach what it watches, removes nothing that cycle; a Kubernetes namespace whose pod listing fails while the API answers, and a discovery file that stops parsing, still count as absent |
 | `path` | `str` | Directory to scan (filesystem source), default `/etc/mcp-hangar/mcp_servers.d/`; a relative path is taken from the working directory |
 | `pattern` | `str` | File glob inside `path` (filesystem source), default `*.yaml` |
 | `watch` | `bool` | Enable file watching (filesystem source), default `true` |
 | `socket_path` | `str` | Docker/Podman socket (docker source) |
+| `allowed_mount_paths` | `list[str]` | Docker source, *since 2.34.2*: absolute host directories a container's `mcp.hangar.volumes` label may mount from. A label is honoured only when every host path in it is absolute and under one of these; `/` and any `*.sock` file are refused even there, and `~` is not expanded. A container whose label names anything else is not registered, and is logged once as `docker_discovery_label_volumes_refused`. Default empty: every container carrying the label is refused |
 | `namespaces` | `list[str]` | Kubernetes namespaces to scan |
 | `label_selector` | `str` | Kubernetes label selector |
 | `in_cluster` | `bool` | Use in-cluster Kubernetes config, default `true` |
+| `allow_local_modes` | `bool` | Kubernetes source, *since 2.34.2*: let a pod's `mcp-hangar.io/mode` annotation ask for a mode other than `http` (the default), `sse` or `remote` -- such as `subprocess`, which runs a command on Hangar's own host. Default `false`: such a pod is skipped and logged once as `kubernetes_discovery_local_mode_refused`. Only the boolean `true` opens it; a string such as `"yes"` does not |
 | `allowed_namespaces` | `list[str]` | Kubernetes namespace allowlist; empty means "everything not denied" |
 | `denied_namespaces` | `list[str]` | Kubernetes namespace denylist, default `[kube-system, default]`. Wins over the allowlist |
 | `group` | `str` | Python entry point group to read servers from (entrypoint source), default `mcp.mcp_servers` |
+
+A container discovered by the docker source runs with a read-only root
+filesystem since 2.34.2, as a declared one does; the label
+`mcp.hangar.read-only: "false"` opts it out. For every container server,
+discovered or declared, a mount whose host path is `/` or normalises to it is
+refused.
+
+The filesystem source skips a definition file, and logs
+`filesystem_discovery_file_refused` once with the reason, when the file
+resolves through a symlink to a path outside `path`, is not a regular file, or
+(on POSIX) is world-writable or sits under a world-writable directory between
+it and `path` -- a sticky directory such as `/tmp` included. A world-writable
+mode on a read-only mount is not refused, so a Kubernetes ConfigMap or Secret
+volume keeps working; a writable `emptyDir` root (0777) is refused. Nothing
+turns these checks off (2.34.2+).
 
 ### `security` sub-section
 
@@ -838,16 +889,35 @@ hot_loading:
   cache:
     ttl_s: 3600
     max_entries: 1000
+  trusted_namespaces: ["io.github.acme/"]
+  allow_force_unverified: false
+  inherit_env: []
+  secrets:
+    allow:
+      "io.github.acme/weather": [WEATHER_API_KEY]
 ```
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | `true` | Enable runtime loading from the registry |
+| `trusted_namespaces` | `list[str]` | `[]` | Registry name prefixes whose entries are verified. Matching is case-sensitive and by whole segment: a missing trailing `/` is added, so `io.github.acme/` matches `io.github.acme/weather` but not `io.github.acmeevil/weather` or `io.github.acme.labs/weather`. An empty prefix, whitespace, `*` or `//` refuses the configuration. Empty: every entry is unverified and refused |
+| `allow_force_unverified` | `bool` | `false` | Whether the `force_unverified` argument of `hangar_load` may load an entry that is not verified. `false`: the argument is ignored. Anything but a YAML boolean refuses the configuration |
+| `inherit_env` | `list[str]` | `[]` | Variable names a hot-loaded server takes from the gateway's environment, on top of a fixed base (`PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE`, `TZ`, `TMPDIR`, `TMP`, `TEMP` and the Windows equivalents). Nothing else is inherited: list a proxy, a CA bundle or `UV_*`/`npm_config_*` settings here if `uvx` or `npx` need them |
+| `secrets.allow` | `dict[str, list[str]]` | `{}` | Exact registry name -> the variables that server may receive. A variable its entry asks for and that is not listed is reported missing and never looked up. A listed one is read from the gateway's environment, then `~/.config/mcp-hangar/secrets/<registry name>/<NAME>`, then `~/.config/mcp-hangar/secrets/<NAME>`. Two keys that differ only in case refuse the configuration |
 | `registry.base_url` | `str` | `https://registry.modelcontextprotocol.io/v0` | Registry API base URL |
 | `registry.timeout_s` | `float` | `10.0` | Registry request timeout in seconds |
 | `registry.max_retries` | `int` | `3` | Retry attempts for registry requests |
 | `cache.ttl_s` | `int` | `3600` | TTL for cached registry lookups, in seconds |
 | `cache.max_entries` | `int` | `1000` | Maximum entries in the registry lookup cache |
+
+*Since 2.30.0* the four trust keys are the operator's decisions about what a
+registry entry, written by whoever published it, may get; each defaults to
+refusing. They apply at startup and on every reload, and each load reads the
+ones in force. An absent section trusts nothing and binds no secret. A
+hot-loaded server runs as the gateway's user, so `trusted_namespaces` is the
+boundary: the server can read whatever that user can, whatever Hangar hands it.
+Statically configured servers are unaffected by `inherit_env` and
+`secrets.allow`.
 
 ## `event_store`
 
@@ -1109,6 +1179,7 @@ listing and inspection tools are not charged. Both budgets are per replica.
 | `oidc.issuers[].jwks_uri` | `str` | inherited | JWKS endpoint for this issuer |
 | `oidc.issuers[].client_id` | `str` | inherited | Optional client ID for additional validation |
 | `oidc.issuers[].max_token_lifetime_seconds` | `int` | inherited | Maximum JWT lifetime for this issuer; `0` disables the check |
+| `oidc.issuers[].allowed_tenants` | `list[str]` | -- | *Since 2.34.2.* Tenants this issuer may assert: a token whose tenant claim is not a string in the list, or names no tenant, is refused. Must be a non-empty list of non-empty strings; per issuer only (at the top level of `oidc` it refuses the configuration). With two or more issuers and any unbound, boot logs `oidc_issuers_not_bound_to_tenants`. A `global` role grant is still shared across issuers. See [Authentication](../guides/AUTHENTICATION.md) |
 | `oidc.issuers[].<other>` | -- | inherited | Each issuer may also override `subject_claim`, `groups_claim`, `email_claim`, `tenant_claim`, `session_id_claim`, `require_tenant`, `strict_tenant_audience` and `tenant_audiences` |
 | `oidc.subject_claim` | `str` | `sub` | JWT subject claim field |
 | `oidc.groups_claim` | `str` | `groups` | JWT groups claim field |
@@ -1124,9 +1195,10 @@ listing and inspection tools are not charged. Both budgets are per replica.
 | `opa.url` | `str` | `http://localhost:8181` | OPA server URL |
 | `opa.policy_path` | `str` | `v1/data/mcp/authz/allow` | OPA policy path |
 | `opa.timeout` | `float` | `5.0` | OPA request timeout in seconds |
+| `opa.require_both` | `bool` | `false` | *Since 2.34.2.* `true`: RBAC and OPA must both allow, so OPA can only refuse more. `false`: OPA is asked only when RBAC denies, and its allow overrides that deny with no tenant scope (boot logs `opa_may_widen_rbac`). Anything but a boolean refuses the configuration |
 | `storage` | `dict` | `driver: memory` | Auth storage configuration (driver, path, host, etc.) |
 | `rate_limit` | `dict` | -- | Auth-specific rate limiting |
-| `role_assignments` | `list[dict]` | -- | Role assignment rules |
+| `role_assignments` | `list[dict]` | -- | Role assignment rules. *Since 2.34.2* reconciled at every boot with auth on: on a durable store a grant the list applied and no longer holds is revoked; grants made through the API or `bootstrap-admin` are never revoked |
 | `stdio.principal` | `dict` | -- | The caller a stdio session is declared to be (see below). Ignored over HTTP |
 
 ### `auth.stdio.principal` -- who the caller is over stdio
@@ -1168,10 +1240,14 @@ Behaviour worth knowing:
 
 - **HTTP ignores the block.** It has a credential channel and keeps using it.
 - **Absent, nothing changes.** The caller is anonymous, exactly as before 2.18.0.
-- **The management surface follows `roles`.** With `viewer`, a client sees the
-  read-only `hangar_*` tools (`hangar_status`, `hangar_health`, `hangar_list`,
-  …) and none that can start, stop or reconfigure anything. Calling the
-  upstreams' own tools does not depend on those roles.
+- **The management surface follows `roles` on a front door, or with auth on.**
+  With `tool_access.mode: front_door` or `auth.enabled: true`, a `viewer` client
+  sees the read-only `hangar_*` tools (`hangar_status`, `hangar_health`,
+  `hangar_list`, …) and none that can start, stop or reconfigure anything. With
+  auth off in `egress` mode, the default, every `hangar_*` management tool is
+  allowed whatever the roles say; since 2.34.2 boot logs
+  `stdio_principal_roles_not_enforced` in that case. Calling the upstreams' own
+  tools does not depend on those roles.
 - **Per-tenant pins for this tenant become matchable.** Hangar refuses at boot
   when per-tenant pins are declared that no caller could carry; a declared stdio
   principal is such a caller, for its own `tenant_id`.
@@ -1449,7 +1525,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 | ---------- | --------- | ------------- |
 | `MCP_CONFIG` | -- | Path to YAML configuration file. A `--config` on the command line wins over it; without either, `./config.yaml` if present, else `~/.config/mcp-hangar/config.yaml` |
 | `MCP_MODE` | `"stdio"` | Server mode: `stdio` or `http` |
-| `MCP_HTTP_HOST` | `"0.0.0.0"` | HTTP bind host. A non-loopback host without authentication refuses to start unless `--unsafe-no-auth` is passed |
+| `MCP_HTTP_HOST` | `"127.0.0.1"` | HTTP bind host, the same as `--host`. A non-loopback host without authentication refuses to start unless `--unsafe-no-auth` is passed, and needs the host names clients use in `MCP_TRUSTED_HOSTS`. The published container image passes `--host 0.0.0.0` |
 | `MCP_HTTP_PORT` | `8000` | HTTP bind port |
 | `MCP_LOG_LEVEL` | `"INFO"` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `MCP_JSON_LOGS` | `"false"` | Enable structured JSON logging |
@@ -1463,6 +1539,16 @@ Environment variables override corresponding YAML settings. Variables follow the
 | `MCP_RATE_LIMIT_BURST` | `"20"` | Rate limit: burst size |
 | `MCP_ALLOW_ABSOLUTE_PATHS` | `"false"` | Allow absolute paths in input validation |
 | `MCP_MAX_RESPONSE_BYTES` | -- | Wins over `execution.max_response_bytes`; a server's own `max_response_bytes` wins over both |
+| `MCP_ALLOWED_COMMANDS` | -- | Comma-separated executable base names a subprocess server may start. Set, it **replaces** the built-in allow-list (see `command` under [`mcp_servers`](#mcp_servers)) rather than adding to it |
+
+### Host, proxy and CORS
+
+| Variable | Default | Description |
+| ---------- | --------- | ------------- |
+| `MCP_TRUSTED_HOSTS` | `"localhost,127.0.0.1,::1,testserver"` | Comma-separated `Host` header values the gateway answers. Another host gets `400` on `/api` and `421` on `/mcp`; `/health/*` and `/metrics` are served for any host. `*` turns the check off. Set it to the names clients reach the gateway by (Service, Ingress host) |
+| `MCP_TRUSTED_PROXIES` | `"127.0.0.1,::1"` | Comma-separated addresses or CIDRs whose `X-Forwarded-For` is believed when resolving the client address (rate limiting, audit). An entry that does not parse is logged as `trusted_proxy_invalid` and skipped |
+| `MCP_CORS_ORIGINS` | `"http://localhost:5173"` | Comma-separated origins allowed for cross-origin browser requests and WebSocket `Origin`. Each needs a scheme and no wildcard; if none is valid the default is used |
+| `MCP_CORS_CREDENTIALS` | `"false"` | `true` allows credentialed cross-origin requests |
 
 ### Persistence
 

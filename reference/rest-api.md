@@ -145,7 +145,7 @@ POST /mcp_servers
 | `idle_ttl_s` | int | No | `300` | Idle timeout in seconds |
 | `health_check_interval_s` | int | No | `60` | Health check interval |
 | `description` | string | No | -- | Human-readable description |
-| `tls` | dict | No | -- | Remote only: `peer_identity` and `max_connection_age`. With `peer_identity` the server is key-pinned, needs `mcp_servers:peer_identity` and an `https` endpoint, and may omit `endpoint` |
+| `tls` | dict | No | -- | Remote only: `peer_identity` and `max_connection_age`. With `peer_identity` the server is key-pinned and needs `mcp_servers:peer_identity`; its `endpoint` may be omitted, and if set must be `https` |
 
 *Since 2.34.2* a `mode` other than `remote` -- `subprocess`, `docker`,
 `container`, or a value Hangar does not recognise -- also needs

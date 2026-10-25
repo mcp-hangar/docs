@@ -51,8 +51,10 @@ restart or a scale-down took the owning replica away and the session with it.
 
 **From 2.7.0** the gateway serves the transport without a session at all.
 `initialize` returns no `Mcp-Session-Id`, no request needs one, and a request
-carrying a stale one is served rather than refused. Any replica answers anything,
-so a round-robin Service is correct and a rolling restart costs a client nothing.
+carrying a stale one is served rather than refused. Any replica answers any
+request, so a round-robin Service is correct and a rolling restart costs a client
+nothing. What a replica answers can still depend on state only it holds: see
+[What stays on one replica](#what-stays-on-one-replica).
 See [core#877](https://github.com/mcp-hangar/mcp-hangar/issues/877) for the
 measurements and the decision.
 
@@ -127,12 +129,43 @@ it does not -- see
 
 **What a pod can tell you about a server's tools is still per-replica.** They are
 learned by connecting to it, so `GET /api/mcp_servers/<id>/tools` reports what
-*that* replica has seen -- a pod
-that has never started the server answers `[]`, and it can stay that way while
-another pod lists five tools. This is the REST inspection endpoint only: the MCP
-surface advertises the gateway's own tools on every replica alike, so a client's
-`tools/list` does not depend on which pod answered. Ask the pod that reports
-`manages_fleet: true` when you want the fleet's view.
+*that* replica has seen -- a pod that has never started the server answers `[]`,
+and it can stay that way while another pod lists five tools. Ask the pod that
+reports `manages_fleet: true` when you want the fleet's view.
+
+On the MCP surface it depends on the topology mode. In `egress` mode `tools/list`
+advertises the gateway's own `hangar_*` tools, the same on every replica. In
+`front_door` mode `tools/list` **is** the per-replica projection of the servers
+that replica has started, so it follows what each replica started:
+
+- servers in `config.yaml` are started by every replica at boot, so their tools
+  are listed everywhere;
+- *since 2.34.2*, servers a configuration reload adds or changes are started by
+  each replica that reloads, right after the reload applies. Each replica
+  reloads its own file, so give every replica the same file and reload each one;
+- a server registered over `POST /api/mcp_servers`, or by discovery, is not
+  started by anything on a front door: no replica lists its tools until someone
+  starts it there (`hangar_start`, `hangar_warm` or
+  `POST /api/mcp_servers/<id>/start`), and then only that replica does. Through a
+  round-robin Service the client's tool list and its calls change with the pod
+  that answers. Declare such servers in `config.yaml` instead, or start them on
+  every replica.
+
+## What stays on one replica
+
+Besides the per-replica items under [What it costs](#what-it-costs) (rate
+limits, circuit breakers, lifecycle state, the `memory` truncation cache), two
+pieces of state live in one process's memory and are not shared:
+
+- **Governed task handles.** The ledger that binds a relayed task to its owner
+  is kept by the replica that relayed it. A `tasks/get`, `tasks/update` or
+  `tasks/cancel` that lands on another replica finds no such task and is
+  answered `-32602`, as for an unknown id. A client that polls tasks through a
+  round-robin Service needs affinity to the relaying replica for the task's
+  lifetime.
+- **Hot-loaded servers.** A server loaded with `hangar_load` exists only on the
+  replica that loaded it, and is gone after that replica restarts. Its peers do
+  not know it.
 
 ## Checking it
 
@@ -256,7 +289,7 @@ rather than inventing a configuration. It resolves when the rollout completes.
 | A server exists on one pod only | the tail is stalled -- look for `event_tailer_read_failed` |
 | `Session not found` on most requests | the gateway is older than 2.7.0, where sessions were per-replica. Pin the Service and the ingress both, or upgrade -- see [sticky routing](#sticky-routing-required-before-270-unnecessary-from-270). From 2.7.0 this cannot happen: there is no session to miss |
 | `DELETE /mcp` answers `405` | expected from 2.7.0. There is no session to terminate |
-| `/tools` is empty on one pod and not another | before 2.7.0, expected: tools were learned per replica as it connected, and in `front_door` -- where `tools/list` **is** that projection -- replicas answered the same tenant differently. From 2.7.0 a `front_door` replica starts every configured mcp_server at boot, so the catalogue follows the configuration rather than one replica's warm-up history ([core#886](https://github.com/mcp-hangar/mcp-hangar/issues/886)). A pod still short of the others is one whose warm-up failed: look for `front_door_warmup_failed` |
+| `/tools` is empty on one pod and not another | before 2.7.0, expected: tools were learned per replica as it connected, and in `front_door` -- where `tools/list` **is** that projection -- replicas answered the same tenant differently. From 2.7.0 a `front_door` replica starts every configured mcp_server at boot ([core#886](https://github.com/mcp-hangar/mcp-hangar/issues/886)), and from 2.34.2 every server a reload adds or changes. A pod still short of the others is one whose warm-up failed (look for `front_door_warmup_failed` or `front_door_reload_warmup_failed`), one that has not reloaded the new file, or the server was registered over REST or by discovery and started on another pod only |
 | Discovery finds nothing, and no `discovery_cycle_complete` anywhere | the replica configured for discovery is not the holder -- look for `discovery_idle_not_the_lease_holder` |
 | Failover took far longer than `lease_ttl_s` | the *holder* wrote the tenure from its own config. Compare `expires_in_s` with `my_lease_ttl_s` under `management_lease` in `GET /api/system` |
 | `409 LocalModeNotOwnedError` | a `subprocess` or `docker` server started on a follower; ask the pod reporting `manages_fleet: true`, or use `remote` |

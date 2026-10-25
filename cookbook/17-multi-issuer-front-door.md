@@ -39,12 +39,19 @@ auth:                                       # validate JWTs; Hangar does not iss
       - issuer: https://issuer-a.example.com      # Customer A (e.g. Keycloak)
         audience: https://hangar.example.com      # ignored while resource_uri is set
         jwks_uri: https://issuer-a.example.com/jwks
-        allowed_tenants: ["tenant:a"]       # 2.34.2+: issuer-a may only name tenant:a
+        allowed_tenants: ["tenant:a"]       # NEW: the only tenant this issuer may name
       - issuer: https://issuer-b.example.com      # Customer B (e.g. Auth0)
         audience: https://hangar.example.com      # ignored while resource_uri is set
         jwks_uri: https://issuer-b.example.com/jwks
         groups_claim: roles                 # per-issuer override; tenant_claim inherits top-level
-        allowed_tenants: ["tenant:b"]       # 2.34.2+: issuer-b may only name tenant:b
+        allowed_tenants: ["tenant:b"]
+  role_assignments:                         # NEW: one tenant-scoped grant per tenant
+    - principal: "group:agents"
+      role: service-account                 # invoke tools; no hangar_* management tools
+      scope: "tenant:tenant:a"              # `tenant:` + the tenant id, here `tenant:a`
+    - principal: "group:agents"
+      role: service-account
+      scope: "tenant:tenant:b"
 
 mcp_servers:
   payments:
@@ -61,6 +68,28 @@ mcp_servers:
 ```
 
 Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
+
+**Bind each issuer to its tenants.** *Since 2.34.2* each issuer entry takes
+`allowed_tenants`. A bound issuer's token is refused with `401` unless its tenant
+claim is a string in the list, and a token naming no tenant is refused too.
+Without it, an issuer could sign a token naming any tenant -- issuer-b could mint
+`tenant_id: tenant:a` -- and its `sub` and `groups` would become the same
+principal and groups as issuer-a's. With two or more issuers and any of them
+unbound, boot logs one `oidc_issuers_not_bound_to_tenants` warning naming them.
+The list must name at least one tenant; an empty list, a bare string or the key
+with no value refuses the configuration, and so does the key set at the top
+level of `auth.oidc`.
+
+**Grant roles at tenant scope.** A caller with no role sees its tenant's tool
+names and is refused every call (`tool:invoke permission required`). The
+binding above confines tenant-scoped roles only: a role assigned at scope
+`global` to a subject or to `group:<name>` still reaches a token with that
+subject or group from any trusted issuer. So with more than one issuer, grant
+OIDC users and groups only `tenant:<id>` roles, as above, and do not list one
+tenant under two issuers. A role's scope is `tenant:` followed by the tenant id
+the token carries; this recipe's tenant ids are `tenant:a` and `tenant:b`, which
+makes the scopes `tenant:tenant:a` and `tenant:tenant:b`. Each IdP is expected
+to put its agents in an `agents` group (issuer-b reads groups from `roles`).
 
 Because `resource_uri` is set, each issuer's `audience` is overridden at
 validation time: every token -- from issuer-a or issuer-b -- must carry
@@ -125,8 +154,8 @@ documented above but are inert until you remove `resource_uri`.
 1. Call a tool as a tenant from issuer-a
 
    Obtain a JWT from Customer A's IdP whose `iss` is
-   `https://issuer-a.example.com`, `aud` is `https://hangar.example.com`, and
-   `tenant_id` is `tenant:a`, then list tools.
+   `https://issuer-a.example.com`, `aud` is `https://hangar.example.com`,
+   `tenant_id` is `tenant:a` and `groups` includes `agents`, then list tools.
 
    ```bash
    curl -s http://localhost:8000/mcp \
@@ -141,13 +170,19 @@ documented above but are inert until you remove `resource_uri`.
 
    ```text
    "charge"
+   "hangar_whoami"
    ```
+
+   `hangar_whoami` is listed to every authenticated caller; calling it shows
+   the principal, tenant and the `service-account` binding at
+   `tenant:tenant:a` the call was judged by.
 
 1. Call a tool as a tenant from issuer-b
 
    A JWT from Customer B's IdP -- different `iss`
    (`https://issuer-b.example.com`), different JWKS -- is validated the same
-   way. With `aud: https://hangar.example.com` and `tenant_id: tenant:b`:
+   way. With `aud: https://hangar.example.com`, `tenant_id: tenant:b` and
+   `agents` in its `roles` claim:
 
    ```bash
    curl -s http://localhost:8000/mcp \
@@ -163,10 +198,13 @@ documented above but are inert until you remove `resource_uri`.
    ```text
    "charge"
    "refund"
+   "hangar_whoami"
    ```
 
    One front door, two authorization servers, two tenants -- each resolved to
-   its own member-scope policy from the same back end.
+   its own member-scope policy from the same back end. A token from issuer-b
+   that names `tenant_id: tenant:a` is refused with `401`: `tenant:a` is not in
+   issuer-b's `allowed_tenants`.
 
 1. Reject a token from an unknown issuer (fail-closed)
 
@@ -253,7 +291,8 @@ registration.
 | `auth.oidc.issuers[].issuer` | string | -- | Trusted `iss` value matched against the token |
 | `auth.oidc.issuers[].audience` | string | -- | Expected `aud` for this issuer; ignored while `resource_uri` is set |
 | `auth.oidc.issuers[].jwks_uri` | string | -- | JWKS endpoint used to verify this issuer's signatures |
-| `auth.oidc.issuers[].allowed_tenants` | list | -- | Tenant claim values this issuer may assert; a token naming any other, or none, is refused (2.34.2+) |
+| `auth.oidc.issuers[].allowed_tenants` | list | -- | *(2.34.2)* Tenants this issuer's tokens may name; a token naming another tenant, or none, is refused with `401` |
+| `auth.role_assignments[].scope` | string | `global` | `tenant:<tenant id>` confines the grant to that tenant. Use it with more than one issuer |
 | `auth.oidc.tenant_claim` | string | `tenant_id` | JWT claim mapped to `tenant_id`; inherited by issuer entries that omit it |
 
 ## What's Next

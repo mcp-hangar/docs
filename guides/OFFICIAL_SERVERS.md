@@ -22,6 +22,13 @@ READMEs.
 
 There is **no official SQLite server**: the upstream one is archived.
 
+[`mcp-hangar add`](../reference/cli.md#add) knows four of the seven --
+`filesystem`, `fetch`, `memory` and `git` -- and writes each as a subprocess
+server. Its registry holds nothing else: the GitHub, PostgreSQL, Slack, SQLite
+and similar entries it used to carry were removed because their packages are no
+longer maintained. Add `everything`, `sequentialthinking`, `time` or any other
+server to `config.yaml` yourself, as below.
+
 ## Two things that decide how you wire them
 
 **Only `everything` speaks HTTP.** Its transport is an argument --
@@ -124,8 +131,9 @@ shells out to `npm install` on the first call. In an image that also carries the
 TypeScript servers, node is there, so `fetch` reaches for `registry.npmjs.org`
 mid-call. Behind an egress policy that does not allow it, the packets are
 dropped silently, `npm` has no timeout, and the first bound anything hits is the
-gateway's 60s `tools/call` timeout -- three of which trip the circuit breaker
-and leave the server looking dead. Give that child a `PATH` without node and
+gateway's 60s `tools/call` timeout -- three of which in a row open the server's
+circuit breaker, so later calls are refused while the server still reads
+`ready`, until a health check passes. Give that child a `PATH` without node and
 `fetch` answers in ~200ms, with a denied host refused in 5s.
 
 **A denied egress is a silent drop, not an error.** Any upstream that dials

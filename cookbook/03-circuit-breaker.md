@@ -7,7 +7,7 @@
 
 ## The Problem
 
-Health checks from recipe 02 run once a minute. Between checks, a flaky MCP server can accept requests, fail, get retried, fail again — wasting agent time and tokens on a MCP server that's clearly broken. Your MCP server responds to health checks (it's technically alive) but fails 80% of real tool calls. Intermittent failure. Health checks say READY. Agents suffer.
+Health checks from recipe 02 run every 30 seconds. Between checks, a flaky MCP server can accept requests, fail, get retried, fail again — wasting agent time and tokens on a MCP server that's clearly broken. Your MCP server responds to health checks (it's technically alive) but fails 80% of real tool calls. Intermittent failure. Health checks say READY. Agents suffer.
 
 Health checks tell you the patient is dead. Circuit breakers stop you from performing surgery on a corpse.
 
@@ -58,10 +58,10 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    {"task": "health_check", "interval_s": 60, "event": "background_worker_started", ...}
    ```
 
-   The worker's `interval_s=60` is not the `health_check_interval_s: 30` set
-   above, and on 2.24.0 the 60 is the one that counts: the worker probes every
-   READY server once a minute, and `health_check_interval_s` is recorded but
-   not read by the scheduler
+   The worker's `interval_s=60` is its default pace, not the
+   `health_check_interval_s: 30` set above. Since 2.28.0 the server's own value
+   counts, so `my-mcp` is probed every 30 seconds. Before 2.28.0 the 60 was the
+   one that counted and `health_check_interval_s` was recorded but not read
    ([mcp-hangar#1686](https://github.com/mcp-hangar/mcp-hangar/issues/1686)).
 
    The group starts its members when it loads, so `my-mcp` is already READY.
@@ -128,17 +128,19 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ```
 
    Call 2 reached the frozen server and waited out the 60-second call timeout.
-   While it waited, the once-a-minute health check -- which gives up after 5
-   seconds -- almost always failed too (if no check fell inside that minute,
-   call 3 times out the same way). That is two failures in a row, so the member left
-   rotation at `health.unhealthy_threshold` (2 by default). Calls 3 and 4
+   While it waited, the member's health checks -- every 30 seconds here, each
+   giving up after 5 seconds -- failed too. Two failures in a row take the
+   member out of rotation at `health.unhealthy_threshold` (2 by default). Calls 3 and 4
    never reached a member at all: `select_member_for()` had nothing in
    rotation to select, so Hangar refused them with `NoAvailableMemberError` in
    milliseconds instead of waiting out another timeout.
 
-   Read the last line again: `circuit_open` is `false`. The calls were refused
-   with the circuit still closed. What refuses a call to a group is an empty
-   rotation — never the breaker, which nothing on the call path asks.
+   If the last line reads `circuit_open: false`, the calls were refused with
+   the circuit still closed. What refuses a call to a group is an empty
+   rotation — never the breaker, which nothing on the call path asks. With
+   checks every 30 seconds, a third failure can land within the same minute,
+   so by the time you list the group the circuit may already be open, as in
+   step 5; the refusals are the same either way.
 
    Freeze it with `docker pause`, not `docker stop`. On 2.24.0 a stopped
    remote server's health check does not count (recipe 02, step 5): two failed
@@ -150,9 +152,9 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    The circuit opens when the group's failures in a row reach
    `failure_threshold` (3 here). The refusals in step 4 do not get there: they
    are Hangar's own, not the member's, so they are not counted against it. A
-   member out of rotation is still health-checked, and it is the next failing
-   health check that brings the run to 3 and opens the circuit -- within a
-   minute, on the health worker's next pass.
+   member out of rotation is still health-checked while it is READY, and it is
+   the next failing health check that brings the run to 3 and opens the circuit
+   -- within 30 seconds, on the member's next check.
 
    Once it opens, `hangar_group_list` reports the same group like this:
 

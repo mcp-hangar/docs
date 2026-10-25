@@ -39,10 +39,12 @@ auth:                                       # validate JWTs; Hangar does not iss
       - issuer: https://issuer-a.example.com      # Customer A (e.g. Keycloak)
         audience: https://hangar.example.com      # ignored while resource_uri is set
         jwks_uri: https://issuer-a.example.com/jwks
+        allowed_tenants: ["tenant:a"]       # 2.34.2+: issuer-a may only name tenant:a
       - issuer: https://issuer-b.example.com      # Customer B (e.g. Auth0)
         audience: https://hangar.example.com      # ignored while resource_uri is set
         jwks_uri: https://issuer-b.example.com/jwks
         groups_claim: roles                 # per-issuer override; tenant_claim inherits top-level
+        allowed_tenants: ["tenant:b"]       # 2.34.2+: issuer-b may only name tenant:b
 
 mcp_servers:
   payments:
@@ -222,8 +224,21 @@ Per-issuer claim mappings inherit from the top level. issuer-b overrides
 `groups_claim: roles`, but it omits `tenant_claim`, so it inherits
 `tenant_claim: tenant_id` from `auth.oidc`. Both issuers therefore resolve the
 tenant from `tenant_id` into `CallerIdentity.tenant_id`, which the front-door
-access resolver uses to apply the member-scope policy -- exactly as in Recipe
-16. Hangar remains a resource server throughout: it **validates** these JWTs, it
+access resolver uses to apply the member-scope policy -- exactly as in
+Recipe 16.
+
+`allowed_tenants` binds each issuer to the tenants it may name. Without it,
+issuer-b could sign a token whose `tenant_id` is `tenant:a`, and Hangar would
+treat the caller as tenant a. With it (core 2.34.2 and later), such a token is
+refused with `401`, as is a token from a bound issuer that names no tenant.
+With an entry left unbound, boot logs `oidc_issuers_not_bound_to_tenants` once,
+naming the open issuers. The binding
+covers tenant-scoped roles only: a role granted at scope `global` to a subject
+or `group:<name>` reaches a token with that subject or group from either
+issuer, so grant OIDC users and groups `tenant:<id>` roles in a recipe like
+this one.
+
+Hangar remains a resource server throughout: it **validates** these JWTs, it
 does not issue them, mint refresh tokens, or perform dynamic client
 registration.
 
@@ -238,6 +253,7 @@ registration.
 | `auth.oidc.issuers[].issuer` | string | -- | Trusted `iss` value matched against the token |
 | `auth.oidc.issuers[].audience` | string | -- | Expected `aud` for this issuer; ignored while `resource_uri` is set |
 | `auth.oidc.issuers[].jwks_uri` | string | -- | JWKS endpoint used to verify this issuer's signatures |
+| `auth.oidc.issuers[].allowed_tenants` | list | -- | Tenant claim values this issuer may assert; a token naming any other, or none, is refused (2.34.2+) |
 | `auth.oidc.tenant_claim` | string | `tenant_id` | JWT claim mapped to `tenant_id`; inherited by issuer entries that omit it |
 
 ## What's Next

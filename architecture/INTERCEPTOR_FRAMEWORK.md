@@ -108,7 +108,7 @@ negotiated the extension:
 {
   "interceptors": [
     {
-      "name": "io.mcp-hangar.validator",
+      "name": "io.mcp-hangar/validator",
       "version": "<package version>",
       "type": "validator",
       "supportedEvents": ["tools/call", "tools/list"],
@@ -116,7 +116,7 @@ negotiated the extension:
       "trustBoundary": "host"
     },
     {
-      "name": "io.mcp-hangar.mutator",
+      "name": "io.mcp-hangar/mutator",
       "version": "<package version>",
       "type": "mutator",
       "supportedEvents": ["tools/call"],
@@ -138,23 +138,26 @@ a JSON-RPC envelope and answers `404` without the header:
 curl -s -X POST http://localhost:8000/interceptor/invoke \
   -H 'MCP-Interceptor-Ext: io.modelcontextprotocol/interceptors' \
   -d '{"jsonrpc":"2.0","id":1,"method":"interceptor/invoke",
-       "params":{"name":"mcp-hangar-validator","event":"tools/call","phase":"request"}}'
+       "params":{"name":"io.mcp-hangar/validator","event":"tools/call","phase":"request"}}'
 ```
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"interceptor":"mcp-hangar-validator","type":"validation","phase":"request","durationMs":0.2,"valid":true}}
+{"jsonrpc":"2.0","id":1,"result":{"interceptor":"io.mcp-hangar/validator","type":"validation","phase":"request","durationMs":0.2,"valid":true}}
 ```
 
 The invoke endpoint is a conformance-shaped no-op: the validator always answers
 `valid: true` and the mutator returns the payload with `modified: false`. It
 publishes an `InterceptorInvoked` hook on the event bus and enforces nothing.
 
-The negotiated shape and `interceptor/invoke` still use the names
-`mcp-hangar-validator` and `mcp-hangar-mutator`, not the `io.mcp-hangar.*` names
-of the default shape
-([mcp-hangar/mcp-hangar#1690](https://github.com/mcp-hangar/mcp-hangar/issues/1690)).
-Invoking a name from the default listing is refused with `-32602 unknown
-interceptor`.
+*Since 2.29.1* both shapes and `interceptor/invoke` use one name per
+interceptor, `io.mcp-hangar/validator` and `io.mcp-hangar/mutator`. Invoke
+also accepts the earlier names as aliases -- `io.mcp-hangar.validator` /
+`io.mcp-hangar.mutator` (the default listing's names from 2.0.0 to 2.29.0) and
+`mcp-hangar-validator` / `mcp-hangar-mutator` (the negotiated shape's names
+before 2.29.1,
+[mcp-hangar/mcp-hangar#1690](https://github.com/mcp-hangar/mcp-hangar/issues/1690))
+-- and answers with the new name. Any other name is refused with
+`-32602 unknown interceptor`.
 
 ## Mutator Ordering
 

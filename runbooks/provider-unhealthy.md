@@ -26,6 +26,12 @@ Hangar's log shows the path: `mcp_server_degraded_by_health_check: <id>`, then
 `McpServer <id> degraded, scheduling retry 1/3 in 5.0s`, and either
 `McpServer <id> recovered successfully after <n> retries` or `mcp_server_given_up`.
 
+The saga's delays (5, 10 and 20 s) are floors. A restart the server refuses
+because its own backoff has not run out (2^failures seconds, capped at 60, with
+10% jitter) is rescheduled for when it has
+(`mcp_server_recovery_restart_rescheduled`) and not counted as a retry. So the
+give-up usually comes about a minute after the degrade, not 35 s.
+
 ## Remediate
 
 - Container mode: check the pod/process — crashloop, bad image, missing env/secret.

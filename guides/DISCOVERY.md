@@ -24,7 +24,11 @@ sources:
   - type: docker
     mode: additive
     socket_path: /var/run/docker.sock  # optional
+    allowed_mount_paths: ["/srv/mcp-data"]  # optional; see the volumes label
 ```
+
+The source lists every container with `mcp.hangar.enabled=true`, stopped and
+created-but-never-started ones included.
 
 Container labels:
 
@@ -44,9 +48,23 @@ services:
 | ------- | ---------- | --------- |
 | `mcp.hangar.enabled` | yes | - |
 | `mcp.hangar.name` | no | container name |
-| `mcp.hangar.mode` | no | `container` (Hangar runs the image); `http` connects to the running container |
-| `mcp.hangar.port` | no | `8080` (`http` mode) |
-| `mcp.hangar.group` | no | - |
+| `mcp.hangar.mode` | no | `container` (Hangar runs the image); `http` or `sse` connects to the running container |
+| `mcp.hangar.port` | no | `8080` (`http`/`sse` mode) |
+| `mcp.hangar.path` | no | `/mcp` (`http`/`sse` mode): the MCP endpoint's path |
+| `mcp.hangar.ttl` | no | `90`: seconds an `authoritative` source keeps the server after it stops being reported |
+| `mcp.hangar.read-only` | no | `true` (`container` mode): run the container with a read-only root filesystem. `"false"` opts out |
+| `mcp.hangar.volumes` | no | - (`container` mode): comma-separated `host:container[:mode]` mounts, honoured only under `allowed_mount_paths` |
+| `mcp.hangar.command` | no | - (`container` mode): accepted, but not passed to the container today; the image's own command runs |
+
+*Since 2.34.2* a container Hangar runs from a label gets a read-only root
+filesystem by default, as a declared container does, and a `mcp.hangar.volumes`
+label is honoured only when every host path in it is absolute and under one of
+the source's `allowed_mount_paths`. `/` and any `*.sock` file are refused even
+there, and `~` is not expanded. A container whose label names anything else is
+not registered at all, rather than registered without its mounts, and is logged
+once as `docker_discovery_label_volumes_refused`. With no `allowed_mount_paths`,
+any container carrying the label is refused. There is no `group` label: a
+discovered server joins no group.
 
 ### Kubernetes
 
@@ -63,6 +81,7 @@ sources:
     in_cluster: true
     allowed_namespaces: [mcp-servers]          # optional allowlist
     denied_namespaces: [kube-system, default]  # default
+    allow_local_modes: false                   # default; see below
 ```
 
 A pod in a denied namespace is refused registration even when it carries the
@@ -87,6 +106,26 @@ metadata:
     mcp-hangar.io/port: "8080"
 ```
 
+| Annotation | Default |
+| ------------ | --------- |
+| `mcp-hangar.io/enabled` | required, `"true"` |
+| `mcp-hangar.io/name` | pod name |
+| `mcp-hangar.io/mode` | `http`; also `sse` or `remote`. Any other mode needs `allow_local_modes` |
+| `mcp-hangar.io/port` | `8080` |
+| `mcp-hangar.io/path` | `/mcp`: the MCP endpoint's path |
+| `mcp-hangar.io/health-path` | `/health` |
+| `mcp-hangar.io/ttl` | `90` seconds |
+| `mcp-hangar.io/command` | - (local modes only) |
+
+*Since 2.34.2* the source registers only pods Hangar connects to. A pod whose
+`mcp-hangar.io/mode` asks for anything else, such as `subprocess` with
+`mcp-hangar.io/command`, which would run that command on Hangar's own host, is
+skipped and logged once as `kubernetes_discovery_local_mode_refused`. If
+whoever can create pods in the watched namespaces is trusted to choose what
+Hangar runs on its host, set `allow_local_modes: true` on the source. The value
+must be the boolean `true`; a string such as `"yes"` leaves the source closed.
+There is no `group` annotation: a discovered server joins no group.
+
 ### Filesystem
 
 ```yaml
@@ -95,8 +134,12 @@ sources:
     mode: additive
     path: /etc/mcp-hangar/mcp_servers.d/
     pattern: "*.yaml"
-    watch: true
 ```
+
+The source reads the directory every `refresh_interval_s`. A `watch: true` key
+is accepted, but file watching needs the `watchdog` package, which Hangar does
+not install, and nothing acts on its events, so polling is what runs either
+way; the log says `Filesystem discovery source started (watching disabled)`.
 
 MCP Server file:
 
@@ -105,10 +148,28 @@ MCP Server file:
 name: custom-tool
 enabled: true
 mode: subprocess
+ttl: 90          # optional; seconds an authoritative source keeps it once the file is gone
 connection:
   command: python
   args: [-m, my_mcp_server]
 ```
+
+A definition file names a command Hangar runs, so *since 2.34.2* the source
+skips a file, and logs `filesystem_discovery_file_refused` once with the reason,
+when:
+
+- it resolves, through a symlink, to a path outside the source's `path`;
+- it is not a regular file;
+- on POSIX, it is world-writable;
+- on POSIX, the source's `path`, or a directory between it and the file, is
+  world-writable. A sticky directory such as `/tmp` counts.
+
+Group-writable files and directories, files owned by another user, and a file
+on a filesystem mounted read-only are not refused, so a Kubernetes ConfigMap or
+Secret volume works unchanged. An `emptyDir` is writable and its root is 0777,
+so it is refused: fill it from an init container into a subdirectory that is
+not world-writable, or mount a ConfigMap. There is no setting to turn the checks
+off.
 
 ### Python Entrypoints
 
@@ -226,7 +287,28 @@ than a special case in core.
 | Mode | Behavior |
 | ------ | ---------- |
 | `additive` | Only adds MCP servers, never removes |
-| `authoritative` | Adds and removes (for dynamic environments) |
+| `authoritative` | Adds, and removes a server the source stopped reporting once its TTL has passed |
+
+*Since 2.34.2* an `authoritative` source deregisters a server it no longer
+reports once the server's TTL has passed since it was last seen: 90 s by
+default, or `mcp.hangar.ttl` on a container, `mcp-hangar.io/ttl` on a pod,
+`ttl` in a file. Before 2.34.2 nothing was removed until a restart, whatever
+the mode. A server that comes back within its TTL is left running. Servers from
+`config.yaml` are never touched.
+
+"No longer reported" means a cycle in which the source answered and reports
+itself healthy afterwards. A source whose scan fails -- Docker when the daemon
+does not answer, a filesystem `path` that is missing -- removes nothing that
+cycle, however long the failure lasts. Two cases still count as a real absence
+and remove the server once its TTL has run out: a Kubernetes namespace whose pod
+listing fails while the API itself answers, and a discovery file that stops
+parsing. A server a check above now refuses -- a Kubernetes local mode, a Docker
+label volume outside `allowed_mount_paths`, a world-writable file -- is no
+longer reported either, so an authoritative source removes it after its TTL.
+
+A discovered definition that changes is not applied: the source reports it
+again, its registration is refused with `McpServer already exists` every cycle,
+and the server keeps its old definition until it is removed or Hangar restarts.
 
 ## Security
 
@@ -278,14 +360,15 @@ the REST API, so it passes the same duplicate and SSRF checks, and the
 | ------ | ------------- |
 | `hangar_discover` | Trigger discovery cycle |
 | `hangar_sources` | List sources with status |
+| `hangar_discovered` | List pending MCP servers (with `auto_register: false`) |
 | `hangar_quarantine` | List quarantined MCP servers |
-| `hangar_approve` | Approve quarantined MCP server |
+| `hangar_approve` | Approve a pending or quarantined MCP server |
 
 ## Conflict Resolution
 
 1. **Static config wins** — Manual config always takes precedence
 2. **Higher priority source wins** — K8s (1) > Docker (2) > Filesystem (3) > Entrypoints (4) > any other source (99)
-3. **TTL expiration** — Authoritative sources deregister after TTL
+3. **TTL expiration** — Authoritative sources deregister a server they stopped reporting after its TTL (see [Discovery Modes](#discovery-modes))
 
 ## Prometheus Metrics
 

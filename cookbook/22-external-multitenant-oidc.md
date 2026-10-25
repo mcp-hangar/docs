@@ -385,7 +385,11 @@ challenge advertise the resource URI and issuer. Because `resource_uri` is set,
 that same URI is enforced as each token's `aud` (RFC 8707), so a token minted for
 another API is not accepted here. To trust more than one issuer at once, add an
 `auth.oidc.issuers` trust list as in
-[17 -- Multi-Issuer Front Door](17-multi-issuer-front-door.md).
+[17 -- Multi-Issuer Front Door](17-multi-issuer-front-door.md). Then give each
+issuer `allowed_tenants` (core 2.34.2 and later), and replace the `global`
+grant to `group:agents` above with one `tenant:<id>` grant per tenant: a
+`global` grant to a group reaches a token carrying that group from every
+trusted issuer.
 
 Throughout, Hangar stays a Resource Server. Keycloak issues and signs the
 tokens; Hangar only validates them.

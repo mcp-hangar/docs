@@ -32,7 +32,7 @@ mcp_servers:
 | Key | Type | Default | Range | Description |
 | ----- | ------ | --------- | ------- | ------------- |
 | `mode` | `str` | `"subprocess"` | subprocess, docker, container, remote, group | MCP Server mode. `container` is an alias of `docker`. `podman` is not a mode and refuses the config; select Podman with `MCP_CONTAINER_RUNTIME`. `group` is described under [`groups`](#groups). |
-| `command` | `list[str]` | -- | -- | Command for subprocess mode (required for subprocess) |
+| `command` | `list[str]` | -- | -- | Command for subprocess mode (required for subprocess). Its first element's base name must be on the executable allow-list -- `bun`, `deno`, `docker`, `node`, `npx`, `podman`, `python`, `python3`, `python3.11` to `python3.14`, `uv`, `uvx` -- or the launch is refused. `MCP_ALLOWED_COMMANDS` replaces the list |
 | `image` | `str` | -- | -- | Docker image for docker mode (required for docker) |
 | `endpoint` | `str` | -- | -- | HTTP endpoint for remote mode (required for remote) |
 | `env` | `dict[str, str]` | `{}` | -- | Environment variables passed to the MCP server process |
@@ -59,9 +59,8 @@ mcp_servers:
 | `tool_projection` | `dict` | -- | -- | Digest pins. See [Digest Pinning](#digest-pinning) |
 | `header_exposure` | `dict` | -- | -- | See [Header Exposure](#header-exposure) |
 
-`network_mode` and `user` are read, but the 2.24.0 key check does not list
-them: each logs `unknown_config_key`, and `HANGAR_CONFIG_STRICT=1` and
-`mcp-hangar config check` refuse a file that sets one. Write `network` rather
+`network_mode` and `user` are in the key check since 2.28.0; before, each
+logged `unknown_config_key` and strict mode refused it. Write `network` rather
 than `network_mode`.
 
 ### `mode: remote` and the SSRF policy
@@ -265,7 +264,7 @@ approvals:
 | `enabled` | `bool` | `true` | Turn the gate off entirely. See the interaction with [`startup_checks`](#startup_checks) below |
 | `channel` | `str` | `event_stream` | Channel for any policy that does not name one |
 | `delivery.required` | `bool` | `false` | When `true`, a gated policy whose channel reaches nobody **refuses the boot** instead of logging at `ERROR` |
-| `<channel>` | `map` | -- | Settings for an installed delivery adapter, keyed by its channel name and passed to it as-is. The 2.24.0 key check knows only `slack` and `webhook` here; any other name logs `unknown_config_key` |
+| `<channel>` | `map` | -- | Settings for an installed delivery adapter, keyed by its channel name and passed to it as-is. Since 2.28.0 the key check accepts the block the configured `channel` names, beside `slack` and `webhook`; a block for any other name logs `unknown_config_key` |
 
 `dashboard` is an old name for `event_stream`; it still resolves, and logs
 `approval_delivery_channel_renamed`.
@@ -667,7 +666,7 @@ discovery:
 | `auto_register` | `bool` | `true` | -- | Automatically register discovered MCP servers |
 | `sources` | `list[dict]` | `[]` | -- | Discovery source configurations (see below) |
 | `security` | `dict` | -- | -- | Security constraints for discovery |
-| `lifecycle` | `dict` | -- | -- | Lifecycle management for discovered MCP servers. Read, but missing from the 2.24.0 key check: it logs `unknown_config_key`, and strict mode and `config check` refuse it |
+| `lifecycle` | `dict` | -- | -- | Lifecycle management for discovered MCP servers. In the key check since 2.28.0; before, it logged `unknown_config_key` and strict mode refused it |
 
 ### `sources[]` entry
 
@@ -873,16 +872,35 @@ hot_loading:
   cache:
     ttl_s: 3600
     max_entries: 1000
+  trusted_namespaces: ["io.github.acme/"]
+  allow_force_unverified: false
+  inherit_env: []
+  secrets:
+    allow:
+      "io.github.acme/weather": [WEATHER_API_KEY]
 ```
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
 | `enabled` | `bool` | `true` | Enable runtime loading from the registry |
+| `trusted_namespaces` | `list[str]` | `[]` | Registry name prefixes whose entries are verified. Matching is case-sensitive and by whole segment: a missing trailing `/` is added, so `io.github.acme/` matches `io.github.acme/weather` but not `io.github.acmeevil/weather` or `io.github.acme.labs/weather`. An empty prefix, whitespace, `*` or `//` refuses the configuration. Empty: every entry is unverified and refused |
+| `allow_force_unverified` | `bool` | `false` | Whether the `force_unverified` argument of `hangar_load` may load an entry that is not verified. `false`: the argument is ignored. Anything but a YAML boolean refuses the configuration |
+| `inherit_env` | `list[str]` | `[]` | Variable names a hot-loaded server takes from the gateway's environment, on top of a fixed base (`PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE`, `TZ`, `TMPDIR`, `TMP`, `TEMP` and the Windows equivalents). Nothing else is inherited: list a proxy, a CA bundle or `UV_*`/`npm_config_*` settings here if `uvx` or `npx` need them |
+| `secrets.allow` | `dict[str, list[str]]` | `{}` | Exact registry name -> the variables that server may receive. A variable its entry asks for and that is not listed is reported missing and never looked up. A listed one is read from the gateway's environment, then `~/.config/mcp-hangar/secrets/<registry name>/<NAME>`, then `~/.config/mcp-hangar/secrets/<NAME>`. Two keys that differ only in case refuse the configuration |
 | `registry.base_url` | `str` | `https://registry.modelcontextprotocol.io/v0` | Registry API base URL |
 | `registry.timeout_s` | `float` | `10.0` | Registry request timeout in seconds |
 | `registry.max_retries` | `int` | `3` | Retry attempts for registry requests |
 | `cache.ttl_s` | `int` | `3600` | TTL for cached registry lookups, in seconds |
 | `cache.max_entries` | `int` | `1000` | Maximum entries in the registry lookup cache |
+
+*Since 2.30.0* the four trust keys are the operator's decisions about what a
+registry entry, written by whoever published it, may get; each defaults to
+refusing. They apply at startup and on every reload, and each load reads the
+ones in force. An absent section trusts nothing and binds no secret. A
+hot-loaded server runs as the gateway's user, so `trusted_namespaces` is the
+boundary: the server can read whatever that user can, whatever Hangar hands it.
+Statically configured servers are unaffected by `inherit_env` and
+`secrets.allow`.
 
 ## `event_store`
 
@@ -1203,10 +1221,14 @@ Behaviour worth knowing:
 
 - **HTTP ignores the block.** It has a credential channel and keeps using it.
 - **Absent, nothing changes.** The caller is anonymous, exactly as before 2.18.0.
-- **The management surface follows `roles`.** With `viewer`, a client sees the
-  read-only `hangar_*` tools (`hangar_status`, `hangar_health`, `hangar_list`,
-  …) and none that can start, stop or reconfigure anything. Calling the
-  upstreams' own tools does not depend on those roles.
+- **The management surface follows `roles` on a front door, or with auth on.**
+  With `tool_access.mode: front_door` or `auth.enabled: true`, a `viewer` client
+  sees the read-only `hangar_*` tools (`hangar_status`, `hangar_health`,
+  `hangar_list`, …) and none that can start, stop or reconfigure anything. With
+  auth off in `egress` mode, the default, every `hangar_*` management tool is
+  allowed whatever the roles say; since 2.34.2 boot logs
+  `stdio_principal_roles_not_enforced` in that case. Calling the upstreams' own
+  tools does not depend on those roles.
 - **Per-tenant pins for this tenant become matchable.** Hangar refuses at boot
   when per-tenant pins are declared that no caller could carry; a declared stdio
   principal is such a caller, for its own `tenant_id`.
@@ -1484,7 +1506,7 @@ Environment variables override corresponding YAML settings. Variables follow the
 | ---------- | --------- | ------------- |
 | `MCP_CONFIG` | -- | Path to YAML configuration file. A `--config` on the command line wins over it; without either, `./config.yaml` if present, else `~/.config/mcp-hangar/config.yaml` |
 | `MCP_MODE` | `"stdio"` | Server mode: `stdio` or `http` |
-| `MCP_HTTP_HOST` | `"0.0.0.0"` | HTTP bind host. A non-loopback host without authentication refuses to start unless `--unsafe-no-auth` is passed |
+| `MCP_HTTP_HOST` | `"127.0.0.1"` | HTTP bind host, the same as `--host`. A non-loopback host without authentication refuses to start unless `--unsafe-no-auth` is passed, and needs the host names clients use in `MCP_TRUSTED_HOSTS`. The published container image passes `--host 0.0.0.0` |
 | `MCP_HTTP_PORT` | `8000` | HTTP bind port |
 | `MCP_LOG_LEVEL` | `"INFO"` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `MCP_JSON_LOGS` | `"false"` | Enable structured JSON logging |
@@ -1498,6 +1520,16 @@ Environment variables override corresponding YAML settings. Variables follow the
 | `MCP_RATE_LIMIT_BURST` | `"20"` | Rate limit: burst size |
 | `MCP_ALLOW_ABSOLUTE_PATHS` | `"false"` | Allow absolute paths in input validation |
 | `MCP_MAX_RESPONSE_BYTES` | -- | Wins over `execution.max_response_bytes`; a server's own `max_response_bytes` wins over both |
+| `MCP_ALLOWED_COMMANDS` | -- | Comma-separated executable base names a subprocess server may start. Set, it **replaces** the built-in allow-list (see `command` under [`mcp_servers`](#mcp_servers)) rather than adding to it |
+
+### Host, proxy and CORS
+
+| Variable | Default | Description |
+| ---------- | --------- | ------------- |
+| `MCP_TRUSTED_HOSTS` | `"localhost,127.0.0.1,::1,testserver"` | Comma-separated `Host` header values the gateway answers. Another host gets `400` on `/api` and `421` on `/mcp`; `/health/*` and `/metrics` are served for any host. `*` turns the check off. Set it to the names clients reach the gateway by (Service, Ingress host) |
+| `MCP_TRUSTED_PROXIES` | `"127.0.0.1,::1"` | Comma-separated addresses or CIDRs whose `X-Forwarded-For` is believed when resolving the client address (rate limiting, audit). An entry that does not parse is logged as `trusted_proxy_invalid` and skipped |
+| `MCP_CORS_ORIGINS` | `"http://localhost:5173"` | Comma-separated origins allowed for cross-origin browser requests and WebSocket `Origin`. Each needs a scheme and no wildcard; if none is valid the default is used |
+| `MCP_CORS_CREDENTIALS` | `"false"` | `true` allows credentialed cross-origin requests |
 
 ### Persistence
 

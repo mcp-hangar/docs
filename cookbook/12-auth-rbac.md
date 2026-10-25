@@ -162,9 +162,9 @@ Built-in roles:
 | Role | Can do |
 | ------ | -------- |
 | `admin` | Everything |
-| `kubernetes-operator` | Register, start and deregister servers and deliver egress policy; nothing else. The role for an operator API key. |
-| `provider-admin` | Register, reconfigure, start, stop and remove servers, deliver compiled egress policy, manage groups and discovery (core 2.29.1 and later; before that it could not create, delete, start or stop a server). The narrow role for a Kubernetes operator's key is `kubernetes-operator`. |
-| `developer` | Invoke tools, read and manage server state. Cannot touch egress policy. |
+| `kubernetes-operator` | Register `remote` servers (key-pinned ones included), start and deregister servers, deliver egress policy; nothing else. The role for an operator API key. |
+| `provider-admin` | Register, reconfigure, start, stop and remove servers, deliver compiled egress policy, manage groups and discovery (core 2.29.1 and later; before that it could not create, delete, start or stop a server). Holds `mcp_servers:local_launch`, so it may register `subprocess` and container servers over REST. The narrow role for a Kubernetes operator's key is `kubernetes-operator`. |
+| `developer` | Invoke tools, read and manage server state, register `remote` servers. Since core 2.34.2 it cannot register a `subprocess` or container server, or change such a server's `env`, over REST (`403`: that needs `mcp_servers:local_launch`). Cannot touch egress policy. |
 | `viewer` | Read-only access |
 | `auditor` | Read-only access to audit logs and metrics |
 | `service-account` | Tool invocation only |

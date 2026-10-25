@@ -41,7 +41,9 @@ See the [Authentication guide](AUTHENTICATION.md) for setup instructions.
 
 ## Endpoints Overview
 
-All endpoints return JSON. Domain errors use a nested envelope; the status is
+Endpoints return JSON (a path or method the API does not serve gets the
+framework's plain-text `404`/`405` when authentication is off). Domain errors
+use a nested envelope; the status is
 in the HTTP status line, not the body:
 
 ```json
@@ -62,7 +64,7 @@ Every route requires a permission when authentication is enabled; the
 | Method | Path | Description |
 | -------- | ------ | ------------- |
 | `GET` | `/api/mcp_servers` | List all MCP servers (optional `?state=ready` filter) |
-| `POST` | `/api/mcp_servers` | Create a new MCP server |
+| `POST` | `/api/mcp_servers` | Create a new MCP server; a non-`remote` one also needs `mcp_servers:local_launch` (2.34.2+) |
 | `GET` | `/api/mcp_servers/{id}` | Get MCP server details |
 | `PUT`/`PATCH` | `/api/mcp_servers/{id}` | Update MCP server configuration |
 | `DELETE` | `/api/mcp_servers/{id}` | Delete a MCP server (stops it first); `409 declared_in_config` for a server the configuration declares (2.26.0+) |
@@ -73,6 +75,7 @@ Every route requires a permission when authentication is enabled; the
 | `GET` | `/api/mcp_servers/{id}/health` | Get health status |
 | `GET` | `/api/mcp_servers/{id}/logs` | Get buffered log lines (`?lines=100`) |
 | `GET` | `/api/mcp_servers/{id}/tools/history` | Tool invocation history |
+| `DELETE` | `/api/mcp_servers/{id}/peer_identity` | Forget a deleted key-pinned server's peer-key name |
 
 ### Sessions
 
@@ -115,18 +118,18 @@ Every route requires a permission when authentication is enabled; the
 | `PUT` | `/api/discovery/sources/{id}/enable` | Enable/disable a source |
 | `GET` | `/api/discovery/pending` | List MCP servers pending approval |
 | `GET` | `/api/discovery/quarantined` | List quarantined MCP servers |
-| `POST` | `/api/discovery/approve/{name}` | Approve a quarantined MCP server |
-| `POST` | `/api/discovery/reject/{name}` | Reject a quarantined MCP server |
+| `POST` | `/api/discovery/approve/{name}` | Approve a quarantined or pending MCP server |
+| `POST` | `/api/discovery/reject/{name}` | Reject a quarantined or pending MCP server |
 
 ### Configuration
 
 | Method | Path | Description |
 | -------- | ------ | ------------- |
-| `GET` | `/api/config` | Get sanitized current configuration |
+| `GET` | `/api/config` | Get the durable server records, secrets redacted |
 | `POST` | `/api/config/reload` | Trigger hot-reload from disk |
 | `POST` | `/api/config/export` | Export current state as YAML |
 | `POST` | `/api/config/backup` | Create a rotating config backup |
-| `GET` | `/api/config/diff` | Diff on-disk vs in-memory configuration |
+| `GET` | `/api/config/diff` | Diff on-disk vs in-memory configuration, secrets redacted |
 
 ### System
 
@@ -149,6 +152,7 @@ Every route requires a permission when authentication is enabled; the
 | -------- | ------ | ------------- |
 | `POST` | `/api/admin/tools/{server}/{tool}/withdraw` | Withdraw a tool |
 | `POST` | `/api/admin/tools/{server}/{tool}/restore` | Restore a withdrawn tool |
+| `GET` | `/api/admin/tools/pins?tool=NAME` | A tool's pin history |
 
 ### Auth Management
 
@@ -220,6 +224,11 @@ curl -X POST http://localhost:8000/api/mcp_servers/ \
 ```json
 {"mcp_server_id": "my-llm", "created": true}
 ```
+
+With authentication on, registering a `subprocess` or container server needs
+`mcp_servers:local_launch` as well as `mcp_servers:write` (2.34.2+): `admin`
+and `provider-admin` hold it, `developer` gets `403`. A `remote` server needs
+only `mcp_servers:write`.
 
 ### Create a Group with Members
 

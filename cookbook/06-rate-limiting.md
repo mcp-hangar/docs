@@ -97,9 +97,11 @@ Rate limiting guards the MCP tool-call path -- the command bus that `hangar_call
 
 ## What Just Happened
 
-Rate limiting is enforced by a token-bucket limiter wired into the command bus as middleware -- every MCP tool call that does work (`hangar_call`, `hangar_start`, `hangar_tools`, ...) is dispatched through it. The read-only tools (`hangar_list`, `hangar_status`, `hangar_details`, `hangar_group_list` and the like) never are, and are never refused by it. When a call would exceed `MCP_RATE_LIMIT_RPS` (requests per second) and the burst allowance is spent, the middleware raises `RateLimitExceeded` before the command reaches its handler. That error is surfaced back to the MCP client in the tool response, as the failed call's `error` and `error_type`. The `MCP_RATE_LIMIT_BURST` setting sizes the bucket, allowing short spikes above the steady-state rate.
+Rate limiting is enforced by a token-bucket limiter wired into the command bus as middleware -- every MCP tool call that does work (`hangar_call`, `hangar_start`, `hangar_tools`, ...) is dispatched through it. The read-only tools (`hangar_list`, `hangar_status`, `hangar_details`, `hangar_group_list` and the like) never are, and are never refused by it. When a call would exceed `MCP_RATE_LIMIT_RPS` (requests per second) and the burst allowance is spent, the middleware raises `RateLimitExceeded` before the command reaches its handler. That error is surfaced back to the MCP client in the tool response, as the failed call's `error` and `error_type`. The `MCP_RATE_LIMIT_BURST` setting is the bucket's capacity: how many commands can go through at once before the steady-state rate applies.
 
-Scope: the limiter sits on the command bus, not on a transport. A REST route that sends a command spends the same bucket: once it is empty, `POST /api/mcp_servers/my-mcp/start` is refused with HTTP 429 and a `RateLimitExceeded` error body. REST routes that only read (`GET`) go through the query bus and are not limited by these settings. Protecting the REST API as a whole is out of scope for this recipe and handled by separate infrastructure (for example a reverse proxy or gateway in front of Hangar).
+**One bucket per command type.** The limiter keys its buckets by the command's type, shared by every caller: `hangar_call` spends the `InvokeToolCommand` bucket, a start spends the `StartMcpServerCommand` bucket, and so on, each with the full `MCP_RATE_LIMIT_RPS` and `MCP_RATE_LIMIT_BURST`. The refusal names the bucket: `the rate limit all callers share for InvokeToolCommand is used up (3 at once, refilled at 1 per second)`. So the rate the gateway admits overall is the configured rate times the number of command types in use, and a `hangar_call` to a cold server spends from both `InvokeToolCommand` and `StartMcpServerCommand`.
+
+Scope: the limiter sits on the command bus, not on a transport. A REST route that sends a command spends the bucket of that command's type, the same bucket the matching MCP tool spends: once the `StartMcpServerCommand` bucket is empty, `POST /api/mcp_servers/my-mcp/start` is refused with HTTP 429 and a `RateLimitExceeded` error body. An empty `InvokeToolCommand` bucket does not refuse it. REST routes that only read (`GET`) go through the query bus and are not limited by these settings. Protecting the REST API as a whole is out of scope for this recipe and handled by separate infrastructure (for example a reverse proxy or gateway in front of Hangar).
 
 **The bucket is per process, so the number multiplies by your replica count.**
 Three replicas configured for 10 rps admit 30 across the fleet, because each
@@ -115,8 +117,8 @@ See [25 -- Running More Than One Replica](25-multiple-replicas.md).
 
 | Environment Variable | Type | Default | Description |
 | --------------------- | ------ | --------- | ------------- |
-| `MCP_RATE_LIMIT_RPS` | float | `10` | Requests per second steady-state limit |
-| `MCP_RATE_LIMIT_BURST` | int | `20` | Maximum burst above the rate limit |
+| `MCP_RATE_LIMIT_RPS` | float | `10` | Steady-state refill rate, per command type, in commands per second |
+| `MCP_RATE_LIMIT_BURST` | int | `20` | Bucket capacity, per command type: how many commands can pass at once |
 
 ## What's Next
 

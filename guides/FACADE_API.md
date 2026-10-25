@@ -175,7 +175,7 @@ config = (
 !!! warning
     Calling `.build()` freezes the configuration. Subsequent calls to `.add_mcp_server()` or other builder methods raise `ConfigurationError`. `.build()` itself can be called again and returns the same data.
 
-Validation errors (empty MCP server name, invalid mode, missing mode-specific parameters, an option the mode does not read) raise `ConfigurationError` with a descriptive message. `.build()` also checks the result against the gateway's config schema, and a key the gateway does not read raises `ConfigurationError` there rather than at boot.
+Validation errors (empty MCP server name, mode `group`, missing mode-specific parameters, an option the mode does not read) raise `ConfigurationError` with a descriptive message. A mode that is not a mode at all raises `ValueError` (`'nope' is not a valid McpServerMode`). `.build()` also checks the result against the gateway's config schema, and a key the gateway does not read raises `ConfigurationError` there rather than at boot. Value ranges are not checked by the builder: an `idle_ttl_s` above 86400, for example, passes `.build()` and makes `start()` raise `ConfigurationError`.
 
 ## API Reference
 
@@ -234,7 +234,7 @@ In egress mode, and without a `coordination:` block, neither runs.
 
 `stop()` stops the warm-up and the required-catalogue retry, discovery, the event tailer, all MCP servers and the background workers, then releases the management lease. It waits for the workers' threads to end, up to 10 seconds in total, and up to 10 seconds for a warm-up that is still starting servers.
 
-A second `start()` while started does nothing, and a second `stop()` does nothing. Concurrent `start()` calls share one bootstrap: the later calls return once the first has finished. A `stop()` made while a `start()` is in flight waits for it, then stops everything it started. `SyncHangar.start()` and `SyncHangar.stop()` are serialised across threads in the same way.
+A second `start()` while started does nothing, and a second `stop()` does nothing. A stopped instance cannot be started again: `stop()` shuts down its thread pool, so a `start()` after it raises `RuntimeError` (`cannot schedule new futures after shutdown`). Create a new `Hangar` instead. Concurrent `start()` calls share one bootstrap: the later calls return once the first has finished. A `stop()` made while a `start()` is in flight waits for it, then stops everything it started. `SyncHangar.start()` and `SyncHangar.stop()` are serialised across threads in the same way.
 
 ### Invocation
 
@@ -374,7 +374,7 @@ Frozen dataclass representing a MCP server state snapshot.
 | `name` | `str` | MCP Server name |
 | `state` | `str` | Current state: `cold`, `initializing`, `ready`, `degraded`, `dead`; `unknown` when the snapshot could not be read |
 | `mode` | `str` | MCP Server mode: `subprocess`, `docker`, `remote` |
-| `tools` | `list[str]` | Available tool names |
+| `tools` | `list[str]` | The tool names the server serves, before its tool-access policy: a name the policy denies is listed here, and `invoke` refuses it |
 | `last_used` | `float \| None` | Last invocation timestamp (epoch seconds), `0.0` before the first call |
 | `error` | `str \| None` | Set only by `list_mcp_servers()` when a server's snapshot could not be read (`state` is then `unknown`). A dead server has `error=None`: read its `state` |
 

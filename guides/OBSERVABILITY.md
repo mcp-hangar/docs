@@ -142,7 +142,7 @@ MCP Hangar exports Prometheus metrics at `/metrics`. All metrics use the `mcp_ha
 | Metric | Type | Labels | Description |
 | -------- | ------ | -------- | ------------- |
 | `mcp_hangar_tool_calls_total` | Counter | MCP server, tool, status | Total tool invocations |
-| `mcp_hangar_tool_call_duration_seconds` | Histogram | MCP server, tool | Invocation latency (buckets: 0.001-30s) |
+| `mcp_hangar_tool_call_duration_seconds` | Histogram | MCP server, tool | Invocation latency of **successful** calls (buckets: 0.001-30s). A failed call is not observed; it is counted in `mcp_hangar_tool_call_errors_total` |
 | `mcp_hangar_tool_call_errors_total` | Counter | MCP server, tool, error_type | Failed invocations by error type |
 
 **Example queries:**
@@ -151,7 +151,7 @@ MCP Hangar exports Prometheus metrics at `/metrics`. All metrics use the `mcp_ha
 # Tool call rate by mcp_server
 sum(rate(mcp_hangar_tool_calls_total[5m])) by (mcp_server)
 
-# P95 latency by tool
+# P95 latency by tool (successful calls only)
 histogram_quantile(0.95, sum(rate(mcp_hangar_tool_call_duration_seconds_bucket[5m])) by (le, tool))
 
 # Error rate
@@ -162,7 +162,7 @@ sum(rate(mcp_hangar_tool_call_errors_total[5m])) / sum(rate(mcp_hangar_tool_call
 
 | Metric | Type | Labels | Description |
 | -------- | ------ | -------- | ------------- |
-| `mcp_hangar_batch_calls_total` | Counter | result | Batch invocations (`success`, `failure`, `partial`) |
+| `mcp_hangar_batch_calls_total` | Counter | result | Batch invocations (`success`, `failure`, `partial`, and `validation_error` for a batch refused at validation). Calls refused by `tool:invoke` authorization are not counted; see [Tool Invocations with hangar_call](BATCH_INVOCATIONS.md#metrics) |
 | `mcp_hangar_batch_duration_seconds` | Histogram | - | Batch execution time |
 | `mcp_hangar_batch_size` | Histogram | - | Number of calls per batch |
 | `mcp_hangar_batch_cancellations_total` | Counter | reason | Cancelled batches (`timeout`, `fail_fast`) |
@@ -807,6 +807,15 @@ Environment variable:
 ```bash
 MCP_LOG_LEVEL=DEBUG mcp-hangar serve --http --host 127.0.0.1
 ```
+
+At `DEBUG`, every domain event is also logged in full as `domain_event_detail`,
+and a tool-call event carries the call's arguments. Values matching a known
+secret shape (a GitHub or Stripe token, for example) are redacted, as are keys
+whose names look secret, but any other value is written as the caller sent it,
+so free-form secrets and personal data in arguments reach the log. The `INFO`
+summary line, `domain_event`, leaves arguments out, and tool results are not
+logged at any level. Turn `DEBUG` on for troubleshooting, not as a standing
+level on a gateway whose logs leave the host.
 
 ### Log Correlation
 

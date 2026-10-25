@@ -682,17 +682,34 @@ nothing.
 | Key | Type | Description |
 | ----- | ------ | ------------- |
 | `type` | `str` | Source type: `kubernetes`, `docker`, `filesystem`, `entrypoint`, or any type registered under the `mcp_hangar.discovery_sources` entry point group. An unregistered type **fails startup** |
-| `mode` | `str` | `additive` (only adds, the default) or `authoritative` (adds and removes). Any other value **fails startup** |
+| `mode` | `str` | `additive` (only adds, the default) or `authoritative` (adds and removes). Any other value **fails startup**. *Since 2.34.2* an authoritative source removes a server it stopped reporting once the server's TTL has passed since it was last seen. A source whose scan fails, or that cannot reach what it watches, removes nothing that cycle; a Kubernetes namespace whose pod listing fails while the API answers, and a discovery file that stops parsing, still count as absent |
 | `path` | `str` | Directory to scan (filesystem source), default `/etc/mcp-hangar/mcp_servers.d/`; a relative path is taken from the working directory |
 | `pattern` | `str` | File glob inside `path` (filesystem source), default `*.yaml` |
 | `watch` | `bool` | Enable file watching (filesystem source), default `true` |
 | `socket_path` | `str` | Docker/Podman socket (docker source) |
+| `allowed_mount_paths` | `list[str]` | Docker source, *since 2.34.2*: absolute host directories a container's `mcp.hangar.volumes` label may mount from. A label is honoured only when every host path in it is absolute and under one of these; `/` and any `*.sock` file are refused even there, and `~` is not expanded. A container whose label names anything else is not registered, and is logged once as `docker_discovery_label_volumes_refused`. Default empty: every container carrying the label is refused |
 | `namespaces` | `list[str]` | Kubernetes namespaces to scan |
 | `label_selector` | `str` | Kubernetes label selector |
 | `in_cluster` | `bool` | Use in-cluster Kubernetes config, default `true` |
+| `allow_local_modes` | `bool` | Kubernetes source, *since 2.34.2*: let a pod's `mcp-hangar.io/mode` annotation ask for a mode other than `http` (the default), `sse` or `remote` -- such as `subprocess`, which runs a command on Hangar's own host. Default `false`: such a pod is skipped and logged once as `kubernetes_discovery_local_mode_refused`. Only the boolean `true` opens it; a string such as `"yes"` does not |
 | `allowed_namespaces` | `list[str]` | Kubernetes namespace allowlist; empty means "everything not denied" |
 | `denied_namespaces` | `list[str]` | Kubernetes namespace denylist, default `[kube-system, default]`. Wins over the allowlist |
 | `group` | `str` | Python entry point group to read servers from (entrypoint source), default `mcp.mcp_servers` |
+
+A container discovered by the docker source runs with a read-only root
+filesystem since 2.34.2, as a declared one does; the label
+`mcp.hangar.read-only: "false"` opts it out. For every container server,
+discovered or declared, a mount whose host path is `/` or normalises to it is
+refused.
+
+The filesystem source skips a definition file, and logs
+`filesystem_discovery_file_refused` once with the reason, when the file
+resolves through a symlink to a path outside `path`, is not a regular file, or
+(on POSIX) is world-writable or sits under a world-writable directory between
+it and `path` -- a sticky directory such as `/tmp` included. A world-writable
+mode on a read-only mount is not refused, so a Kubernetes ConfigMap or Secret
+volume keeps working; a writable `emptyDir` root (0777) is refused. Nothing
+turns these checks off (2.34.2+).
 
 ### `security` sub-section
 
@@ -1162,6 +1179,7 @@ listing and inspection tools are not charged. Both budgets are per replica.
 | `oidc.issuers[].jwks_uri` | `str` | inherited | JWKS endpoint for this issuer |
 | `oidc.issuers[].client_id` | `str` | inherited | Optional client ID for additional validation |
 | `oidc.issuers[].max_token_lifetime_seconds` | `int` | inherited | Maximum JWT lifetime for this issuer; `0` disables the check |
+| `oidc.issuers[].allowed_tenants` | `list[str]` | -- | *Since 2.34.2.* Tenants this issuer may assert: a token whose tenant claim is not a string in the list, or names no tenant, is refused. Must be a non-empty list of non-empty strings; per issuer only (at the top level of `oidc` it refuses the configuration). With two or more issuers and any unbound, boot logs `oidc_issuers_not_bound_to_tenants`. A `global` role grant is still shared across issuers. See [Authentication](../guides/AUTHENTICATION.md) |
 | `oidc.issuers[].<other>` | -- | inherited | Each issuer may also override `subject_claim`, `groups_claim`, `email_claim`, `tenant_claim`, `session_id_claim`, `require_tenant`, `strict_tenant_audience` and `tenant_audiences` |
 | `oidc.subject_claim` | `str` | `sub` | JWT subject claim field |
 | `oidc.groups_claim` | `str` | `groups` | JWT groups claim field |
@@ -1177,9 +1195,10 @@ listing and inspection tools are not charged. Both budgets are per replica.
 | `opa.url` | `str` | `http://localhost:8181` | OPA server URL |
 | `opa.policy_path` | `str` | `v1/data/mcp/authz/allow` | OPA policy path |
 | `opa.timeout` | `float` | `5.0` | OPA request timeout in seconds |
+| `opa.require_both` | `bool` | `false` | *Since 2.34.2.* `true`: RBAC and OPA must both allow, so OPA can only refuse more. `false`: OPA is asked only when RBAC denies, and its allow overrides that deny with no tenant scope (boot logs `opa_may_widen_rbac`). Anything but a boolean refuses the configuration |
 | `storage` | `dict` | `driver: memory` | Auth storage configuration (driver, path, host, etc.) |
 | `rate_limit` | `dict` | -- | Auth-specific rate limiting |
-| `role_assignments` | `list[dict]` | -- | Role assignment rules |
+| `role_assignments` | `list[dict]` | -- | Role assignment rules. *Since 2.34.2* reconciled at every boot with auth on: on a durable store a grant the list applied and no longer holds is revoked; grants made through the API or `bootstrap-admin` are never revoked |
 | `stdio.principal` | `dict` | -- | The caller a stdio session is declared to be (see below). Ignored over HTTP |
 
 ### `auth.stdio.principal` -- who the caller is over stdio

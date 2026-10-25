@@ -92,7 +92,7 @@ event_store:
    ```
 
    The command replaces the image's own, and `serve --http` binds `127.0.0.1`
-   by default (since 2.29.0), which the published port cannot reach, so it names
+   by default (since 2.28.0), which the published port cannot reach, so it names
    `--host 0.0.0.0`. The config above has no `auth:` block, so Hangar refuses to
    start on that host (`http_auth_required_for_non_loopback`).
    Add the `auth:` block from [12 -- Auth & RBAC](12-auth-rbac.md) first; for a

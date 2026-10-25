@@ -30,20 +30,24 @@ pip install mcp-hangar
 
 ### Extras you may need
 
-Two optional dependencies are load-bearing, and a plain `pip install
-mcp-hangar` installs neither:
+Three optional dependencies are load-bearing, and a plain `pip install
+mcp-hangar` installs none of them:
 
 ```bash
 pip install "mcp-hangar[postgres]"      # persistence.backend: postgresql
 pip install "mcp-hangar[kubernetes]"    # the kubernetes discovery source
+pip install "mcp-hangar[redis]"         # truncation.cache_driver: redis
 ```
 
 `[postgres]` brings the PostgreSQL driver, so it is required for
 `persistence.backend: postgresql` — and therefore for any replica set, since a
 declared cluster refuses to start on a file-backed backend. `[kubernetes]`
 brings the client the Kubernetes discovery source imports; without it the source
-cannot be constructed and discovers nothing. The published image already
-installs both, so this applies to a pip install only.
+cannot be constructed and discovers nothing. `[redis]` brings the client the
+`redis` truncation cache driver imports; a set of replicas that truncates
+responses needs it, because each replica's `memory` cache holds only its own
+continuations. The published image already installs all three, so this applies
+to a pip install only.
 
 ## Install from the MCP Registry
 
@@ -166,11 +170,11 @@ make setup
 ## Docker
 
 ```bash
-docker pull ghcr.io/mcp-hangar/mcp-hangar:2.24.0
+docker pull ghcr.io/mcp-hangar/mcp-hangar:2.34.2
 
 # Run with config
 docker run -p 8080:8080 -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  ghcr.io/mcp-hangar/mcp-hangar:2.24.0
+  ghcr.io/mcp-hangar/mcp-hangar:2.34.2
 ```
 
 The image serves HTTP on `0.0.0.0:8080`, and Hangar refuses to bind a

@@ -43,7 +43,10 @@ export PATH="$HOME/.mcp-hangar/bin:$PATH"   # or open a new shell
 mcp-hangar init -y
 ```
 
-That's it. Restart your MCP client and you have filesystem, fetch, and memory MCP servers.
+Restart your MCP client and you have fetch and memory MCP servers, pinned. The
+starter bundle's `filesystem` server needs a directory, which `-y` does not ask
+for: add one to the end of its `command` in the config and run
+`mcp-hangar pin --write`, or run `mcp-hangar init` without `-y`.
 
 !!! info "What just happened?"
     **Install** - Installed `mcp-hangar` into a private venv in `~/.mcp-hangar` via uv or pip.
@@ -51,7 +54,8 @@ That's it. Restart your MCP client and you have filesystem, fetch, and memory MC
     pinned their tools, and pointed the MCP clients it detected at Hangar.
     Your client starts `mcp-hangar serve` (stdio mode) itself.
     The `init -y` flag uses sensible defaults: detects runtimes (npx, uvx, Docker/Podman),
-    configures the starter bundle (filesystem, fetch, memory), updates the detected clients
+    configures the starter bundle (filesystem, fetch, memory) when your clients list no MCP
+    servers of their own (otherwise it moves theirs behind Hangar), updates the detected clients
     (Claude Code, Cursor, Claude Desktop).
 
 ### Manual Installation

@@ -140,8 +140,9 @@ mcp_servers:
 mcp-hangar serve --http --host 127.0.0.1
 ```
 
-Without authentication configured, `serve --http` refuses to bind its default
-host `0.0.0.0`, so a local run names the loopback address.
+`serve --http` binds `127.0.0.1` by default; the flag only makes that explicit.
+Without authentication configured it refuses to bind a non-loopback host such
+as `0.0.0.0`.
 
 Drive it directly to check a handshake:
 

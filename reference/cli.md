@@ -31,9 +31,11 @@ These options go before the command name (`mcp-hangar --json status`):
 | `--show-completion` | - | FLAG | - | - | Print completion for the current shell |
 | `--help` | - | FLAG | - | - | Show help message and exit |
 
-`pin`, `config check` and `auth bootstrap-admin` do not read the global
-`--config`: each takes its own (see those commands). `serve` takes its own
-`--config` as well, and falls back to the global one.
+`serve`, `pin`, `config check` and the `approvals` subcommands take a path of
+their own and fall back to the global `--config` when it is not given. `init`,
+`status`, `add`, `remove` and `why` read the global `--config` (`init` also
+takes `--config-path`). Only `auth bootstrap-admin` ignores the global
+`--config`: it requires its own.
 
 ## Commands
 
@@ -45,6 +47,8 @@ These options go before the command name (`mcp-hangar --json status`):
 | [`remove`](#remove) | Remove MCP server from configuration |
 | [`serve`](#serve) | Start the MCP server |
 | [`pin`](#pin) | Compute, write and check tool digest pins |
+| [`why`](#why) | Show why calls were refused, from the event store |
+| [`approvals`](#approvals) | List, approve and deny calls held for approval |
 | [`completion`](#completion) | Generate shell completion scripts |
 | [`auth`](#auth) | Manage authentication (bootstrap the initial admin) |
 | [`config`](#config) | Validate `config.yaml` without starting a gateway |
@@ -66,7 +70,7 @@ mcp-hangar init [OPTIONS]
 | Option | Short | Type | Default | Description |
 | -------- | ------- | ------ | --------- | ------------- |
 | `--non-interactive` | `-y` | FLAG | false | Run without prompts, using defaults |
-| `--bundle` | `-b` | TEXT | - | MCP Server bundle to install |
+| `--bundle` | `-b` | TEXT | - | MCP server bundle to install: `starter` or `developer` |
 | `--servers` | - | TEXT | - | Comma-separated list of MCP servers (alias: `--mcp_servers`) |
 | `--config-path` | - | PATH | [the shared rule](#default-locations) | Custom path for config file. Without it, the global `--config`, then `MCP_CONFIG`, then `./config.yaml` if present, then `~/.config/mcp-hangar/config.yaml` |
 | `--client` | - | TEXT | detected | Client to point at Hangar; repeatable. `claude-code`, `claude-code-project`, `cursor`, `cursor-project`, `claude-desktop`, `all` |
@@ -74,14 +78,15 @@ mcp-hangar init [OPTIONS]
 | `--skip-clients` | - | FLAG | false | Do not modify any MCP client config (alias: `--skip-claude`) |
 | `--skip-test` | - | FLAG | false | Skip the smoke test. No digest pins are written either — they come from that run |
 | `--reset` | - | FLAG | false | Reset existing configuration |
+| `--undo` | - | FLAG | false | Put every MCP client config back as it was before `init` first changed it, and stop |
+| `--force` | - | FLAG | false | With `--undo`: restore even the files edited since `init` wrote them. Without `--undo` it exits 2 |
 
 ### MCP Server Bundles
 
 | Bundle | MCP servers | Use Case |
 | -------- | ----------- | ---------- |
 | `starter` | filesystem, fetch, memory | General use, getting started |
-| `developer` | filesystem, fetch, memory, github, git | Software development |
-| `data` | filesystem, fetch, memory, sqlite, postgres | Data analysis |
+| `developer` | filesystem, fetch, memory, git | Software development |
 
 ### Examples
 
@@ -93,7 +98,7 @@ mcp-hangar init
 mcp-hangar init --bundle starter
 
 # Install specific mcp_servers
-mcp-hangar init --servers filesystem,github,sqlite
+mcp-hangar init --servers filesystem,fetch,git
 
 # Non-interactive with developer bundle
 mcp-hangar init -y --bundle developer
@@ -107,6 +112,9 @@ mcp-hangar init -y --client all
 
 # Touch no client config
 mcp-hangar init --skip-clients
+
+# Put the client configs back as they were before init
+mcp-hangar init --undo
 ```
 
 ### What It Does
@@ -128,9 +136,31 @@ With `--skip-test`, step 6 writes no pins — an unverified pin would refuse eve
 call to a tool nobody digested — and the summary says so instead of reporting a
 pass. Run [`pin --write`](#pin) afterwards to add them.
 
+The smoke test starts the servers one after another. Each gets 60 seconds
+divided by the number of servers, and never less than 30 seconds.
+
 With `-y`, nothing is asked: servers that need a path or a token are written
 without one, and an existing config file is copied to
-`config.backup.<timestamp>.yaml` beside it and overwritten.
+`config.backup.<timestamp>.yaml` beside it and overwritten. Without
+`--bundle` or `--servers`, and when the detected clients list no servers of
+their own (those are moved behind Hangar instead), `-y` installs the `starter`
+bundle, minus any server whose runtime (`npx` or `uvx`) is missing. Its
+`filesystem` server needs a directory: it is written as
+`[npx, -y, "@modelcontextprotocol/server-filesystem"]` with none, so its smoke
+test fails and the summary reports one server failed. Add the directory to the
+end of its `command` and run [`pin --write`](#pin), or pick servers with
+`--servers fetch,memory,git`.
+
+### Undo
+
+`init` keeps a copy of each MCP client config it changes, taken before the first
+change, under `$XDG_STATE_HOME/mcp-hangar/init-backups` (by default
+`~/.local/state/mcp-hangar/init-backups`), with the original file's mode.
+`init --undo` writes those copies back, removes the client files `init`
+created, and changes nothing else; the Hangar `config.yaml` stays. If a client
+file changed since `init` wrote it, `--undo` restores nothing, lists the
+changed files and exits 1; `--undo --force` restores them anyway. With nothing to
+undo it says so and exits 0.
 
 ---
 
@@ -184,7 +214,7 @@ mcp-hangar status -w -i 0.5
 mcp-hangar status --details
 
 # Single mcp_server details
-mcp-hangar status github
+mcp-hangar status fetch
 
 # JSON output for scripting
 mcp-hangar --json status
@@ -231,43 +261,52 @@ mcp-hangar add [OPTIONS] NAME
 | `--search` | `-s` | FLAG | false | Search registry instead of exact match |
 | `--yes` | `-y` | FLAG | false | Skip confirmation prompts |
 | `--no-reload` | - | FLAG | false | Don't hot-reload running server |
+| `--replace` | - | FLAG | false | Replace a server the config already has, dropping what the registry entry lacks (pins, `env`, args) |
 
 ### Available MCP servers
 
-| MCP Server | Description | Requires Config |
-| ---------- | ------------- | ----------------- |
-| `filesystem` | File system access | Yes (allowed paths) |
-| `fetch` | HTTP requests | No |
-| `memory` | Key-value storage | No |
-| `github` | GitHub API | Yes (token) |
-| `git` | Git operations | No |
-| `sqlite` | SQLite databases | Yes (database path) |
-| `postgres` | PostgreSQL databases | Yes (connection string) |
-| `brave-search` | Brave Search API | Yes (API key) |
-| `puppeteer` | Browser automation | No |
-| `slack` | Slack integration | Yes (token) |
-| `google-maps` | Google Maps API | Yes (API key) |
+| MCP Server | Package | Description | Requires Config |
+| ---------- | ------- | ------------- | ----------------- |
+| `filesystem` | `@modelcontextprotocol/server-filesystem` (npx) | Read and write local files | Yes (a directory) |
+| `fetch` | `mcp-server-fetch` (uvx) | Make HTTP requests to fetch web content | No |
+| `memory` | `@modelcontextprotocol/server-memory` (npx) | Persistent key-value storage for context | No |
+| `git` | `mcp-server-git` (uvx) | Local git operations | No |
 
-The registry is a fixed list of these eleven. `google-drive`, `sentry`,
-`raygun`, `everart` and `sequential-thinking` were listed here and are not in
-it -- `mcp-hangar add sentry` answers `Did you mean: sqlite, slack?` and
-installs nothing. For anything outside the list, add the server to
-`config.yaml` yourself.
+The registry is a fixed list of these four. `github`, `postgres`, `slack`,
+`puppeteer`, `brave-search`, `google-maps` and `sqlite` were removed because
+their packages are no longer maintained or are not published by the project
+they are named after; see [The official MCP servers](../guides/OFFICIAL_SERVERS.md).
+A name that is not in the list installs nothing and exits 1. For anything
+outside the list, add the server to `config.yaml` yourself.
+
+### Adding a server the config already has
+
+*Since 2.34.2* `add` does not overwrite an entry the file already has:
+
+- if the entry is exactly what `add` would write, it says so and exits 0, so a
+  script can run `add` again safely;
+- otherwise it exits 1 and lists the keys the replacement would drop or change.
+
+`--replace` writes the registry entry over the existing one, dropping its pins,
+policy, args and `env`. Before 2.34.2 every `add` did that, without a word.
 
 ### Examples
 
 ```bash
 # Add by exact name
-mcp-hangar add github
+mcp-hangar add git
 
-# Search for mcp_servers
-mcp-hangar add --search database
+# Search names and descriptions
+mcp-hangar add --search fetch
 
 # Skip confirmation
 mcp-hangar add filesystem -y
 
 # Add without hot-reload
-mcp-hangar add postgres --no-reload
+mcp-hangar add memory --no-reload
+
+# Overwrite an entry the config already has
+mcp-hangar add git --replace
 ```
 
 ### Configuration Prompts
@@ -278,7 +317,9 @@ When adding a MCP server that requires configuration, you'll be prompted for:
 - **Paths** (directories, files): Path validation
 - **Text** (URLs, names): Standard input
 
-Environment variables are detected automatically. If `GITHUB_TOKEN` is set, you'll be asked whether to use it.
+If the variable a server reads is already set in the environment, you are
+asked whether to use it instead. None of the four entries in today's registry
+takes a secret; `filesystem` asks for a directory.
 
 With `-y` no prompt is shown, so a server that needs configuration is added
 without it. `add` rewrites the config file through PyYAML, which keeps values
@@ -313,13 +354,13 @@ mcp-hangar remove [OPTIONS] NAME
 
 ```bash
 # Remove with confirmation
-mcp-hangar remove github
+mcp-hangar remove git
 
 # Remove without confirmation
 mcp-hangar remove filesystem -y
 
 # Remove from config but keep running
-mcp-hangar remove postgres --keep-running
+mcp-hangar remove memory --keep-running
 ```
 
 ### Behavior
@@ -352,7 +393,7 @@ Bare `mcp-hangar` accepts only the [global options](#global-options); pass
 | -------- | ------- | ------ | --------- | -------------- | ------------- |
 | `--config` | `-c` | PATH | [the shared rule](#default-locations) | - | Path to config.yaml file. Overrides the global `--config`, which overrides `MCP_CONFIG` |
 | `--http` | - | FLAG | false | `MCP_MODE=http` | Run in HTTP mode |
-| `--host` | - | TEXT | 127.0.0.1 | `MCP_HTTP_HOST` | HTTP server host |
+| `--host` | - | TEXT | 127.0.0.1 | `MCP_HTTP_HOST` | HTTP server host. A non-loopback host needs authentication |
 | `--port` | `-p` | INT | 8000 | `MCP_HTTP_PORT` | HTTP server port |
 | `--log-file` | - | PATH | - | - | Path to log file |
 | `--log-level` | - | TEXT | INFO | `MCP_LOG_LEVEL` | Log level |
@@ -380,11 +421,12 @@ mcp-hangar serve --http --port 9000
 mcp-hangar serve --http --host 127.0.0.1 --port 8080
 ```
 
-> **Binding a non-loopback host requires authentication.** When `--host` is
-> anything other than a loopback address (e.g. `0.0.0.0`), Hangar
-> refuses to start unless authentication is configured (`auth`) or the
-> `--unsafe-no-auth` flag is passed to explicitly accept an unauthenticated
-> listener. A loopback bind (`--host 127.0.0.1`, the default since 2.28.0) is exempt. This prevents
+> **Binding a non-loopback host requires authentication.** The default host is
+> `127.0.0.1` (since 2.28.0; it was `0.0.0.0` before). When `--host` is set to anything other than a loopback address
+> (for example `0.0.0.0`), Hangar refuses to start, exiting 1 with
+> `http_auth_required_for_non_loopback`, unless authentication is configured
+> (`auth`) or the `--unsafe-no-auth` flag is passed to explicitly accept an
+> unauthenticated listener. A loopback bind, the default, is exempt. This prevents
 > accidentally exposing an unauthenticated gateway on a routable interface.
 
 ### HTTP Endpoints
@@ -428,7 +470,7 @@ mcp-hangar serve --log-file /var/log/mcp-hangar.log
 # JSON logs for log aggregation
 mcp-hangar serve --json-logs
 
-# Full production setup
+# Full production setup (a non-loopback host needs auth configured)
 mcp-hangar serve --http --host 0.0.0.0 --port 8000 \
   --log-level INFO --json-logs --log-file /var/log/mcp.log
 ```
@@ -444,11 +486,21 @@ serve right now.
 A pin is the SHA-256 of a tool's `name`, `description`, `inputSchema` and
 `outputSchema`, canonicalized per RFC 8785. When `digest_enforcement` is `block`
 (the default), a tool whose digest no longer matches its pin is refused before
-the upstream is asked:
+the upstream is asked. What the client sees depends on the tool surface:
 
-```
-Tool 'fetch' schema does not match its pinned digest
-```
+- With `tool_access.mode: front_door`, the configuration `init` writes, the tool
+  is withheld from `tools/list`, and a call to it answers the same error as a
+  name that does not exist:
+
+  ```text
+  Tool 'fetch' not found
+  ```
+
+- Through `hangar_call`, the call answers
+  `Tool 'fetch' schema does not match its pinned digest`.
+
+Either way the refusal is recorded in the event store with both digests, and
+[`mcp-hangar why`](#why) shows it.
 
 Because the description is part of the digest, a poisoned description that
 changes no parameter is caught.
@@ -465,7 +517,7 @@ mcp-hangar pin [OPTIONS]
 | -------- | ------- | ------ | --------- | ------------- |
 | `--config` | `-c` | PATH | [the shared rule](#default-locations) | Configuration to read (and, with `--write`, to update) |
 | `--server` | `-s` | TEXT | every server | Only this MCP server. Repeatable |
-| `--write` | - | FLAG | false | Merge the observed digests into `mcp_servers.<id>.tool_projection.pins` |
+| `--write` | - | FLAG | false | Merge the observed digests into `mcp_servers.<id>.tool_projection.pins`. Never into a group |
 | `--check` | - | FLAG | false | Exit 1 when a configured pin disagrees with what the server serves |
 | `--json` | - | FLAG | false | Machine-readable output |
 | `--log-level` | - | TEXT | INFO | Log level; overrides the config file's `logging.level`. Env: `MCP_LOG_LEVEL` |
@@ -524,12 +576,129 @@ mcp-hangar pin --check --json
   the configuration knows.
 - `--write` rewrites the configuration file through PyYAML, which preserves
   values but **not comments or key order**. The previous file is kept beside it
-  as `<config>.bak`. Bare `mcp-hangar pin` prints the same digests if you would
-  rather paste them into a file you maintain by hand.
+  as `<config>.bak`, with the configuration file's mode. Bare `mcp-hangar pin`
+  prints the same digests if you would rather paste them into a file you
+  maintain by hand.
 - Only the all-tenants `tool_projection.pins` block is written and checked. Pins
   under `tenant_overrides` are left alone.
+- A `mode: group` entry is never started; its members are asked instead.
+  *Since 2.34.2* `--check` holds the pins a group declares under its own
+  `tool_projection.pins` against every member that serves the tool, and reports
+  a mismatch as `drift <group>.<tool> (member <id>)`; `--json` adds a `member`
+  key to such an entry. A pinned tool no member serves is drift. `--write` does
+  not write pins into a group: a group pin holds for every member, so refresh it
+  by hand. `--server <group>` asks that group's members; `--server <member>`
+  checks only that member's own pins. Before 2.34.2 any configuration with a
+  group made every `pin` run exit 2.
 - A tool that is served but not pinned is not drift — `pins` is a subset by
   design. A pinned tool that is no longer served **is**.
+
+---
+
+## why
+
+Show why calls were refused: the gate, the reason and, for a digest mismatch,
+both digests. It reads the SQLite event store without writing to it, so it works
+while a gateway your client started has the store open.
+
+### Synopsis
+
+```bash
+mcp-hangar why [OPTIONS] [EVENT_ID]
+```
+
+### Arguments
+
+| Argument | Required | Description |
+| ---------- | ---------- | ------------- |
+| `EVENT_ID` | No | Show one refusal in full. The first characters of the id are enough |
+
+### Options
+
+| Option | Short | Type | Default | Description |
+| -------- | ------- | ------ | --------- | ------------- |
+| `--last` | `-n` | INT | 10 | How many of the latest refusals to show |
+| `--server` | `-s` | TEXT | - | Only refusals for this server |
+| `--tool` | `-t` | TEXT | - | Show the history of this tool's pin instead: each pin recorded or revoked |
+| `--db` | - | PATH | - | Read this event store file instead of the one the config names |
+
+`why` has no `--config` of its own: it reads the global one
+(`mcp-hangar --config X why`), then follows
+[the shared rule](#default-locations). The store is `--db` if given, else the
+SQLite event store the configuration names (`event_store.path`, or
+`persistence.sqlite` with `persistence.backend: sqlite`), else the one `init`
+puts under `$XDG_STATE_HOME/mcp-hangar`.
+
+It lists `ToolCallRefused`, `DigestMismatchEvent`, `ToolApprovalDenied`,
+`ToolApprovalExpired` and `ToolApprovalCancelled` events, and a call refused
+because an upstream presented a key its pin list does not hold. It exits 0, also
+when nothing was refused, and 1 when the store cannot be read: a PostgreSQL
+backend, a disabled or in-memory event store, or a file that is not YAML.
+
+### Examples
+
+```bash
+# The latest ten refusals
+mcp-hangar why
+
+# The latest one, for one server
+mcp-hangar why --last 1 --server filesystem
+
+# One refusal in full
+mcp-hangar why 3f2a9c1b
+
+# Each pin recorded for a tool
+mcp-hangar why --tool read_file
+```
+
+---
+
+## approvals
+
+List and resolve calls held by an `approval_list`, from a second process. A
+stdio gateway serves no REST API, so this is how a hold on it is decided. The
+command writes the decision to the approval store the gateway shares; the
+waiting gateway reads it and releases or refuses the call.
+
+### Synopsis
+
+```bash
+mcp-hangar approvals list [--state STATE] [--config PATH] [--db PATH]
+mcp-hangar approvals approve APPROVAL_ID [--reason TEXT] [--config PATH] [--db PATH]
+mcp-hangar approvals deny APPROVAL_ID [--reason TEXT] [--config PATH] [--db PATH]
+```
+
+### Options
+
+| Option | Short | Type | Default | Description |
+| -------- | ------- | ------ | --------- | ------------- |
+| `--config` | `-c` | PATH | [the shared rule](#default-locations) | The gateway's `config.yaml`. Falls back to the global `--config` |
+| `--db` | - | PATH | - | Use this SQLite approval store instead of the configuration's |
+| `--state` | - | TEXT | `pending` | `list` only: `pending`, `approved`, `denied`, `expired` or `cancelled` |
+| `--reason` | `-r` | TEXT | - | `approve`/`deny` only: why, recorded with the decision |
+
+`APPROVAL_ID` is the full id or a unique prefix of a pending one.
+
+### Who decides
+
+The approver is the configuration's `auth.stdio.principal`, and nobody else.
+A configuration without one is refused. Its declared roles decide whether auth
+is on or off: they must hold `approval:resolve` (`provider-admin` or `admin`).
+`viewer`, the role `init` declares, does not, so resolving with the
+configuration `init` wrote is refused until you add one of those roles. The
+listing shows approvals with no tenant and those of the principal's tenant.
+
+### Where the store is
+
+`--db` if given; with `persistence.backend: sqlite`, the database under
+`persistence.sqlite`; with `persistence.backend: postgresql`, that backend;
+otherwise `mcp_hangar.db` in the directory of `event_store.path`. That path
+must be absolute, as `init` writes it: a relative one would resolve against the
+gateway's working directory, which this command cannot know, so it is refused.
+
+The command exits 0 on success and 1 on any refusal: no principal, a role
+without `approval:resolve`, no store, an unknown or ambiguous id, or an approval
+that already expired or was decided.
 
 ---
 
@@ -673,10 +842,11 @@ Answer "is this configuration valid" without starting a gateway.
 mcp-hangar config check [PATH]
 ```
 
-Reports every key that Hangar does not read. A key it does not read is kept and
-ignored, so the setting simply does not apply -- which is why a misspelling
-surfaces as a server that will not start, or as authentication that is quietly
-off, rather than as a configuration error.
+Reports every key that Hangar does not read, and every value the boot would
+refuse. A key it does not read is kept and ignored, so the setting simply does
+not apply -- which is why a misspelling surfaces as a server that will not
+start, or as authentication that is quietly off, rather than as a configuration
+error.
 
 `PATH` wins; without it the command reads the global `--config`, then follows
 [the shared rule](#default-locations). Before 2.25.0 the global `--config` was
@@ -684,9 +854,9 @@ not read here.
 
 | exit code | meaning |
 | --- | --- |
-| `0` | every key is one Hangar reads |
-| `1` | at least one key is not |
-| `2` | the file is missing, or is not YAML |
+| `0` | every key is one Hangar reads and every checked value is accepted |
+| `1` | at least one key is not, or a value the boot refuses |
+| `2` | the file is missing, is not YAML, or is not a mapping |
 
 ```console
 $ mcp-hangar config check config.yaml
@@ -703,8 +873,21 @@ key today -- see [Unknown keys](configuration.md#unknown-keys) for what changes
 in 3.0.0 -- but this command exists to be asked the question directly, so it
 answers it. That makes it the thing to run in CI, and before a rollout.
 
-Checked: top-level section names, the direct keys of each section, and the keys
-of an `mcp_servers.<id>` spec. Not checked: anything deeper.
+Keys checked: top-level section names, the direct keys of each section, and the
+keys of an `mcp_servers.<id>` spec. Not checked: anything deeper.
+
+*Since 2.28.0, widened in 2.29.0,* values are checked too, by the checks the boot and a reload run
+without starting anything: `pin_recheck_interval_s`, the process-wide sections,
+each server's `max_consecutive_failures`, and the `mcp_servers` section built as
+a reload builds it. A value the loader only warns about and replaces with a
+default is not reported. A refused value is listed under its own heading:
+
+```console
+$ mcp-hangar config check config.yaml
+FAIL config.yaml: 1 value(s) the gateway refuses at boot:
+
+  mcp_server 'mock': max_consecutive_failures 500: MaxConsecutiveFailures cannot exceed 100 (allowed 1-100)
+```
 
 ---
 
@@ -718,8 +901,8 @@ configuration file by one rule, highest first
 ([mcp-hangar#1657](https://github.com/mcp-hangar/mcp-hangar/issues/1657)):
 
 1. a path on the command line -- the command's own flag or argument
-   (`serve --config`, `pin --config`, `init --config-path`,
-   `config check PATH`), then the global `--config`;
+   (`serve --config`, `pin --config`, `approvals ... --config`,
+   `init --config-path`, `config check PATH`), then the global `--config`;
 2. `$MCP_CONFIG`;
 3. `./config.yaml`, if the working directory has one;
 4. `~/.config/mcp-hangar/config.yaml`, the file `init` writes.
@@ -762,14 +945,11 @@ mcp_servers:
       - "@modelcontextprotocol/server-filesystem"
       - "/home/user/documents"
 
-  github:
+  git:
     mode: subprocess
     command:
-      - npx
-      - -y
-      - "@modelcontextprotocol/server-github"
-    env:
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      - uvx
+      - mcp-server-git
 
   my-api:
     mode: remote
@@ -805,9 +985,18 @@ event_store:
 | Code | Meaning |
 | ------ | --------- |
 | 0 | Success |
-| 1 | User error (invalid input, missing file, permission denied) |
+| 1 | User error (invalid input, missing file, permission denied), or a refusal |
 | 2 | System error (network failure, MCP server crash), or a usage error (unknown command or option) |
 | 130 | Interrupted by user (Ctrl+C) |
+
+Some commands use these codes more narrowly; their own sections say how:
+
+- `pin` and `config check` exit 1 for drift or an invalid configuration, and 2
+  when the question cannot be answered, a missing configuration file included.
+- `serve` exits 1 when the configuration file it was asked for is missing.
+- `init --force` without `--undo` exits 2.
+- `status <server>` for a server that is not configured prints
+  `MCP server '<server>' not found` and exits 0.
 
 ---
 

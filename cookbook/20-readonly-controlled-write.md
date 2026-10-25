@@ -88,11 +88,13 @@ event_store:
      -v /srv/hangar/events:/app/data:rw \
      -v "$PWD/config.yaml:/app/config.yaml:ro" \
      -p 8000:8080 \
-     ghcr.io/mcp-hangar/mcp-hangar:2.5.0 serve --http --port 8080
+     ghcr.io/mcp-hangar/mcp-hangar:2.5.0 serve --http --host 0.0.0.0 --port 8080
    ```
 
-   `serve --http` binds `0.0.0.0` by default, and the config above has no
-   `auth:` block, so Hangar refuses to start (`http_auth_required_for_non_loopback`).
+   The command replaces the image's own, and `serve --http` binds `127.0.0.1`
+   by default (since 2.28.0), which the published port cannot reach, so it names
+   `--host 0.0.0.0`. The config above has no `auth:` block, so Hangar refuses to
+   start on that host (`http_auth_required_for_non_loopback`).
    Add the `auth:` block from [12 -- Auth & RBAC](12-auth-rbac.md) first; for a
    throwaway local rehearsal only, append `--unsafe-no-auth`.
 

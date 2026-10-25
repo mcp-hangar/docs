@@ -62,10 +62,11 @@ The `health` block holds `consecutive_failures`, `last_failure_ago`, and
 
 A call inside the backoff is refused with `CircuitBreakerOpen` and the time to
 wait. The deliberate starts are `hangar_start` on the server or on its group,
-`POST /api/mcp_servers/<id>/start`, `hangar_warm` naming the server, a group
-adding the server with auto-start, and a failover saga starting the backup it
-was configured with. `hangar_warm` with no names skips dead servers and lists
-them in `skipped_dead`.
+`POST /api/mcp_servers/<id>/start`, `hangar_warm` naming the server, and a
+group adding the server with auto-start. `hangar_warm` with no names skips dead
+servers and lists them in `skipped_dead`. Core has a failover saga class, but
+no configuration key enables it, so it never starts a backup; failover is the
+group's rotation.
 
 A group does not count a dead member as healthy. A member Hangar gave up on, or
 one a capability block stopped, leaves rotation until a successful start puts

@@ -7,7 +7,7 @@
 
 ## The Problem
 
-Your MCP server from recipe 01 crashes at 3 AM. Hangar doesn't know. It keeps sending requests to a dead endpoint and forwards cryptic connection errors back to Claude. Claude retries. More errors. The on-call engineer gets paged because "AI is broken" — but nobody knows which MCP server is down until someone checks logs. Hangar could have told you within three minutes.
+Your MCP server from recipe 01 crashes at 3 AM. Hangar doesn't know. It keeps sending requests to a dead endpoint and forwards cryptic connection errors back to Claude. Claude retries. More errors. The on-call engineer gets paged because "AI is broken" — but nobody knows which MCP server is down until someone checks logs. Hangar could have told you within two minutes.
 
 ## The Config
 
@@ -47,7 +47,9 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    reads its requests from stdin: started with `&`, it reads end-of-file at
    once and exits. Every step below talks to this one process, and the log
    file holds one JSON object per line. The health check worker starts with
-   it.
+   it. Its `interval_s` of 60 is the default pace; since 2.28.0 a server that
+   sets its own `health_check_interval_s`, as `my-mcp` does with 30, is checked
+   on that interval instead.
 
 2. Check initial status
 
@@ -88,11 +90,11 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    docker pause mcp-math
    ```
 
-5. Wait for three health check cycles (about three minutes)
+5. Wait for three health check cycles (about a minute and a half)
 
    ```bash
    echo "Waiting for health checks to detect failure..."
-   sleep 200
+   sleep 100
    grep -E 'health_check_failed|degraded_by_health_check' /tmp/hangar.log
    ```
 
@@ -103,8 +105,10 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    {"event": "mcp_server_degraded_by_health_check: my-mcp", "level": "warning", ...}
    ```
 
-   One check a minute, each waiting 5 seconds for a reply; the third failure
-   degrades the server.
+   One check every 30 seconds, the server's `health_check_interval_s`, each
+   waiting 5 seconds for a reply; the third failure degrades the server. Before
+   2.28.0 the setting was not read and checks ran once a minute
+   ([mcp-hangar#1686](https://github.com/mcp-hangar/mcp-hangar/issues/1686)).
 
    Since 2.25.0 a stopped server (`docker stop mcp-math`) is detected the same
    way: the refused connection counts as a failed check, and the third one
@@ -112,7 +116,7 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
    ([mcp-hangar#1698](https://github.com/mcp-hangar/mcp-hangar/issues/1698)).
    On 2.24.0 the refused connection escaped the check instead, so the log
    showed `background_task_failed` with
-   `connection_failed: [Errno 61] Connection refused` (`Errno 111` on Linux) once a minute and the
+   `connection_failed: [Errno 61] Connection refused` (`Errno 111` on Linux) on every check and the
    server stayed `ready`; only its failing tool calls took it out of a group's
    rotation (recipe 03).
 
@@ -147,8 +151,10 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
    Hangar retries the start on a backoff, and the first retry after the server
    answers again brings it back to READY. If every retry fails first, the
-   server is DEAD (`[DEAD]` in `hangar_status`), and only a deliberate start
-   -- `POST /api/mcp_servers/my-mcp/start` or `hangar_start` -- revives it.
+   server is DEAD (`[DEAD]` in `hangar_status`, with `dead.reason` `given_up`).
+   A call naming it after its backoff starts it again, as does a deliberate
+   start -- `POST /api/mcp_servers/my-mcp/start` or `hangar_start` -- at any
+   time. A group does not route a call to it.
 
 8. Stop Hangar
 
@@ -161,11 +167,11 @@ Save this as `~/.config/mcp-hangar/config.yaml` (or update your existing file).
 
 ## What Just Happened
 
-Hangar's background health check worker probes each READY MCP server every 60 seconds. The probe mechanism sends a `tools/list` JSON-RPC request to the MCP server with a 5-second timeout. If the MCP server responds successfully, the health check passes and `consecutive_failures` resets to 0.
+Hangar's background health check worker probes each READY MCP server every `health_check_interval_s` seconds (60 by default; 30 in this recipe). The probe mechanism sends a `tools/list` JSON-RPC request to the MCP server with a 5-second timeout. If the MCP server responds successfully, the health check passes and `consecutive_failures` resets to 0.
 
 When the MCP server fails to respond, Hangar records a failure in the `HealthTracker`. After `max_consecutive_failures` (3 by default) failed checks, the MCP server state transitions from READY to DEGRADED. This transition emits a `McpServerDegraded` domain event, which updates metrics and triggers alerts.
 
-A degraded server's health check no longer probes it. Instead Hangar retries its start on a backoff (3 retries by default), and when the MCP server is back online one of them reinitializes it (DEGRADED -> INITIALIZING -> READY). No manual intervention required -- Hangar detected the failure and recovery without human involvement. Only when every retry fails does the server end up DEAD and wait for a deliberate start.
+A degraded server's health check no longer probes it. Instead Hangar retries its start on a backoff (3 retries by default), and when the MCP server is back online one of them reinitializes it (DEGRADED -> INITIALIZING -> READY). No manual intervention required -- Hangar detected the failure and recovery without human involvement. Only when every retry fails does the server end up DEAD; then a call naming it after its backoff, or a deliberate start, revives it.
 
 State machine transitions:
 
@@ -176,11 +182,11 @@ State machine transitions:
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
-| `health_check_interval_s` | int | `60` | Recorded on the server and reported by the API. It does **not** set the probe cadence: the background worker checks on its own interval, adjusted per state by the health tracker (skipped while cold or initializing, backed off once degraded). Treat it as documentation of intent until the scheduler reads it ([mcp-hangar#1686](https://github.com/mcp-hangar/mcp-hangar/issues/1686)) |
+| `health_check_interval_s` | int | `60` | Seconds between health checks of this server while it is READY. Since 2.28.0 the worker honours it; it wakes as often as the most frequent server needs, never less than once a second. Cold, initializing, degraded and dead servers are not probed. Before 2.28.0 it was recorded but not read, and every server was checked every 60 s ([mcp-hangar#1686](https://github.com/mcp-hangar/mcp-hangar/issues/1686)) |
 | `max_consecutive_failures` | int | `3` | Failures before state transition to DEGRADED |
 
 ## What's Next
 
-Your MCP server is monitored — but when it starts failing intermittently, every request during the 60-second health check interval still hits a broken server. You need automatic protection that trips immediately on the first failure, not after 3 health checks.
+Your MCP server is monitored — but when it starts failing intermittently, every request between two health checks still hits a broken server. You need automatic protection that trips immediately on the first failure, not after 3 health checks.
 
 → [03 — Circuit Breaker](03-circuit-breaker.md)

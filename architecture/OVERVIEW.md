@@ -264,27 +264,52 @@ flowchart TD
 ```mermaid
 stateDiagram-v2
     [*] --> COLD
-    COLD --> INITIALIZING: ensure_ready()
-    INITIALIZING --> READY: success
-    INITIALIZING --> DEAD: failure
-    READY --> DEGRADED: failures ≥ threshold
-    DEGRADED --> INITIALIZING: reinitialize
-    DEGRADED --> DEAD: recovery gives up
-    DEAD --> INITIALIZING: retry < max
+    COLD --> INITIALIZING: start (ensure_ready)
+    INITIALIZING --> READY: start succeeds
+    INITIALIZING --> DEAD: start fails (start_failed)
+    INITIALIZING --> DEGRADED: start fails at max_consecutive_failures
+    READY --> DEGRADED: health checks fail max_consecutive_failures times
+    READY --> DEAD: connection lost (crashed) or capability block
+    READY --> COLD: stop or idle
+    DEGRADED --> INITIALIZING: recovery saga restart
+    DEGRADED --> DEAD: recovery saga gives up (given_up)
+    DEAD --> INITIALIZING: deliberate start, or a call after the backoff
+    INITIALIZING --> COLD: stop
+    DEGRADED --> COLD: stop
+    DEAD --> COLD: stop
 ```
 
-**Valid transitions:**
+**What moves a server:**
 
-| From | To |
-| ------ | ---- |
-| COLD | INITIALIZING |
-| INITIALIZING | READY, DEAD, DEGRADED |
-| READY | COLD, DEAD, DEGRADED |
-| DEGRADED | INITIALIZING, COLD, DEAD |
-| DEAD | INITIALIZING, DEGRADED |
+| From | To | When |
+| ------ | ---- | ------ |
+| COLD | INITIALIZING | A start: a call, `hangar_start`, `hangar_warm`, a group starting its members |
+| INITIALIZING | READY | The start succeeded |
+| INITIALIZING | DEAD | The start failed with fewer than `max_consecutive_failures` failures counted (`start_failed`), or the server exposed undeclared tools under capability enforcement `block` or `quarantine` (`capability_blocked`) |
+| INITIALIZING | DEGRADED | The start failed and the count reached `max_consecutive_failures` |
+| READY | DEGRADED | `max_consecutive_failures` health checks failed in a row |
+| READY | DEAD | Its connection was found dead (`crashed`), or its catalogue gained an undeclared tool under `block` or `quarantine` (`capability_blocked`) |
+| READY | COLD | Stopped, or reaped after `idle_ttl_s` |
+| DEGRADED | INITIALIZING | The recovery saga restarts it |
+| DEGRADED | DEAD | The recovery saga ran out of retries (`given_up`) |
+| DEAD | INITIALIZING | A deliberate start, or a call naming it after its backoff (never a call for `capability_blocked`) |
+| INITIALIZING, DEGRADED, DEAD | COLD | Stopped |
 
-There is no direct DEGRADED -> READY transition. Degraded MCP servers must
-reinitialize.
+There is no direct DEGRADED -> READY transition: a degraded server is not health
+checked, and only a restart (DEGRADED -> INITIALIZING -> READY) brings it back.
+DEAD never goes straight to DEGRADED either; a start that fails again goes
+DEAD -> INITIALIZING -> DEGRADED.
+
+A server's call failures (timeouts, connection errors) count toward the same
+`max_consecutive_failures` but do not move its state: a READY server whose calls
+keep failing stays READY, and its calls are refused with `CircuitBreakerOpen`
+until a health check passes (see [Circuit Breaker](#circuit-breaker)).
+
+The aggregate's `VALID_TRANSITIONS` table lists fewer edges than this. A stop
+assigns COLD directly from any state, and the two DEGRADED edges from
+INITIALIZING and READY are assigned directly too, so a stop records
+`McpServerStopped` and a degrade records `McpServerDegraded`, without a
+`McpServerStateChanged` event.
 
 ## CQRS Pattern
 
@@ -305,10 +330,16 @@ are persisted to the Event Store for auditing and can be replayed. See
 Acquire in order to avoid deadlocks (see `lock_hierarchy.py`, in the shared kernel):
 
 ```
-PROVIDER(10) < PROVIDER_GROUP(11) < EVENT_BUS(20) < EVENT_STORE(30) < SAGA_MANAGER(40) < STDIO_CLIENT(50)
+PROVIDER(10) < PROVIDER_GROUP(11) < EVENT_BUS(20) < REPOSITORY(31) < SAGA_MANAGER(40) < STDIO_CLIENT(50)
 ```
 
-`TrackedLock` enforces this ordering at runtime.
+These are the levels a `TrackedLock` is created at: each server, each group,
+the event bus, the in-memory server repository, the saga manager and each stdio
+client. `lock_hierarchy.py` defines more levels (`COMMAND_BUS`, `EVENT_STORE`,
+`HTTP_CLIENT` and others) that no tracked lock uses today, and some leaf locks,
+such as the rate limiter's, are plain locks outside the hierarchy. `TrackedLock`
+enforces the ordering at runtime while Python runs without `-O`, which the
+published image does.
 
 ### Threads
 
@@ -337,8 +368,8 @@ response = client.call(...)  # Outside lock
 
 | Category | Strategy |
 | ---------- | ---------- |
-| Transient (timeout) | Retry with backoff |
-| Permanent (not found) | Fail fast, mark DEAD |
+| Transient (timeout, connection error) | Retried only under a configured `retry:` policy, or a `hangar_call` `max_attempts` above 1; otherwise one attempt. Counts against the server's consecutive failures |
+| Permanent (tool not found) | Fail fast; the server's state is unchanged |
 | MCP Server (app error) | Propagate, track metrics |
 
 ### Circuit Breaker
@@ -347,7 +378,10 @@ Two mechanisms carry the name.
 
 - **A server's own breaker** is its health tracker: once its consecutive
   failures reach `max_consecutive_failures` the batch executor refuses calls to
-  it with `CircuitBreakerOpen` (control #5).
+  it with `CircuitBreakerOpen` (control #5), whatever its state. Failed calls
+  raise the count without changing the state, so a READY server can be refused
+  this way; the next passing health check resets the count. A DEAD server is
+  judged by its backoff instead.
 - **A group's circuit** opens after `circuit_breaker.failure_threshold` member
   failures (default 10) and marks the group degraded. Nothing on the call path
   asks it: calls keep going to members still in rotation, and are refused with

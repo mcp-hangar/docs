@@ -69,11 +69,21 @@ The server acknowledges with:
 {
   "type": "subscribed",
   "event_types": ["McpServerStateChanged"],
+  "rejected_event_types": [],
   "mcp_server_ids": ["math"]
 }
 ```
 
-The server waits for this first message, up to 5 seconds after accepting the connection, and only then starts streaming: events published before the first message arrives, or before the 5 seconds run out, are not delivered. Only the first `subscribe` is acknowledged.
+The subscription is live from the moment the connection is accepted. The server
+then waits up to 5 seconds for this first message before it starts sending;
+events published in that window are queued, not lost, and are filtered by the
+`subscribe` message when they are sent. If no message arrives within 5 seconds,
+everything queued is sent unfiltered. Only the first `subscribe` is
+acknowledged. Before 2.28.0 events in the window were not delivered.
+
+`rejected_event_types` lists the entries of `event_types` the server cannot
+match, such as a partial wildcard (`McpServer*`); they match nothing and are
+left out of `event_types` in the acknowledgement.
 
 You can update filters at any time by sending another `subscribe` message; it takes effect without an acknowledgement. Omit a key to not filter on that dimension (e.g., omit `mcp_server_ids` to receive events from all MCP servers). An `event_types` entry matches an event type exactly, and `"*"` matches every type.
 

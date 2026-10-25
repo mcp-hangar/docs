@@ -38,6 +38,9 @@ auth:                                     # validate JWTs; Hangar does not issue
   storage:                                # from recipe 12: holds the admin key used in step 5
     driver: sqlite
     path: data/auth.db
+  role_assignments:                       # NEW: a validated token grants no permission by itself
+    - principal: "group:agents"           # matched against the token's `groups` claim
+      role: service-account               # invoke tools; no hangar_* management tools
 
 mcp_servers:
   payments:
@@ -60,6 +63,16 @@ mcp_servers:
 ```
 
 Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
+
+The role matters as much as the token. A caller with no role sees its tenant's
+tool names and is refused every call with
+`Not authorized to invoke tool '<tool>': tool:invoke permission required`.
+`service-account` holds `tool:invoke` and none of the management permissions, so
+the tenant's `tools/list` carries its tools and `hangar_whoami`, which every
+authenticated caller is shown. Have your IdP put the agents in an `agents`
+group, or name each subject instead: an OIDC principal's id is the token's
+`sub` claim itself (`principal: "<sub>"`). With a single
+issuer a global grant is fine; with several, see recipe 17.
 
 Because `resource_uri` is set, every token must carry
 `aud: https://hangar.example.com`; the `audience` line is not used. A token
@@ -122,9 +135,10 @@ Steps 5 and 6 need an admin API key. Mint it as in
 
 1. Call a tool as a tenant
 
-   Obtain a JWT from your IdP whose `tenant_id` claim is `tenant:b` and whose
-   `aud` is `https://hangar.example.com`, then list tools. In front-door mode
-   external agents see flat back-end tool names, not the `hangar_*` meta-API.
+   Obtain a JWT from your IdP whose `tenant_id` claim is `tenant:b`, whose
+   `groups` claim includes `agents` and whose `aud` is
+   `https://hangar.example.com`, then list tools. In front-door mode external
+   agents see flat back-end tool names, not the `hangar_*` meta-API.
 
    ```bash
    curl -s http://localhost:8000/mcp \
@@ -143,10 +157,15 @@ Steps 5 and 6 need an admin API key. Mint it as in
    ```text
    "charge"
    "refund"
+   "hangar_whoami"
    ```
 
    `tenant:a` would instead see `charge` but not `refund` (denied) or
    `beta_tool` (withdrawn for that tenant).
+
+   Call one the same way, with `"method":"tools/call"` and
+   `"params":{"name":"charge","arguments":{...}}`. A token whose principal holds
+   no role gets the same listing and a tool error on the call.
 
 1. Withdraw a tool at runtime for one tenant
 
@@ -167,8 +186,8 @@ Steps 5 and 6 need an admin API key. Mint it as in
    {"withdrawn": true, "mcp_server": "payments", "tool": "refund", "kind": "tool", "tenant_id": "tenant:b"}
    ```
 
-   Re-running the `tools/list` from step 4 as `tenant:b` now returns only
-   `charge`.
+   Re-running the `tools/list` from step 4 as `tenant:b` now returns `charge`
+   and `hangar_whoami`.
 
 1. Restore the tool
 
@@ -187,7 +206,10 @@ Steps 5 and 6 need an admin API key. Mint it as in
    ```
 
    Omitting `tenant_id` (or sending `null`) withdraws/restores globally for all
-   tenants instead of one.
+   tenants instead of one. That needs a global `admin:*` grant, which the
+   `admin` role holds. A caller whose grant is scoped to one tenant acts on
+   that tenant only: without `tenant_id` it means its own, and naming another
+   is refused.
 
 ## What Just Happened
 
@@ -195,7 +217,8 @@ Setting `tool_access.mode: front_door` flips Hangar's topology from
 trusted-egress to untrusted-front-door. The access resolver now applies a
 fail-closed default: a caller with no tenant identity is denied every tool
 before any server- or group-level policy is even consulted. A valid token
-without a `tenant_id` claim therefore lists no tools at all. The `401` in step
+without a `tenant_id` claim therefore lists no upstream tools; the `hangar_*`
+tools its role permits, and `hangar_whoami`, are still listed. The `401` in step
 3 comes earlier, from authentication: `allow_anonymous: false` refuses a
 request that carries no credential before any tool policy runs.
 
@@ -208,8 +231,14 @@ different effective tool sets from the same back end.
 In front-door mode Hangar also re-exports a **flat** tool surface: external
 agents see clean back-end tool names (`charge`, `refund`) instead of the
 `hangar_*` meta-API, filtered per request to the tools that are active and
-allowed for that tenant. (If two back-end servers expose the same flat name,
-both are dropped to avoid routing ambiguity.)
+allowed for that tenant. If two back-end servers expose the same flat name to
+the same caller, both are dropped to avoid routing ambiguity, and
+`flat_tool_name_collision` is logged. The collision is decided per caller,
+after that caller's policy filtering: if `tenant:a` may see the name on only
+one of the two servers, it gets that one. An upstream tool named like one of
+the gateway's own tools (`hangar_status`, `hangar_whoami`, ...) is never
+projected; the gateway's tool keeps the name and `flat_tool_name_reserved` is
+logged (*since 2.34.2*).
 
 Tool withdrawal has two independent overlays. Config-declared withdrawals
 (`tool_projection.withdrawn` / `tenant_overrides`) survive reloads. Runtime
@@ -235,6 +264,7 @@ Hangar **validates** the JWTs your IdP issues; it never issues tokens itself.
 | `auth.oidc.audience` | string | `""` | Expected `aud`; ignored while `resource_uri` is set |
 | `auth.oidc.resource_uri` | string | `""` | Public URI advertised as `resource`; also enforced as JWT `aud` when set |
 | `auth.oidc.tenant_claim` | string | `tenant_id` | JWT claim mapped to `tenant_id` |
+| `auth.role_assignments[]` | list | `[]` | `principal` (an OIDC `sub`, `group:<name>`, ...), `role`, and `scope` (`global` by default, or `tenant:<tenant id>`) |
 
 ## What's Next
 

@@ -626,8 +626,14 @@ mcp-hangar why [OPTIONS] [EVENT_ID]
 (`mcp-hangar --config X why`), then follows
 [the shared rule](#default-locations). The store is `--db` if given, else the
 SQLite event store the configuration names (`event_store.path`, or
-`persistence.sqlite` with `persistence.backend: sqlite`), else the one `init`
-puts under `$XDG_STATE_HOME/mcp-hangar`.
+`persistence.sqlite` with `persistence.backend: sqlite`), else `data/events.db`,
+where the gateway writes it for a configuration that names none, also when no
+configuration file is found. A relative path is read from the current
+directory, and the gateway writes it from its own working directory, so run
+`why` from there or pass `--db`. The configuration `init` writes names an
+absolute path under `$XDG_STATE_HOME/mcp-hangar`. *Before 2.34.3* a
+configuration that named no store was read from that `init` path, where the
+gateway does not write it.
 
 It lists `ToolCallRefused`, `DigestMismatchEvent`, `ToolApprovalDenied`,
 `ToolApprovalExpired` and `ToolApprovalCancelled` events, and a call refused

@@ -1168,10 +1168,14 @@ Behaviour worth knowing:
 
 - **HTTP ignores the block.** It has a credential channel and keeps using it.
 - **Absent, nothing changes.** The caller is anonymous, exactly as before 2.18.0.
-- **The management surface follows `roles`.** With `viewer`, a client sees the
-  read-only `hangar_*` tools (`hangar_status`, `hangar_health`, `hangar_list`,
-  …) and none that can start, stop or reconfigure anything. Calling the
-  upstreams' own tools does not depend on those roles.
+- **The management surface follows `roles` on a front door, or with auth on.**
+  With `tool_access.mode: front_door` or `auth.enabled: true`, a `viewer` client
+  sees the read-only `hangar_*` tools (`hangar_status`, `hangar_health`,
+  `hangar_list`, …) and none that can start, stop or reconfigure anything. With
+  auth off in `egress` mode, the default, every `hangar_*` management tool is
+  allowed whatever the roles say; since 2.34.2 boot logs
+  `stdio_principal_roles_not_enforced` in that case. Calling the upstreams' own
+  tools does not depend on those roles.
 - **Per-tenant pins for this tenant become matchable.** Hangar refuses at boot
   when per-tenant pins are declared that no caller could carry; a declared stdio
   principal is such a caller, for its own `tenant_id`.

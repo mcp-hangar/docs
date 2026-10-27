@@ -30,6 +30,26 @@ members the GC reaped for being idle reads `healthy_count: 0` while it is
 members in rotation in any state, so `healthy_count` <= `members_in_rotation_count`
 <= `total_members`.
 
+**Vacant members.** *Since 2.34.4* deleting a server that is a group member
+(`DELETE /api/mcp_servers/{id}`, or a discovery source removing it after its
+TTL) leaves the member in the group as vacant: `"vacant": true`,
+`"state": "cold"` and `"in_rotation": false` in the group status. No call,
+rebalance, start or recovery probe reaches it. It still counts in
+`total_members` and no longer counts as in rotation, so the group's state
+follows: a group with `min_healthy` equal to its members in rotation reads
+`partial` after one of them is deleted, and a group whose only member is deleted
+goes `inactive` and refuses calls. Before 2.34.4 the group kept the deleted
+server's stopped copy in rotation, and the next call through the group started
+it again, outside the fleet.
+
+Only discovery fills a vacant member: a server discovery registers again under
+that id goes back in the group with the weight, priority and rotation the member
+had. A server re-created over the API leaves the member vacant; re-add it with
+`POST /api/groups/{id}/members`, or remove the member for good with
+`DELETE /api/groups/{id}/members/{member_id}`. Servers the configuration file
+declares cannot be deleted over the API, and a reload never leaves a vacant
+member.
+
 `is_available` folds two conditions into one flag: the circuit is closed, and
 at least one member is in rotation. It is not the same as a call being
 accepted. A call through the group is refused only when no member is in

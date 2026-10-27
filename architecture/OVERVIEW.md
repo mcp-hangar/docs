@@ -210,7 +210,7 @@ src/mcp_hangar/
 +-- application/      Use cases and orchestration
 |   +-- commands/     Command handlers (CQRS write side)
 |   +-- queries/      Query handlers (CQRS read side)
-|   +-- sagas/        Long-running processes (recovery, failover)
+|   +-- sagas/        Long-running processes (recovery; failover deprecated)
 |   +-- event_handlers/ React to domain events
 |   +-- services/     Application services (McpServerService, ValidatorPipeline, MutatorPipeline)
 |   +-- ports/        Port interfaces (ObservabilityPort)

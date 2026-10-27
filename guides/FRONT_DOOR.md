@@ -359,6 +359,22 @@ already a `-32601`, `legacy_protocol` is an era rather than a failure, and
 > `src/mcp_hangar/context.py` (`bind_routing_headers`),
 > `src/mcp_hangar/fastmcp_server/flat_tool_projection.py`.
 
+### `Mcp-Method` / `Mcp-Name` on a handshake-era request
+
+`serve --http`, in either mode, routes a handshake-era (2025-06-18 and older)
+`POST /mcp` on its SEP-2243 `Mcp-Method` and `Mcp-Name` headers when it carries
+them, and refuses a header that contradicts the body. *Since 2.34.4*:
+
+- such a request is answered in full. Before, the SSE answer stopped before
+  writing anything: the client got `200` and an empty stream;
+- a repeated `Mcp-Method` or `Mcp-Name` header is refused with `400` and
+  `-32020`, the answer a 2026-07-28 request already gets;
+- a client that disconnects in the middle of sending such a request no longer
+  stops the gateway, which held its event loop and answered nothing else. The
+  request is dropped without an answer.
+
+A 2026-07-28 request is routed by the SDK's own entry and is not affected.
+
 ## Flat Per-Tenant Tool Re-Export
 
 In `egress` mode, clients see Hangar's `hangar_*` meta-API (`hangar_list`,
@@ -386,6 +402,51 @@ dropped** and a `flat_tool_name_collision` warning is logged — Hangar will not
 route an ambiguous name to the wrong back end. Single-backend deployments never
 hit this path. In `egress` mode the handlers are not replaced and the full
 `hangar_*` surface is intact.
+
+**Servers that leave and come back.** *Since 2.34.4* a server that leaves the
+fleet -- removed by a config reload, by `DELETE /api/mcp_servers/{id}`, or by a
+discovery source -- leaves `tools/list` too, and listing clients get
+`notifications/tools/list_changed`. A server registered again under the same
+name is listed again at once, with its last known tools and under the
+withdrawals and pins its name had, whether or not it is started on that replica;
+the first call starts it. When one of two servers that collided on a tool name
+is removed, the name is listed again and routes to the server that stayed.
+
+**Hot-loaded servers are not served here.** The front door lists and routes
+only the servers the configuration declares. A server loaded with
+`hangar_load` is not listed, and a flat call of one of its tools answers
+`-32601`. *Since 2.34.4* the `hangar_load` answer carries a warning saying so;
+to serve the server on a front door, declare it in `config.yaml`. See
+[`hangar_load`](../reference/tools.md#hangar_load).
+
+### Boot warm-up
+
+At boot a front door starts its configured servers one at a time, to learn
+their tools: the warm-up. A first `tools/list`, flat `tools/call` or
+`server/discover` that would answer an empty catalogue because the warm-up has
+not projected anything yet waits for it, for at most 5 seconds. A caller with no
+identity, a catalogue that policy leaves empty for the caller, and an `egress`
+gateway are answered at once. *Since 2.34.4*:
+
+- `GET` and `POST /server/discover` wait on the same condition as `tools/list`.
+  Before, a discover that arrived after `/health/live` but before the warm-up
+  had projected the upstreams returned an empty `tools` list;
+- after any wait, including one that reached the deadline, the listing is read
+  again and serves what exists by then, as `server/discover` already did;
+- the warm-up counts as running from before the gateway accepts a request, so a
+  listing that arrives in the first moment waits instead of answering only the
+  `hangar_*` tools;
+- the warming state ends at a bound derived from the servers being warmed: each
+  one's start budget (one attempt at each of its two start calls, at the stdio
+  client's 15 s or a `remote` server's `http.connect_timeout` plus
+  `http.read_timeout`, never less than 30 s), summed, plus 30 s. When it passes,
+  listings stop waiting and a `front_door_warmup_bound_passed` WARNING names the
+  servers still warming. A server the warm-up starts after the bound is still
+  projected and announced with `notifications/tools/list_changed`;
+- a warm-up that hangs on one server no longer stops
+  [`tool_access.required_catalogue`](../reference/configuration.md#tool_access) from
+  retrying the required servers that failed: once the bound passes, the retry
+  starts on a thread of its own.
 
 > Source: `src/mcp_hangar/fastmcp_server/flat_tool_projection.py`.
 

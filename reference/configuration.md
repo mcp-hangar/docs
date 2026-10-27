@@ -1414,7 +1414,29 @@ http:
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
-| `graceful_shutdown_timeout_s` | `int` | *(unset)* | How long `serve --http` waits for in-flight requests once told to stop, before cancelling them. Unset waits without a bound. Must be a positive integer. Read when the HTTP server starts, so a reload checks it but does not apply it |
+| `graceful_shutdown_timeout_s` | `int` | *(unset)* | How long `serve --http` waits for the MCP requests and batches in flight once told to stop. Unset waits as long as they take. Must be a positive integer. Read when the HTTP server starts, so a reload checks it but does not apply it |
+
+*Since 2.34.4* a stopping `serve --http` waits for the MCP requests in flight
+before it lets their streams close, so each caller gets its response. A
+2026-07-28 `subscriptions/listen` stream is not waited for. Once the bound runs
+out:
+
+- each `hangar_call` or front-door tool call still running is abandoned, and its
+  caller gets a JSON-RPC error on the same stream, with code `-32000` and
+  `data.reason: "shutdown"` (`http_shutdown_abandoned_calls` in the log). The
+  call may or may not have taken effect upstream;
+- any other request still running (`hangar_start`, `hangar_warm`, a cold
+  `hangar_tools`, a resource read) gets no answer: its connection ends
+  (`http_shutdown_bound_exceeded`);
+- the servers are stopped and the process exits within about the bound plus the
+  component shutdown, ending itself 2 seconds after that if something still
+  holds it (`http_exit_forced`).
+
+Before 2.34.4 a stop cut the stream of every call in flight at once, so the
+client saw a transport error while the call ran on upstream, and the process
+lived as long as its slowest call whatever the bound said. In Kubernetes, keep
+`terminationGracePeriodSeconds` above the bound plus a few seconds. Stdio is
+unaffected by this key.
 
 ## `ssrf`
 

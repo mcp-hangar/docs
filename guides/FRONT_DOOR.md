@@ -403,6 +403,8 @@ route an ambiguous name to the wrong back end. Single-backend deployments never
 hit this path. In `egress` mode the handlers are not replaced and the full
 `hangar_*` surface is intact.
 
+> Source: `src/mcp_hangar/fastmcp_server/flat_tool_projection.py`.
+
 **Servers that leave and come back.** *Since 2.34.4* a server that leaves the
 fleet -- removed by a config reload, by `DELETE /api/mcp_servers/{id}`, or by a
 discovery source -- leaves `tools/list` too, and listing clients get
@@ -447,8 +449,6 @@ gateway are answered at once. *Since 2.34.4*:
   [`tool_access.required_catalogue`](../reference/configuration.md#tool_access) from
   retrying the required servers that failed: once the bound passes, the retry
   starts on a thread of its own.
-
-> Source: `src/mcp_hangar/fastmcp_server/flat_tool_projection.py`.
 
 ## OAuth Protected Resource Discovery (RFC 9728)
 

@@ -299,16 +299,101 @@ the mode. A server that comes back within its TTL is left running. Servers from
 "No longer reported" means a cycle in which the source answered and reports
 itself healthy afterwards. A source whose scan fails -- Docker when the daemon
 does not answer, a filesystem `path` that is missing -- removes nothing that
-cycle, however long the failure lasts. Two cases still count as a real absence
-and remove the server once its TTL has run out: a Kubernetes namespace whose pod
-listing fails while the API itself answers, and a discovery file that stops
-parsing. A server a check above now refuses -- a Kubernetes local mode, a Docker
-label volume outside `allowed_mount_paths`, a world-writable file -- is no
-longer reported either, so an authoritative source removes it after its TTL.
+cycle, however long the failure lasts.
 
-A discovered definition that changes is not applied: the source reports it
-again, its registration is refused with `McpServer already exists` every cycle,
-and the server keeps its old definition until it is removed or Hangar restarts.
+*Since 2.34.4* a scan that fails in part does not remove anything either. A
+Kubernetes namespace whose pod listing fails (forbidden, timeout, API error)
+while the API itself answers, and a discovery file that exists but is not valid
+YAML or whose content fails to load, keep what they registered. Every cycle
+logs `discovery_part_failed_servers_kept` at WARNING with the part, the servers
+kept and, under `unreported_past_ttl`, those not reported for longer than their
+TTL. Once the part answers again, a server that is no longer there is removed
+one TTL later. With `namespaces` unset, a failure to list the namespaces fails
+the whole scan, and one pod whose annotations do not parse no longer hides the
+rest of its namespace. Before 2.34.4 both cases counted as a real absence and
+removed the server once its TTL ran out.
+
+So revoking Hangar's permission to list pods in a namespace no longer removes
+that namespace's servers: drop the namespace from `namespaces` as well. With a
+ClusterRole a deleted namespace lists as empty and its servers go after their
+TTL. With a Role and RoleBinding per namespace, deleting the namespace deletes
+the RoleBinding too, so the listing is forbidden from then on and its servers
+are kept with the warning until the namespace leaves `namespaces`. Breaking a
+discovery file no longer removes its server: delete the file or set
+`enabled: false` in it.
+
+A deleted file, a disabled definition, and a file refused by the trust checks
+(including one that cannot be opened) still remove their server after its TTL.
+So does any server a check above refuses -- a Kubernetes local mode, a Docker
+label volume outside `allowed_mount_paths`, a world-writable file: it is no
+longer reported, and an authoritative source removes it after its TTL.
+
+### A changed definition
+
+*Since 2.34.4* a discovered server whose definition changes (an edited file,
+changed labels or annotations) is replaced with the new definition on the next
+cycle, after its calls in flight finish (at most 30 seconds, as a graceful
+reload waits). The change passes every check a new registration does. A change
+that is refused -- an endpoint the SSRF policy refuses, a local mode on a
+gateway that shares its state -- leaves the running definition running and is
+logged once as `discovery_change_not_applied`; fix or revert the definition. A
+manual scan tries a refused change again. With `auto_register: false`, or when
+the change fails validation and is quarantined, it waits for
+[approval](#approving-a-discovered-server) while the running definition keeps
+running, and approving it applies it.
+
+Only a server discovery registered is ever replaced: never one declared in
+`config.yaml`, created over the API, or re-pointed over the API, even when a
+source reports the same name. Before 2.34.4 a changed definition was refused
+with `McpServer already exists` every cycle, and on an authoritative source the
+server was removed and created again from the new definition once its TTL ran
+out.
+
+### Servers an operator took over
+
+*Since 2.34.4* discovery never deletes a server it did not register. A
+discovered server re-pointed over the API (`PUT /api/mcp_servers/{id}` with a
+new `endpoint`), or deleted and created again over the API under the same name,
+is the operator's from then on: when its source stops reporting the name,
+discovery logs `discovery_deregistration_refused_not_discovered` at INFO once,
+leaves the server in place, and stops tracking the name. Delete such a server
+yourself with `DELETE /api/mcp_servers/{id}` if it should go.
+
+### After a restart
+
+With a durable storage backend (`persistence.backend: sqlite` or
+`postgresql`), *since 2.34.4* a server discovery registered stays with the
+source that registered it after a restart, instead of being restored as a
+static server that nothing could remove. Its row records that source and the
+definition it reported. When the instance takes the management lease:
+
+- an authoritative source that no longer reports the server removes it one TTL
+  later, also when it went away while the gateway was down;
+- an additive source keeps it;
+- a definition that changed meanwhile is handled as a change.
+
+A discovered row written by an earlier version records no source. If its
+description is still `Discovered from <source>`, only that source can take the
+server over, when it next reports it, and the server stays until then. A row
+whose source cannot be told, servers declared in `config.yaml`, and servers
+created over the API or CLI stay static. Re-pointing a discovered server over
+the API drops its recorded origin. To keep a discovered server whatever its
+source reports, set `mode: additive` on the source or declare the server in
+`config.yaml`.
+
+### When the management lease changes hands
+
+In a multi-replica deployment only the instance holding the management lease
+runs discovery. *Since 2.34.4* an instance that takes the lease, including one
+that held it before, rebuilds discovery tracking from the fleet as it is then:
+every discovered server counts as seen at that moment, so an authoritative
+source removes one it no longer reports a full TTL after the lease was taken,
+not on the first cycle. A server a peer removed meanwhile is registered again
+when its source reports it, and a server re-pointed over the API or CLI
+meanwhile is no longer governed by discovery. Pending and quarantined entries
+are kept only where the fleet still runs what this instance ran when the entry
+was made; one a peer approved, replaced or removed is dropped, and the next
+cycle decides again. A standalone gateway is unchanged.
 
 ## Security
 
@@ -363,6 +448,59 @@ the REST API, so it passes the same duplicate and SSRF checks, and the
 | `hangar_discovered` | List pending MCP servers (with `auto_register: false`) |
 | `hangar_quarantine` | List quarantined MCP servers |
 | `hangar_approve` | Approve a pending or quarantined MCP server |
+
+## Approving a discovered server
+
+A server waits for approval in one of two places: pending, when its source has
+`auto_register: false` (`hangar_discovered`, `GET /api/discovery/pending`), and
+quarantine, when it failed validation (`hangar_quarantine`,
+`GET /api/discovery/quarantined`). A changed definition of a running server
+waits in the same places while the running definition keeps running.
+
+*Since 2.34.4* every listing shows a `definition_digest`, the full SHA-256 of
+the definition. A source re-reports its definition every cycle, so pass the
+digest you reviewed and the approval applies only that definition:
+
+```bash
+curl -X POST "http://localhost:8000/api/discovery/approve/svc?definition_digest=<digest>"
+```
+
+On MCP, `hangar_approve(mcp_server="svc", definition_digest="<digest>")`. If
+the definition waiting has another digest, the approval is refused with
+`DiscoveredDefinitionChangedError` (409 on REST) naming the current one, and
+nothing changes. An approval without a digest still applies whatever waits
+under the name and logs `discovery_approval_not_bound` at WARNING. Use
+`definition_digest`, not the 16-character `fingerprint`, which does not bind.
+The REST body and query rules, and their 400s, are in the
+[REST reference](../reference/rest-api.md#approve-mcp-server).
+
+An approval runs the input validator on the command and the source's own
+policy, as an automatic registration does, and refuses a definition that fails
+them or whose source is no longer registered. It still overrides the other
+reasons a definition is quarantined: a failed health or schema check, and the
+rate and count limits. A refused approval answers `approved: false` with
+`error: "approval refused: <reason>"`, and the definition keeps waiting where
+it was, with the same `definition_digest`, so a reject can still remove it.
+*Since 2.34.5* the same holds when the control plane refuses the registration,
+for instance because a server of that name already exists, and when the
+replacement of a running server's changed definition is refused or fails; the
+running server is untouched.
+
+A pending entry is cleared once a scan no longer reports it: the source
+reports the running definition again or another one under the name, or a
+healthy source stops reporting the name. A quarantined change is cleared when
+its source reports the running definition again, and removing a source clears
+what it left waiting.
+
+An approval and a discovery cycle on the same server take turns: an approval
+that arrives mid-cycle waits for the cycle to finish and then sees what it
+left, so an approval bound to a digest the cycle has since replaced is refused.
+Approvals and cycles on different servers do not wait for each other.
+
+In a cluster that shares a management lease, a manual scan (`hangar_discover`,
+`POST /api/discovery/sources/{id}/scan`) and an approval are refused with 409
+on an instance that does not hold the lease: send them to the one that does. A
+standalone gateway always holds it.
 
 ## Conflict Resolution
 

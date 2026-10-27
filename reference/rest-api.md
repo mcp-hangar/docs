@@ -232,6 +232,12 @@ DELETE /mcp_servers/{mcp_server_id}
 
 Stops the MCP server if running, then removes it from the registry.
 
+*Since 2.34.4* the server also leaves the front door's `tools/list`, and listing
+clients get `notifications/tools/list_changed`. A group it was a member of keeps
+it as a vacant member that no call reaches; see [Groups](#groups). A delete over
+the API works on a discovered server too, while a discovery source never deletes
+a server it did not register, such as one created or re-pointed over the API.
+
 **Response 200:**
 
 ```json
@@ -441,6 +447,8 @@ GET /groups
 ```
 
 Each entry is the group's status, read at one instant. `state` is the group's availability (`inactive`, `partial`, `healthy`, `degraded`), not a server lifecycle state. `healthy_count` counts the members that are `ready` and in rotation; `members_in_rotation_count` counts the members in rotation in any state. A group whose members are all `cold` reads `healthy_count: 0` and still routes while `is_available` is `true`. See [Group States](../guides/MCP_SERVER_GROUPS.md#group-states).
+
+Each of `members` has `id`, `state`, `in_rotation`, `vacant`, `weight`, `priority` and `consecutive_failures`. *Since 2.34.4* a member whose server was deleted (`DELETE /mcp_servers/{mcp_server_id}`, or a discovery TTL removal) stays in the group with `"vacant": true`, `"state": "cold"` and `"in_rotation": false`. It counts in `total_members`, not in rotation, and nothing routes to it. A server discovery registers again under that id fills it; one re-created over the API leaves it vacant, to be re-added with [Add Group Member](#add-group-member) or removed with [Remove Group Member](#remove-group-member). See [`hangar_group_list`](tools.md#hangar_group_list).
 
 ### Create Group
 
@@ -670,6 +678,10 @@ POST /discovery/sources/{source_id}/scan
 {"source_id": "...", "scan_triggered": true, "mcp_servers_found": 3}
 ```
 
+**Response 409** (2.34.4 and later): in a cluster that shares a management
+lease, this instance does not hold it. Discovery runs only on the instance that
+does; send the scan there. A standalone gateway always holds the lease.
+
 ### Enable/Disable Source
 
 ```
@@ -697,8 +709,12 @@ GET /discovery/pending
 **Response 200:**
 
 ```json
-{"pending": [{"name": "new-mcp-server", "source_type": "docker", "mode": "remote", "connection_info": {...}, "fingerprint": "...", "ttl_seconds": 90, ...}]}
+{"pending": [{"name": "new-mcp-server", "source_type": "docker", "mode": "remote", "connection_info": {...}, "fingerprint": "...", "ttl_seconds": 90, ..., "definition_digest": "9f86d0...0a08"}]}
 ```
+
+`definition_digest` (2.34.4 and later) is the full SHA-256 of the definition
+(its connection, metadata, mode and source), the value an approval binds to.
+The 16-character `fingerprint` does not bind.
 
 ### List Quarantined MCP servers
 
@@ -709,21 +725,62 @@ GET /discovery/quarantined
 **Response 200:**
 
 ```json
-{"quarantined": {...}}
+{"quarantined": {"broken-api": {"mcp_server": {...}, "fingerprint": "...", "definition_digest": "9f86d0...0a08", "reason": "health_check_failed", "quarantine_time": "2026-01-15T10:30:00+00:00"}}}
 ```
+
+Keyed by name. `mcp_server` is the discovered definition, as one entry of
+`GET /discovery/pending` shows it.
 
 ### Approve MCP Server
 
 ```
 POST /discovery/approve/{name}
+POST /discovery/approve/{name}?definition_digest=<digest>
 ```
 
 Approves a quarantined MCP server, or one pending approval because its source
-has `auto_register: false` (the ones `GET /discovery/pending` lists).
+has `auto_register: false` (the ones `GET /discovery/pending` lists). The entry
+can also be a changed definition of a running discovered server; approving it
+replaces the server.
 
-**Response 200:** `{"approved": true, "mcp_server": "...", "status": "registered"}` on success. A
-name in neither place also answers `200`, with
+**Binding (2.34.4 and later).** Pass the `definition_digest` you reviewed, in
+the query string or as the JSON body `{"definition_digest": "<digest>"}`. The
+approval then applies only a definition that still has that digest. A request
+with no body, or with `{}`, is an unbound approval: whatever waits under the
+name is applied, as before, and `discovery_approval_not_bound` is logged at
+WARNING.
+
+**Response 200:** `{"approved": true, "mcp_server": "...", "status": "registered"}`
+for a new server, `"status": "updated"` for an applied change. A name in neither
+place also answers `200`, with
 `{"approved": false, "mcp_server": "...", "error": "McpServer not found in quarantine or pending"}`.
+A refused approval answers `200` with `{"approved": false, "mcp_server": "...", "error": "approval refused: <reason>"}`
+and leaves the definition waiting where it was, with the same
+`definition_digest`; a running server is untouched. It is refused when the
+definition fails the input validator or its source's own policy, or its source
+is no longer registered (2.34.4 and later), and when the control plane refuses
+the registration or the replacement of a running server (2.34.5 and later).
+See [`hangar_approve`](tools.md#hangar_approve).
+
+**Response 400:** anything that looks like an attempt to bind but cannot be read
+as exactly one digest, rather than an unbound approval:
+
+| `error` | When |
+| --------- | ------ |
+| `invalid_body` | The body is present but not a JSON object (malformed JSON, an array, a form body) |
+| `unknown_fields` | The body has a key other than `definition_digest`, or the query string has a misspelt binding (`fingerprint`, `digest`, `definition-digest` and other spellings). Other query parameters are ignored |
+| `invalid_definition_digest` | A `definition_digest` that is `null` or not a 64-character lowercase hex string |
+| `conflicting_definition_digest` | The query string and the body name different digests |
+
+**Response 409:** the definition waiting has another digest than the one given.
+Nothing changes; review it again and approve its current digest.
+
+```json
+{"error": {"code": "DiscoveredDefinitionChangedError", "message": "...", "details": {"reviewed_definition_digest": "...", "current_definition_digest": "..."}}}
+```
+
+**Response 409** also answers an approval on an instance that does not hold a
+shared management lease, as for [Trigger Scan](#trigger-scan).
 
 ### Reject MCP Server
 

@@ -411,6 +411,17 @@ mcp-hangar serve
 mcp-hangar --config config.yaml serve
 ```
 
+On SIGTERM or SIGINT a stdio `serve` shuts its servers down and exits with 0,
+also while its client keeps stdin open: at most about 2 seconds after the
+shutdown it ends the blocked stdin reader and logs `stdio_exit_forced`. Closing
+stdin still exits as before. A signal that a thread other than the main one
+took is forwarded to the main thread after 0.25 s (`shutdown_signal_forwarded`);
+should that not reach it either, the gateway shuts down from its own thread
+(`shutdown_signal_received` with `via=wakeup_fd`) and ends about 2 seconds
+later. *Since 2.34.4*; before, the process could keep running until stdin
+closed or a SIGKILL. `serve --http` is unchanged by this; see
+[`http.graceful_shutdown_timeout_s`](configuration.md#http) for how it stops.
+
 **HTTP**
 
 HTTP server with Streamable HTTP transport. Used by LM Studio and web clients.

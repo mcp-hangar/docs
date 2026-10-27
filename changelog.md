@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.57](https://github.com/mcp-hangar/docs/compare/v1.2.56...v1.2.57) (2026-10-27)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#568](https://github.com/mcp-hangar/docs/issues/568)) ([8b2f6d5](https://github.com/mcp-hangar/docs/commit/8b2f6d57d1dffa410225ab18c1f10f0b01eb6fe0))
+* **guides:** describe discovery as of 2.34.5 ([#566](https://github.com/mcp-hangar/docs/issues/566)) ([94079f0](https://github.com/mcp-hangar/docs/commit/94079f004dd972e594900817a400066a175d4008))
+* **guides:** update front door, groups and overview for 2.34.4 ([#567](https://github.com/mcp-hangar/docs/issues/567)) ([f187069](https://github.com/mcp-hangar/docs/commit/f18706998d4ec6e6333e0f03abb8430ee3895697))
+* **reference:** cover the 2.34.4 and 2.34.5 discovery, group and shutdown changes ([#565](https://github.com/mcp-hangar/docs/issues/565)) ([c5cc18f](https://github.com/mcp-hangar/docs/commit/c5cc18ff465c3f50ba91ac955ca1a396c1e5b4e2))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#570](https://github.com/mcp-hangar/docs/issues/570)) ([db79613](https://github.com/mcp-hangar/docs/commit/db796138027d799b9f8558c24be1b5feab629133))
+
 ## [1.2.56](https://github.com/mcp-hangar/docs/compare/v1.2.55...v1.2.56) (2026-10-25)
 
 

@@ -682,7 +682,7 @@ nothing.
 | Key | Type | Description |
 | ----- | ------ | ------------- |
 | `type` | `str` | Source type: `kubernetes`, `docker`, `filesystem`, `entrypoint`, or any type registered under the `mcp_hangar.discovery_sources` entry point group. An unregistered type **fails startup** |
-| `mode` | `str` | `additive` (only adds, the default) or `authoritative` (adds and removes). Any other value **fails startup**. *Since 2.34.2* an authoritative source removes a server it stopped reporting once the server's TTL has passed since it was last seen. A source whose scan fails, or that cannot reach what it watches, removes nothing that cycle; a Kubernetes namespace whose pod listing fails while the API answers, and a discovery file that stops parsing, still count as absent |
+| `mode` | `str` | `additive` (only adds, the default) or `authoritative` (adds and removes). Any other value **fails startup**. *Since 2.34.2* an authoritative source removes a server it stopped reporting once the server's TTL has passed since it was last seen. A source whose scan fails, or that cannot reach what it watches, removes nothing that cycle. *Since 2.34.4* neither does a scan that fails in part: a Kubernetes namespace whose pod listing fails while the API answers, or a discovery file that exists but cannot be parsed or loaded, keeps what it registered and logs `discovery_part_failed_servers_kept` every cycle. A deleted file, a disabled definition and a file the trust checks refuse still remove their server after its TTL. See [Discovery Modes](../guides/DISCOVERY.md#discovery-modes) |
 | `path` | `str` | Directory to scan (filesystem source), default `/etc/mcp-hangar/mcp_servers.d/`; a relative path is taken from the working directory |
 | `pattern` | `str` | File glob inside `path` (filesystem source), default `*.yaml` |
 | `watch` | `bool` | Enable file watching (filesystem source), default `true` |
@@ -1414,7 +1414,29 @@ http:
 
 | Key | Type | Default | Description |
 | ----- | ------ | --------- | ------------- |
-| `graceful_shutdown_timeout_s` | `int` | *(unset)* | How long `serve --http` waits for in-flight requests once told to stop, before cancelling them. Unset waits without a bound. Must be a positive integer. Read when the HTTP server starts, so a reload checks it but does not apply it |
+| `graceful_shutdown_timeout_s` | `int` | *(unset)* | How long `serve --http` waits for the MCP requests and batches in flight once told to stop. Unset waits as long as they take. Must be a positive integer. Read when the HTTP server starts, so a reload checks it but does not apply it |
+
+*Since 2.34.4* a stopping `serve --http` waits for the MCP requests in flight
+before it lets their streams close, so each caller gets its response. A
+2026-07-28 `subscriptions/listen` stream is not waited for. Once the bound runs
+out:
+
+- each `hangar_call` or front-door tool call still running is abandoned, and its
+  caller gets a JSON-RPC error on the same stream, with code `-32000` and
+  `data.reason: "shutdown"` (`http_shutdown_abandoned_calls` in the log). The
+  call may or may not have taken effect upstream;
+- any other request still running (`hangar_start`, `hangar_warm`, a cold
+  `hangar_tools`, a resource read) gets no answer: its connection ends
+  (`http_shutdown_bound_exceeded`);
+- the servers are stopped and the process exits within about the bound plus the
+  component shutdown, ending itself 2 seconds after that if something still
+  holds it (`http_exit_forced`).
+
+Before 2.34.4 a stop cut the stream of every call in flight at once, so the
+client saw a transport error while the call ran on upstream, and the process
+lived as long as its slowest call whatever the bound said. In Kubernetes, keep
+`terminationGracePeriodSeconds` above the bound plus a few seconds. Stdio is
+unaffected by this key.
 
 ## `ssrf`
 

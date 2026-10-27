@@ -329,11 +329,13 @@ The primary success response:
 | `mcp_server_id` | `str` | Assigned MCP server ID; pass it to `hangar_unload` |
 | `mcp_server_name` | `str` | Registry name of the loaded server |
 | `tools` | `list[str]` | Available tool names |
-| `warnings` | `list[str]` | Present only when there is something to warn about |
+| `warnings` | `list[str]` | Present only when there is something to warn about. On a front door (`tool_access.mode: front_door`) it always says that the front door does not serve the loaded server, and that declaring it in `config.yaml` is the way to serve it there |
 
-Other possible `status` values, each with a `message`: `"ambiguous"` (several registry entries match the name, listed in `matches`), `"not_found"` (no match in the registry), `"missing_secrets"` (required secrets not configured, with `mcp_server_name`, a `missing` list and `instructions`), `"unverified"` (MCP server not verified, with `mcp_server_name` and `instructions`; `force_unverified` overrides it only where `hot_loading.allow_force_unverified` is `true`), `"already_loaded"` (with the existing `mcp_server_id`), `"failed"` (hot-loading is not configured, no installable package or runtime for this server, or `approval_tools` asked for with no approval gate configured).
+Other possible `status` values, each with a `message`: `"ambiguous"` (several registry entries match the name, listed in `matches`), `"not_found"` (no match in the registry), `"missing_secrets"` (required secrets not configured, with `mcp_server_name`, a `missing` list and `instructions`), `"unverified"` (MCP server not verified, with `mcp_server_name` and `instructions`; `force_unverified` overrides it only where `hot_loading.allow_force_unverified` is `true`), `"already_loaded"` (with the existing `mcp_server_id`, and on a front door the same `warnings` as a load), `"failed"` (hot-loading is not configured, no installable package or runtime for this server, or `approval_tools` asked for with no approval gate configured).
 
 A short name often matches several registry entries: `filesystem` and `time` both answer `"ambiguous"`. Pass a name from `matches`.
+
+**On a front door.** The front door lists and routes only the servers the configuration declares. A hot-loaded server's tools are not listed in `tools/list`, and a flat call of one answers `-32601`. *Since 2.34.4* `hangar_load` says so in `warnings` instead of answering `loaded` with no hint of it. The load itself is unchanged, and an `egress` gateway answers as before.
 
 **Example:**
 
@@ -479,7 +481,7 @@ For a group:
 | `total_members` | `int` | Total member count |
 | `is_available` | `bool` | Whether the group can accept requests |
 | `circuit_open` | `bool` | Whether the circuit breaker is open |
-| `members` | `list[object]` | Members with `id`, `state`, `in_rotation`, `weight`, `priority`, `consecutive_failures` |
+| `members` | `list[object]` | Members with `id`, `state`, `in_rotation`, `vacant`, `weight`, `priority`, `consecutive_failures`. See [vacant members](#hangar_group_list) |
 
 **Example:**
 
@@ -652,6 +654,8 @@ Trigger a discovery scan across all enabled sources. Discovered MCP servers are 
 
 Returns `{error: "Discovery not configured. Enable discovery in config.yaml"}` when discovery is not enabled.
 
+In a cluster that shares a management lease, a scan is refused with an error on an instance that does not hold the lease: discovery runs only on the instance that does, so send it there. A standalone gateway always holds the lease. *Since 2.34.4.*
+
 **Example:**
 
 ```json
@@ -678,7 +682,11 @@ List MCP servers discovered but not yet registered (pending approval).
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `pending` | `list[object]` | Pending MCP servers with `name`, `source`, `mode`, `discovered_at`, `fingerprint` |
+| `pending` | `list[object]` | Pending MCP servers with `name`, `source`, `mode`, `discovered_at`, `fingerprint`, `definition_digest` |
+
+`definition_digest` is the full SHA-256 of the definition (its connection, metadata, mode and source), the value [`hangar_approve`](#hangar_approve) binds an approval to. `fingerprint` is 16 characters, kept for change detection, and does not bind. *Since 2.34.4.*
+
+A pending entry is cleared once a scan no longer reports that definition: the source reports the running definition again or another one under the name, or a source that is healthy after the scan stops reporting the name. A definition still reported next to another under the same name is kept.
 
 Returns `{error: ...}` when discovery is not configured.
 
@@ -692,7 +700,8 @@ Returns `{error: ...}` when discovery is not configured.
 {
   "pending": [
     {"name": "new-api", "source": "docker", "mode": "remote",
-     "discovered_at": "2026-01-15T10:30:00Z", "fingerprint": "abc123"}
+     "discovered_at": "2026-01-15T10:30:00Z", "fingerprint": "abc123",
+     "definition_digest": "9f86d0...0a08"}
   ]
 }
 ```
@@ -709,7 +718,7 @@ List MCP servers that failed health checks during discovery and were quarantined
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
-| `quarantined` | `list[object]` | Quarantined MCP servers with `name`, `source`, `reason`, `quarantine_time` |
+| `quarantined` | `list[object]` | Quarantined MCP servers with `name`, `source`, `reason`, `quarantine_time`, `fingerprint`, `definition_digest` |
 
 Returns `{error: ...}` when discovery is not configured.
 
@@ -723,22 +732,24 @@ Returns `{error: ...}` when discovery is not configured.
 {
   "quarantined": [
     {"name": "broken-api", "source": "docker", "reason": "health_check_failed",
-     "quarantine_time": "2026-01-15T10:30:00Z"}
+     "quarantine_time": "2026-01-15T10:30:00Z", "fingerprint": "abc123",
+     "definition_digest": "9f86d0...0a08"}
   ]
 }
 ```
 
 ### `hangar_approve` (async) {#hangar_approve}
 
-Approve a pending or quarantined MCP server for registration.
+Approve a pending or quarantined MCP server for registration, or a changed definition of a running discovered server.
 
 **Parameters:**
 
 | Parameter | Type | Default | Description |
 | ----------- | ------ | --------- | ------------- |
 | `mcp_server` | `str` | required | MCP Server name from `hangar_discovered` or `hangar_quarantine` output |
+| `definition_digest` | `str \| None` | `None` | The `definition_digest` of the definition you reviewed, from the same listing: 64 lowercase hex characters, not the 16-character `fingerprint`. Given, the approval applies only that definition. A value that is not such a digest is an invalid argument; `null` is the same as leaving it out |
 
-**Side Effects:** Registers the MCP server in COLD state. Removes from pending or quarantine list.
+**Side Effects:** Registers the MCP server in COLD state, or replaces the running definition with the approved change, after its calls in flight finish. Removes it from the pending or quarantine list. A refused approval changes nothing: the definition keeps waiting where it waited, with the same `definition_digest`, and a running server is untouched.
 
 **Returns:**
 
@@ -746,8 +757,20 @@ Approve a pending or quarantined MCP server for registration.
 | ------- | ------ | ------------- |
 | `approved` | `bool` | Whether approval succeeded |
 | `mcp_server` | `str` | MCP Server name |
-| `status` | `str` | `"registered"` on success |
+| `status` | `str` | `"registered"` for a new server, `"updated"` for an applied change of a running one |
 | `error` | `str` | Error message on failure |
+
+**Binding to what you reviewed.** A source re-reports its definition every cycle, so the one waiting under a name can change between listing and approving it. With `definition_digest`, an approval whose definition now has another digest is refused with the tool error `DiscoveredDefinitionChangedError`, whose message names the current digest, and nothing changes: review it again and approve that digest. Without `definition_digest`, whatever waits under the name is applied, as before, and `discovery_approval_not_bound` is logged at WARNING. *Since 2.34.4.*
+
+**Refusals.** Each answers `{"approved": false, "mcp_server": "...", "error": "approval refused: <reason>"}` and leaves the definition waiting:
+
+- The definition fails the checks an automatic registration runs: the input validator on its command, or its source's own policy (a Kubernetes namespace the source may not take from, for example). So does one whose source is no longer registered. Approval still overrides the other reasons a definition is quarantined: a failed health or schema check, and the rate and count limits. *Since 2.34.4.*
+- The control plane refuses the registration, for instance because a server of that name already exists. *Since 2.34.5*; before, it answered `approved: true, status: registered` and dropped the entry.
+- The replacement of a running server's changed definition is refused or fails. *Since 2.34.5*; before, it answered with a bare error and the change was gone from the listings until the next discovery cycle parked it again.
+
+A name in neither list answers `{"approved": false, ..., "error": "McpServer not found in quarantine or pending"}`.
+
+**Ordering and the lease.** An approval and a discovery cycle on the same server take turns: an approval that arrives mid-cycle waits for the cycle to finish and then sees what it left, so an approval bound to a digest the cycle has since replaced is refused as above. Approvals and cycles on different servers do not wait for each other. In a cluster that shares a management lease, an approval is refused with an error on an instance that does not hold the lease; send it to the instance that does. *Since 2.34.4.*
 
 Returns `{error: ...}` when discovery is not configured.
 
@@ -755,7 +778,7 @@ Returns `{error: ...}` when discovery is not configured.
 
 ```json
 // Request
-{"mcp_server": "new-api"}
+{"mcp_server": "new-api", "definition_digest": "9f86d0...0a08"}
 
 // Response
 {"approved": true, "mcp_server": "new-api", "status": "registered"}
@@ -823,7 +846,9 @@ List all MCP server groups with member details, health state, and load balancing
 | ------- | ------ | ------------- |
 | `groups` | `list[object]` | Groups with `group_id`, `description`, `state`, `strategy`, `min_healthy`, `healthy_count`, `members_in_rotation_count`, `total_members`, `is_available`, `circuit_open`, `members` |
 
-Each member in the `members` list contains: `id`, `state`, `in_rotation`, `weight`, `priority`, `consecutive_failures`.
+Each member in the `members` list contains: `id`, `state`, `in_rotation`, `vacant`, `weight`, `priority`, `consecutive_failures`.
+
+**Vacant members.** *Since 2.34.4* a server deleted while it is a group member (`DELETE /api/mcp_servers/{id}`, or a discovery source removing it after its TTL) stays in the group as a vacant member: `"vacant": true`, `"state": "cold"` and `"in_rotation": false`. No call, rebalance, start or recovery probe reaches it. It still counts in `total_members` and no longer counts as in rotation, so a group whose only member is deleted reads `inactive` and refuses calls. A server that discovery registers again under the same id fills the member, with the weight, priority and rotation it had. A server re-created over the API leaves it vacant: re-add it with `POST /api/groups/{id}/members`, or remove the member with `DELETE /api/groups/{id}/members/{member_id}`. Before 2.34.4 the group kept the deleted server's stopped copy in rotation and the next call through the group started it again, outside the fleet.
 
 **Example:**
 
@@ -840,10 +865,10 @@ Each member in the `members` list contains: `id`, `state`, `in_rotation`, `weigh
       "members_in_rotation_count": 2, "total_members": 2, "is_available": true,
       "circuit_open": false,
       "members": [
-        {"id": "llm-1", "state": "ready", "in_rotation": true, "weight": 50,
-         "priority": 1, "consecutive_failures": 0},
-        {"id": "llm-2", "state": "ready", "in_rotation": true, "weight": 50,
-         "priority": 2, "consecutive_failures": 0}
+        {"id": "llm-1", "state": "ready", "in_rotation": true, "vacant": false,
+         "weight": 50, "priority": 1, "consecutive_failures": 0},
+        {"id": "llm-2", "state": "ready", "in_rotation": true, "vacant": false,
+         "weight": 50, "priority": 2, "consecutive_failures": 0}
       ]
     }
   ]

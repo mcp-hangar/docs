@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.59](https://github.com/mcp-hangar/docs/compare/v1.2.58...v1.2.59) (2026-10-30)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#573](https://github.com/mcp-hangar/docs/issues/573)) ([f7aa297](https://github.com/mcp-hangar/docs/commit/f7aa2975952a5163845f47dc0d1acfaa1eb7bc41))
+* **reference:** describe a tenant's view of a group ([#575](https://github.com/mcp-hangar/docs/issues/575)) ([ff5272f](https://github.com/mcp-hangar/docs/commit/ff5272fd7e81087b28bbdccbebe0c685c5961f3c))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#576](https://github.com/mcp-hangar/docs/issues/576)) ([b489c85](https://github.com/mcp-hangar/docs/commit/b489c8560a0ed84c8f2862e70a20a2d90a773b3f))
+
 ## [1.2.58](https://github.com/mcp-hangar/docs/compare/v1.2.57...v1.2.58) (2026-10-29)
 
 

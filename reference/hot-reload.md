@@ -135,9 +135,25 @@ curl -X POST http://127.0.0.1:8000/api/config/reload
 | Scenario | Behavior | Final State |
 | ---------- | ---------- | ------------- |
 | **Added** | Registered. On `front_door`, then started (see below) | `COLD`; on `front_door` `READY` once started |
-| **Removed** | Stopped (gracefully by default), then removed | (deleted) |
+| **Removed from the file** | Stopped (gracefully by default), then removed | (deleted) |
 | **Modified** | Old stopped, new registered. On `front_door`, then started | `COLD`; on `front_door` `READY` once started |
 | **Unchanged** | No action taken | Preserved |
+
+*Since 2.34.10* a reload removes only what the file owns. A server created over
+the API or registered by discovery stays, running and untouched, with its
+policies, and groups and members made over the API stay too. Before 2.34.10 such a
+server was stopped and removed by any reload, which includes saving the file
+while `config_reload` is on, and came back at the next restart.
+
+The file still wins for what it declares. If it now names a server another origin
+registered, that server is stopped and rebuilt from the file. If it names a group or
+a member, its entry applies; a member it drops leaves the group, and the server
+stays if the file does not own it. To remove a server or a group made over the
+API, use `DELETE /api/mcp_servers/{id}` or `DELETE /api/groups/{id}`.
+
+Two limits remain. A restart returns to the file's groups, so groups and members
+made over the API do not yet survive one. And a server with a durable row, such as
+a file server edited at runtime, is restored by a restart after it leaves the file.
 
 *Since 2.34.2*, with `tool_access.mode: front_door`, a reload starts each server
 it adds and each server whose settings it changed, right after the reload
@@ -355,6 +371,7 @@ config_reload:
 | ------------ | ------------ |
 | `tool_access.mode` change refused | Restart the gateway |
 | Hot-loaded MCP servers unaffected | Use `hangar_unload` to manage separately |
+| Servers and groups made over the API unaffected | Use the API's `DELETE` routes |
 | Only `mcp_servers` (with groups and their policies), `tool_access.required_catalogue`, `execution`, `headers.param_validation`, `resource_links`, `interceptors` and `ui_resources` are applied | Restart the gateway for any other section (`auth`, `event_store`, `logging`, ...) |
 | In-flight requests | Completed before MCP server stops in graceful mode, for up to 30 s in all; failed at once with `graceful=false` |
 

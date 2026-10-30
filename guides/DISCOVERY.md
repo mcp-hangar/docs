@@ -359,6 +359,13 @@ discovery logs `discovery_deregistration_refused_not_discovered` at INFO once,
 leaves the server in place, and stops tracking the name. Delete such a server
 yourself with `DELETE /api/mcp_servers/{id}` if it should go.
 
+### After a reload
+
+*Since 2.34.10* a configuration reload leaves a discovered server alone: it keeps
+running with its source, and the next scan finds it registered. If the file now
+declares the same name, the file's definition applies. See
+[Hot-Reload](../reference/hot-reload.md#reload-behavior).
+
 ### After a restart
 
 With a durable storage backend (`persistence.backend: sqlite` or

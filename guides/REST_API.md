@@ -103,6 +103,8 @@ Every route requires a permission when authentication is enabled; the
 | `POST` | `/api/groups/{id}/members` | Add a member to the group |
 | `DELETE` | `/api/groups/{id}/members/{member_id}` | Remove a member |
 
+A caller whose principal has a `tenant_id` gets its own view of a group from the two `GET` routes: see [a tenant's view of a group](../reference/tools.md#hangar_list).
+
 ### Discovery
 
 > **Note:** All discovery endpoints return 404 when no `discovery:` block is configured.

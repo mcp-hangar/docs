@@ -101,6 +101,8 @@ List all configured MCP servers, groups, and runtime (hot-loaded) MCP servers wi
 
 **Group member counts.** `healthy_count` counts the members that are `ready` and in rotation. `members_in_rotation_count` counts the members in rotation in any state, the length of the `members_in_rotation` list `hangar_group_rebalance` returns. So `healthy_count` <= `members_in_rotation_count` <= `total_members`. A group whose members are all `cold`, such as one the GC reaped for being idle, reads `healthy_count: 0` and still routes: the next call through it starts a member. To ask whether a group can take a call, read `is_available`. `hangar_status` and `hangar_health` report the same count as `healthy_members`.
 
+**A tenant's view of a group.** *Since 2.34.8* a caller whose principal has a `tenant_id` gets a view of a group cut to the members its calls may be routed to, in [`hangar_list`](#hangar_list), [`hangar_details`](#hangar_details), [`hangar_group_list`](#hangar_group_list) and `GET /api/groups[/{id}]`. A pinned tenant sees its one member. A tenant in rotation does not see members out of rotation. `total_members`, `healthy_count`, `members_in_rotation_count`, `state` and `is_available` are taken over those members, and `state` is judged against `min_healthy` capped at the number of members shown, so a healthy pinned member reads `healthy`. `min_healthy` and `circuit_open` are absent. `state_filter` on `hangar_list` filters on this view's `state`. No member shown, or none live, reads `inactive` with `is_available: false`, and `GET /api/groups/{id}` then answers 200 with an empty `members`, not 404. A caller without a tenant, and every caller with auth off, sees the whole group.
+
 **Example:**
 
 ```json
@@ -467,7 +469,7 @@ For a MCP server:
 | `dead` | `object \| None` | `null` unless `state` is `dead`; then `reason`, `since`, `retry_allowed_at`, `revived_by` |
 | `tools_policy` | `object` | Tool access policy: `active` and `unrestricted`; with a policy configured also `has_allow_list` and `has_deny_list`; and `filtered_count` when the policy hid tools from `tools` |
 
-For a group:
+For a group (a caller with a tenant gets [its own view](#hangar_list), without `min_healthy` and `circuit_open`):
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |

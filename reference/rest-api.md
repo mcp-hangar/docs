@@ -471,6 +471,8 @@ POST /groups
 {"group_id": "llm-pool", "created": true}
 ```
 
+*Since 2.35.0* a group or member changed through these routes is written to the store first, and the request fails if that write fails. On a durable backend it survives a restart and reaches the other replicas without one. On the in-memory backend it lasts as long as the process. See [MCP Server Groups](../guides/MCP_SERVER_GROUPS.md#more-than-one-replica).
+
 ### Get Group
 
 ```

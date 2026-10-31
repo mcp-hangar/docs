@@ -1,4 +1,4 @@
-<!-- verified-against: 2.33.0 -->
+<!-- verified-against: 2.35.0 -->
 
 # Key-Pinned Upstreams
 
@@ -48,7 +48,7 @@ A release before 2.32.0 ignores `tls.peer_identity` and serves such a server as 
 `POST /api/mcp_servers` with a `tls` block creates a key-pinned server, and `PUT /api/mcp_servers/{id}` changes its list or endpoint. A key-pinned server registered over the API needs:
 
 - **Durable storage.** `persistence.backend` must be `sqlite` (one gateway) or `postgresql` (several replicas). The server's name and `key_ref` are recorded there, in the peer-key name record, and that is how replicas learn of a changed list. Without durable storage the declaration is refused.
-- **The permission.** Setting or changing a peer identity, changing a key-pinned server's endpoint, deleting it, and forgetting its name (`DELETE /api/mcp_servers/{id}/peer_identity`) all need `mcp_servers:peer_identity`, on top of what the route already needs (`mcp_servers:lifecycle` for a delete). Of the built-in roles, only `admin` and `kubernetes-operator` hold it; a custom role can be granted it. `mcp_servers:write` is not enough. Under OPA, allow action `peer_identity` on resource type `mcp_servers`.
+- **The permission.** Setting or changing a peer identity, changing a key-pinned server's endpoint, deleting it, and forgetting its name (`DELETE /api/mcp_servers/{id}/peer_identity`) all need `mcp_servers:peer_identity`, on top of what the route already needs (`mcp_servers:write` and `mcp_servers:lifecycle` for a delete). Of the built-in roles, only `admin` and `kubernetes-operator` hold it; a custom role can be granted it. `mcp_servers:write` is not enough. Under OPA, allow action `peer_identity` on resource type `mcp_servers`. By default OPA is asked only when RBAC denies, so its allow is enough; with `auth.opa.require_both: true` the principal must hold the permission under RBAC too.
 - **Authentication.** With authentication disabled, any client of the API can set or change a key list. A key list decides which upstream a call may reach, so run authentication wherever lists are set over the API.
 - **The SSRF policy.** An endpoint set over the API is checked against it. A key-pinned server is usually reached at a private address, so list the networks it may resolve into:
 
@@ -96,9 +96,10 @@ The operator registers a key-pinned server only when all of these hold. Each fai
 | Core has durable storage | `RegistrationFailed` |
 | The endpoint is inside `ssrf.trusted_networks` | `EndpointNotTrusted` |
 
-Two cases do not appear as `Degraded`:
+Three cases do not appear as `Degraded`:
 
 - **A private CA.** When a private CA signed core's certificate, set `hangar.tls.ca.secretName` or `hangar.tls.ca.configMapName` in the operator chart (the operator's `--hangar-ca-file`). Without it the operator cannot read core's capabilities, the reconcile fails and is retried, and the CR gets no condition for it. Read the operator's log.
+- **A key that cannot read `/api/system`.** That route needs `mcp_servers:read` held at global scope. `kubernetes-operator` holds it, so this is a key without the role, or with the role bound to one tenant. The operator cannot read core's capabilities, the reconcile fails and is retried, and the CR gets no condition for it. Read the operator's log.
 - **A `mode: container` server on an operator with no core to register with** (no `--hangar-url`) is held: its pod is not created, and the CR reads `Ready=False` with reason `PeerIdentityNotCarried`.
 
 See [KUBERNETES.md](KUBERNETES.md) for the rest of the `MCPServer` fields.

@@ -151,9 +151,14 @@ a member, its entry applies; a member it drops leaves the group, and the server
 stays if the file does not own it. To remove a server or a group made over the
 API, use `DELETE /api/mcp_servers/{id}` or `DELETE /api/groups/{id}`.
 
-Two limits remain. A restart returns to the file's groups, so groups and members
-made over the API do not yet survive one. And a server with a durable row, such as
-a file server edited at runtime, is restored by a restart after it leaves the file.
+*Since 2.35.0* groups and members made over the API also survive a restart on a
+durable backend, so a reload and a restart reach the same state for them. On the
+in-memory backend a group lasts as long as the process.
+
+One limit remains. Something with a durable row is restored by a restart after it
+leaves the file, where a reload would remove it: a file server edited at runtime,
+or a group or member made over the API before the file declared the same one. After
+that restart, delete it over the API.
 
 *Since 2.34.2*, with `tool_access.mode: front_door`, a reload starts each server
 it adds and each server whose settings it changed, right after the reload

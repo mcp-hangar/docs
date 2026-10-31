@@ -115,9 +115,11 @@ Exactly one replica **manages**: discovery, garbage collection, TTL
 deregistration, and the metric-snapshot worker. It holds a lease -- a row in the
 shared database with a expiry and a generation -- and the others wait.
 
-Everything else is a *projection*: fleet membership, risk scores, session
-suspensions and the websocket event feed are rebuilt on every replica from the
-shared event log, so what you get back does not depend on which pod answered.
+Everything else is a *projection*: fleet membership, group definitions and
+members (*since 2.35.0*), tool access policies set over the API (*since 2.35.0*),
+risk scores, session suspensions and the websocket event feed are rebuilt on every
+replica from the shared event log, so what you get back does not depend on which
+pod answered.
 
 **One thing is not, and one was not until 2.5.1.** The connect-time SSRF guard
 on a registered `remote` server used to be armed only on the replica that

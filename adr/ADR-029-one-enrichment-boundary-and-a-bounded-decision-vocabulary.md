@@ -1,6 +1,6 @@
 # ADR-029: One Enrichment Boundary and a Bounded Decision Vocabulary for Traces
 
-**Status:** Accepted
+**Status:** Accepted -- **amended 2026-11-02**: a refused caller that may see the tool is told, in bounded terms, what refused it and what to do next. Sections 1 to 11 are unchanged; see the Amendment at the end.
 **Date:** 2026-09-19
 **Authors:** MCP Hangar Team
 
@@ -198,3 +198,82 @@ The #1276 data-handling contract reaches Hangar-owned spans through `_TextFreeTr
 - mcp-hangar/mcp-hangar#1275 (this decision's issue), #1276 (the data-handling contract), #1264 (the tracing epic), #1286 (route telemetry, where the scope of the logical-target rule and the one selection per call were settled).
 - [ADR-007](ADR-007-langfuse-integration.md), [ADR-013](ADR-013-egress-policy-enforcement-model.md), [ADR-014](ADR-014-tasks-relay-with-governance.md), [ADR-016](ADR-016-approval-resolution-chokepoint.md), [ADR-020](ADR-020-high-availability.md).
 - OpenTelemetry semantic conventions v1.39.0 (open-telemetry/semantic-conventions#2043, #2083); `open-telemetry/semantic-conventions-genai`.
+
+## Amendment (2026-11-02): what a caller is told when a visible tool is refused
+
+Decided on mcp-hangar/mcp-hangar#1775. Sections 1 to 11 are unchanged. This gives the decisions of section 5 a second reader and adds the caller-facing names that reader needs.
+
+### 12. What a caller is told when a visible tool is refused
+
+The vocabulary above is for telemetry. A refusal also has a reader on the other side of the call: the client, and through it the model and the user. That reader gets unrelated shapes for the same kind of decision, so a refusal now names itself in bounded terms.
+
+#### 12.1 Which refusals
+
+This section covers a tool the caller may see, refused on purpose:
+
+- the gates `circuit_breaker`, `validators`, `tenant_budget` and `approval`;
+- `digest_pin` and `deferred_digest_pin` where the caller reaches them: a direct `hangar_call`, and a pin bound to another upstream;
+- `cold_start` for the reasons `not_revived_by_calls`, `circuit_open` and `upstream_peer_key_mismatch`;
+- the `tool:invoke` check that runs before the gates, which `ToolCallRefused` records as `authorization`;
+- an L7 `deny` or `require_approval`, and an upstream key mismatch at dispatch;
+- a command-bus rate limit on the call itself.
+
+A tool the caller may not see stays indistinguishable from one that does not exist (`-32601`, mcp-hangar/mcp-hangar#905). On the front door that covers `tool_access`, `withdrawal`, a name `resolve_target` cannot route, and a tool withheld because it drifted from a blocking pin (#1776). On `hangar_call` the first three stay batch entries with the text they have today. A tool refused by policy or withdrawn during an approval hold is the exception: the caller was already held on it, so it is an `approval` refusal.
+
+Two kinds of ending are not governance decisions and keep their own results, with no shape and no event id:
+
+- what stopped the call without a decision: a cancellation, a spent batch budget, a failed start and `no_available_member`;
+- a control that broke, which section 5 already says is no refusal: a gate whose outcome is `error`, an authorizer that raises, an L7 evaluator failure and a failure of the approval machinery. Each still fails closed. `digest_unverifiable` follows its outcome: as `error` it belongs here, and as the `deny` of `deferred_digest_pin` it is a listed refusal.
+
+#### 12.2 The shape
+
+The refusal text is:
+
+```text
+Refused by MCP Hangar (<gate>): <reason>. <next step>
+```
+
+It replaces the message the gate produced, so text an approver or a validator supplied does not reach the caller through it. `<gate>` and `<reason>` are bounded values, never free text. For a stage of `_GATES` they are `hangar.gate.name` and `hangar.gate.reason`. The refusals outside `_GATES` are not gates (section 5), so the caller-facing name says which layer refused: `authorization`, `l7` with its verdict, `upstream_key` with `upstream_peer_key_mismatch`, and `rate_limit` with `exceeded`. Section 5's definition of a gate does not change. A refusal with no bounded reason omits it, and `code` is `<gate>` alone. The next step is a concrete command where one exists.
+
+The structured fields are:
+
+```json
+"io.mcp-hangar/toolFailure": {
+  "class": "governance",
+  "code": "<gate>.<reason>",
+  "correlationId": "<event id>"
+}
+```
+
+On a flat call the refusal is a tool result with `isError: true`, and the fields are in its `_meta`. On `hangar_call` one result answers many calls, so each refused entry of `results` carries the text and the same fields, and the refusal of one call does not set `isError` on a batch.
+
+`correlationId` is the id of the `ToolCallRefused` event, so on a local SQLite event store `mcp-hangar why <event id>` reads the record behind it. A rate limit and an upstream key mismatch at dispatch publish no such event at 2.35.0, and they have to, because this field is required. The mismatch keeps its `ToolInvocationFailed`, and `why` shows the refusal once. A failed publish does not change the refusal, so an id does not guarantee a record.
+
+`class` follows whether waiting clears the refusal, which is what SEP-3313 asks a client to branch on. `class: "reliability"` with `retryable: true`, and `retryNotBefore` where the time is known, is for a rate limit, `circuit_open`, and the tenant budget reasons `concurrency` and `rate`. Every other refusal is `class: "governance"`: a client must not auto-retry it.
+
+An authorization denial (`tool:invoke`, approval denied) also carries `"io.mcp-hangar/authorizationDenial"` with the envelope fields of SEP-2643. Its `reason` is that SEP's `insufficient_authorization`, not the Hangar reason. `remediation` is `undisclosed` for `tool:invoke` and `unavailable` for an approval denied. Hangar sends neither `authorizationContextId` nor `remediationHints`, because it implements nothing that would use them. An approval timeout is not a denial and does not carry the envelope.
+
+#### 12.3 Whose keys, and who may write them
+
+The fields follow SEP-3313 and SEP-2643, so a client written against either needs little to read them. The keys do not: both SEPs are drafts, and `io.modelcontextprotocol/` belongs to the specification. When a SEP goes Final, Hangar adds its official key beside its own. Removing Hangar's key is then a deprecation with an upgrade note.
+
+An upstream's own failure is relayed untouched (#1900), which would let an upstream forge a Hangar refusal, next step included. So Hangar removes these two keys from every result an upstream originates, on a flat call, in a batch entry and in relayed task output. The keys are the authoritative mark of a Hangar refusal. The text prefix is not authenticated: an upstream can write the same line, and a client must not trust it.
+
+#### 12.4 Approval timeouts
+
+A call held for approval on stdio must not outlast the client that sent it. Hangar ends the wait itself, before the timeouts of the clients it has measured, and returns the shape above with gate `approval` and reason `approval_timeout`, `class: "governance"`.
+
+The limit is a separate setting, applied on stdio. Where it is shorter than `approval_timeout_seconds` it ends the approval's window: the record moves to `expired` and `ToolApprovalExpired` is published, as at the policy deadline. An approve that arrives afterwards is refused, so nothing records a grant for a call that will not run. On stdio the decision comes from a second process that cannot see the hold, so only the end of the wait can make this true.
+
+#### 12.5 Enforcement
+
+A table test enumerates `_GATES` and the refusals raised at dispatch, by stage and reason, and fails on one with no entry, so a new refusal has to decide what its caller is told. The entry is a visible shape, `-32601`, or a stated reason why neither applies. A separate test holds that an upstream result carrying either key reaches the caller without it, and another approves from a second process after the wait has ended and finds the approve refused.
+
+#### 12.6 Consequences
+
+- The text of a refusal changes for every client, and anything parsing the old messages breaks. The change ships with an upgrade note.
+- A rate-limited call now writes a durable event, so refused traffic costs a write.
+- On stdio the approval window is the limit, not `approval_timeout_seconds`. A human slower than it cannot get that call through, and a retry opens a new approval.
+- Hangar removes its keys from what a downstream Hangar returns too, so a chained gateway's refusal reaches the caller as text only.
+- `mcp-hangar why` reads only a local SQLite store. A caller on a remote gateway holds an id that only the operator can look up.
+- One refusal can have two names until `why` adopts the caller-facing ones: it prints `l7_egress` and `upstream_tls` today.

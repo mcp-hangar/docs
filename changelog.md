@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.65](https://github.com/mcp-hangar/docs/compare/v1.2.64...v1.2.65) (2026-11-02)
+
+
+### Changed
+
+* **architecture:** adr-029 -- a refused caller is told which gate refused and what to do next ([e1c21f0](https://github.com/mcp-hangar/docs/commit/e1c21f0c56e0d9e681a55ae5ca05b15a5c7550da))
+
 ## [1.2.64](https://github.com/mcp-hangar/docs/compare/v1.2.63...v1.2.64) (2026-11-02)
 
 

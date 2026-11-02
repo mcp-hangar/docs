@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.66](https://github.com/mcp-hangar/docs/compare/v1.2.65...v1.2.66) (2026-11-02)
+
+
+### Changed
+
+* **architecture:** adr-029 -- keep the gate's message under the refusal line ([66f5ae6](https://github.com/mcp-hangar/docs/commit/66f5ae617a6a366c8f50cdd867d14acb982a6827))
+* **repo:** the docs are not published to npm ([f94ce7a](https://github.com/mcp-hangar/docs/commit/f94ce7aafd92d1c709b8d8ee5e25ddb4713a974b)), closes [#597](https://github.com/mcp-hangar/docs/issues/597)
+
 ## [1.2.65](https://github.com/mcp-hangar/docs/compare/v1.2.64...v1.2.65) (2026-11-02)
 
 

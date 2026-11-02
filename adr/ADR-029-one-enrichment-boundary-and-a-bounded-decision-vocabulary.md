@@ -1,6 +1,6 @@
 # ADR-029: One Enrichment Boundary and a Bounded Decision Vocabulary for Traces
 
-**Status:** Accepted
+**Status:** Accepted -- **amended 2026-11-02**: a refused caller that may see the tool is told, in the same bounded vocabulary, which gate refused and what to do next. Sections 1 to 11 are unchanged; see the Amendment at the end.
 **Date:** 2026-09-19
 **Authors:** MCP Hangar Team
 
@@ -198,3 +198,60 @@ The #1276 data-handling contract reaches Hangar-owned spans through `_TextFreeTr
 - mcp-hangar/mcp-hangar#1275 (this decision's issue), #1276 (the data-handling contract), #1264 (the tracing epic), #1286 (route telemetry, where the scope of the logical-target rule and the one selection per call were settled).
 - [ADR-007](ADR-007-langfuse-integration.md), [ADR-013](ADR-013-egress-policy-enforcement-model.md), [ADR-014](ADR-014-tasks-relay-with-governance.md), [ADR-016](ADR-016-approval-resolution-chokepoint.md), [ADR-020](ADR-020-high-availability.md).
 - OpenTelemetry semantic conventions v1.39.0 (open-telemetry/semantic-conventions#2043, #2083); `open-telemetry/semantic-conventions-genai`.
+
+## Amendment (2026-11-02): what a caller is told when a visible tool is refused
+
+Decided on mcp-hangar/mcp-hangar#1775. Sections 1 to 11 are unchanged; this adds a reader to the vocabulary of section 5 and takes nothing from it.
+
+### 12. What a caller is told when a visible tool is refused
+
+The vocabulary above is for telemetry. A refusal also has a reader on the other side of the call: the client, and through it the model and the user. That reader gets unrelated shapes for the same kind of decision, so the same bounded vocabulary now reaches the caller.
+
+#### 12.1 Which refusals
+
+This section covers a tool the caller may see, refused on purpose:
+
+- the gates `digest_pin`, `deferred_digest_pin`, `circuit_breaker`, `validators`, `tenant_budget` and `approval`;
+- the `tool:invoke` check that runs before the gates, which `ToolCallRefused` records as `authorization`;
+- an L7 deny (`hangar.l7.*`);
+- a command-bus rate limit (`hangar.dispatch.*`).
+
+A tool the caller may not see stays indistinguishable from one that does not exist (`-32601`, mcp-hangar/mcp-hangar#905). That covers `tool_access`, `withdrawal` and `resolve_target` on the front door.
+
+The remaining stages of `_GATES` do not report a governance decision: a cancellation, a spent batch budget and a failed cold start keep their own results. Section 12.5 lists them as such.
+
+#### 12.2 The shape
+
+A refusal is a tool result with `isError: true`. Its text starts with:
+
+```text
+Refused by MCP Hangar (<gate>): <reason>. <next step>
+```
+
+`<gate>` and `<reason>` are bounded values, never free text. For a stage of `_GATES` they are `hangar.gate.name` and `hangar.gate.reason`. The other three refusals are not gates (section 5), so the caller-facing name says which layer refused: `authorization` with its fixed code, `l7` with its verdict, and `rate_limit` with `exceeded`. Section 5's definition of a gate does not change. The next step is a concrete command where one exists. `_meta` carries:
+
+```json
+"io.mcp-hangar/toolFailure": {
+  "class": "governance",
+  "code": "<gate>.<reason>",
+  "correlationId": "<event id>"
+}
+```
+
+`correlationId` is the id of the `ToolCallRefused` event, so `mcp-hangar why <event id>` reads the record behind it. A command-bus rate limit publishes no such event at 2.35.0, and it has to, because this field is required.
+
+`class` is `governance`, which tells a client that retrying the call will not help. A rate limit is the exception: it clears by waiting, so it is `class: "reliability"` with `retryable: true` and `retryNotBefore`, the fields SEP-3313 allows only on that class.
+
+An authorization denial (`tool:invoke`, approval denied) also carries `"io.mcp-hangar/authorizationDenial"` with the envelope fields of SEP-2643: `reason`, `remediation` and, where they apply, `authorizationContextId` and `remediationHints`.
+
+#### 12.3 Why Hangar's own keys
+
+The fields follow SEP-3313 and SEP-2643, so a client written against either needs little to read them. The keys do not: both SEPs are drafts, and `io.modelcontextprotocol/` belongs to the specification. When a SEP goes Final, Hangar adds its official key beside its own. Removing Hangar's key is then a deprecation with an upgrade note.
+
+#### 12.4 Approval timeouts
+
+A call held for approval must not end as a transport timeout, which tells the caller nothing. On stdio Hangar ends the wait itself, before a client's timeout, and returns the shape above with gate `approval`. The approval and its event stay as they are. The limit is a setting whose default comes from measured client timeouts.
+
+#### 12.5 Enforcement
+
+A table test enumerates `_GATES` and fails on a stage with no mapping, so a new gate has to decide what its caller is told. A stage outside section 12.1 is listed in that table as not a governance refusal, with no shape.

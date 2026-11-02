@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.63](https://github.com/mcp-hangar/docs/compare/v1.2.62...v1.2.63) (2026-11-02)
+
+
+### Changed
+
+* **repo:** add AGENTS.md for coding agents ([#589](https://github.com/mcp-hangar/docs/issues/589)) ([8c13a9d](https://github.com/mcp-hangar/docs/commit/8c13a9d23797adaf2d4e901d7f159c06773147d8))
+
 ## [1.2.62](https://github.com/mcp-hangar/docs/compare/v1.2.61...v1.2.62) (2026-10-31)
 
 

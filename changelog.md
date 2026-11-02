@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.64](https://github.com/mcp-hangar/docs/compare/v1.2.63...v1.2.64) (2026-11-02)
+
+
+### Changed
+
+* **repo:** state how a green PR is merged in AGENTS.md ([#592](https://github.com/mcp-hangar/docs/issues/592)) ([0de19be](https://github.com/mcp-hangar/docs/commit/0de19be1cff90d0bcdf113207137d6b257716053))
+
 ## [1.2.63](https://github.com/mcp-hangar/docs/compare/v1.2.62...v1.2.63) (2026-11-02)
 
 

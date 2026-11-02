@@ -2,9 +2,9 @@
 
 This repository is the single source of truth for public-facing MCP Hangar documentation.
 
-Content is consumed by mcp-hangar.io through the `@mcp-hangar/docs` npm package.
+mcp-hangar.io consumes this content by installing `@mcp-hangar/docs` from this repository at a pinned commit. Nothing is published to the npm registry.
 
-Docs follow semver and are published on tagged releases.
+Docs follow semver, with a tagged GitHub release for each version.
 
 Layout overview:
 

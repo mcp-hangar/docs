@@ -1,6 +1,6 @@
 # MCP Hangar Docs
 
-Public documentation for MCP Hangar. Published to npm as `@mcp-hangar/docs` by release-please and rendered on [mcp-hangar.io/docs](https://mcp-hangar.io/docs) by `mcp-hangar/mcp-hangar-website`, which pins this repository to a commit SHA.
+Public documentation for MCP Hangar. Released by release-please as GitHub releases, and rendered on [mcp-hangar.io/docs](https://mcp-hangar.io/docs) by `mcp-hangar/mcp-hangar-website`, which installs `@mcp-hangar/docs` from this repository at a pinned commit SHA.
 
 ## Quick Reference
 
@@ -86,7 +86,7 @@ changelog.md      Written by release-please
 | `branch-name.yml`, `pr-title.yml`, `pr-body.yml` | shared reusables from `mcp-hangar/.github` |
 | `sync-upgrade-guide.yml` | daily and on dispatch: bring over a released upgrade section this repo is missing, open a PR on `chore/sync-upgrade-guide` |
 | `sync-release-matrix.yml` | daily and on dispatch: regenerate the released-artifacts table from GHCR, open a PR |
-| `release-please.yml` | release PR and npm publish |
+| `release-please.yml` | release PR and GitHub release |
 | `project-board.yml`, `stale.yml`, `dependabot-automerge.yml` | housekeeping |
 
 ## What NOT to Do

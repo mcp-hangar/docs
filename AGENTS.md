@@ -69,7 +69,7 @@ changelog.md      Written by release-please
 - Branch `<type>/<slug>`. Title `<type>(<scope>): <lowercase subject>` with scope in `architecture`, `ci`, `deps`, `guides`, `infra`, `reference`, `release`, `repo`. There is no `cookbook` scope; recipes are `guides`.
 - Body: `## Why` and `## How tested`, each with a prose sentence. A section that holds only a code block counts as empty.
 - No changelog fragment here; the `pr-body` check is the gate. Squash-merge. Update a branch by merging `origin/main`, never by rebasing a pushed branch.
-- A green PR may be merged by an agent, releases included. A PR refreshed by a bot force-push (release-please, the sync workflows) shows no checks until it is closed and reopened.
+- An agent prepares the merge of a green PR, releases included, and the owner runs it; the classifier refuses `gh pr merge` from an agent. A PR refreshed by a bot force-push (release-please, the sync workflows) shows no checks until it is closed and reopened.
 - After a core minor, merge the `chore/sync-upgrade-guide` PR first, with the re-read pages and their tokens on it; other open PRs then need `gh pr update-branch`.
 
 ## ADRs

@@ -233,7 +233,7 @@ The refusal text is:
 Refused by MCP Hangar (<gate>): <reason>. <next step>
 ```
 
-It replaces the message the gate produced, so text an approver or a validator supplied does not reach the caller through it. `<gate>` and `<reason>` are bounded values, never free text. For a stage of `_GATES` they are `hangar.gate.name` and `hangar.gate.reason`. The refusals outside `_GATES` are not gates (section 5), so the caller-facing name says which layer refused: `authorization`, `l7` with its verdict, `upstream_key` with `upstream_peer_key_mismatch`, and `rate_limit` with `exceeded`. Section 5's definition of a gate does not change. A refusal with no bounded reason omits it, and `code` is `<gate>` alone. The next step is a concrete command where one exists.
+The gate's own message stays on the next line, because it holds what a caller needs, such as an approver's reason or a validator's limit. That line is not bounded and is not for a client to parse. In the first line `<gate>` and `<reason>` are bounded values, never free text. For a stage of `_GATES` they are `hangar.gate.name` and `hangar.gate.reason`. The refusals outside `_GATES` are not gates (section 5), so the caller-facing name says which layer refused: `authorization`, `l7` with its verdict, `upstream_key` with `upstream_peer_key_mismatch`, and `rate_limit` with `exceeded`. Section 5's definition of a gate does not change. A refusal with no bounded reason omits it, and `code` is `<gate>` alone. The next step is a concrete command where one exists.
 
 The structured fields are:
 

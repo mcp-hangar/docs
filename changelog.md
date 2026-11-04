@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.67](https://github.com/mcp-hangar/docs/compare/v1.2.66...v1.2.67) (2026-11-04)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([1f202fc](https://github.com/mcp-hangar/docs/commit/1f202fcaeb730b4bcb531df34bea85ce00b8d214))
+* **reference:** document approvals.stdio_wait_seconds ([dc8055e](https://github.com/mcp-hangar/docs/commit/dc8055e633e6b6350058123ab3e409a0de7bde7e))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([182b83a](https://github.com/mcp-hangar/docs/commit/182b83ace0fdae56027b1ceadee7fa49f4dd3e4e))
+
 ## [1.2.66](https://github.com/mcp-hangar/docs/compare/v1.2.65...v1.2.66) (2026-11-02)
 
 

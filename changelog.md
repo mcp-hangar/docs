@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.68](https://github.com/mcp-hangar/docs/compare/v1.2.67...v1.2.68) (2026-11-04)
+
+
+### Changed
+
+* **guides:** the quickstart moves your servers behind hangar before the drift demo ([244af5b](https://github.com/mcp-hangar/docs/commit/244af5be315a18e35b3d7c5d1d82de408e57ae96))
+
 ## [1.2.67](https://github.com/mcp-hangar/docs/compare/v1.2.66...v1.2.67) (2026-11-04)
 
 

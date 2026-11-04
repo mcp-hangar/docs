@@ -257,6 +257,7 @@ approvals:
   channel: event_stream    # the deployment default, used by any policy that names none
   delivery:
     required: false        # refuse to boot if a gated policy's channel notifies nobody
+  stdio_wait_seconds: 50   # on stdio, the longest an approval stays open
 ```
 
 | Key | Type | Default | Description |
@@ -264,10 +265,18 @@ approvals:
 | `enabled` | `bool` | `true` | Turn the gate off entirely. See the interaction with [`startup_checks`](#startup_checks) below |
 | `channel` | `str` | `event_stream` | Channel for any policy that does not name one |
 | `delivery.required` | `bool` | `false` | When `true`, a gated policy whose channel reaches nobody **refuses the boot** instead of logging at `ERROR` |
+| `stdio_wait_seconds` | `int` | `50` | Since 2.36.0. On a gateway serving stdio, an approval stays open for the shorter of this and `approval_timeout_seconds`. A value that is not a positive integer logs `approval_stdio_wait_invalid` and falls back to 50. HTTP is unaffected |
 | `<channel>` | `map` | -- | Settings for an installed delivery adapter, keyed by its channel name and passed to it as-is. Since 2.28.0 the key check accepts the block the configured `channel` names, beside `slack` and `webhook`; a block for any other name logs `unknown_config_key` |
 
 `dashboard` is an old name for `event_stream`; it still resolves, and logs
 `approval_delivery_channel_renamed`.
+
+`stdio_wait_seconds` exists because a stdio client gives up on a request after
+its own timeout (60 seconds by default in the MCP TypeScript SDK), and a held
+call it has abandoned should not be granted. When the limit ends the window the
+approval moves to `expired`, an approve that arrives later is refused, and a
+retried call opens a new approval. Raise it if your client waits longer; lower
+it if your client gives up sooner.
 
 `event_stream` is the built-in channel: it does not push anywhere itself,
 because the notification already travels as a `ToolApprovalRequested` domain

@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-mcp--hangar.io-blue)](https://mcp-hangar.io)
 
-Production-grade MCP server registry with lazy loading, health monitoring, and container support.
+The MCP gateway that pins every tool, holds risky calls for approval, and enforces egress policy.
 
 ## Repository Structure
 
@@ -20,6 +20,9 @@ their own repositories (see [Releases & Artifacts](getting-started/releases.md))
 
 ## Features
 
+- **Tool Pinning** -- `mcp-hangar init` and `mcp-hangar pin --write` record a digest of every tool; a call to a tool whose description or schema changed since is refused
+- **Approvals** -- calls a policy marks for approval are held until an authorized principal resolves them ([Approval delivery adapters](guides/APPROVAL_ADAPTERS.md))
+- **Egress Policy** -- allow, deny or hold each tool call, and reject arguments that carry secrets or exceed a size limit ([Egress Policy](guides/EGRESS_POLICY.md))
 - **Lazy Loading** -- MCP servers start only when invoked, tools visible immediately
 - **Container Support** -- Docker/Podman with auto-detection
 - **MCP Server Groups** -- Load balancing with multiple strategies

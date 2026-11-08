@@ -145,8 +145,6 @@ spec:
   image: registry.example.com/your-org/db-tools:latest
   replicas: 1
 
-  startupTimeout: "60s"
-
   resources:
     requests:
       memory: "128Mi"
@@ -200,8 +198,6 @@ metadata:
 spec:
   mode: remote
   endpoint: https://api.example.com/mcp
-
-  startupTimeout: "30s"
 ```
 
 A remote CR either mirrors a server core already has, usually from its
@@ -244,11 +240,9 @@ Registration needs two things from core:
 A start that fails, such as a mistyped Service name, leaves the CR Degraded with
 reason `StartFailed`, retried every 10 seconds.
 
-For a container-mode server, `spec.healthPath` (operator 0.17.27) names the
-path core's discovery probes on its pod, stamped as `mcp-hangar.io/health-path`.
-Unset, core probes `/health`, and core 2.27.1 or newer falls back to an MCP
-`initialize` on `/mcp` when that answers 404, so a server without a health
-endpoint is registered rather than quarantined.
+Since operator 0.17.36 the operator registers a container-mode server in core
+itself, at its pod IP, so core's discovery no longer probes the pod and
+`spec.healthPath` has no reader; it is removed from the CRD (mcp-hangar-operator#328).
 
 Circuit breaking lives in core (`config.yaml`), not on the CR. The operator's
 own consecutive-failure cap before it marks a server Degraded is a constant, not
@@ -335,7 +329,6 @@ spec:
   # When does this group report Degraded?
   healthPolicy:
     minHealthyPercentage: 50
-    unhealthyThreshold: 3
 ```
 
 The group's status counts its members by state: `readyCount`, `degradedCount`,
@@ -402,7 +395,6 @@ spec:
 
   providerTemplate:
     spec:
-      startupTimeout: "60s"
       resources:
         requests:
           memory: "64Mi"
@@ -942,11 +934,11 @@ after an operator upgrade:**
   with a bad `endpoint`, refuses any spec change -- `replicas`, a discovery
   re-sync -- until the same update fixes it. Metadata and status
   updates still go through.
-- The per-field rules (durations, `cidr`, `expectedTools`, the length limits)
+- The per-field rules (durations, `cidr`, the length limits)
   are re-checked on Kubernetes 1.30+ only when that field changes; before 1.30
   there is no ratcheting, so a stored violation of any rule refuses every spec
   change until the same update fixes it. A stored bad
-  `cidr` or `expectedTools` entry can still block the controller's status write
+  `cidr` entry can still block the controller's status write
   when it copies the capabilities into `status.capabilities` for the first
   time.
 - Find container servers with no image:
@@ -971,7 +963,6 @@ after an operator upgrade:**
 | `image` | string | For container | - | Container image, at most 1024 characters |
 | `endpoint` | string | For remote | - | Absolute `http` or `https` URL with a host, at most 2048 characters |
 | `replicas` | int | No | `1` | `1` runs the server, `0` stops it (Cold); nothing else since operator 0.17.10 |
-| `startupTimeout` | duration | No | - | Startup timeout. Accepted but not acted on; must be a non-negative duration |
 | `shutdownGracePeriod` | duration | No | `30s` | Pod termination grace period; must be a non-negative duration |
 | `resources` | object | No | - | Resource requirements |
 | `env` | array | No | - | Environment variables |
@@ -988,8 +979,7 @@ after an operator upgrade:**
 | `tls.maxConnectionAge` | duration | No | `1h` in core | How long one connection serves before a fresh handshake checks the key again; only with `tls.peerIdentity` |
 | `initData` | string | No | - | The init-data document (TOML) a confidential guest is launched with, for a container-mode server whose `tls.peerIdentity.issuance` is `kbs-attested` ([ADR-031](../adr/ADR-031-a-kbs-attested-key-is-bound-to-code-identity-through-init-data.md)); refused on any other server. The operator copies it byte for byte into the pod's `io.katacontainers.config.hypervisor.cc_init_data` annotation and publishes the SHA-256, SHA-384 and SHA-512 of those bytes as `status.initDataDigests`. Such a server also needs a digest-pinned `image`, no `env` from a Secret, only `emptyDir` volumes and `automountServiceAccountToken: false`. Up to 98,304 bytes. Operator 0.17.34 |
 | `capabilities.network` | object | No | - | Declared egress; feeds the generated `NetworkPolicy`. An egress `cidr` must be an IPv4 CIDR such as `10.0.0.0/8` or an IPv6 one such as `fd00::/8` |
-| `capabilities.tools` | object | No | - | `maxCount` / `expectedTools`; drives violation events. `expectedTools` holds at most 256 non-empty, unique names of at most 256 characters |
-| `capabilities.enforcementMode` | string | No | `alert` | `alert`, `block` or `quarantine` |
+| `capabilities.tools` | object | No | - | `maxCount`; drives violation events |
 
 ### MCPServer Status
 
@@ -1029,9 +1019,7 @@ runs:
 - An `MCPServer` with `mode: container` and no `image`, or `mode: remote` and
   no `endpoint`, or an `endpoint` that is not an absolute `http`/`https` URL
   with a host.
-- A negative or unparseable `startupTimeout` or `shutdownGracePeriod`.
-- An `expectedTools` list with an empty or duplicate entry, more than 256
-  entries, or an entry longer than 256 characters.
+- A negative or unparseable `shutdownGracePeriod`.
 - An egress `cidr` that is not an IPv4 CIDR or an IPv6 CIDR (the IPv6 form is
   checked for its shape and prefix length only), and an `image` longer than
   1024 or an `endpoint` longer than 2048 characters.

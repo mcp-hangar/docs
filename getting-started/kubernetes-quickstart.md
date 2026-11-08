@@ -6,7 +6,10 @@ from the published charts, run one MCP server in a pod, call one of its tools
 through core with an API key, and then deny that tool with an
 `MCPEgressPolicy`. About ten minutes on a laptop.
 
-Every command below runs as written, in order, in one shell.
+Every command below runs as written, in order, in one shell. A nightly job
+does exactly that on a fresh kind cluster against the published charts
+(`scripts/run_kind_walkthrough.py`), and fails unless the refusal in step 6
+comes back.
 
 ## What you need
 

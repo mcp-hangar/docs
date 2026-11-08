@@ -1,0 +1,67 @@
+# Runs every command of getting-started/kubernetes-quickstart.md, in order and
+# as written, on a fresh kind cluster, and fails unless the page's tool call is
+# refused at the end (docs#462, operator#324).
+#
+# It installs the PUBLISHED charts and images, which change without a commit in
+# this repository, so it runs every night as well as on a PR that touches the
+# page. The blocks it runs are the ones marked `<!-- ci:walkthrough -->`
+# (scripts/run_kind_walkthrough.py); every bash block on the page must be.
+name: kind-walkthrough
+
+on:
+  pull_request:
+    paths:
+      - getting-started/kubernetes-quickstart.md
+      - scripts/run_kind_walkthrough.py
+      - .github/workflows/kind-walkthrough.yml
+  schedule:
+    - cron: "40 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The reader installs their own kind and Helm; these are pinned so the job
+  # turns red on a change of ours or of the charts, not on a tool release.
+  KIND_VERSION: v0.30.0
+  KIND_SHA256: 517ab7fc89ddeed5fa65abf71530d90648d9638ef0c4cde22c2c11f8097b8889
+  HELM_VERSION: v3.21.4
+
+jobs:
+  walkthrough:
+    name: kind walkthrough
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install kind
+        run: |
+          set -euo pipefail
+          curl -sSLo /tmp/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          echo "${KIND_SHA256}  /tmp/kind" | sha256sum -c -
+          sudo install /tmp/kind /usr/local/bin/kind
+          kind version
+          kubectl version --client
+          jq --version
+
+      # `kind create cluster` is the page's first command, so the cluster is
+      # not created here.
+      - name: Run the page
+        run: >-
+          python3 scripts/run_kind_walkthrough.py getting-started/kubernetes-quickstart.md
+          --require-expect EgressPolicyDeniedError
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl -n mcp-hangar get pods,mcpservers,mcpegresspolicies,networkpolicies -o wide || true
+          kubectl -n mcp-hangar describe mcpservers,mcpegresspolicies || true
+          kubectl -n mcp-hangar logs deploy/mcp-hangar --tail=80 || true
+          kubectl -n mcp-hangar logs deploy/mcp-hangar-operator --tail=80 || true
+          kubectl -n mcp-hangar logs deploy/mcp-provider-notes --tail=40 || true

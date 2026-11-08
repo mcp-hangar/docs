@@ -317,7 +317,10 @@ enforces a `NetworkPolicy` by looking for a CNI it recognises, and it does not
 recognise kind's. It reports what it could establish rather than assume. On a
 cluster whose CNI it does not recognise but you know enforces policy, set
 `operator.networkPolicyEnforcement: enforced` in the operator chart's values.
-On Calico or Cilium it reads `Enforcing` by itself.
+On Calico or Cilium it reads `Enforcing` by itself. An operator release with
+[mcp-hangar-operator#393](https://github.com/mcp-hangar/mcp-hangar-operator/issues/393)
+decides this from a block its own probe observes instead of the CNI's name,
+and then reads `Enforcing` here too.
 
 <!-- ci:walkthrough -->
 ```bash
@@ -335,7 +338,81 @@ L7Delivered=True (Delivered)
 
 <!-- ci:expect BackstopApplied=True -->
 
-## 8. Clean up
+## 8. Fence the server's ingress
+
+The backstop limits where the server's pod may connect. It does not limit who
+may connect to the server: any pod in the cluster can still call it directly
+on its pod address and skip core. The operator can fence that too. With
+`providerIngress.enabled`, it writes a second `NetworkPolicy` per container
+server that admits TCP 8080 only from core's pods in the gateway namespace.
+
+First, the baseline. This helper starts a throwaway pod that is not core,
+in core's namespace, and opens a connection to the server's pod address:
+
+<!-- ci:walkthrough -->
+```bash
+PROVIDER_IP=$(kubectl -n mcp-hangar get pod -l mcp-hangar.io/provider=notes \
+  -o jsonpath='{.items[0].status.podIP}')
+knock() {
+  kubectl -n mcp-hangar run "knock-$1" --rm -i --restart=Never --quiet \
+    --image=ghcr.io/mcp-hangar/mcp-hangar:2.36.1@sha256:71c6a52a8880e910f21ed05ead8178343aee721dd1ac544ebf55349d7aac213f \
+    --command -- python3 -c \
+    "import socket; socket.create_connection(('$PROVIDER_IP', 8080), timeout=5)" \
+    > /dev/null 2>&1 && echo "$1: reachable" || echo "$1: blocked"
+}
+knock before
+```
+
+<!-- ci:expect before: reachable -->
+
+It prints `before: reachable`. Now turn the fence on. Core runs in the
+`mcp-hangar` namespace, and the operator finds its pods by the label
+`app.kubernetes.io/name=mcp-hangar`:
+
+<!-- ci:walkthrough -->
+```bash
+helm upgrade mcp-hangar-operator oci://ghcr.io/mcp-hangar/charts/mcp-hangar-operator \
+  --namespace mcp-hangar --reuse-values \
+  --set providerIngress.enabled=true --set providerIngress.gatewayNamespace=mcp-hangar \
+  --wait --timeout 5m
+for i in $(seq 60); do
+  kubectl -n mcp-hangar get networkpolicy notes-ingress > /dev/null 2>&1 && break
+  sleep 2
+done
+kubectl -n mcp-hangar get networkpolicy notes-ingress \
+  -o jsonpath='{.spec.ingress[0].from[0].namespaceSelector.matchLabels}{" "}{.spec.ingress[0].from[0].podSelector.matchLabels}{"\n"}'
+sleep 10
+knock after
+```
+
+<!-- ci:expect after: blocked -->
+
+The policy admits pods labelled `app.kubernetes.io/name: mcp-hangar` in the
+namespace `mcp-hangar`, and nothing else, so the same knock now prints
+`after: blocked`. Core is the gateway those labels name, so a call through it
+still goes through:
+
+<!-- ci:walkthrough -->
+```bash
+kubectl -n mcp-hangar wait --for=condition=Ready mcpserver/notes --timeout=2m
+call add '{"a": 2, "b": 3}'
+kubectl -n mcp-hangar get mcpserver notes \
+  -o jsonpath='{range .status.conditions[?(@.type=="ProviderIngressApplied")]}{.type}={.status} ({.reason}){"\n"}{end}'
+```
+
+<!-- ci:expect "result": 5 -->
+
+`add` answers `5` as before. `ProviderIngressApplied` reports whether the
+fence is enforced on the same evidence as the backstop's `BACKSTOP` column, so
+on kind it reads `False (EnforcementNotObserved)` until the operator release
+above, although the knock shows the block.
+
+The fence is opt-in for the whole operator, and one server can opt out with
+the annotation `mcp-hangar.io/provider-ingress: "false"`. Other
+`NetworkPolicy` objects that select the server's pod can only add allowed
+sources, never remove them, so check for those before you rely on the fence.
+
+## 9. Clean up
 
 <!-- ci:walkthrough -->
 ```bash

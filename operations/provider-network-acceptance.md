@@ -14,6 +14,28 @@ checks gateway allow, ordinary client deny, matching labels in the wrong
 namespace deny, wrong labels in the gateway namespace deny, and opt-out.
 These are disposable CI topologies, not production acceptance.
 
+## Recorded acceptance (2026-11-08)
+
+The lab cluster this record was prepared for was decommissioned, and the
+maintainer decided that deployment acceptance for ADR-013 is the CI packet
+tests on Calico and Cilium plus the docs `kind-walkthrough` job, scoped as
+below. The decision text is on [docs #471](https://github.com/mcp-hangar/docs/issues/471).
+The rows that follow record those runs. They establish the boundary on these
+disposable topologies; any other cluster still needs its own run of this
+procedure.
+
+| Evidence | Topology | What ran |
+| --- | --- | --- |
+| [Operator e2e reachability, nightly](https://github.com/mcp-hangar/mcp-hangar-operator/actions/runs/42362999947) at operator `e6bfa3c` | kind with `kindest/node:v1.37.0`; Calico v3.28.2, Cilium v1.20.1, and Cilium v1.20.1 with NodeLocal DNSCache as a pod behind a CiliumLocalRedirectPolicy | `TestOperator_ProviderIngress_GatewayOnly`, `TestOperator_AuditEnforceAudit_Reachability`, `TestOperator_EgressPolicyBackstopIsEnforced`, each passed on all three legs |
+| [Docs kind walkthrough](https://github.com/mcp-hangar/docs/actions/runs/42522485888) | kind v0.30.0 with `kindest/node:v1.34.0` and its default CNI (kindnet), published charts | `getting-started/kubernetes-quickstart.md` steps 1 to 8, every expectation held |
+
+Selectors in both: the gateway is namespace `mcp-hangar` and pod label
+`app.kubernetes.io/name=mcp-hangar`; the provider is pod label
+`mcp-hangar.io/provider: <server>` on TCP/8080; every probe is a new TCP
+connection from a new pod. The e2e runs the operator built from the commit,
+without core, so it does not exercise MCP calls; the walkthrough runs core and
+the published operator, so it does.
+
 Use a chart whose `appVersion` contains the feature. If `image.tag` overrides it,
 verify the actual image and both provider-ingress flags. Review the operator's
 upgrade notes for Audit/default-Allow behavior before changing a deployment.
@@ -58,18 +80,22 @@ to distinguish these cases. Treat unexpected success in a deny case as failure.
 
 | Source | Expected result with opt-in | Recorded result |
 | --- | --- | --- |
-| Real gateway namespace and matching pod labels | Allow | NOT RUN |
-| Ordinary client in provider namespace | Deny | NOT RUN |
-| Matching gateway labels in a different namespace | Deny | NOT RUN |
-| Wrong pod labels in gateway namespace | Deny | NOT RUN |
-| Actual gateway MCP call to the test provider | Success for an allowed operation | NOT RUN |
-| Gateway and provider health/readiness checks | Remain healthy | NOT RUN |
+| Real gateway namespace and matching pod labels | Allow | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e) |
+| Ordinary client in provider namespace | Deny | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e) and kindnet (walkthrough step 8, `after: blocked`) |
+| Matching gateway labels in a different namespace | Deny | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e); NOT RUN on kindnet |
+| Wrong pod labels in gateway namespace | Deny | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e) and kindnet (walkthrough step 8; there the gateway and provider share a namespace) |
+| Actual gateway MCP call to the test provider | Success for an allowed operation | PASS on kindnet (walkthrough step 8, `add` answers 5 behind the fence); NOT RUN on Calico or Cilium |
+| Gateway and provider health/readiness checks | Remain healthy | PASS on kindnet (walkthrough step 8, `MCPServer` Ready after the fence); NOT RUN on Calico or Cilium |
 
 Set the test server annotation to `"false"`. Verify removal of only the
 operator-owned ingress policy. Repeat the ordinary-client probe: expect baseline
 connectivity if no independent policy blocks it. An independent deny must remain
 in place; annotate that topology instead of claiming opt-out removed it.
 Restore the original annotation after collecting evidence.
+
+Recorded: opt-out PASS on Calico, Cilium and Cilium with NodeLocal DNSCache
+(e2e: the owned policy is removed and the ordinary client connects again);
+NOT RUN on kindnet. The e2e namespace holds no independent deny.
 
 ## Run Audit and Enforce probes
 
@@ -80,11 +106,11 @@ For each transition, wait for `status.observedGeneration` to match and record
 
 | Policy stage | Expected policy-owned behavior | Recorded result |
 | --- | --- | --- |
-| Audit with default Deny | No blocking backstop; baseline destination reachable | NOT RUN |
-| Enforce with default Deny | Destination outside the allow-list blocked | NOT RUN |
-| Return to Audit | Owned blocking backstop removed; baseline reachable again | NOT RUN |
-| Enforce with default Allow | No policy-owned restrictive backstop | NOT RUN |
-| Same Allow stage with a separately owned deny | Independent deny still blocks | NOT RUN |
+| Audit with default Deny | No blocking backstop; baseline destination reachable | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 0) |
+| Enforce with default Deny | Destination outside the allow-list blocked | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 1) and kindnet (walkthrough step 7, `blocked`) |
+| Return to Audit | Owned blocking backstop removed; baseline reachable again | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 2) |
+| Enforce with default Allow | No policy-owned restrictive backstop | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 3) |
+| Same Allow stage with a separately owned deny | Independent deny still blocks | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 4) |
 
 Also exercise a permitted and a forbidden MCP operation through the configured
 gateway in Enforce mode. Use a principal authorized for the operation so that
@@ -95,10 +121,19 @@ verify observation without policy-owned blocking. TCP reachability alone does
 not prove an L7 rule was evaluated. Use the deployment's existing authenticated
 client; redact credentials and sensitive tool arguments from the evidence.
 
+Recorded: on kindnet the walkthrough's step 6 calls a permitted tool (`add`,
+answers 5) and a forbidden one (`read_env`, refused with
+`EgressPolicyDeniedError` and layer `l7`) through core with an administrator
+key, in Enforce mode. The forbidden operation in Audit mode, and the matching
+audit and decision records, are NOT RUN.
+
 ## Qualifying limits and rollback
 
 Record node/host traffic, pre-existing connections, other additive allow policies,
 remote providers and opted-out servers as unverified unless separately exercised.
+The recorded acceptance above leaves all of them unverified, along with
+hostname (`toFQDNs`) egress outside the Cilium legs and any CNI not named
+here.
 Do not extend a result for container pods to remote endpoints. NodeLocal DNS and
 Cilium hostname egress require their own allowed/denied DNS and upstream probes;
 the ingress test does not qualify hostname egress.
@@ -108,6 +143,10 @@ named probe resources. Verify gateway/provider health and that independently
 owned policies are unchanged. Retain before/after manifests and probe evidence.
 
 Attach the completed record to [docs #471](https://github.com/mcp-hangar/docs/issues/471).
+On the status side, operator releases before the one with
+[mcp-hangar-operator#393](https://github.com/mcp-hangar/mcp-hangar-operator/issues/393)
+report kindnet's backstop and fence as unenforced although the probes above
+show them blocking; status there is not acceptance evidence either way.
 Report PASS, FAIL or INCONCLUSIVE per row and identify every untested boundary.
 Closing the architecture follow-up requires a maintainer decision on the retained
 ADR boundary and acceptance evidence for the deployment scope being claimed.

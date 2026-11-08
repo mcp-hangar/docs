@@ -94,13 +94,11 @@ Then the operator, which reads `hangar.url` and the Secret from the same file:
 <!-- ci:walkthrough -->
 ```bash
 helm install mcp-hangar-operator oci://ghcr.io/mcp-hangar/charts/mcp-hangar-operator \
-  --namespace mcp-hangar -f values.yaml --set image.tag=0.17.36 --wait --timeout 5m
+  --namespace mcp-hangar -f values.yaml --wait --timeout 5m
 ```
 
-`--set image.tag=0.17.36` selects operator 0.17.36, the first release that
-registers container servers in core itself. It stays on the command line rather
-than in `values.yaml` because both charts read `image.tag`. Once the operator
-chart's default image is 0.17.36 or later, drop it.
+The operator chart 0.12.52 and later defaults to operator 0.17.36, the first
+release that registers container servers in core itself.
 
 ## 3. Run an MCP server in a pod
 

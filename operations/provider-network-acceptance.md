@@ -133,7 +133,11 @@ Record node/host traffic, pre-existing connections, other additive allow policie
 remote providers and opted-out servers as unverified unless separately exercised.
 The recorded acceptance above leaves all of them unverified, along with
 hostname (`toFQDNs`) egress outside the Cilium legs and any CNI not named
-here.
+here. kindnet's egress enforcement holds for the walkthrough's kind version only:
+on the hosted runner's kind (`kindest/node:v1.37.0`, pod subnet
+`192.168.0.0/16`) the operator's egress tests saw denied destinations get
+through while the ingress fence held
+([operator run](https://github.com/mcp-hangar/mcp-hangar-operator/actions/runs/42522227476)).
 Do not extend a result for container pods to remote endpoints. NodeLocal DNS and
 Cilium hostname egress require their own allowed/denied DNS and upstream probes;
 the ingress test does not qualify hostname egress.

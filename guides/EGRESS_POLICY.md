@@ -138,9 +138,6 @@ in place.
 | ------- | ------ | ------------- |
 | `name` | string | Rule name, unique within the policy (enforced by a CEL rule). |
 | `match.host` | string | Upstream host: an FQDN (needs Cilium), or a literal IP/CIDR (works under any CNI). |
-| `match.toolSchemaDigestRef` | string | References an existing per-tenant tool-schema pin. |
-| `match.imageDigest` | `required` \| `inherited` | How the target's image pin gates this upstream. |
-| `match.issuers` | list | Restricts which token issuers may be brokered to this upstream. |
 | `tools.allow` / `tools.deny` / `tools.requireApproval` | list of globs | Tool-name globs. Precedence: **deny > requireApproval > allow > defaultAction**. |
 | `headers.allow` / `headers.deny` / `headers.requireApproval` | list | `Mcp-Param-*` header selectors; see [the policy language recipe](../cookbook/24-egress-policy-language.md). |
 | `arguments.deny.secretPatterns` | list | Named secret-pattern groups to reject (below). |

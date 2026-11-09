@@ -145,9 +145,9 @@ unchanged today. Read once, pin by digest.
 | Artifact | Version | Digest | Signed |
 | --- | --- | --- | --- |
 | Core image (`ghcr.io/mcp-hangar/mcp-hangar`) | `2.36.1` | `sha256:71c6a52a8880e910f21ed05ead8178343aee721dd1ac544ebf55349d7aac213f` | ✅ |
-| Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.17.35` | `sha256:10890b1c3b576701c4b6c4a0bb9ea2909876ce1128cf0673b54760d41747d9b8` | ✅ |
-| Chart `charts/mcp-hangar` (appVersion `2.36.1`) | `0.15.55` | `sha256:597e281aee2c289d528c098792e6f71e35a4c3dcbdc35e29268e931f10e08f73` | ✅ |
-| Chart `charts/mcp-hangar-operator` (appVersion `0.17.35`) | `0.12.51` | `sha256:170971c96478f3d0f0d7afa20e4dfb222ddfb58382278de12fd6d1c466693493` | ✅ |
+| Operator image (`ghcr.io/mcp-hangar/mcp-hangar-operator`) | `0.17.36` | `sha256:d5df6d8cd2a9b98b7c000b2c0dc8f7dcbd57e6962290dc3f869534fcb0508406` | ✅ |
+| Chart `charts/mcp-hangar` (appVersion `2.36.1`) | `0.15.56` | `sha256:0dc53c7d22bd98573199a59bca75473488c0f01dd12400023e231c2c5be442d2` | ✅ |
+| Chart `charts/mcp-hangar-operator` (appVersion `0.17.36`) | `0.12.52` | `sha256:5c1e6dbc39a0231f3d76d69fc281fa852d6f96792226c18fea61e7a67e61b84a` | ✅ |
 <!-- END generated: released-artifacts -->
 
 ### Chart release history
@@ -161,6 +161,7 @@ the compatibility matrix above names only the newest chart per core minor.
 
 | Chart version | appVersion | kubeVersion |
 | --- | --- | --- |
+| `0.15.56` | `2.36.1` | `>=1.25.0-0` |
 | `0.15.55` | `2.36.1` | `>=1.25.0-0` |
 | `0.15.54` | `2.36.0` | `>=1.25.0-0` |
 | `0.15.53` | `2.35.0` | `>=1.25.0-0` |
@@ -240,6 +241,7 @@ the compatibility matrix above names only the newest chart per core minor.
 
 | Chart version | appVersion | kubeVersion |
 | --- | --- | --- |
+| `0.12.52` | `0.17.36` | `>=1.30.0-0` |
 | `0.12.51` | `0.17.35` | `>=1.30.0-0` |
 | `0.12.50` | `0.17.34` | `>=1.30.0-0` |
 | `0.12.49` | `0.17.33` | `>=1.30.0-0` |

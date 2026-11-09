@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.70](https://github.com/mcp-hangar/docs/compare/v1.2.69...v1.2.70) (2026-11-09)
+
+
+### Changed
+
+* **guides:** drop the crd fields the operator removes ([#617](https://github.com/mcp-hangar/docs/issues/617)) ([6093a3b](https://github.com/mcp-hangar/docs/commit/6093a3b807d9f31f1ab39b5744aa9ac423f99060))
+* **guides:** drop the operator image pin from the kind walkthrough ([6d773be](https://github.com/mcp-hangar/docs/commit/6d773befc6f1b1245254eea0938f0411cd0251cc)), closes [#462](https://github.com/mcp-hangar/docs/issues/462)
+* **guides:** fence provider ingress in the kind walkthrough and record ci acceptance ([749246a](https://github.com/mcp-hangar/docs/commit/749246afae13d01e427646e0581260849cde4f04))
+* **guides:** from an empty kind cluster to a governed deny, on one page ([bf5c8f5](https://github.com/mcp-hangar/docs/commit/bf5c8f5d8a5a378a4255a13d258d1ef700ea4cbf)), closes [#462](https://github.com/mcp-hangar/docs/issues/462)
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#609](https://github.com/mcp-hangar/docs/issues/609)) ([bd5e62d](https://github.com/mcp-hangar/docs/commit/bd5e62db1ad6ad600df60b6c832922696ef822d0))
+* **repo:** one tagline on the docs index ([ec3a8d7](https://github.com/mcp-hangar/docs/commit/ec3a8d747c85dd1eb1556e5cb513261db191bcb4))
+
 ## [1.2.69](https://github.com/mcp-hangar/docs/compare/v1.2.68...v1.2.69) (2026-11-05)
 
 

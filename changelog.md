@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.75](https://github.com/mcp-hangar/docs/compare/v1.2.74...v1.2.75) (2026-11-12)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#629](https://github.com/mcp-hangar/docs/issues/629)) ([ca73375](https://github.com/mcp-hangar/docs/commit/ca73375ca9eca1a4c6c1c9fce41044ef6b328189))
+* **guides:** describe the partial backstop of a group with remote members ([#631](https://github.com/mcp-hangar/docs/issues/631)) ([3663236](https://github.com/mcp-hangar/docs/commit/3663236056c2f01b0fd60a84246f27c262b86324))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#632](https://github.com/mcp-hangar/docs/issues/632)) ([cd2416d](https://github.com/mcp-hangar/docs/commit/cd2416dd9691e79e9f5f50116e2f43b000c89105))
+
 ## [1.2.74](https://github.com/mcp-hangar/docs/compare/v1.2.73...v1.2.74) (2026-11-12)
 
 

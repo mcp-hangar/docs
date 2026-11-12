@@ -296,7 +296,7 @@ drops the policy on restart shows it on every reconcile.
 | Condition | Meaning |
 | ----------- | --------- |
 | `Compiled` | The policy was structurally compiled. |
-| `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`, and `False` with `RemoteTargetHasNoPods` when the target is a `mode: remote` server, operator 0.17.28). |
+| `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`, `False` with `RemoteTargetHasNoPods` when the target is a `mode: remote` server, operator 0.17.28, and `True` with `RemoteMembersNotCovered` for a group whose remote members it does not cover, operator 0.17.39). |
 | `BackstopEnforceable` | Whether anything in the cluster enforces the written backstop: `True` / `EnforcerObserved` when the operator finds a policy-enforcing API or a known CNI agent, `False` / `NoEnforcerObserved` when it finds neither (`status.backstopEnforcement: Unenforced`; the `Backstop` column of `kubectl get`), `Unknown` / `EnforcementUnverified` when it could not tell, for example because it may not list DaemonSets (`status.backstopEnforcement: Unverified`). |
 | `L7Delivered` | Whether core took the compiled L7 policy (operator 0.17.5). `True` / `Delivered` once every target server accepted the push; `True` / `DeliveredNotPersisted` when core took it but has no persistence backend (see [Surviving a gateway restart](#surviving-a-gateway-restart)); `False` / `CoreAuthRejected`, `CoreUnreachable` or `PushFailed`, naming the server whose push failed, or `GatewayPodMissingPolicy` when a gateway pod accepted the push but did not return the policy on read-back (operator 0.17.38); `Unknown` / `CoreIntegrationOff` when the operator runs without `--hangar-url`. Shown as the `L7` column of `kubectl get mcpegresspolicies`. |
 | `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), `CiliumAgentNotObserved` (Cilium requested, CRD present, no `cilium` agent observed; operator 0.17.7 and later), `TargetNotFound`, `EnforcementNotObserved` (nothing observed to enforce the backstop), or `L7PushFailed` (`L7Delivered=False`). |
@@ -313,6 +313,17 @@ that. Now it writes no backstop (and removes one left behind), reports
 a remote target they are the only enforcement; the network path is controlled by the
 gateway pod's own egress policy. A group reads `NotApplicable` only when every member
 is remote.
+
+A group with both `mode: container` and `mode: remote` members keeps the backstop
+for the members that run pods. Since operator 0.17.39 it reports
+`BackstopApplied=True` with reason `RemoteMembersNotCovered`, a message that names
+the remote members, and `backstopEnforcement: Partial` in place of `Enforcing`.
+Before, it read plain `Enforcing`, as if the backstop covered the remote members
+too. `Partial` does not set `Degraded`: nothing is enforced less than before, and
+the L7 rules still reach every member. Apply the new CRD with the operator image:
+with an older CRD the API server rejects the status write of such a policy. An
+alert or script that treats anything but `Enforcing` as a problem will now see
+these policies.
 
 **One enforcement probe for every NetworkPolicy the operator writes.** The
 probe behind `BackstopEnforceable` looks for a policy-enforcing API (Calico,

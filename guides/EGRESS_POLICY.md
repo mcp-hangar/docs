@@ -219,13 +219,30 @@ becomes Ready -- a new pod, a container restarted in place, or every Ready
 gateway pod when the operator itself starts. It finds gateway pods with
 `--hangar-gateway-selector` (default `app.kubernetes.io/name=mcp-hangar`, the
 mcp-hangar chart's label; empty disables it). A selector that matches no pod
-makes this a no-op, and the operator logs an error-level line saying so. With
-more than one gateway replica and no shared backend, the push goes through the
-`--hangar-url` Service and reaches whichever replica it routes to, not
-necessarily the one that restarted.
+makes this a no-op, and the operator logs an error-level line saying so.
+
+How the push reaches the pods depends on `--hangar-url`:
+
+- **A cluster Service name** (`<service>.<namespace>.svc...`, operator 0.17.38
+  and later): the operator delivers the policy to each Ready gateway pod in that
+  namespace at the pod's IP, on its container port named `http`, and reads it
+  back with `GET /api/mcp_servers/{id}/l7_policy`. `L7Delivered=True` means
+  every serving pod answered the read-back with the policy. Until then the
+  policy reads `L7Delivered=False`, naming the pods, and the operator retries
+  every 10 seconds. This needs `policy:read` on the operator's API key (the
+  built-in `kubernetes-operator` role holds it) and the operator able to reach
+  the pod IPs. Gateway-labelled pods in other namespaces are never contacted.
+- **Any other URL** -- an IP, a bare or external host name -- or an operator
+  older than 0.17.38: the push goes through `--hangar-url` once and a 2xx counts
+  as delivered. With more than one replica it reaches whichever one the Service
+  routes to, not necessarily the one that restarted. A single replica is
+  affected as well: a rolling update keeps the old pod serving until the new one
+  is Ready, so the push sent when the new pod turns Ready can land on the old
+  one. On those operators, give core's Deployment `strategy.type: Recreate` (a
+  post-render patch), or use a backend that keeps the policy (below).
 
 Where the re-delivery does not reach -- an older operator, a selector that
-matches nothing, a replica the Service did not route to -- whatever the gateway
+matches nothing, a replica the push did not reach -- whatever the gateway
 does not keep across a restart is **not enforced from the restart until the
 next reconcile**, which can be hours. The L3/L4 backstop is not affected; it
 lives in the cluster, not in the gateway.
@@ -281,7 +298,7 @@ drops the policy on restart shows it on every reconcile.
 | `Compiled` | The policy was structurally compiled. |
 | `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`, and `False` with `RemoteTargetHasNoPods` when the target is a `mode: remote` server, operator 0.17.28). |
 | `BackstopEnforceable` | Whether anything in the cluster enforces the written backstop: `True` / `EnforcerObserved` when the operator finds a policy-enforcing API or a known CNI agent, `False` / `NoEnforcerObserved` when it finds neither (`status.backstopEnforcement: Unenforced`; the `Backstop` column of `kubectl get`), `Unknown` / `EnforcementUnverified` when it could not tell, for example because it may not list DaemonSets (`status.backstopEnforcement: Unverified`). |
-| `L7Delivered` | Whether core took the compiled L7 policy (operator 0.17.5). `True` / `Delivered` once every target server accepted the push; `True` / `DeliveredNotPersisted` when core took it but has no persistence backend (see [Surviving a gateway restart](#surviving-a-gateway-restart)); `False` / `CoreAuthRejected`, `CoreUnreachable` or `PushFailed`, naming the server whose push failed; `Unknown` / `CoreIntegrationOff` when the operator runs without `--hangar-url`. Shown as the `L7` column of `kubectl get mcpegresspolicies`. |
+| `L7Delivered` | Whether core took the compiled L7 policy (operator 0.17.5). `True` / `Delivered` once every target server accepted the push; `True` / `DeliveredNotPersisted` when core took it but has no persistence backend (see [Surviving a gateway restart](#surviving-a-gateway-restart)); `False` / `CoreAuthRejected`, `CoreUnreachable` or `PushFailed`, naming the server whose push failed, or `GatewayPodMissingPolicy` when a gateway pod accepted the push but did not return the policy on read-back (operator 0.17.38); `Unknown` / `CoreIntegrationOff` when the operator runs without `--hangar-url`. Shown as the `L7` column of `kubectl get mcpegresspolicies`. |
 | `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), `CiliumAgentNotObserved` (Cilium requested, CRD present, no `cilium` agent observed; operator 0.17.7 and later), `TargetNotFound`, `EnforcementNotObserved` (nothing observed to enforce the backstop), or `L7PushFailed` (`L7Delivered=False`). |
 
 `Compiled` and `BackstopApplied` say nothing about core. Before operator 0.17.5 a policy whose L7 push core refused -- an API key without `policy:write`, a core that was down, a payload core rejected -- read `Compiled=True` and `Degraded=False`, with a Warning Event as the only trace. It now reads `L7Delivered=False` and `Degraded=True` / `L7PushFailed`, so an alert on `Degraded` may fire on a policy that has been undelivered since it was created. Fix the key's permissions or core's reachability; the next reconcile clears it.
@@ -325,7 +342,7 @@ running, whatever the flag says.
 ## Limitations and notes
 
 - **L7 needs core integration.** The tool-call / argument rules are enforced only when the operator runs with `--hangar-url`; otherwise a policy applies its L3/L4 backstop, its L7 rules are not delivered, and it reports `L7Delivered=Unknown` / `CoreIntegrationOff`.
-- **The CR does not report whether the gateway still holds the L7 policy.** `L7Delivered=True` means core accepted the last push, not that the gateway kept it. A gateway without durable storage drops it on restart until it is delivered again; see [Surviving a gateway restart](#surviving-a-gateway-restart). To see what a gateway holds right now, `GET /api/mcp_servers/{id}/l7_policy`.
+- **The CR does not report whether the gateway still holds the L7 policy.** `L7Delivered=True` means the gateway accepted the last push -- and, with a cluster Service `--hangar-url` on operator 0.17.38 and later, that every serving pod read it back at that moment -- not that the gateway kept it since. A gateway without durable storage drops it on restart until it is delivered again; see [Surviving a gateway restart](#surviving-a-gateway-restart). To see what a gateway holds right now, `GET /api/mcp_servers/{id}/l7_policy`.
 - **FQDN enforcement requires Cilium.** Under other CNIs, list upstreams as CIDRs, or accept that hostname upstreams are denied (fail closed) and surfaced via `Degraded`.
 - **L7 rules are merged per server.** Because the core enforces one policy per server (not per upstream connection), a policy's upstream `tools`/`arguments` rules are flattened together (see [above](#l7-semantics)). Scope host-specific tool rules with separate policies if you need them kept apart.
 - **`requireApproval` needs the approval gate to be interactive** — since core 2.11.0 a gated call blocks on the approval gate (typed pending approval, `approval:resolve` chokepoint, dispatch-time revalidation), delivered on the default `event_stream` channel when nothing else is configured; on a deployment with the gate turned off (`approvals: {enabled: false}`) it fails closed, as it always did. `Audit` mode records the would-be verdict and never asks a human.

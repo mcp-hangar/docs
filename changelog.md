@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.74](https://github.com/mcp-hangar/docs/compare/v1.2.73...v1.2.74) (2026-11-12)
+
+
+### Changed
+
+* **guides:** describe per-pod L7 delivery and the single-replica rolling update ([#627](https://github.com/mcp-hangar/docs/issues/627)) ([73d0973](https://github.com/mcp-hangar/docs/commit/73d0973d3709074213631be004a2adc778862483))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#626](https://github.com/mcp-hangar/docs/issues/626)) ([4171192](https://github.com/mcp-hangar/docs/commit/4171192c47e6b0d1bee78012bf17c456673432ee))
+
 ## [1.2.73](https://github.com/mcp-hangar/docs/compare/v1.2.72...v1.2.73) (2026-11-11)
 
 

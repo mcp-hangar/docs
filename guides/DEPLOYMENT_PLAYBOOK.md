@@ -146,8 +146,12 @@ What changes from Stage 3:
 
 - Switch the topology mode: set `tool_access.mode: front_door`. In this mode a
   caller with no tenant identity is denied every tool (fail-closed), and
-  external agents see flat per-tenant backend tool names instead of the
-  `hangar_*` meta-API.
+  external agents see backend tool names instead of the `hangar_*` meta-API:
+  the ones each `mcp_servers` entry lists in `tool_projection.flat`, filtered
+  per tenant. *Since 2.37.0* every entry must carry that list, or the gateway
+  refuses to start, and a server registered over the REST API or by discovery
+  serves no tool on a front door. See
+  [Choosing the surface](FRONT_DOOR.md#choosing-the-surface-tool_projectionflat).
 - Front the gateway with a real OIDC issuer. Hangar validates the JWTs and maps
   a tenant claim onto the caller identity; per-tenant `tool_access` and tool
   projection then govern what each tenant can call. See the
@@ -208,7 +212,8 @@ controls:
 - **Auth** went from off (dev) to on (staging onward) to OIDC per-tenant
   (front door).
 - **Topology** went from the default `egress` (trusted callers, full meta-API)
-  to `front_door` (untrusted agents, fail-closed, flat per-tenant tools).
+  to `front_door` (untrusted agents, fail-closed, only the tools each entry
+  names in `tool_projection.flat`, filtered per tenant).
 - **Durability** went from in-memory to a `sqlite` event store that fails fast
   rather than silently losing the audit trail.
 - **Health gating** used `/health/live` and `/health/ready` so rollouts wait

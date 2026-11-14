@@ -54,6 +54,8 @@ mcp_servers:
     strategy: weighted_round_robin       # group's normal LB for everyone else
     min_healthy: 1
     description: "Search backend with canary rollout"
+    tool_projection:
+      flat: [version]                    # the group's tools the front door serves (2.37.0+)
 
     canary:                              # NEW: per-tenant canary routing
       member: search-v2                  # NEW: member that receives canary traffic

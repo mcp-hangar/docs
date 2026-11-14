@@ -64,6 +64,7 @@ mcp_servers:
     description: "Payments backend"
 
     tool_projection:
+      flat: [charge, refund]              # the tools the front door serves (2.37.0+)
       digest_enforcement: audit           # NEW: start in audit (observe, do not block)
 
       withdrawn: []                       # (optional) tools withdrawn for ALL tenants

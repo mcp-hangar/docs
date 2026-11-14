@@ -172,6 +172,12 @@ A reload can therefore launch subprocesses or containers, or open connections
 to remote servers. In `egress` mode a reload starts nothing, and servers start
 on first use.
 
+*Since 2.37.0*, on a front door, a reload is refused when any entry in
+`mcp_servers` lacks `tool_projection.flat`, whether the new file dropped the
+key or added a server without it. Nothing is stopped, and the gateway keeps
+serving the configuration it had. See
+[What a front door serves](configuration.md#what-a-front-door-serves-tool_projectionflat).
+
 *Since 2.34.4*, on a front door, a server a reload removes also leaves
 `tools/list`, and listing clients get `notifications/tools/list_changed`.
 Before, its tools stayed listed though a call of them was already refused. A
@@ -236,7 +242,8 @@ mcp_servers:
 ```
 
 **Result:** `math` unchanged, `filesystem` added in `COLD` state. On a
-`front_door` gateway it is then started, and its tools are listed.
+`front_door` gateway each entry would also carry `tool_projection.flat`; the
+added server is then started, and the tools its `flat` names are listed.
 
 ### Update MCP Server
 

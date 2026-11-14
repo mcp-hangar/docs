@@ -62,6 +62,9 @@ mcp_servers:
         "tenant:globex":
           allow_list: [charge, refund]      # globex may charge and refund
 
+    tool_projection:
+      flat: [charge, refund]                # the tools the front door serves (2.37.0+)
+
   billing:
     mode: remote
     endpoint: http://localhost:8082/mcp
@@ -73,6 +76,9 @@ mcp_servers:
           deny_list: [invoice]              # acme must be named to be kept out
         "tenant:globex":
           allow_list: [invoice]             # globex may invoice
+
+    tool_projection:
+      flat: [invoice]
 ```
 
 Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.

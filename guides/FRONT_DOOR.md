@@ -15,18 +15,26 @@ itself as an OAuth 2.0 protected resource (RFC 9728).
 ## Egress vs. Front-Door
 
 The topology mode is set once at the top level of your config under
-`tool_access.mode`:
+`tool_access.mode`. *Since 2.37.0* a front door also needs each entry in
+`mcp_servers` to name the tools it serves, in `tool_projection.flat`:
 
 ```yaml
 tool_access:
   mode: front_door   # "egress" (default) | "front_door"
+
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: http://payments:8080/mcp
+    tool_projection:
+      flat: [charge, refund]   # required on a front door; flat: [] serves no tool
 ```
 
 | | `egress` (default) | `front_door` |
 | --- | --- | --- |
 | Caller trust | Trusted internal callers | Untrusted external agents |
 | Caller without a tenant identity | Allowed (server-level policy applies) | **Denied** (fail-closed) |
-| Tool surface exposed to clients | Full `hangar_*` meta-API | Flat per-tenant backend tool names, beside the `hangar_*` tools the caller's role permits |
+| Tool surface exposed to clients | Full `hangar_*` meta-API | The backend tools each entry names in `tool_projection.flat`, under their own names and filtered per tenant, beside the `hangar_*` tools the caller's role permits |
 | Use case | Internal control plane / proxy | Public or multi-tenant front door |
 
 If `tool_access.mode` is absent, Hangar uses `egress`, so an upgrade never
@@ -38,6 +46,80 @@ permissive mode instead. This changed in 2.2.0; see the
 
 > Source: `src/mcp_hangar/server/config.py` (`_init_topology_mode_from_config`),
 > `src/mcp_hangar/domain/services/tool_access_resolver.py` (`TopologyMode`).
+
+## Choosing the Surface (`tool_projection.flat`)
+
+A front door serves an upstream tool under its own name only when the
+`mcp_servers` entry it belongs to lists it in `tool_projection.flat`. Every
+top-level entry, server or group, must carry the key; `flat: []` is a valid
+choice and serves none of its tools. A front door with an entry that has no
+`flat` refuses to start, and a reload that drops the key is refused while the
+gateway keeps serving what it served. The full rules, and how `flat` differs
+from `tools:` and `pins`, are in the
+[configuration reference](../reference/configuration.md#what-a-front-door-serves-tool_projectionflat).
+
+Before 2.37.0 a front door served every tool of every upstream. This
+configuration did that, and no longer starts:
+
+```yaml
+# Refused at 2.37.0: payments has not chosen its surface.
+tool_access:
+  mode: front_door
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: http://payments:8080/mcp
+```
+
+The same deployment in the new shape names each tool its clients call. To keep
+the old surface exactly, list every tool the server serves; to narrow it, leave
+some out:
+
+```yaml
+tool_access:
+  mode: front_door
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: http://payments:8080/mcp
+    tool_projection:
+      flat: [charge, refund, legacy_charge]   # every tool tools/list showed before
+```
+
+There is no `flat: all` and no wildcard. To find the names, read `tools/list`
+from the running front door before you upgrade, or
+`GET /api/mcp_servers/payments/tools`. After upgrading, write `flat: []` so the
+gateway starts, run `mcp-hangar pin`, and copy the names it prints into `flat`.
+
+Two consequences decide whether the list fits your deployment:
+
+- **A tool the list leaves out cannot be called on a front door.** It is absent
+  from `tools/list` and its call answers `-32601`, like a name that does not
+  exist. `hangar_call` is not served on a front door, so there is no other path
+  until discovery on demand ships
+  ([mcp-hangar#1373](https://github.com/mcp-hangar/mcp-hangar/issues/1373)).
+- **A server with no configuration entry serves no tool here.** A server
+  registered over `POST /api/mcp_servers` or by a discovery source, and so every
+  server the Kubernetes operator registers, cannot declare `flat`, and a front
+  door projects none of its tools. Declare it in `config.yaml`, or serve it
+  from an `egress` gateway.
+
+Why no default: a front door that serves whatever an upstream offers puts a tool
+the upstream adds tomorrow in front of every tenant no policy excludes, without
+anyone choosing it. The list is the worse choice where clients need every tool
+of a server that changes often, since each new tool waits for an edit, and where
+most servers arrive over REST or discovery. In those deployments `egress` is the
+closer fit until discovery on demand ships.
+
+`flat` changes only the tools. Prompts, resources and subscriptions are not
+narrowed by it, so `flat: []` still serves them. A member of one group is
+projected by its group's list. Task follow-ups are governed by the tool-access
+policy, and so is every call of a listed tool: naming a tool does not let a
+tenant whose policy denies it call it.
+
+> Source: `src/mcp_hangar/server/config.py` (`_check_flat_projection`,
+> `_not_visible`, `flat_tool_names`),
+> `src/mcp_hangar/fastmcp_server/flat_tool_projection.py` (`_named_flat`).
 
 ## Fail-Closed Default
 
@@ -388,8 +470,10 @@ This is done by re-registering the low-level `tools/list` and `tools/call`
 handlers when the topology mode is `front_door`. Each request builds a
 per-tenant `flat_name → (mcp_server, tool)` map, filtered to tools that are:
 
-1. active (not withdrawn) for the caller's tenant, and
-2. allowed for that tenant by the member-scope policy.
+1. active (not withdrawn) for the caller's tenant,
+2. allowed for that tenant by the member-scope policy, and
+3. named in `tool_projection.flat` by the entry the call routes to: the group
+   for a member of one group, else the server (*since 2.37.0*).
 
 A flat `tools/call` checks the caller's `tool:invoke` permission, as
 `hangar_call` does. A caller without it -- one holding only `viewer`, for
@@ -572,8 +656,10 @@ mcp_servers:
         "tenant:b":
           allow_list: [charge, refund]
 
-    # Config-declared tool withdrawals (effective = config OR runtime).
+    # The tools served under their own names (required on a front door), and
+    # config-declared withdrawals (effective = config OR runtime).
     tool_projection:
+      flat: [charge, refund]
       withdrawn: [legacy_charge]
       tenant_overrides:
         "tenant:a":

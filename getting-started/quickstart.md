@@ -85,6 +85,7 @@ mcp_servers:
       pins:
         echo: 2970199253016cbcebf2d4b43d194f2cdd4c28a8517381ae8a81aecc5edff245
       upstream: stdio:python:c0febcf3c496d3ee
+      flat: [echo]
 tool_access:
   mode: front_door
 auth:
@@ -95,12 +96,16 @@ auth:
       roles: [viewer]
 ```
 
-Three settings are doing the work:
+Four settings are doing the work:
 
 - `tool_access.mode: front_door` — your client sees the servers' own tool names
   (`echo`, `read_file`, …), plus only the read-only `hangar_*` tools the
   `viewer` role permits (`hangar_status`, `hangar_list`, …) — nothing that can
   start, stop or reconfigure a server. Hangar mediates every call.
+- `tool_projection.flat` — which of the server's tools the front door serves
+  under their own names. `init` writes every tool it saw; remove one to stop
+  serving it. Since 2.37.0 every server needs the key on a front door, and a
+  tool it does not list cannot be called through Hangar at all.
 - `tool_projection.pins` — the SHA-256 of each tool's name, description and
   schemas, as they were when `init` started the server. This is what "changed
   underneath you" is measured against.
@@ -120,7 +125,9 @@ When your client lists no MCP servers at all, `-y` installs the starter bundle
 written without the directory it needs. Its check fails and `init` ends with
 one server failed; the other two are tested and pinned. Add a directory to the
 end of the `filesystem` server's `command`, then run `mcp-hangar pin --write`,
-or run `init` without `-y` to be asked for it.
+or run `init` without `-y` to be asked for it. The failed server is written with
+`flat: []`, and `pin --write` adds pins, not `flat`: copy the tool names it
+wrote under that server's `pins` into its `flat` to serve them.
 
 ## 4. Change the tool — withheld
 
@@ -246,10 +253,32 @@ works on every version.
 ## Adding more MCP servers
 
 ```bash
-mcp-hangar add git        # local git operations
+mcp-hangar add git --no-reload        # local git operations
+```
 
+`add` writes no `tool_projection.flat`, and on a front door a server without it
+refuses the next start and the next reload. Give the new entry an empty list
+first, so the file loads:
+
+```yaml
+  git:
+    mode: subprocess
+    idle_ttl_s: 300
+    command: [uvx, mcp-server-git]
+    tool_projection:
+      flat: []
+```
+
+Then pin it, and name the tools your client should be served:
+
+```bash
 mcp-hangar pin --config ~/.config/mcp-hangar/config.yaml --write    # pin what you added
 ```
+
+`pin --write` writes the tools it found under `git`'s `tool_projection.pins`.
+Copy the ones you want into `flat`, for example
+`flat: [git_status, git_diff, git_log, git_show]`, and restart your client.
+`mcp-hangar config check` says whether the file will load.
 
 The `add` registry holds four servers: `filesystem`, `fetch`, `memory` and
 `git` (see [the CLI reference](../reference/cli.md#add)). Anything else, add to
@@ -278,15 +307,21 @@ mcp_servers:
   # with what each one needs, is in ../guides/OFFICIAL_SERVERS.md
   # A subprocess server runs `command` followed by `args`, since 2.28.0;
   # before it `args` was read in docker/container mode only.
+  # On a front door each server names the tools it serves in
+  # tool_projection.flat; one without the key refuses to start.
   filesystem:
     mode: subprocess
     command: [npx, -y, "@modelcontextprotocol/server-filesystem", /Users/your-username/Documents]
     idle_ttl_s: 300
+    tool_projection:
+      flat: []          # fill in from `mcp-hangar pin`, below
 
   fetch:
     mode: subprocess
     command: [uvx, "mcp-server-fetch"]
     idle_ttl_s: 300
+    tool_projection:
+      flat: [fetch]
 
 tool_access:
   mode: front_door
@@ -300,7 +335,9 @@ auth:
 ```
 
 Then `mcp-hangar pin --config ~/.config/mcp-hangar/config.yaml --write` to add
-the pins, and point your client at it:
+the pins. It writes each server's tool names under its `tool_projection.pins`;
+copy the `filesystem` ones you want served into its `flat`. Then point your
+client at it:
 
 ```json
 {
@@ -342,6 +379,21 @@ check authentication.
 ```
 
 Add the block from step 3.
+
+### Gateway refuses to start: "That surface must be chosen explicitly"
+
+Since 2.37.0 every server in `mcp_servers` needs `tool_projection.flat` on a
+front door, and the error names the one that has none. Usually it is a server
+`mcp-hangar add` wrote, or a file written by hand for an older version. Add
+`flat` with the tools to serve, or `flat: []` for none, and run
+`mcp-hangar config check`. See
+[Choosing the surface](../guides/FRONT_DOOR.md#choosing-the-surface-tool_projectionflat).
+
+### A server's tools are all missing
+
+Its `tool_projection.flat` is `[]`, or does not name them. A tool the list
+leaves out is not served under any name. Run `mcp-hangar pin` to see the tools
+the server has, and add the ones you want to `flat`.
 
 ### A tool you did not change is being refused
 

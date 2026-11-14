@@ -56,7 +56,7 @@ mcp_servers:
 | `capabilities` | `dict` | -- | -- | Declared capability contract (network, filesystem, environment, tools, resources, `enforcement_mode`). Hangar enforces these at runtime and flags deviations. |
 | `access` | `dict` | -- | -- | Prompt and resource access policy. See [Prompts and resources](#prompts-and-resources-access) |
 | `tool_access` | `dict` | -- | -- | `tool_access.member.<tenant>`: a per-tenant policy for this server, with the same keys as `tools` plus `access` |
-| `tool_projection` | `dict` | -- | -- | Digest pins. See [Digest Pinning](#digest-pinning) |
+| `tool_projection` | `dict` | -- | -- | Digest pins, and the tools a front door serves (`flat`, required there since 2.37.0). See [Digest Pinning](#digest-pinning) and [What a front door serves](#what-a-front-door-serves-tool_projectionflat) |
 | `header_exposure` | `dict` | -- | -- | See [Header Exposure](#header-exposure) |
 
 `network_mode` and `user` are in the key check since 2.28.0; before, each
@@ -166,6 +166,115 @@ split into its characters, so `deny_list: add` denied `a` and `d` and allowed
 `add` ([mcp-hangar#1648](https://github.com/mcp-hangar/mcp-hangar/issues/1648),
 [mcp-hangar#1718](https://github.com/mcp-hangar/mcp-hangar/issues/1718)). A
 policy you mean to have no effect is removed by deleting the block.
+
+### What a front door serves (`tool_projection.flat`)
+
+*Since 2.37.0.* Three keys on an `mcp_servers` entry take tool names, and each
+answers a different question. None of them is read from another.
+
+| Key | Question it answers | Effect of a name it lists |
+| --- | --- | --- |
+| `tools:` as a list | Which tools does this server have? (visibility) | The tool exists, with the schema written there; a name it does not list does not exist |
+| `tools:` as a mapping | Which tools may be called? (access policy) | `allow_list`, `deny_list` and `approval_list` decide whether a call runs, for every caller |
+| `tool_projection.flat` | Which tools does a front door serve under their own names? (flattening) | The tool is in a front door's `tools/list` and callable by its own name there |
+| `tool_projection.pins` | Is this still the tool that was reviewed? (contract) | A tool whose digest moved is withheld, under `digest_enforcement: block` |
+
+Listing a tool in `flat` does not allow it: a tenant's policy still decides,
+and a tool a policy denies stays unlisted. `flat` is not an access policy
+either. It chooses a front door's surface and nothing else, but on a front door
+a tool it does not list cannot be called by any path.
+
+```yaml
+mcp_servers:
+  payments:
+    mode: remote
+    endpoint: http://payments:8080/mcp
+    tools:
+      deny_list: [delete_account]
+    tool_projection:
+      flat: [charge, refund]            # served under their own names
+  search-pool:
+    mode: group
+    members:
+      - id: search-1
+        mode: remote
+        endpoint: http://search-1:8080/mcp
+    tool_projection:
+      flat: [search]                    # the group's list covers its members
+  audit-log:
+    mode: remote
+    endpoint: http://audit:8080/mcp
+    tool_projection:
+      flat: []                          # serves its resources, no tool
+tool_access:
+  mode: front_door
+```
+
+The rules, all checked when the configuration loads:
+
+- With `tool_access.mode: front_door`, every top-level `mcp_servers` entry,
+  servers and groups alike, must set `tool_projection.flat`. An entry without it
+  refuses to start, and the message says the surface must be chosen:
+
+  ```text
+  mcp_servers.payments is served on a front door (tool_access.mode: front_door) and has not chosen which of its tools are projected under their own names. That surface must be chosen explicitly: add tool_projection.flat to 'payments' with the tools to project, or flat: [] for none. There is no `flat: all`. ...
+  ```
+
+- `flat` is a list of tool names. There is no `flat: all` and no wildcard: a
+  name containing `*`, `?`, `[` or `]`, or the name `all`, is refused.
+- A name the entry's own `tools:` does not make visible is refused: one a
+  `tools:` list does not declare, or one a `tools:` policy does not allow. The
+  message names both keys. A per-tenant `tool_access.member` policy is not
+  consulted here; it narrows the list per caller at request time.
+- Under `egress`, which serves no tool under its own name, `flat` is refused
+  (ADR-027).
+- A reload of a file that drops the key, or adds an entry without it, is
+  refused before anything stops, and the gateway keeps serving what it served.
+
+What a tool that is not listed becomes on a front door:
+
+- It is not in `tools/list`, and a call of it answers `-32601`, as a name that
+  does not exist does.
+- No other path reaches it: `hangar_call` is not served on a front door. Until
+  discovery on demand ships
+  ([mcp-hangar#1373](https://github.com/mcp-hangar/mcp-hangar/issues/1373)),
+  name every tool a client must call.
+
+What `flat` does not change:
+
+- A member of one group is projected by its group's list, not by its own.
+- `flat` does not narrow prompts, resources or subscriptions. An entry with
+  `flat: []` still serves them on a front door, which still serves only callers
+  with a tenant.
+- A task follow-up (`tasks/get`, `tasks/result` and the others) is governed by
+  the tool-access policy, not by `flat`.
+- Who may call a projected tool: `tool:invoke` from the authorizer, narrowed by
+  tool-access policy (ADR-028).
+
+A server registered over `POST /api/mcp_servers` or by a discovery source,
+including every server the Kubernetes operator registers, has no
+configuration entry, so it cannot declare `flat`. A front door projects none
+of its tools. Declare a server in `config.yaml` to serve its tools on a front
+door, or serve it from an `egress` gateway.
+
+To fill the list, read the tool names from the server. `mcp-hangar pin` prints
+every tool each server serves, and on a front door it needs the key already
+present, so write `flat: []` first. `pin --write` writes `pins`, never `flat`:
+copy the names you want served into `flat` yourself. `mcp-hangar init` and the
+client import write `flat` with the tools their smoke test saw.
+[`mcp-hangar add`](cli.md#add) writes no `flat` key. `mcp-hangar config check`
+reports a missing or refused `flat` without starting anything.
+
+**Why there is no default.** Before 2.37.0 a front door served every tool of
+every upstream under its own name, so an upstream that gained a tool put it in
+front of every tenant no policy excluded, at the next listing, without anyone
+choosing it. Each entry now names its surface, and an upgraded front door
+refuses to start rather than keep the old surface without a word. The cost falls
+on deployments whose clients do need every tool of a server: they list each one
+by name and keep the list up to date when the upstream adds a tool. It also
+falls on servers registered over REST or by discovery, which a front door does
+not serve at all. If most of your fleet arrives that way, an `egress` gateway is
+the closer fit until discovery on demand ships.
 
 ### Prompts and resources (`access`)
 
@@ -446,6 +555,7 @@ mcp_servers:
 | `tool_projection.withdrawn` | `list[str]` | `[]` | Tools withdrawn for every caller. Also accepted under `tenant_overrides.<tenant>`, for that tenant only |
 | `tool_projection.withdrawn_prompts` | `list[str]` | `[]` | Prompts withdrawn, the same way |
 | `tool_projection.withdrawn_resources` | `list[str]` | `[]` | Resources withdrawn, named by their upstream uri, the same way |
+| `tool_projection.flat` | `list[str]` | -- | The tools a front door serves under their own names (2.37.0+). Required on every entry with `tool_access.mode: front_door`, refused under `egress`. See [What a front door serves](#what-a-front-door-serves-tool_projectionflat) |
 
 Every key here is also accepted on a group's `tool_projection`.
 
@@ -1408,6 +1518,10 @@ tool_access:
 | `mode` | `str` | `egress` | `egress` or `front_door`. Any other value refuses the config. A reload cannot change it |
 | `required_catalogue.servers` | `list[str]` | -- | Server or group ids that must have been projected once before `/health/ready` answers 200. A group is met by any one member. Must be a non-empty list of ids declared in `mcp_servers` |
 | `required_catalogue.retry_for_s` | `float` | `600` | How long readiness waits for the list, and the missing servers are retried, counted from the first config apply. Must be above 0 |
+
+With `mode: front_door`, every entry in `mcp_servers` must also set
+`tool_projection.flat` (2.37.0+), or the configuration refuses to start; see
+[What a front door serves](#what-a-front-door-serves-tool_projectionflat).
 
 `required_catalogue` applies in `front_door` only; in `egress` it is checked and
 ignored. Where several replicas take the management lease, a required server

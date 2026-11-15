@@ -1,4 +1,4 @@
-<!-- verified-against: 2.35.0 -->
+<!-- verified-against: 2.37.0 -->
 
 # Key-Pinned Upstreams
 
@@ -43,6 +43,8 @@ A server the file declares carries its key list as above. The file is the operat
 
 A release before 2.32.0 ignores `tls.peer_identity` and serves such a server as a plain one, without checking its key. Do not ship the file to a replica older than 2.32.0.
 
+The example above has no `tool_access` block, so it is an `egress` gateway. On a front door (`tool_access.mode: front_door`) the entry also needs `tool_projection.flat` with the tools to project under their own names, or `flat: []` for none. From 2.37.0 a front door with an entry that has no `flat` key does not start. See [the upgrade guide](../upgrade.md#upgrade-to-2370).
+
 ### The REST API
 
 `POST /api/mcp_servers` with a `tls` block creates a key-pinned server, and `PUT /api/mcp_servers/{id}` changes its list or endpoint. A key-pinned server registered over the API needs:
@@ -60,6 +62,7 @@ A release before 2.32.0 ignores `tls.peer_identity` and serves such a server as 
   ```
 
   Otherwise every such endpoint is refused with `ssrf_blocked`. Loopback can never be trusted this way.
+- **The topology.** A server registered over the API has no `tool_projection.flat` key, so from 2.37.0 a front door projects none of its tools, and a front door does not serve `hangar_call`. An `egress` gateway serves it as before. To serve a key-pinned server's tools on a front door, declare the server in the configuration file with `flat`.
 
 A name keeps its key after its server is deleted, so it cannot come back as a plain server. A create under a recorded name succeeds only with that `key_ref` and the permission. Forgetting the name is a separate act, after the delete.
 
@@ -82,6 +85,8 @@ spec:
         - sha256:06eeb57619607484302cf6ffa9ff03c37dd97cf0a5582b3712acd5a1a84e3901
     maxConnectionAge: 1h
 ```
+
+The operator registers the server over the REST API, so everything in the previous section applies, the topology included: on a front door, a server the operator registers projects no tools.
 
 The apiserver refuses a malformed pin, a missing `keyRef` and an `http` endpoint. For `mode: container`, the operator runs the pod and registers it at `https://<pod IP>:8080`. The pod gets no discovery annotations, and it must serve TLS on port 8080 with a listed key.
 
@@ -121,7 +126,8 @@ A key-pinned server's upstream identity is `peer-key:<key_ref>`, not `remote:htt
 
 ## Observing it
 
-- **A refusal** carries `observed_peer_spki`, the key the peer presented. A refused cold start is a `ToolCallRefused`, exported as status `denied` with reason `upstream_peer_key_mismatch`. A refusal on a warm connection is a `ToolInvocationFailed`, exported as status `error` with `failure_code: upstream_peer_key_mismatch`.
+- **A refusal** carries `observed_peer_spki`, the key the peer presented. A refused cold start is a `ToolCallRefused`, exported as status `denied` with reason `upstream_peer_key_mismatch`. A refusal on a warm connection is a `ToolInvocationFailed`, exported as status `error` with `failure_code: upstream_peer_key_mismatch`. From 2.36.0 a warm refusal also publishes a `ToolCallRefused` with gate `upstream_key` under the same correlation id. The audit exports skip it, so the refusal is still exported once, and `mcp-hangar why` shows it once.
+- **What the caller reads.** From 2.36.0 the refusal's first line is `Refused by MCP Hangar (cold_start): upstream_peer_key_mismatch` on a cold start, or `Refused by MCP Hangar (upstream_key): upstream_peer_key_mismatch` on a warm connection, followed by the `mcp-hangar why` command to run. The result carries `io.mcp-hangar/toolFailure` in `_meta`.
 - **A served call** carries `upstream_peer_spki`, the verified key of the connection that served it.
 - **A declared issuance.** From 2.33.0 a call to a server that declares `issuance` carries it as `declared_key_issuance`, in JSON-lines, LEEF, syslog and OTLP; CEF has no free field for it. It records what the configuration declares, never a verification.
 - **Exports.** JSON-lines, LEEF, syslog and OTLP carry each field under its own format's name. CEF carries the one key a record has as `fileHash`, with `fileType` saying which (`UpstreamTlsKeyVerified` or `UpstreamTlsKeyRefused`); the refusal's code is in `reason`.

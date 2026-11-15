@@ -85,6 +85,24 @@ The provider runs beside the gateway -- another compose service, another pod --
 and speaks HTTP. Today that means `everything`, or any stdio server behind a
 proxy. `examples/quickstart/` in the core repository is exactly this shape.
 
+Since `@modelcontextprotocol/server-everything` 2.3.0 the server binds
+`127.0.0.1` unless `HOST` says otherwise, so a gateway in another container gets
+`Connection refused`. Pin the version and set `HOST=0.0.0.0` on the provider's
+service, and reach the port over the compose network with `expose`, not
+`ports`, so it is never published on the host:
+
+```yaml
+services:
+  everything:
+    image: node:lts-alpine
+    command: ["npx", "-y", "@modelcontextprotocol/server-everything@2.3.0", "streamableHttp"]
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3001
+    expose:
+      - "3001"
+```
+
 ### Container -- Hangar starts the container
 
 ```yaml

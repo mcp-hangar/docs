@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-mcp--hangar.io-blue)](https://mcp-hangar.io)
 
-The MCP gateway that pins every tool, holds risky calls for approval, and enforces egress policy.
+A policy enforcement plane for MCP: it pins every tool, holds risky calls for approval, and enforces egress policy.
 
 ## Repository Structure
 

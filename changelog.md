@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.78](https://github.com/mcp-hangar/docs/compare/v1.2.77...v1.2.78) (2026-11-15)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#639](https://github.com/mcp-hangar/docs/issues/639)) ([ca7be1a](https://github.com/mcp-hangar/docs/commit/ca7be1ae3c4b719b14f30280b65cbec65a7493e1))
+* **guides:** document opt-in flat projection and fix front-door examples ([#640](https://github.com/mcp-hangar/docs/issues/640)) ([671cd3f](https://github.com/mcp-hangar/docs/commit/671cd3fb6905150cb0dbe2d2119eddf42be1dac1))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#642](https://github.com/mcp-hangar/docs/issues/642)) ([299d250](https://github.com/mcp-hangar/docs/commit/299d25076e98ff7b789caee0dba2e0819ddc0410))
+
 ## [1.2.77](https://github.com/mcp-hangar/docs/compare/v1.2.76...v1.2.77) (2026-11-14)
 
 

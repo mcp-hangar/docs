@@ -65,6 +65,9 @@ mcp_servers:
           allow_list: [charge]
         "tenant:b":
           allow_list: [charge, refund]
+
+    tool_projection:
+      flat: [charge, refund]                # the tools the front door serves (2.37.0+)
 ```
 
 Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.

@@ -128,7 +128,7 @@ front door. It is not deployable as written.
 # config.yaml -- ILLUSTRATIVE. Every value is a placeholder pending security review.
 
 tool_access:
-  mode: front_door                 # untrusted edge: fail-closed, flat per-tenant tools
+  mode: front_door                 # untrusted edge: fail-closed, only the tools `flat` names
 
 auth:
   enabled: true
@@ -190,6 +190,12 @@ mcp_servers:
     auth:
       type: bearer
       token: ${REPORTS_PROVIDER_TOKEN}   # per-provider service account, least privilege
+
+    tool_projection:
+      # The edge's whole surface for this provider (2.37.0+). A tool left out
+      # is not callable here by any path; delete_report stays listed so the
+      # tenant policy below is what refuses it.
+      flat: [list_reports, get_report, delete_report]
 
     tool_access:                   # tenant-scoped, read-only surface
       member:

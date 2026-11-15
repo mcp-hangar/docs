@@ -55,14 +55,22 @@ mcp_servers:
         "tenant:b":
           allow_list: [charge, refund]    # tenant:b limited to these two
 
-    tool_projection:                      # NEW: config-declared withdrawals
-      withdrawn: [legacy_charge]          # withdrawn for ALL tenants
+    tool_projection:
+      flat: [charge, refund, beta_tool]   # NEW: the tools the front door serves (2.37.0+)
+      withdrawn: [legacy_charge]          # NEW: withdrawn for ALL tenants
       tenant_overrides:
         "tenant:a":
           withdrawn: [beta_tool]          # withdrawn for tenant:a only
 ```
 
 Save this as `~/.config/mcp-hangar/config.yaml` or pass it with `--config`.
+
+`flat` is the surface: the front door serves `payments`' tools under their own
+names only when they are listed there, and since 2.37.0 an entry without the
+key refuses to start. `legacy_charge` needs no place in it, being withdrawn for
+everyone. A tool the backend serves and the list leaves out is not callable on
+the front door at all. See
+[Choosing the surface](../guides/FRONT_DOOR.md#choosing-the-surface-tool_projectionflat).
 
 The role matters as much as the token. A caller with no role sees its tenant's
 tool names and is refused every call with
@@ -257,6 +265,7 @@ Hangar **validates** the JWTs your IdP issues; it never issues tokens itself.
 | `tool_access.mode` | string | `egress` | Topology mode: `egress` or `front_door` |
 | `tool_access.member.<tenant>.allow_list` | list | `[]` | Tools this tenant may call |
 | `tool_access.member.<tenant>.deny_list` | list | `[]` | Tools this tenant may not call |
+| `tool_projection.flat` | list | -- | *(2.37.0)* Tools served under their own names; required on every entry on a front door |
 | `tool_projection.withdrawn` | list | `[]` | Tools withdrawn for all tenants |
 | `tool_projection.tenant_overrides.<tenant>.withdrawn` | list | `[]` | Tools withdrawn for one tenant |
 | `auth.oidc.enabled` | bool | `false` | Enable OIDC/JWT validation |

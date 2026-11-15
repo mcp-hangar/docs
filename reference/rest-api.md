@@ -157,6 +157,13 @@ POST /mcp_servers
 with a host; anything else (`file:///...`, a bare host name) is `422
 ValidationError`. Before, it was stored and failed at every start.
 
+*Since 2.37.0* a front door (`tool_access.mode: front_door`) serves none of the
+tools of a server registered here: the body has no `tool_projection.flat`, and a
+front door serves only the tools a configuration entry lists there. The server
+is still registered and can be started, and an `egress` gateway serves it as before. To serve it
+on a front door, declare it in `config.yaml` with `flat`; see
+[What a front door serves](configuration.md#what-a-front-door-serves-tool_projectionflat).
+
 The registration's provenance is always recorded as `api`; a `source` field in
 the body is ignored. A body without `mcp_server_id` or `mode` is `400
 missing_fields`, and an id that already exists is `422 ValidationError`.

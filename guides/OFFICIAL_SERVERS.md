@@ -146,7 +146,9 @@ Once one is registered, it is an upstream like any other:
 
 - [Egress policy](EGRESS_POLICY.md) -- `fetch` is the obvious one to govern; a
   denied host is a refusal with a verdict, not a timeout.
-- [Front-door mode](FRONT_DOOR.md) -- projects each provider's tools under
-  their own names instead of the `hangar_*` API.
+- [Front-door mode](FRONT_DOOR.md) -- projects the provider's tools you list in
+  `tool_projection.flat` under their own names instead of the `hangar_*` API.
+  `mcp-hangar add` writes no `flat`, so add it before a front door loads the
+  server.
 - [Tool-access policy](../reference/configuration.md) -- `filesystem` and `git`
   have write tools worth denying before they are worth allowing.

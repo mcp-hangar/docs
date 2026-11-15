@@ -127,14 +127,19 @@ mcp-hangar init --undo
    `auth.stdio.principal` block
 6. Starts each MCP server once to verify it, and **records a digest pin for
    every tool it serves** while it is up, under that server's
-   `tool_projection` with `digest_enforcement: block`
+   `tool_projection` with `digest_enforcement: block`. *Since 2.37.0* it also
+   writes `tool_projection.flat` with those tools, the surface the front door
+   serves; a server whose test failed gets `flat: []`. A server moved in from a
+   client config is written the same way, with every tool the test saw
 7. Writes the Hangar entry into the selected clients, merging it into their
    existing `mcpServers` rather than replacing them
 8. Shows what was written, what was tested and what was pinned
 
 With `--skip-test`, step 6 writes no pins — an unverified pin would refuse every
 call to a tool nobody digested — and the summary says so instead of reporting a
-pass. Run [`pin --write`](#pin) afterwards to add them.
+pass. Run [`pin --write`](#pin) afterwards to add them. Each server is then
+written with `flat: []`, so the front door serves none of its tools until you
+copy the names `pin --write` wrote under `pins` into `flat`.
 
 The smoke test starts the servers one after another. Each gets 60 seconds
 divided by the number of servers, and never less than 30 seconds.
@@ -148,7 +153,8 @@ bundle, minus any server whose runtime (`npx` or `uvx`) is missing. Its
 `filesystem` server needs a directory: it is written as
 `[npx, -y, "@modelcontextprotocol/server-filesystem"]` with none, so its smoke
 test fails and the summary reports one server failed. Add the directory to the
-end of its `command` and run [`pin --write`](#pin), or pick servers with
+end of its `command`, run [`pin --write`](#pin), and copy the tool names it
+wrote into the server's `flat`, which `init` left as `[]`; or pick servers with
 `--servers fetch,memory,git`.
 
 ### Undo
@@ -289,6 +295,22 @@ outside the list, add the server to `config.yaml` yourself.
 
 `--replace` writes the registry entry over the existing one, dropping its pins,
 policy, args and `env`. Before 2.34.2 every `add` did that, without a word.
+
+### On a front door
+
+`add` writes no `tool_projection.flat`. With `tool_access.mode: front_door`,
+the configuration `init` writes, a server without that key refuses the next
+start, and a reload of the file is refused while the gateway keeps what it
+served. `pin` refuses the file too. After `add`:
+
+1. Add `tool_projection: {flat: []}` to the new entry, so the file loads.
+2. Run [`pin --write`](#pin): it writes the server's tools under its `pins`.
+3. Copy the tools to serve from `pins` into `flat`, and run
+   [`config check`](#config).
+
+With a running gateway, pass `--no-reload` and reload once the entry has its
+`flat`. See
+[What a front door serves](configuration.md#what-a-front-door-serves-tool_projectionflat).
 
 ### Examples
 
@@ -501,7 +523,8 @@ the upstream is asked. What the client sees depends on the tool surface:
 
 - With `tool_access.mode: front_door`, the configuration `init` writes, the tool
   is withheld from `tools/list`, and a call to it answers the same error as a
-  name that does not exist:
+  name that does not exist (as for a tool `tool_projection.flat` does not
+  name):
 
   ```text
   Tool 'fetch' not found
@@ -592,6 +615,10 @@ mcp-hangar pin --check --json
   maintain by hand.
 - Only the all-tenants `tool_projection.pins` block is written and checked. Pins
   under `tenant_overrides` are left alone.
+- `--write` never writes `tool_projection.flat`, the list of tools a front door
+  serves. A tool it pins is served there only once you add it to `flat`. On a
+  front door `pin` loads the file as the gateway does, so an entry without
+  `flat` refuses it; write `flat: []` first (*since 2.37.0*).
 - A `mode: group` entry is never started; its members are asked instead.
   *Since 2.34.2* `--check` holds the pins a group declares under its own
   `tool_projection.pins` against every member that serves the tool, and reports

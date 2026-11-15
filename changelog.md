@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.79](https://github.com/mcp-hangar/docs/compare/v1.2.78...v1.2.79) (2026-11-15)
+
+
+### Changed
+
+* **guides:** bind the everything server for a gateway in another container ([#643](https://github.com/mcp-hangar/docs/issues/643)) ([d4b76e3](https://github.com/mcp-hangar/docs/commit/d4b76e33c6b4afcc77f8eaf28d4a4e1761ab047c))
+* **guides:** bring over upgrade notes for the latest release ([#645](https://github.com/mcp-hangar/docs/issues/645)) ([09176aa](https://github.com/mcp-hangar/docs/commit/09176aa867e5848d90cbba681c9cd8fae2e6896c))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#646](https://github.com/mcp-hangar/docs/issues/646)) ([c7932f6](https://github.com/mcp-hangar/docs/commit/c7932f61af4b200972e859a19a24cbd0de065f24))
+
 ## [1.2.78](https://github.com/mcp-hangar/docs/compare/v1.2.77...v1.2.78) (2026-11-15)
 
 

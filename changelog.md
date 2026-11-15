@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.80](https://github.com/mcp-hangar/docs/compare/v1.2.79...v1.2.80) (2026-11-15)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([#649](https://github.com/mcp-hangar/docs/issues/649)) ([612b014](https://github.com/mcp-hangar/docs/commit/612b014c1ee8c22745433c16eb16058a5a624e49))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#651](https://github.com/mcp-hangar/docs/issues/651)) ([00ba270](https://github.com/mcp-hangar/docs/commit/00ba27087c0aeda68bfba161f60158f6de90d8c7))
+* **repo:** describe Hangar as a policy enforcement plane for MCP ([#648](https://github.com/mcp-hangar/docs/issues/648)) ([80a9855](https://github.com/mcp-hangar/docs/commit/80a9855907fe14a16f1ed5ce08b1b831f3b5c9f4))
+
 ## [1.2.79](https://github.com/mcp-hangar/docs/compare/v1.2.78...v1.2.79) (2026-11-15)
 
 

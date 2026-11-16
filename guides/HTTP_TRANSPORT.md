@@ -178,16 +178,67 @@ When a MCP server responds with `Content-Type: text/event-stream`, the client:
 
 ### Protocol Versions and Sessions
 
-Hangar opens every remote MCP server with `initialize`, and what the upstream
-answers decides how the rest of the connection is spoken:
+Since 2.39.0 Hangar starts a remote MCP server by probing `server/discover`
+(SEP-2575), the way the MCP SDK client's `mode="auto"` does, and only then, if
+the upstream is not stateless, runs the `initialize` handshake. The probe
+carries the 2026-07-28 envelope and waits at most 10 seconds:
 
-- An upstream that answers `initialize` keeps the version it negotiated. If it returns an `Mcp-Session-Id`, Hangar
-  sends that header on every later request, and when the upstream answers a
-  request with `404` (the session is gone, typically after an upstream restart)
-  Hangar runs `initialize` again and retries the request once.
-- A stateless upstream (2026-07-28) answers `initialize` with method-not-found.
-  Hangar then carries the protocol version and client info in each request's
-  `params._meta`, and never sends or stores a session id.
+- A result whose `supportedVersions` lists `2026-07-28` makes the connection
+  stateless. Hangar sends no `initialize` and no `notifications/initialized`,
+  and goes straight to `tools/list`. Every later request carries the protocol
+  version, client info and client capabilities in `params._meta`
+  (`io.modelcontextprotocol/clientCapabilities` is `{}` when Hangar declares
+  none) and an `MCP-Protocol-Version` header with the same version. Hangar
+  never sends or stores an `Mcp-Session-Id` and opens no standing `GET` stream.
+- A `-32022` (unsupported protocol version) whose `data.supported` offers
+  `2026-07-28` is retried once. One that offers only handshake-era versions
+  falls back to `initialize`. One that offers no version Hangar speaks fails
+  the start ("upstream serves no MCP protocol version Hangar speaks").
+- Any other answer falls back to `initialize`: method-not-found, an HTTP error
+  status, a result without `2026-07-28`, or no answer within 10 seconds.
+  Upstreams on 2025-11-25 and earlier are started as before.
+- A failure to reach the upstream at all, such as a refused connection, fails
+  the start as a failed `initialize` would. So does a TLS peer key outside a
+  [key-pinned](KEY_PINNED_UPSTREAMS.md) server's list: the probe is refused and
+  never falls back to `initialize`.
+
+After a fallback, the handshake decides the rest of the connection:
+
+- An upstream that answers `initialize` keeps the version it negotiated. If it
+  returns an `Mcp-Session-Id`, Hangar sends that header on every later request,
+  and when the upstream answers a request with `404` (the session is gone,
+  typically after an upstream restart) Hangar runs `initialize` again, without
+  a new probe, and retries the request once.
+- An upstream that answers `initialize` with method-not-found is still read as
+  stateless: Hangar carries the 2026-07-28 envelope on every later request and
+  never sends or stores a session id.
+
+**What a stateless upstream cannot tell Hangar.** The 2026-07-28 lifecycle has
+no standing `GET` stream, and Hangar does not route a message an upstream puts
+in a `POST` response besides the response itself. So nothing the upstream sends
+unprompted reaches Hangar: no `notifications/tools/list_changed`, no progress
+and no log lines. A changed catalogue is seen at the next start, or for a
+pinned server at the next pin re-check
+(`tool_projection.pin_recheck_interval_s`, see
+[Digest Pinning](../reference/configuration.md#digest-pinning)).
+
+**`upstream_protocol`.** A remote server can opt out of the probe:
+
+```yaml
+mcp_servers:
+  old-upstream:
+    mode: remote
+    endpoint: https://old.example.com/mcp
+    upstream_protocol: legacy   # auto (default) | legacy
+```
+
+`auto`, the default, probes as above. `legacy` never sends `server/discover`
+and always runs the `initialize` handshake, for an upstream that mishandles the
+probe. The key is read from the configuration file only: a server registered
+through the REST API, or by the operator, is always `auto`. Any other value, or
+the key on a `subprocess`, `docker` or `container` server, refuses the
+configuration at load. A `group` does not read the key; set it on each remote
+member. See [the configuration reference](../reference/configuration.md#mcp_servers).
 
 ## Health Checks
 

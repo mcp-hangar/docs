@@ -65,7 +65,7 @@ jq -r --arg t "$TRACE_ID" '.resourceSpans[]?.scopeSpans[].spans[]
 
 ### Gate decisions
 
-`batch.call.<tool>` gets one `hangar.gate.decision` span event for each stage of the batch executor's gate chain that runs. The events are recorded in order and none overwrites another. Each event carries `hangar.gate.name`, `hangar.gate.outcome` (`allow`, `deny`, `skip`, `deferred` or `error`), and, when the gate can say why, a bounded `hangar.gate.reason`. A digest-pin gate also records the pinned digest as `hangar.gate.revision`. The thirteen gate names are, in order: `cancelled_before_execution`, `global_timeout`, `resolve_target`, `tool_access`, `withdrawal`, `digest_pin`, `circuit_breaker`, `validators`, `tenant_budget`, `approval`, `cold_start`, `deferred_digest_pin` and `cancelled_after_cold_start`.
+`batch.call.<tool>` gets one `hangar.gate.decision` span event for each stage of the batch executor's gate chain that runs. The events are recorded in order and none overwrites another. Each event carries `hangar.gate.name`, `hangar.gate.outcome` (`allow`, `deny`, `skip`, `deferred` or `error`), and, when the gate can say why, a bounded `hangar.gate.reason`. A digest-pin gate also records the pinned digest as `hangar.gate.revision`. The fifteen gate names are, in order: `cancelled_before_execution`, `global_timeout`, `resolve_target`, `tool_access`, `withdrawal`, `digest_pin`, `header_exposure`, `circuit_breaker`, `validators`, `tenant_budget`, `approval`, `cold_start`, `deferred_digest_pin`, `deferred_header_exposure` and `cancelled_after_cold_start`. `header_exposure` and `deferred_header_exposure` were added in 2.37.1; before, there were thirteen.
 
 The call's summary is scalar: `hangar.call.outcome` is `allow`, `deny` or `error`. For a refusal, `hangar.refusal.gate` and `hangar.refusal.reason` name the first gate that refused. No gate, cold start or upstream span appears after it. This is the deny from the capture, a tool on the server's `deny_list`:
 
@@ -189,6 +189,17 @@ batch.call.add
 ```
 
 In the capture, three calls reached a cold server concurrently. One trace has the shape above. The other two recorded `hangar.gate.decision name=cold_start outcome=skip reason=not_cold` and waited in a `mcp_server.startup_wait` span under `handler.InvokeToolCommand`, with `hangar.startup.role=waiter` and `hangar.startup.mechanism=ensure_ready`. A caller that waits in the executor's single flight instead records `hangar.startup.mechanism=single_flight`, and its wait span carries a link to the leader's `mcp_server.cold_start` when the leader published one. A waiter that arrives before that gets no link: Hangar never invents a cause. The launch span, `mcp_server.launch`, was added in 2.24.0.
+
+The tree above is a subprocess server. Since 2.39.0 the start of a `remote` server first sends `server/discover`, which is a CLIENT span of its own like `initialize`. The shape below is read from the source at v2.39.0, not captured. A stateless (2026-07-28) upstream gets no `initialize` and no `notifications/initialized`:
+
+```
+      handler.StartMcpServerCommand     hangar.startup.role=leader
+        mcp_server.launch               mcp.server.mode=remote
+        server/discover
+        tools/list
+```
+
+A `-32022` that offers 2026-07-28 adds a second `server/discover` span. An upstream that is not stateless shows `server/discover` followed by `initialize`, `notifications/initialized` and `tools/list`. A server declared `upstream_protocol: legacy` has no `server/discover` span, and its tree is the subprocess one with `mcp.server.mode=remote`.
 
 ```bash
 jq -c '.resourceSpans[]?.scopeSpans[].spans[]

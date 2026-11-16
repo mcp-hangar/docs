@@ -299,7 +299,8 @@ Hangar forwards an upstream definition verbatim, so before v2.14.0 it advertised
 such a tool and counted it as surface delivered while every conforming client
 silently dropped it. Since v2.14.0 the tool is **withheld at the projection**:
 absent from `tools/list`, and `-32601` on the call. Shown and callable stay the
-same set.
+same set; since 2.37.1 that holds for `hangar_call` too (see
+[below](#withheld-means-withheld-on-hangar_call-too)).
 
 A log line names the tool and the reason, and the withdrawal is counted by
 `mcp_hangar_projection_withdrawals_total{reason="invalid_x_mcp_header"}`.
@@ -329,9 +330,9 @@ the annotation token and the property path. An upstream can name the property
 
 | `on_violation` | Effect |
 | ---------------- | -------- |
-| `warn` (default) | The tool is served. A warning names it, and the metric counts it. |
-| `withdraw` | The tool is withheld, exactly as an invalid annotation is. |
-| `refuse_boot` | The catalogue is not served at all; `tools/list` fails. |
+| `warn` (default) | The tool is served. A warning names it, and the metric counts it. Hangar, as a client, sends the value in a header. |
+| `withdraw` | The tool is withheld, exactly as an invalid annotation is, and `hangar_call` refuses it. |
+| `refuse_boot` | The catalogue is not served at all; `tools/list` fails. `hangar_call` refuses the violating tool. |
 
 An unknown `on_violation` is **refused at parse**, not defaulted — a typo that
 silently resolved to `warn` would report the control as enforcing while the
@@ -362,9 +363,60 @@ A member of a group inherits the block its group declares, so a
 `header_exposure` written once on the group covers every member. Deleting the
 block and reloading restores the tools it withheld.
 
-> Source: `src/mcp_hangar/domain/policies/header_exposure.py`,
-> `src/mcp_hangar/fastmcp_server/flat_tool_projection.py`
-> (`_invalid_header_annotation`, `_denied_header_exposure`).
+#### Withheld means withheld on `hangar_call` too
+
+*Since 2.37.1.* Before, a tool the flat listing withheld could still be called
+through `hangar_call`. Now both surfaces read one verdict, from the same live
+schema: an invalid annotation first, then the `header_exposure` block of the
+server, else of each group that owns it.
+
+- The `header_exposure` gate runs after `digest_pin`. A tool it withholds is
+  refused with `ToolHeaderWithheldError` ("withheld for its header
+  annotations"), logged once as `batch_call_refused`, with the reason the flat
+  path counts: `invalid_x_mcp_header`, `header_exposure_withdraw` or
+  `header_exposure_refuse_boot`. Under `refuse_boot` only the violating tool is
+  refused; the server's other tools stay callable through `hangar_call`.
+- A tool whose schema is not in the catalogue before its cold start is judged
+  after it, by the `deferred_header_exposure` gate. If the schema is still
+  missing and a block that withholds governs the server, the call is refused as
+  `schema_unknown`. Without such a block the call goes through.
+- Both gates are hidden refusals, like a withdrawal: the result carries the
+  gate's own message only, without the `Refused by MCP Hangar` line and the
+  refusal metadata a shaped refusal gets.
+- `warn`, and a tool that violates nothing, refuse nothing.
+
+#### What Hangar itself sends upstream
+
+*Since 2.38.0.* As the client of a `remote` upstream, Hangar sends the
+`Mcp-Param-*` headers a tool declares with `x-mcp-header`, encoded by the MCP
+SDK: a null or absent value is left out, and a value outside printable ASCII or
+with leading or trailing whitespace is sent base64-wrapped. The headers are
+built from the schema the upstream's last `tools/list` served this client; a
+tool it never listed gets none.
+
+So `header_exposure` now also decides what leaves Hangar. Under `warn`, or with
+no block, the annotated value **is** sent in a header to the upstream and to
+every intermediary in between. Only `withdraw` or `refuse_boot` stops it. The
+client applies the verdict on its own, before anything is sent, so a path that
+skipped the batch gates still sends nothing. It raises
+`ParamHeaderRefusedError` with a bounded reason:
+
+| Reason | Why the call is not sent |
+| --- | --- |
+| `invalid_x_mcp_header` | The schema's annotations are invalid |
+| `header_exposure_withdraw`, `header_exposure_refuse_boot` | A block that withholds governs the server and the schema violates it |
+| `server_unknown`, `owners_unknown` | A block that withholds exists, and the client cannot tell which blocks govern this server, so it fails closed |
+| `header_collision` | A mirrored header would be named like one the client already sends: the `api_key_header` of `auth`, a key of `http.headers`, `Authorization`, or a framing or routing header such as `Mcp-Session-Id` or `MCP-Protocol-Version` |
+
+A refusal is not counted against the upstream's health: the upstream did
+nothing wrong.
+
+> Source: `src/mcp_hangar/fastmcp_server/header_verdicts.py`
+> (`withholding_verdict`, `invalid_header_annotation`, `denied_header_exposure`),
+> `src/mcp_hangar/domain/policies/header_exposure.py` (`mirror_refusal`),
+> `src/mcp_hangar/server/tools/batch/executor.py`
+> (`_gate_header_exposure`, `_gate_deferred_header_exposure`),
+> `src/mcp_hangar/http_client.py` (`_param_headers`).
 
 ### `Mcp-Param-*`: a header nobody validated decides nothing
 

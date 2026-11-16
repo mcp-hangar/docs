@@ -203,6 +203,7 @@ Changes to anything a server is built from restart it, among them:
 | `max_consecutive_failures` | Failure threshold |
 | `args`, `resources`, `read_only`, `build` | Container settings |
 | `description`, `auth`, `tls`, `http`, `capabilities`, `max_response_bytes` | Other server settings |
+| `upstream_protocol` | How a remote upstream is opened, `auto` or `legacy` (since 2.39.0); leaving it out is `auto` |
 
 A server's `tools` access block, `access`, `tool_access`, `tool_projection`
 (pins) and `header_exposure`, and a group member's `weight` and `priority`, are

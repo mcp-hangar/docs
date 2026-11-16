@@ -51,6 +51,7 @@ mcp_servers:
 | `auth` | `dict` | -- | -- | HTTP auth configuration (remote mode only) |
 | `tls` | `dict` | -- | -- | TLS for a `remote` upstream: `verify_ssl` (bool, default `true`) and `ca_cert_path` (a bundle to trust, for an upstream signed by your own CA). Both are honoured from 2.5.0; earlier releases accepted and discarded them. Since 2.32.0 also `peer_identity` (`key_ref` and a `spki_sha256` key list: the server is pinned by its key, needs an `https://` endpoint, refuses `verify_ssl: false` and ignores `ca_cert_path`) and `max_connection_age`. See [Key-pinned upstreams](../guides/KEY_PINNED_UPSTREAMS.md) |
 | `http` | `dict` | -- | -- | HTTP transport configuration (remote mode only) |
+| `upstream_protocol` | `str` | `"auto"` | auto, legacy | Since 2.39.0, how Hangar opens a `remote` upstream. `auto` probes `server/discover` and speaks the 2026-07-28 stateless lifecycle to an upstream that serves it, falling back to `initialize` otherwise; `legacy` never probes and always runs the `initialize` handshake. Remote mode only: the key on any other mode, or any other value, refuses the configuration at load. Read from the configuration file only; the REST API and the operator cannot set it. Changing it rebuilds the server on reload. See [Protocol versions and sessions](../guides/HTTP_TRANSPORT.md#protocol-versions-and-sessions) |
 | `max_concurrency` | `int` | -- | >= 0 | Per-MCP server concurrency limit; `0` means no limit. Unset uses `execution.default_mcp_server_concurrency` |
 | `max_response_bytes` | `int` | -- | > 0 | Largest upstream response this server's transport reads before failing the call with `ResponseTooLarge`. Wins over `execution.max_response_bytes` and `MCP_MAX_RESPONSE_BYTES`. Anything but a positive integer refuses the config |
 | `capabilities` | `dict` | -- | -- | Declared capability contract (network, filesystem, environment, tools, resources, `enforcement_mode`). Hangar enforces these at runtime and flags deviations. |
@@ -628,6 +629,11 @@ of the catalogue too, so a tool added without an announcement is seen within an
 interval, and a pinned server whose `capabilities` enforcement blocks or
 quarantines a tool outside `expected_tools` is blocked at its next call.
 
+Since 2.39.0 a `remote` upstream that serves the 2026-07-28 stateless
+lifecycle has no channel to send `tools/list_changed` on, so for such a server
+a change is caught by this re-check or at the server's next start. See
+[Protocol versions and sessions](../guides/HTTP_TRANSPORT.md#protocol-versions-and-sessions).
+
 Before 2.25.0 the catalogue a pin was checked against was refreshed only at
 start and on `tools/list_changed`, so an unannounced change was served under
 the old pin until the gateway restarted.
@@ -664,6 +670,22 @@ answers `-32601` on the call; `refuse_boot` refuses to serve the catalogue at
 all. The default is `warn`, so adding the block does not change what a client
 sees until you choose otherwise.
 
+Since 2.37.1, `withdraw` and `refuse_boot` also refuse the tool on
+`hangar_call`, with `ToolHeaderWithheldError`. The `header_exposure` gate
+refuses it with reason `header_exposure_withdraw`, `header_exposure_refuse_boot`
+or, for an invalid annotation, `invalid_x_mcp_header`. A tool whose schema is
+not in the catalogue until its cold start is judged by the
+`deferred_header_exposure` gate after it, and refused as `schema_unknown` if a
+block that withholds governs the server and the schema is still missing.
+`warn` refuses nothing.
+
+Since 2.38.0, Hangar sends the `Mcp-Param-*` headers a tool annotates when it
+calls a `remote` upstream, so the same verdict governs what Hangar itself puts
+in a header. Under `warn`, or with no block, an annotated argument's value is
+sent in a header. Under `withdraw` or `refuse_boot` the HTTP client refuses the
+call before sending anything (`ParamHeaderRefusedError`), even on a path that
+skipped the gates.
+
 An unknown `on_violation` **refuses the configuration** rather than falling back
 to the default -- the same contract as an unknown `arguments.secretPatterns`
 group in an egress policy, and for the same reason: a control that reports as
@@ -678,8 +700,9 @@ Independently of any configuration, a tool whose `x-mcp-header` annotations are
 nobody could call. Both controls are counted by
 `mcp_hangar_projection_withdrawals_total{reason}`.
 
-See the [front-door guide](../guides/FRONT_DOOR.md) for the full behaviour,
-including why the projected schema is never edited.
+See the [front-door guide](../guides/FRONT_DOOR.md#header-exposure-x-mcp-header)
+for the full behaviour, including why the projected schema is never edited and
+which headers Hangar refuses to mirror.
 
 ## `headers`
 

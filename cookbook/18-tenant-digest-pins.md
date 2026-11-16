@@ -211,7 +211,11 @@ recipe is about pins.
    reads when it starts the server or when the backend sends
    `notifications/tools/list_changed`, and since 2.25.0 on every
    `tool_projection.pin_recheck_interval_s` (60 seconds by default) for a
-   pinned server that is READY. So wait out one interval -- the log shows
+   pinned server that is READY. From a remote backend that serves the
+   2026-07-28 stateless lifecycle, which Hangar speaks since 2.39.0, the
+   notification never arrives: that lifecycle gives it no channel. Drift there
+   is caught by the re-check or at the server's next start. So
+   wait out one interval -- the log shows
    `tool_digest_pin_drift_detected` -- or, before 2.25.0, restart the gateway
    to make it re-read. Then
    call `refund` again as `tenant:a` with enforcement still set to `block`:

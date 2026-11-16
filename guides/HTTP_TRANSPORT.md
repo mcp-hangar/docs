@@ -236,8 +236,9 @@ mcp_servers:
 and always runs the `initialize` handshake, for an upstream that mishandles the
 probe. The key is read from the configuration file only: a server registered
 through the REST API, or by the operator, is always `auto`. Any other value, or
-the key on a server whose `mode` is not `remote`, refuses the configuration at
-load. See [the configuration reference](../reference/configuration.md#mcp_servers).
+the key on a `subprocess`, `docker` or `container` server, refuses the
+configuration at load. A `group` does not read the key; set it on each remote
+member. See [the configuration reference](../reference/configuration.md#mcp_servers).
 
 ## Health Checks
 

@@ -383,7 +383,8 @@ server, else of each group that owns it.
 - Both gates are hidden refusals, like a withdrawal: the result carries the
   gate's own message only, without the `Refused by MCP Hangar` line and the
   refusal metadata a shaped refusal gets.
-- `warn`, and a tool that violates nothing, refuse nothing.
+- `warn` adds no refusal of its own. An invalid annotation is refused whatever
+  the block says, and with no block at all.
 
 #### What Hangar itself sends upstream
 
@@ -395,8 +396,9 @@ built from the schema the upstream's last `tools/list` served this client; a
 tool it never listed gets none.
 
 So `header_exposure` now also decides what leaves Hangar. Under `warn`, or with
-no block, the annotated value **is** sent in a header to the upstream and to
-every intermediary in between. Only `withdraw` or `refuse_boot` stops it. The
+no block, the annotated value of a validly annotated tool **is** sent in a
+header to the upstream and to every intermediary in between. Only `withdraw`
+or `refuse_boot` stops it. The
 client applies the verdict on its own, before anything is sent, so a path that
 skipped the batch gates still sends nothing. It raises
 `ParamHeaderRefusedError` with a bounded reason:

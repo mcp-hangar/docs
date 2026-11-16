@@ -51,7 +51,7 @@ mcp_servers:
 | `auth` | `dict` | -- | -- | HTTP auth configuration (remote mode only) |
 | `tls` | `dict` | -- | -- | TLS for a `remote` upstream: `verify_ssl` (bool, default `true`) and `ca_cert_path` (a bundle to trust, for an upstream signed by your own CA). Both are honoured from 2.5.0; earlier releases accepted and discarded them. Since 2.32.0 also `peer_identity` (`key_ref` and a `spki_sha256` key list: the server is pinned by its key, needs an `https://` endpoint, refuses `verify_ssl: false` and ignores `ca_cert_path`) and `max_connection_age`. See [Key-pinned upstreams](../guides/KEY_PINNED_UPSTREAMS.md) |
 | `http` | `dict` | -- | -- | HTTP transport configuration (remote mode only) |
-| `upstream_protocol` | `str` | `"auto"` | auto, legacy | Since 2.39.0, how Hangar opens a `remote` upstream. `auto` probes `server/discover` and speaks the 2026-07-28 stateless lifecycle to an upstream that serves it, falling back to `initialize` otherwise; `legacy` never probes and always runs the `initialize` handshake. Remote mode only: the key on any other mode, or any other value, refuses the configuration at load. Read from the configuration file only; the REST API and the operator cannot set it. Changing it rebuilds the server on reload. See [Protocol versions and sessions](../guides/HTTP_TRANSPORT.md#protocol-versions-and-sessions) |
+| `upstream_protocol` | `str` | `"auto"` | auto, legacy | Since 2.39.0, how Hangar opens a `remote` upstream. `auto` probes `server/discover` and speaks the 2026-07-28 stateless lifecycle to an upstream that serves it, falling back to `initialize` otherwise; `legacy` never probes and always runs the `initialize` handshake. Remote mode only: the key on a `subprocess`, `docker` or `container` server, or any other value, refuses the configuration at load; a `group` does not read it. Read from the configuration file only; the REST API and the operator cannot set it. Changing it rebuilds the server on reload. See [Protocol versions and sessions](../guides/HTTP_TRANSPORT.md#protocol-versions-and-sessions) |
 | `max_concurrency` | `int` | -- | >= 0 | Per-MCP server concurrency limit; `0` means no limit. Unset uses `execution.default_mcp_server_concurrency` |
 | `max_response_bytes` | `int` | -- | > 0 | Largest upstream response this server's transport reads before failing the call with `ResponseTooLarge`. Wins over `execution.max_response_bytes` and `MCP_MAX_RESPONSE_BYTES`. Anything but a positive integer refuses the config |
 | `capabilities` | `dict` | -- | -- | Declared capability contract (network, filesystem, environment, tools, resources, `enforcement_mode`). Hangar enforces these at runtime and flags deviations. |
@@ -677,12 +677,13 @@ or, for an invalid annotation, `invalid_x_mcp_header`. A tool whose schema is
 not in the catalogue until its cold start is judged by the
 `deferred_header_exposure` gate after it, and refused as `schema_unknown` if a
 block that withholds governs the server and the schema is still missing.
-`warn` refuses nothing.
+`warn` adds no refusal of its own; an invalid annotation is refused whatever
+the block says.
 
 Since 2.38.0, Hangar sends the `Mcp-Param-*` headers a tool annotates when it
 calls a `remote` upstream, so the same verdict governs what Hangar itself puts
 in a header. Under `warn`, or with no block, an annotated argument's value is
-sent in a header. Under `withdraw` or `refuse_boot` the HTTP client refuses the
+sent in a header, unless the annotations are invalid. Under `withdraw` or `refuse_boot` the HTTP client refuses the
 call before sending anything (`ParamHeaderRefusedError`), even on a path that
 skipped the gates.
 

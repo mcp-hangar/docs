@@ -126,7 +126,7 @@ A key-pinned server's upstream identity is `peer-key:<key_ref>`, not `remote:htt
 
 ## Stateless upstreams
 
-From 2.39.0 Hangar starts a remote server with a `server/discover` probe, and speaks the 2026-07-28 stateless lifecycle to an upstream that names it: no `initialize`, no `Mcp-Session-Id` (see [the upgrade guide](../upgrade.md#upgrade-to-2390)). The key check does not depend on the lifecycle. It runs in the TLS handshake of every connection the transport opens, so against a stateless upstream it runs on the connection that carries `server/discover`, before the probe's first byte. The probe reads only a timeout as a legacy answer, so a mismatch there refuses the cold start with `upstream_peer_key_mismatch`, as on an `initialize`, and the start does not fall back to the handshake.
+From 2.39.0 Hangar starts a remote server with a `server/discover` probe, and speaks the 2026-07-28 stateless lifecycle to an upstream that names it: no `initialize`, no `Mcp-Session-Id` (see [the upgrade guide](../upgrade.md#upgrade-to-2390)). The key check does not depend on the lifecycle. It runs in the TLS handshake of every connection the transport opens, so against a stateless upstream it runs on the connection that carries `server/discover`, before the probe's first byte. Of the probe's transport failures only a timeout is read as a legacy upstream, so a mismatch on that connection refuses the cold start with `upstream_peer_key_mismatch`, as on an `initialize`, and the start does not fall back to the handshake.
 
 Two things differ:
 

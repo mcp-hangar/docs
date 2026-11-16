@@ -1,4 +1,4 @@
-<!-- verified-against: 2.37.0 -->
+<!-- verified-against: 2.39.0 -->
 
 # Key-Pinned Upstreams
 
@@ -124,6 +124,17 @@ Every replica applies a changed list. It replaces its copy of the server with a 
 
 A key-pinned server's upstream identity is `peer-key:<key_ref>`, not `remote:https://host:port`. Digest pins bound to it survive an endpoint change and a rotation within the lineage. Giving an existing server a peer identity, or changing its `key_ref`, changes its identity, so record its pins again with `mcp-hangar pin --write`.
 
+## Stateless upstreams
+
+From 2.39.0 Hangar starts a remote server with a `server/discover` probe, and speaks the 2026-07-28 stateless lifecycle to an upstream that names it: no `initialize`, no `Mcp-Session-Id` (see [the upgrade guide](../upgrade.md#upgrade-to-2390)). The key check does not depend on the lifecycle. It runs in the TLS handshake of every connection the transport opens, so against a stateless upstream it runs on the connection that carries `server/discover`, before the probe's first byte. Of the probe's transport failures only a timeout is read as a legacy upstream, so a mismatch on that connection refuses the cold start with `upstream_peer_key_mismatch`, as on an `initialize`, and the start does not fall back to the handshake.
+
+Two things differ:
+
+- **No `GET` stream.** A stateless upstream has no standing `GET` stream, so there is no stream handshake to count, and Hangar receives none of its unprompted notifications, `notifications/tools/list_changed` included.
+- **`upstream_protocol: legacy`**, which keeps the `initialize` handshake and the `GET` stream, is read from the configuration file only. The REST API and the operator do not carry it, so a key-pinned server registered over them runs `auto`.
+
+From 2.38.0 Hangar also sends the arguments a tool annotates with `x-mcp-header` as `Mcp-Param-*` request headers. They travel inside the verified connection like the body.
+
 ## Observing it
 
 - **A refusal** carries `observed_peer_spki`, the key the peer presented. A refused cold start is a `ToolCallRefused`, exported as status `denied` with reason `upstream_peer_key_mismatch`. A refusal on a warm connection is a `ToolInvocationFailed`, exported as status `error` with `failure_code: upstream_peer_key_mismatch`. From 2.36.0 a warm refusal also publishes a `ToolCallRefused` with gate `upstream_key` under the same correlation id. The audit exports skip it, so the refusal is still exported once, and `mcp-hangar why` shows it once.
@@ -132,7 +143,7 @@ A key-pinned server's upstream identity is `peer-key:<key_ref>`, not `remote:htt
 - **A declared issuance.** From 2.33.0 a call to a server that declares `issuance` carries it as `declared_key_issuance`, in JSON-lines, LEEF, syslog and OTLP; CEF has no free field for it. It records what the configuration declares, never a verification.
 - **Exports.** JSON-lines, LEEF, syslog and OTLP carry each field under its own format's name. CEF carries the one key a record has as `fileHash`, with `fileType` saying which (`UpstreamTlsKeyVerified` or `UpstreamTlsKeyRefused`); the refusal's code is in `reason`.
 - **`mcp-hangar why`** shows a refused key next to the keys the configuration file lists now.
-- **`mcp_hangar_upstream_peer_key_connections_total{mcp_server,outcome}`** counts handshakes, `verified` or `refused`, the GET stream's included. From 2.32.1 `mcp_server` is the server's id. 2.32.0 labelled it with the endpoint's host.
+- **`mcp_hangar_upstream_peer_key_connections_total{mcp_server,outcome}`** counts handshakes, `verified` or `refused`, the GET stream's included on an upstream that runs the `initialize` handshake. From 2.32.1 `mcp_server` is the server's id. 2.32.0 labelled it with the endpoint's host.
 
 ## Several replicas, and upgrades
 

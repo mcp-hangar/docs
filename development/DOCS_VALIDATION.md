@@ -257,6 +257,48 @@ both directions -- it runs in CI ahead of the check it guards:
 python scripts/check_config.py --selftest
 ```
 
+### Config blocks on the published wheel
+
+`scripts/check_config_published.py` asks the released product, not the source
+tree, whether each documented configuration would start. Its own workflow
+(`.github/workflows/config-published.yml`) installs `mcp-hangar` from PyPI into
+a virtualenv every night and on a PR that touches a page, and the script runs
+that install's `mcp-hangar config check` on every `yaml` fence whose top level
+has `mcp_servers`:
+
+```bash
+python -m venv /tmp/hangar && /tmp/hangar/bin/pip install mcp-hangar
+python scripts/check_config_published.py --venv /tmp/hangar
+```
+
+The key check above cannot see a value the gateway refuses. 2.37.0 made
+`tool_projection.flat` required on a front door, and nine examples with valid
+keys, two of them in the quickstart, described a gateway that refused to start
+(mcp-hangar/mcp-hangar#1374). Run over the docs as they were before the fix,
+this gate names exactly those nine.
+
+A fragment, one section or one server entry, is not a whole configuration and
+is not checked. `adr/` is left out: a decision record shows elided values, and
+an Accepted ADR cannot be edited. A fence marked `config-check: skip` is
+skipped here too. A fence shown because the gateway refuses it carries the
+reason on the line above it, and the gate checks both the refusal and the text:
+
+```markdown
+<!-- config-check: refused That surface must be chosen explicitly -->
+```
+
+As with `skip`, a whole "before" configuration in an upgrade note needs this
+marker written in the note itself, in the product's `upgrade.d/` fragment:
+`upgrade.md` is copied verbatim, and an unmarked refused block turns the sync
+PR red.
+
+It also runs the configuration reference's steps for filling `flat` against a
+stub upstream: `flat: []` is accepted and `pin` prints the tool, `pin --write`
+writes `pins` and leaves `flat` alone, and without `flat` both `config check`
+and `pin` refuse the file. The job is not required. A core release that refuses
+a documented example turns it red on the next nightly run and on every PR that
+touches a page, until the page is fixed.
+
 ### Symbol drift
 
 `scripts/validate_docs.py` extracts high-signal identifiers from every Markdown

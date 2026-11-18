@@ -61,6 +61,8 @@ from `tools:` and `pins`, are in the
 Before 2.37.0 a front door served every tool of every upstream. This
 configuration did that, and no longer starts:
 
+<!-- config-check: refused That surface must be chosen explicitly -->
+
 ```yaml
 # Refused at 2.37.0: payments has not chosen its surface.
 tool_access:

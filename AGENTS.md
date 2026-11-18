@@ -8,7 +8,7 @@ Public documentation for MCP Hangar. Released by release-please as GitHub releas
 | --- | --- |
 | Format | Markdown with frontmatter, lowercase kebab-case file names |
 | Lint | `markdownlint-cli2` with `.markdownlint.jsonc` on every `*.md` outside `.github/` |
-| Validators | seven scripts in `scripts/`, run by `validate-docs.yml` against checkouts of core and the operator |
+| Validators | seven scripts in `scripts/`, run by `validate-docs.yml` against checkouts of core and the operator, and `check_config_published.py`, run by `config-published.yml` against the wheel on PyPI |
 | Release | release-please, `chore(release): release X.Y.Z`; `docs:` commits land under Changed |
 | Owner | `@mapyr` reviews everything; `adr/`, `development/` and `operations/RELEASE_COMPATIBILITY.md` are CODEOWNERS-protected |
 
@@ -27,6 +27,9 @@ python scripts/check_freshness.py --docs . --source ../mcp-hangar
 python scripts/check_config.py --selftest
 python scripts/check_config.py --docs . --source ../mcp-hangar
 python scripts/validate_docs.py --docs . --source ../mcp-hangar
+python scripts/check_config_published.py --selftest
+python -m venv /tmp/hangar && /tmp/hangar/bin/pip install --quiet mcp-hangar
+python scripts/check_config_published.py --docs . --venv /tmp/hangar
 ```
 
 Baseline every check on a clean `origin/main` worktree before editing. Only a difference between the baseline run and your run is yours. `development/DOCS_VALIDATION.md` explains what each script covers and what still needs a human.
@@ -82,6 +85,7 @@ changelog.md      Written by release-please
 | --- | --- |
 | `lint.yml` | markdownlint-cli2 on every PR |
 | `validate-docs.yml` | the seven validators, on PRs, pushes to `main` and weekly |
+| `config-published.yml` | nightly and on PRs touching a page: every whole `config.yaml` block through the published wheel's `config check`, and the `flat` steps (`scripts/check_config_published.py`) |
 | `domain-lint.yml` | wording and domain checks |
 | `branch-name.yml`, `pr-title.yml`, `pr-body.yml` | shared reusables from `mcp-hangar/.github` |
 | `sync-upgrade-guide.yml` | daily and on dispatch: bring over a released upgrade section this repo is missing, open a PR on `chore/sync-upgrade-guide` |

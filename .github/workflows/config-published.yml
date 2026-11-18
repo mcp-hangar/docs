@@ -1,0 +1,51 @@
+# Asks the PUBLISHED mcp-hangar wheel whether each whole config.yaml block in
+# the docs would start, and runs the reference's steps for filling
+# tool_projection.flat (scripts/check_config_published.py, mcp-hangar#1374).
+#
+# validate-docs reads key names from a source checkout and installs nothing, so
+# it passed nine front-door examples that 2.37.0 refuses to start. This job
+# installs from PyPI, as a reader does. The wheel changes without a commit in
+# this repository, so it runs every night as well as on a PR that touches a page.
+name: config-published
+
+on:
+  pull_request:
+    paths:
+      - "**.md"
+      - scripts/check_config.py
+      - scripts/check_config_published.py
+      - .github/workflows/config-published.yml
+  schedule:
+    - cron: "20 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: config blocks on the published wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      # The marker parsing decides which fences are checked, and a marker that
+      # stops being recognised fails open. Runs before the check it guards.
+      - name: Check the gate's own fence selection
+        run: |
+          pip install --quiet pyyaml
+          python scripts/check_config_published.py --selftest
+
+      - name: Install the published wheel
+        run: |
+          python -m venv "$RUNNER_TEMP/hangar"
+          "$RUNNER_TEMP/hangar/bin/pip" install --quiet mcp-hangar
+          "$RUNNER_TEMP/hangar/bin/mcp-hangar" --version
+
+      - name: Check config blocks and the flat steps
+        run: python scripts/check_config_published.py --docs . --venv "$RUNNER_TEMP/hangar"

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.81](https://github.com/mcp-hangar/docs/compare/v1.2.80...v1.2.81) (2026-11-18)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([0cf48b0](https://github.com/mcp-hangar/docs/commit/0cf48b0ca633191330805cae5267a7a1156d3fef))
+* **guides:** bring over upgrade notes for the latest release ([#652](https://github.com/mcp-hangar/docs/issues/652)) ([b7a5b31](https://github.com/mcp-hangar/docs/commit/b7a5b3128499f02fea4873a04386045810821b7a))
+* **guides:** describe the stateless upstream era and header exposure on hangar_call ([#654](https://github.com/mcp-hangar/docs/issues/654)) ([09349d1](https://github.com/mcp-hangar/docs/commit/09349d1e227407b80545281beb3db3e5b0c70f96))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([aab56bd](https://github.com/mcp-hangar/docs/commit/aab56bdb8bb288fd587e5c1912cdcb8838df3892))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([d2db710](https://github.com/mcp-hangar/docs/commit/d2db7101750011deb6f5d99801660fc0da966f08))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([#655](https://github.com/mcp-hangar/docs/issues/655)) ([1619930](https://github.com/mcp-hangar/docs/commit/16199303ea9b5d93f8385c531c8d663b97fcb512))
+
 ## [1.2.80](https://github.com/mcp-hangar/docs/compare/v1.2.79...v1.2.80) (2026-11-15)
 
 

@@ -1531,23 +1531,39 @@ On a gateway with auth disabled the decision is attributed to the system princip
 A `decision` other than `approve` or `deny` is `400`; an approval that is
 already resolved is `409` with its `state`.
 
-*Since 2.25.0* an approval for a held call whose `hangar_call` batch deadline
-has already passed is refused: the call will not run, so there is nothing to
-let through. The answer is `409`:
+*Since 2.25.0* an approval for a held call whose batch was cancelled is
+refused: the call will not run, so there is nothing to let through. The answer
+is `409`:
 
 ```json
 {"error": "Approval refused: the held call was cancelled and did not run", "state": "cancelled"}
 ```
 
-The record moves to the terminal state `cancelled`, and the gate publishes
-`ToolApprovalCancelled`, whose `attempted_by` names the approver, instead of
-`ToolApprovalGranted`. On a `cancelled` record `decided_by` names who tried to
-approve the call, not who let it through. A client that reads every `409` as
-"already resolved" should read `state`. A denial after the deadline is still
-recorded as a denial. An approval that lands on a different gateway instance
-from the held call still answers `200` there; the instance holding the call
-records it `cancelled`
-([mcp-hangar#1702](https://github.com/mcp-hangar/mcp-hangar/issues/1702)).
+A client that reads every `409` as "already resolved" should read `state`.
+
+What cancels a held call changed in 2.39.1. A batch deadline that passes no
+longer does: the hold does not count against the budget, and an approval inside
+the approval window answers `200` and runs the call
+([mcp-hangar#2271](https://github.com/mcp-hangar/mcp-hangar/issues/2271)). Only
+`fail_fast` and a stop that abandons the batches in flight cancel a held call.
+
+Since 2.39.1 the gateway holding the call moves the record from `pending` to
+`cancelled` the moment the batch is cancelled, with the reason "the held call
+was cancelled before a decision; it did not run", and publishes
+`ToolApprovalCancelled` with an empty `attempted_by`
+([mcp-hangar#2272](https://github.com/mcp-hangar/mcp-hangar/issues/2272)). After
+that, an approval and a denial are both refused with this `409`, on every
+instance and from `mcp-hangar approvals`, which exits 1. Before 2.39.1 the
+record stayed `pending` until the window ended: an approval on another instance
+answered `200` with `approved` there and was recorded `cancelled` later, and a
+denial was recorded as a denial.
+
+An approval that reaches the record just before the cancel, on another instance,
+is still not a grant: the holder records it `cancelled`, `decided_by` and
+`attempted_by` name the approver, and the reason is "approved after the held
+call was cancelled; the call did not run"
+([mcp-hangar#1702](https://github.com/mcp-hangar/mcp-hangar/issues/1702)). A
+denial that reaches it first stays a denial.
 
 ---
 

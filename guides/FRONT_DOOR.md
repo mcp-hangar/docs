@@ -549,10 +549,15 @@ hit this path. In `egress` mode the handlers are not replaced and the full
 fleet -- removed by a config reload, by `DELETE /api/mcp_servers/{id}`, or by a
 discovery source -- leaves `tools/list` too, and listing clients get
 `notifications/tools/list_changed`. A server registered again under the same
-name is listed again at once, with its last known tools and under the
+name is listed again at once, with those of its last known tools that the
+`tool_projection.flat` declared for that name lists, and under the
 withdrawals and pins its name had, whether or not it is started on that replica;
-the first call starts it. When one of two servers that collided on a tool name
-is removed, the name is listed again and routes to the server that stayed.
+the first call starts it. *Since 2.37.0* only the configuration declares
+`flat`: a server a reload adds back names its tools in its own `flat`, and a
+server registered again over REST or by a discovery source under a name the
+configuration does not declare is listed with none of its tools. When one of
+two servers that collided on a tool name is removed, the name is listed again
+and routes to the server that stayed.
 
 **Hot-loaded servers are not served here.** The front door lists and routes
 only the servers the configuration declares. A server loaded with

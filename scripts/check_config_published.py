@@ -30,6 +30,12 @@ It also runs the commands the configuration reference gives for filling
 `flat`, against a stub stdio upstream: with `flat: []` the file is accepted
 and `pin` prints the server's tools; `pin --write` writes `pins` and leaves
 `flat` alone; without `flat`, both `config check` and `pin` refuse the file.
+Then the quickstart's steps, each in a fresh home: `init` over a client that
+lists the stub writes `flat` with its tool beside the pins; `add git` writes the
+entry the quickstart shows, which is refused until it has `flat: []`; and
+`init --skip-test` writes `flat: []` on a server it installs and leaves a
+client's server in the client. Every `text` fence quoting the front-door
+refusal must match what `config check` prints, up to the page's `...`.
 
 Usage:
     python scripts/check_config_published.py --venv PATH [--docs PATH]
@@ -42,11 +48,13 @@ Exit code 0 = every block and every step behaved as the docs say, 1 = not,
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import textwrap
 from pathlib import Path
 
 import yaml
@@ -59,6 +67,12 @@ from check_config import BLOCK_RE, is_skipped, iter_docs  # noqa: E402
 MIN_EXPECTED_BLOCKS = 60
 
 REFUSED_RE = re.compile(r"^\s*<!--\s*config-check:\s*refused\s+(.+?)\s*-->\s*$")
+
+#: A `text` fence, indented when it sits in a list item.
+TEXT_FENCE_RE = re.compile(r"^[ \t]*```text\n(.*?)^[ \t]*```", re.S | re.M)
+
+#: What marks a quote of the refusal a front door without `flat` prints.
+REFUSAL_PHRASE = "has not chosen which of its tools are projected"
 
 #: `config check` prints through rich, which wraps at the terminal width.
 ENV_EXTRA = {"COLUMNS": "400", "NO_COLOR": "1", "TERM": "dumb"}
@@ -133,6 +147,21 @@ def selftest() -> int:
     assert got[2] == ("d", None), "the refused marker covers one fence, not the next"
     assert got[3] == ("e", None), "prose between the marker and the fence ends it"
     assert flat("a\n  b   c\n") == "a b c"
+    quoted = (
+        "- It refuses:\n\n  ```text\n  mcp_servers.pay is served on a front door (tool_access.mode: front_door)"
+        " and has not chosen which of its tools are projected under their own\n  names. ...\n  ```\n\n"
+        "```text\nsomething else\n```\n"
+    )
+    assert list(quoted_refusals(quoted)) == [
+        (
+            3,
+            "pay",
+            "mcp_servers.pay is served on a front door (tool_access.mode: front_door) and has not chosen"
+            " which of its tools are projected under their own names.",
+        )
+    ], "an indented quote is found, cut at its `...`, and other text fences are not"
+    page = "```bash\nmcp-hangar add git --no-reload\n```\n\nProse.\n\n```yaml\n  git:\n    mode: subprocess\n```\n"
+    assert quickstart_git_entry(page) == {"mode": "subprocess"}, "the entry after `add git` is read, dedented"
     print("OK: selftest")
     return 0
 
@@ -144,9 +173,19 @@ class Runner:
         self.env = {**os.environ, **ENV_EXTRA, "HOME": str(home)}
         self.env.pop("MCP_CONFIG", None)
 
+        # The home is also the working directory, so no `./config.yaml` of the
+        # caller's is picked up by a command that falls back to it.
+        self.home = home
+
     def __call__(self, *args: str) -> tuple[int, str]:
         result = subprocess.run(
-            [str(self.binary), *args], capture_output=True, text=True, env=self.env, timeout=120
+            [str(self.binary), *args],
+            capture_output=True,
+            text=True,
+            env=self.env,
+            cwd=self.home,
+            stdin=subprocess.DEVNULL,
+            timeout=180,
         )
         return result.returncode, flat(result.stdout + result.stderr)
 
@@ -215,6 +254,123 @@ def walk_fill_the_list(run: Runner, work: Path) -> list[str]:
     return problems
 
 
+def quoted_refusals(text: str):
+    """Yield `(lineno, server, quote)` for every `text` fence quoting the front-door refusal.
+
+    The quote ends where the page cut it short with `...`; what is left of it
+    must be in the output word for word, with the page's server name.
+    """
+    for match in TEXT_FENCE_RE.finditer(text):
+        quote = flat(match.group(1))
+        if REFUSAL_PHRASE not in quote:
+            continue
+        name = re.match(r"mcp_servers\.([\w-]+) ", quote)
+        if name:
+            lineno = text[: match.start()].count("\n") + 1
+            yield lineno, name.group(1), quote.removesuffix("...").rstrip()
+
+
+def check_quoted_refusals(root: Path, run: Runner, work: Path) -> list[str]:
+    """Each page that quotes the front-door refusal quotes what the wheel prints."""
+    server = work / "server.py"
+    server.write_text(STUB_SERVER)
+    problems: list[str] = []
+    quotes = 0
+    for doc in iter_docs(root):
+        rel = doc.relative_to(root)
+        if rel.parts[0] == "adr":
+            continue
+        for lineno, name, quote in quoted_refusals(doc.read_text(encoding="utf-8", errors="ignore")):
+            quotes += 1
+            config = {
+                "tool_access": {"mode": "front_door"},
+                "mcp_servers": {name: {"mode": "subprocess", "command": [str(run.python), str(server)]}},
+            }
+            path = work / f"refusal-{quotes}.yaml"
+            path.write_text(yaml.safe_dump(config))
+            code, output = run("config", "check", str(path))
+            if code != 1 or quote not in output:
+                problems.append(
+                    f"{rel}:{lineno}: the quoted refusal is not what config check prints (exit {code}): {output}"
+                )
+    if not quotes:
+        problems.append("no page quotes the front-door refusal; the extraction broke")
+    return problems
+
+
+def walk_quickstart(root: Path, venv: Path, work: Path) -> list[str]:
+    """The quickstart's step 3 and "Adding more MCP servers", and the reference's `--skip-test`, in a fresh home each."""
+    server = work / "server.py"
+    server.write_text(STUB_SERVER)
+    problems: list[str] = []
+
+    def init(name: str, *args: str, client: bool = True) -> tuple[Runner, dict, Path]:
+        home = work / name
+        home.mkdir()
+        run = Runner(venv, home)
+        if client:
+            client_config = {"mcpServers": {"notes": {"command": str(run.python), "args": [str(server)]}}}
+            (home / ".claude.json").write_text(json.dumps(client_config))
+        code, output = run("init", "-y", *args)
+        written = home / ".config" / "mcp-hangar" / "config.yaml"
+        if code != 0 or not written.is_file():
+            problems.append(f"init {' '.join(args)} failed (exit {code}): {output}")
+            return run, {}, written
+        return run, yaml.safe_load(written.read_text()).get("mcp_servers") or {}, written
+
+    # Step 3: a client's server moves in with its pins, and `flat` names every tool the test saw.
+    run, servers, written = init("init", "--client", "claude-code")
+    projection = (servers.get("notes") or {}).get("tool_projection") or {}
+    if projection.get("flat") != ["list_notes"] or "list_notes" not in (projection.get("pins") or {}):
+        problems.append(f"init did not write flat and pins for the tool its test saw: {projection!r}")
+
+    # "Adding more MCP servers": `add` writes the page's entry without `flat`, the file
+    # is refused until the entry has one, and `flat: []` makes it load.
+    if servers:
+        documented = quickstart_git_entry((root / "getting-started" / "quickstart.md").read_text())
+        code, output = run("add", "git", "--no-reload", "-y")
+        config = yaml.safe_load(written.read_text())
+        added = dict(config["mcp_servers"].get("git") or {})
+        if code != 0 or added != {k: v for k, v in documented.items() if k != "tool_projection"}:
+            problems.append(
+                f"add git did not write the quickstart's entry (exit {code}): {added!r}: {output}"
+            )
+        code, output = run("config", "check", str(written))
+        if code != 1 or "must be chosen explicitly" not in output:
+            problems.append(f"config check did not refuse the entry add wrote (exit {code}): {output}")
+        config["mcp_servers"]["git"] = {**added, "tool_projection": documented.get("tool_projection")}
+        written.write_text(yaml.safe_dump(config))
+        code, output = run("config", "check", str(written))
+        if code != 0:
+            problems.append(
+                f"config check refused git with the quickstart's `flat: []` (exit {code}): {output}"
+            )
+
+    # `--skip-test` takes no pins and writes `flat: []` on a server it installs...
+    _, servers, _ = init(
+        "skip-test-servers", "--skip-test", "--servers", "memory", "--skip-clients", client=False
+    )
+    if (servers.get("memory") or {}).get("tool_projection") != {"flat": []}:
+        problems.append(f"init --skip-test did not write `flat: []` and no pins: {servers.get('memory')!r}")
+    # ...and leaves a client's server in the client, because moving one needs its first start.
+    run, servers, _ = init("skip-test-client", "--skip-test", "--client", "claude-code")
+    kept = json.loads((run.home / ".claude.json").read_text()).get("mcpServers") or {}
+    if "notes" in servers or "notes" not in kept:
+        problems.append(
+            f"init --skip-test moved a client's server: config {sorted(servers)}, client {sorted(kept)}"
+        )
+    return problems
+
+
+def quickstart_git_entry(page: str) -> dict:
+    """The `git` entry the quickstart shows right after `mcp-hangar add git`."""
+    after = page[page.index("mcp-hangar add git") :]
+    match = BLOCK_RE.search(after)
+    if not match:
+        return {}
+    return (yaml.safe_load(textwrap.dedent(match.group(1))) or {}).get("git") or {}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--docs", default=".", help="Path to the docs repo root.")
@@ -243,6 +399,8 @@ def main() -> int:
             print(f"FAIL: found only {checked}. The extraction in this script broke, not the docs.")
             return 1
         problems += walk_fill_the_list(run, work)
+        problems += check_quoted_refusals(root, run, work)
+        problems += walk_quickstart(root, venv, work)
 
     if problems:
         print(f"FAIL: {len(problems)} problem(s):\n")

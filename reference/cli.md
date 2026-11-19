@@ -137,9 +137,12 @@ mcp-hangar init --undo
 
 With `--skip-test`, step 6 writes no pins — an unverified pin would refuse every
 call to a tool nobody digested — and the summary says so instead of reporting a
-pass. Run [`pin --write`](#pin) afterwards to add them. Each server is then
-written with `flat: []`, so the front door serves none of its tools until you
-copy the names `pin --write` wrote under `pins` into `flat`.
+pass. Run [`pin --write`](#pin) afterwards to add them. Each server `init`
+installs (`--bundle`, `--servers`) is then written with `flat: []`, so the
+front door serves none of its tools until you copy the names `pin --write`
+wrote under `pins` into `flat`. A server your clients already list is not
+moved at all: it stays in the client, because moving one needs its first
+start. Run `init` without `--skip-test` to move it.
 
 The smoke test starts the servers one after another. Each gets 60 seconds
 divided by the number of servers, and never less than 30 seconds.

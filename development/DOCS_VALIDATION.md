@@ -295,7 +295,11 @@ PR red.
 It also runs the configuration reference's steps for filling `flat` against a
 stub upstream: `flat: []` is accepted and `pin` prints the tool, `pin --write`
 writes `pins` and leaves `flat` alone, and without `flat` both `config check`
-and `pin` refuse the file. The job is not required. A core release that refuses
+and `pin` refuse the file. It runs the quickstart's `init` and `add git` steps
+and `init --skip-test` the same way, in a fresh home each, and compares the
+entry `add git` writes with the one the quickstart shows. A `text` fence that
+quotes the front-door refusal must be what `config check` prints, up to the
+page's `...`. The job is not required. A core release that refuses
 a documented example turns it red on the next nightly run and on every PR that
 touches a page, until the page is fixed.
 

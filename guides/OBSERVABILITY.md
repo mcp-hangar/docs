@@ -165,7 +165,7 @@ sum(rate(mcp_hangar_tool_call_errors_total[5m])) / sum(rate(mcp_hangar_tool_call
 | `mcp_hangar_batch_calls_total` | Counter | result | Batch invocations (`success`, `failure`, `partial`, and `validation_error` for a batch refused at validation). Calls refused by `tool:invoke` authorization are not counted; see [Tool Invocations with hangar_call](BATCH_INVOCATIONS.md#metrics) |
 | `mcp_hangar_batch_duration_seconds` | Histogram | - | Batch execution time |
 | `mcp_hangar_batch_size` | Histogram | - | Number of calls per batch |
-| `mcp_hangar_batch_cancellations_total` | Counter | reason | Cancelled batches (`timeout`, `fail_fast`) |
+| `mcp_hangar_batch_cancellations_total` | Counter | reason | Cancelled batches (`fail_fast`), and batches whose deadline passed (`timeout`). Since 2.39.1 a passed deadline cancels no call held for approval, so read `timeout` as "deadline passed", not "calls cancelled" |
 | `mcp_hangar_batch_circuit_breaker_rejections_total` | Counter | mcp_server | Circuit breaker rejections |
 | `mcp_hangar_batch_concurrency` | Gauge | - | Current parallel executions |
 
@@ -329,7 +329,7 @@ answers for one replica. See
 | -------- | ------ | -------- | ------------- |
 | `mcp_hangar_approval_requests_total` | Counter | channel | Tool invocations held by the gate |
 | `mcp_hangar_approval_deliveries_total` | Counter | channel, outcome | Notifications handed to a channel: `sent`, `failed`, `not_notified` |
-| `mcp_hangar_approval_decisions_total` | Counter | channel, decision | How each hold ended: `granted`, `denied`, `expired`, and since 2.25.0 `cancelled` (an approval for a call whose batch was cancelled) |
+| `mcp_hangar_approval_decisions_total` | Counter | channel, decision | How each hold ended: `granted`, `denied`, `expired`, and since 2.25.0 `cancelled` (an approval for a call whose batch was cancelled). Since 2.39.1 a hold whose batch is cancelled by `fail_fast` or a stop counts as `cancelled` the moment it happens, answered or not, and a batch deadline no longer cancels a hold |
 
 **Example queries:**
 

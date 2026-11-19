@@ -93,11 +93,14 @@ mcp_servers:
       approval_channel: event_stream    # optional; defaults to approvals.channel
 ```
 
-Give `hangar_call` a `timeout` longer than `approval_timeout_seconds` (its
-default is 60 s, its maximum 300 s). In 2.24.0 a batch timeout that fires during
-the hold cancels the call (`error_type: "CancellationError"`) once the hold
-ends, while the approval stays pending and can still be approved -- the tool
-then does not run.
+Since 2.39.1 the time a call is held does not count against `hangar_call`'s
+`timeout`, so the approval window alone decides how long an approver has. On
+2.25.0 to 2.39.0, give `hangar_call` a `timeout` longer than
+`approval_timeout_seconds` (its default is 60 s, its maximum 300 s): a batch
+timeout that passes during the hold cancels the call, and an approval after it
+is refused. In 2.24.0 the call was cancelled once the hold ended, while the
+approval stayed pending and could still be approved -- the tool then did not
+run.
 
 ### Policy Precedence
 
@@ -230,18 +233,37 @@ channel, and `channel` on the `ToolApprovalRequested` event matches. Before
 
 **Expected Result:** After 10 seconds, the call's result carries `error_type: "approval_timeout"` and the error "No response within timeout". Resolving it afterwards answers `409` with `state: "expired"`.
 
-### 3.3a Approval After the Batch Deadline (2.25.0+)
+### 3.3a Approval After the Batch Deadline (2.39.1+)
 
 1. Keep `approval_timeout_seconds` well above the batch's `timeout` -- for
    example 120 against a `hangar_call` `timeout` of 10
 2. Invoke a tool matching `approval_list` through `hangar_call`
 3. Wait past the batch timeout, then approve it over REST
 
-**Expected Result:** the resolve answers `409` with
+**Expected Result:** the resolve answers `200` with `state: "approved"`, the
+socket carries `ToolApprovalGranted`, and the tool runs once: the batch returns
+its result. The deadline did not cut the hold short. On 2.25.0 to 2.39.0 the
+resolve answered `409` with `state: "cancelled"` and the tool did not run.
+
+### 3.3b Approval After the Batch Is Cancelled (2.39.1+)
+
+1. Invoke a tool matching `approval_list` through `hangar_call` with
+   `fail_fast: true`, next to a second call that fails after the first is held
+   -- for example a call to a stdio server whose command sleeps 10 seconds and
+   exits without a handshake
+2. Wait until the second call fails, then approve the held one over REST, or
+   with `mcp-hangar approvals approve`
+
+**Expected Result:** the held call reads `error_type: "CancellationError"`, and
+`GET /api/approvals?state=cancelled` lists the record from the moment the batch
+was cancelled, with the reason "the held call was cancelled before a decision;
+it did not run". The socket carries `ToolApprovalCancelled` with an empty
+`attempted_by`. The resolve answers `409` with
 `{"error": "Approval refused: the held call was cancelled and did not run", "state": "cancelled"}`,
-`GET /api/approvals?state=cancelled` lists the record, and the socket carries
-`ToolApprovalCancelled` with `attempted_by`, not `ToolApprovalGranted`. The tool
-does not run. Before 2.25.0 the resolve answered `200` with `state: "approved"`.
+and `mcp-hangar approvals approve` exits 1 with "was cancelled: the held call
+will not run". A deny is refused the same way. The tool does not run. Before
+2.39.1 the record stayed `pending` until its window ended, and the CLI or a REST
+call on another instance could still record it `approved`.
 
 ### 3.4 Deny-List Override
 
@@ -411,7 +433,8 @@ After each approval action, verify events in the event store/log:
 | Approve | `ToolApprovalGranted` |
 | Deny | `ToolApprovalDenied` |
 | Timeout | `ToolApprovalExpired` |
-| Approve after the batch deadline (2.25.0+) | `ToolApprovalCancelled` |
+| Approve after the batch deadline (2.39.1+) | `ToolApprovalGranted` |
+| Batch cancelled while held (2.39.1+) | `ToolApprovalCancelled`, empty `attempted_by` |
 
 Check via the `/api/ws/events` socket from §3.1, or the server log, which
 records each one as a `domain_event` line with its `event_type`. There is no

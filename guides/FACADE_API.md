@@ -313,8 +313,9 @@ There is no way to make an unchecked call. If your configuration refuses anonymo
 
 #### Tools that need approval
 
-- `invoke` raises `TimeoutError` at `timeout_s`, and the event loop is not blocked while the call waits. `SyncHangar.invoke` blocks the calling thread for up to `timeout_s`.
-- The call holds one of the facade's pool threads until the approval is decided or expires (`approval_timeout_seconds`, 300 seconds by default), even after `invoke` has raised `TimeoutError`. An approval given after `invoke` timed out is refused, so the tool does not run.
+- Since 2.39.1 the time the call is held does not count against `timeout_s` ([mcp-hangar#2271](https://github.com/mcp-hangar/mcp-hangar/issues/2271)). `invoke` waits for the hold to end, which takes up to `approval_timeout_seconds` (300 seconds by default), then for at most the time that was left when the hold began. It raises `TimeoutError` only for time spent outside the hold. The event loop is not blocked while the call waits. `SyncHangar.invoke` blocks the calling thread for up to `timeout_s` plus the hold.
+- An approval inside the window runs the tool and `invoke` returns its result. A hold nobody answers raises `ToolCallFailedError` with the code `approval_timeout`, and a denial with `approval_denied`. Before 2.39.1, `invoke` raised `TimeoutError` at `timeout_s` while the call was still held, and an approval given after that was refused, so the tool did not run.
+- The call holds one of the facade's pool threads until the approval is decided or expires.
 - The same pool runs `stop()` and `health()`, and each pending approval takes one of its threads. Size it with `HangarConfig().max_concurrency(...)` for the approvals that can be pending at once.
 
 ### MCP Server Management

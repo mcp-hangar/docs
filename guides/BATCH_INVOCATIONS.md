@@ -272,13 +272,33 @@ Example:
 - Elapsed time: 50s
 - Effective timeout: min(30, 10) = 10s
 
-A call held for [approval](APPROVAL_ADAPTERS.md) is not cut short by the batch
-timeout: it reads its approval outcome (`approval_timeout` or `approval_denied`;
-an approval that arrives after the deadline reads `CancellationError` and is not
-dispatched), and the batch returns when the hold ends. Since 2.25.0 that late
-approval is refused with `409` and recorded `cancelled`, not `approved`
-([mcp-hangar#1702](https://github.com/mcp-hangar/mcp-hangar/issues/1702)). A call the budget runs out
-on before it is held reads `TimeoutError`.
+A call the budget runs out on before it is held reads `TimeoutError`. Since
+2.39.1 the time a call is held for [approval](APPROVAL_ADAPTERS.md) does not
+count against the budget, neither the batch's `timeout` nor the per-call one
+([mcp-hangar#2271](https://github.com/mcp-hangar/mcp-hangar/issues/2271)):
+
+- The hold runs to the end of its approval window, and the batch returns when
+  the hold ends, so a batch with a held call can take longer than its `timeout`.
+- An approval inside the window dispatches the call, with the budget it had left
+  when the hold began. Before 2.39.1 an approval after the batch deadline was
+  refused with `409`, recorded `cancelled`, and the call read
+  `CancellationError`.
+- A hold nobody answers reads `approval_timeout` and is recorded `expired`; a
+  denial reads `approval_denied`.
+
+Only `fail_fast` and a stop that abandons the batches in flight still cancel a
+held call. Since 2.39.1 the hold then ends at once and the approval is recorded
+`cancelled`, so an approval or a denial that arrives later, from any process,
+is refused with `409`
+([mcp-hangar#2272](https://github.com/mcp-hangar/mcp-hangar/issues/2272)).
+
+The client can still give up first. Over stdio,
+[`approvals.stdio_wait_seconds`](../reference/configuration.md#notification-channels-approvals)
+ends the wait before a client's own request timeout. Over HTTP nothing does: a
+client that times out or disconnects does not cancel the held call, so an
+approval given after it has gone still runs the tool, and the result reaches
+nobody. Keep `approval_timeout_seconds` below the request timeout of the clients
+you serve.
 
 ### Response Size
 

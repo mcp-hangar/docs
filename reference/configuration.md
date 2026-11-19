@@ -388,6 +388,17 @@ approval moves to `expired`, an approve that arrives later is refused, and a
 retried call opens a new approval. Raise it if your client waits longer; lower
 it if your client gives up sooner.
 
+Since 2.39.1 the approval window is the only limit on a hold: a policy's
+`approval_timeout_seconds`, and over stdio the shorter of that and
+`stdio_wait_seconds`. The time a call is held does not count against a `hangar_call` `timeout`, the front door's 30 s
+call budget or the facade's `timeout_s`
+([mcp-hangar#2271](https://github.com/mcp-hangar/mcp-hangar/issues/2271)).
+Before, the call budget ended the hold first, so on a front door the effective
+window was 30 s whatever the window said. Over HTTP no wait limit applies, and a
+client that times out or disconnects does not cancel the held call: an approval
+given after it has gone still runs the tool, and the result reaches nobody. Keep
+`approval_timeout_seconds` below the request timeout of the clients you serve.
+
 `event_stream` is the built-in channel: it does not push anywhere itself,
 because the notification already travels as a `ToolApprovalRequested` domain
 event on `/api/ws/events`, which any client holding `audit:read` can stream. A

@@ -181,8 +181,9 @@ serving the configuration it had. See
 *Since 2.34.4*, on a front door, a server a reload removes also leaves
 `tools/list`, and listing clients get `notifications/tools/list_changed`.
 Before, its tools stayed listed though a call of them was already refused. A
-server added again under the same name is listed again at once, with its last
-known tools. See the [front-door guide](../guides/FRONT_DOOR.md#flat-per-tenant-tool-re-export).
+server added again under the same name is listed again at once, with those of
+its last known tools its new `tool_projection.flat` lists (*since 2.37.0* the
+reload is refused without the key). See the [front-door guide](../guides/FRONT_DOOR.md#flat-per-tenant-tool-re-export).
 
 ### Compared Fields
 

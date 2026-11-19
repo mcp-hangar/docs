@@ -85,7 +85,7 @@ changelog.md      Written by release-please
 | --- | --- |
 | `lint.yml` | markdownlint-cli2 on every PR |
 | `validate-docs.yml` | the seven validators, on PRs, pushes to `main` and weekly |
-| `config-published.yml` | nightly and on PRs touching a page: every whole `config.yaml` block through the published wheel's `config check`, and the `flat` steps (`scripts/check_config_published.py`) |
+| `config-published.yml` | nightly and on PRs touching a page: every whole `config.yaml` block through the published wheel's `config check`, the `flat` steps, the quickstart's `init` and `add` steps, and every quoted front-door refusal (`scripts/check_config_published.py`) |
 | `domain-lint.yml` | wording and domain checks |
 | `branch-name.yml`, `pr-title.yml`, `pr-body.yml` | shared reusables from `mcp-hangar/.github` |
 | `sync-upgrade-guide.yml` | daily and on dispatch: bring over a released upgrade section this repo is missing, open a PR on `chore/sync-upgrade-guide` |

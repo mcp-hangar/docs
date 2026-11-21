@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.82](https://github.com/mcp-hangar/docs/compare/v1.2.81...v1.2.82) (2026-11-21)
+
+
+### Changed
+
+* **guides:** bring over upgrade notes for the latest release ([a57fe3e](https://github.com/mcp-hangar/docs/commit/a57fe3e469caa90dff2324fa7b66eb70fa9f6147))
+* **guides:** describe the approval hold as core 2.39.1 runs it ([fc698ff](https://github.com/mcp-hangar/docs/commit/fc698ff453a03fbf28957c09de713fe027b4b671))
+* **guides:** say which tools a re-registered server lists on a front door ([8da7612](https://github.com/mcp-hangar/docs/commit/8da7612707b8126e6b7aba1ab094de4eda14593b))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([f16e788](https://github.com/mcp-hangar/docs/commit/f16e788b0d343c2e7b633409b5dbd13d7e85bc60))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([48039fa](https://github.com/mcp-hangar/docs/commit/48039facaa612b7882c3752730b2b2def77c620e))
+
 ## [1.2.81](https://github.com/mcp-hangar/docs/compare/v1.2.80...v1.2.81) (2026-11-18)
 
 

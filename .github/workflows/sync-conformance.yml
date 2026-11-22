@@ -58,7 +58,10 @@ jobs:
       # Core is public, so reading its artifacts needs no grant on core; the
       # download endpoint still wants an authenticated caller, which this
       # repository's own token is. A run from a fork is never taken: its
-      # head repository is not core.
+      # head repository is not core. The listing is ordered by artifact id,
+      # which is not creation order (measured: an artifact uploaded eight
+      # minutes later had the lower id), so every page is read and the newest
+      # is chosen by its creation time.
       - name: Find the newest pass table core published
         id: find
         env:
@@ -69,8 +72,10 @@ jobs:
           if [ "${ANY_BRANCH}" != "true" ]; then
             select="${select} | select(.workflow_run.head_branch == \"main\")"
           fi
-          found=$(gh api "repos/${CORE}/actions/artifacts?name=conformance-pass-table&per_page=100" \
-            --jq "[.artifacts[] | ${select}] | first | select(. != null) | \"\(.id) \(.workflow_run.id) \(.workflow_run.head_sha)\"")
+          gh api --paginate "repos/${CORE}/actions/artifacts?name=conformance-pass-table&per_page=100" \
+            --jq ".artifacts[] | ${select} | \"\(.created_at) \(.id) \(.workflow_run.id) \(.workflow_run.head_sha)\"" \
+            > "${RUNNER_TEMP}/artifacts.txt"
+          found=$(sort "${RUNNER_TEMP}/artifacts.txt" | tail -n 1 | cut -d' ' -f2-)
           if [ -z "${found}" ]; then
             echo "::error::no unexpired conformance-pass-table artifact from ${CORE}; nothing to publish"
             exit 1

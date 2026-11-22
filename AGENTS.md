@@ -62,7 +62,7 @@ changelog.md      Written by release-please
 - A page that states a current version carries `<!-- verified-against: X.Y.Z -->`. The token says a human re-read the page; it is never bumped by a bot, and it fails the build once the released version is more than one minor ahead. Re-read the page against the tag, fix what changed, then move the token.
 - `upgrade.md` must have a `## Upgrade to X.Y` section for every released minor. `sync-upgrade-guide.yml` brings over the section assembled from core's `upgrade.d/` notes; a release without steps still gets a one-line section.
 - Verify behaviour against the released artifact (the wheel or image of the version the page names), not against a local core branch.
-- Generated content is never hand-edited: the block between the `released-artifacts` markers in `operations/RELEASE_COMPATIBILITY.md` (`sync-release-matrix.yml`) and `changelog.md` (release-please).
+- Generated content is never hand-edited: the block between the `released-artifacts` markers in `operations/RELEASE_COMPATIBILITY.md` (`sync-release-matrix.yml`), the block between the `conformance-pass-table` markers in `reference/conformance.md` (`sync-conformance.yml`) and `changelog.md` (release-please).
 - Tables use the compact pipe style (`| a | b |`, separator `| --- | --- |`); the linter enforces it. Blank lines around headings, lists, fences and tables; one trailing newline; no trailing punctuation in headings.
 - No emoji. Public text says "a test Kubernetes cluster"; it never names a host or an IP.
 
@@ -90,6 +90,7 @@ changelog.md      Written by release-please
 | `branch-name.yml`, `pr-title.yml`, `pr-body.yml` | shared reusables from `mcp-hangar/.github` |
 | `sync-upgrade-guide.yml` | daily and on dispatch: bring over a released upgrade section this repo is missing, open a PR on `chore/sync-upgrade-guide` |
 | `sync-release-matrix.yml` | daily and on dispatch: regenerate the released-artifacts table from GHCR, open a PR |
+| `sync-conformance.yml` | daily and on dispatch: copy the newest conformance pass table core published from `main` into `reference/conformance.md`, open a PR; a dry run on PRs that touch it |
 | `release-please.yml` | release PR and GitHub release |
 | `project-board.yml`, `stale.yml`, `dependabot-automerge.yml` | housekeeping |
 

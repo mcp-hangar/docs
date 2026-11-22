@@ -143,9 +143,10 @@ that already ran when the policy was applied, is blocked. The operator's egress
 tests probe from new pods that connect at once, so on kindnet they saw denied
 destinations get through while the ingress fence held
 ([operator run](https://github.com/mcp-hangar/mcp-hangar-operator/actions/runs/42522227476)).
-The window reproduced on kind v0.33.0 with `kindest/node:v1.34.0` and
-`kindest/node:v1.37.0`, so neither the node image nor the pod subnet causes
-it, and Calico and Cilium do not have it
+The window reproduced on kind v0.33.0 with pod subnet `192.168.0.0/16` and
+both `kindest/node:v1.34.0` and `kindest/node:v1.37.0`. On that cluster a new
+pod got through and the same pod one second later was blocked, so the cause is
+timing, not the node image or the pod subnet. Calico and Cilium do not have it
 ([diagnosis](https://github.com/mcp-hangar/mcp-hangar-operator/pull/395#issuecomment-6899128663)).
 The walkthrough's kindnet rows therefore hold for pods that were already
 running only. Record a just-started pod's first egress connections on kindnet

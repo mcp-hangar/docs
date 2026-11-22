@@ -1,0 +1,129 @@
+# Regenerates the pass table in reference/conformance.md from the newest
+# `conformance-pass-table` artifact a core `MCP Conformance` run on `main`
+# uploaded, and opens a PR when it drifts (mcp-hangar/mcp-hangar#1902). Core
+# assembles that table from the run's own results; this copies it verbatim
+# between the markers, under one line naming the run.
+#
+# Daily, like every other sync in this org, plus the manual trigger. On a PR
+# that touches the sync it is a dry run: it takes the newest artifact from any
+# core branch, splices it and prints the diff, and opens nothing. That proves
+# the cross-repository download with this repository's token before merge.
+name: sync-conformance
+
+on:
+  schedule:
+    - cron: "53 6 * * *" # daily, after core's nightly runs
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - ".github/workflows/sync-conformance.yml"
+      - "scripts/sync_conformance_table.py"
+      - "reference/conformance.md"
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_BOT_APP_ID: ${{ secrets.RELEASE_BOT_APP_ID }}
+  CORE: mcp-hangar/mcp-hangar
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        if: ${{ env.RELEASE_BOT_APP_ID != '' && github.event_name != 'pull_request' }}
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          # Do NOT leave the token in the local git config; see sync-release-matrix.yml.
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Self-test the splice
+        run: python scripts/sync_conformance_table.py --selftest
+
+      # Core is public, so reading its artifacts needs no grant on core; the
+      # download endpoint still wants an authenticated caller, which this
+      # repository's own token is. A run from a fork is never taken: its
+      # head repository is not core. The listing is ordered by artifact id,
+      # which is not creation order (measured: an artifact uploaded eight
+      # minutes later had the lower id), so every page is read and the newest
+      # is chosen by its creation time.
+      - name: Find the newest pass table core published
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANY_BRANCH: ${{ github.event_name == 'pull_request' }}
+        run: |
+          select='select(.expired | not) | select(.workflow_run.head_repository_id == .workflow_run.repository_id)'
+          if [ "${ANY_BRANCH}" != "true" ]; then
+            select="${select} | select(.workflow_run.head_branch == \"main\")"
+          fi
+          gh api --paginate "repos/${CORE}/actions/artifacts?name=conformance-pass-table&per_page=100" \
+            --jq ".artifacts[] | ${select} | \"\(.created_at) \(.id) \(.workflow_run.id) \(.workflow_run.head_sha)\"" \
+            > "${RUNNER_TEMP}/artifacts.txt"
+          found=$(sort "${RUNNER_TEMP}/artifacts.txt" | tail -n 1 | cut -d' ' -f2-)
+          if [ -z "${found}" ]; then
+            echo "::error::no unexpired conformance-pass-table artifact from ${CORE}; nothing to publish"
+            exit 1
+          fi
+          read -r artifact run sha <<< "${found}"
+          {
+            echo "artifact=${artifact}"
+            echo "run_url=https://github.com/${CORE}/actions/runs/${run}"
+            echo "sha=${sha}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "Taking artifact ${artifact} from run ${run} at ${sha}."
+
+      - name: Download it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: ${{ steps.find.outputs.artifact }}
+        run: |
+          gh api "repos/${CORE}/actions/artifacts/${ARTIFACT}/zip" > "${RUNNER_TEMP}/table.zip"
+          unzip -o -q "${RUNNER_TEMP}/table.zip" -d "${RUNNER_TEMP}/table"
+          test -s "${RUNNER_TEMP}/table/conformance-pass-table.md"
+
+      - name: Regenerate the pass table
+        env:
+          RUN_URL: ${{ steps.find.outputs.run_url }}
+          SHA: ${{ steps.find.outputs.sha }}
+        run: |
+          python scripts/sync_conformance_table.py "${RUNNER_TEMP}/table/conformance-pass-table.md" "${RUN_URL}" "${SHA}"
+          git diff --stat
+
+      - name: Lint the regenerated page
+        run: npx --yes markdownlint-cli2 reference/conformance.md
+
+      - name: Open PR on drift
+        if: github.event_name != 'pull_request'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          branch: chore/sync-conformance
+          delete-branch: true
+          commit-message: "docs(reference): regenerate the conformance pass table from core's run on main"
+          title: "docs(reference): regenerate the conformance pass table from core's run on main"
+          body: |
+            Automated by `sync-conformance`: the pass table in `reference/conformance.md` differs from the newest one core's `MCP Conformance` workflow published from `main`.
+
+            ## Why
+
+            The table is generated by core from each run's own results (`scripts/conformance_pass_table.py`) and uploaded as the `conformance-pass-table` artifact. This copies the newest one verbatim, so the page says what the suite last said about `main`.
+
+            ## How tested
+
+            The splice (`scripts/sync_conformance_table.py`) passed its self-test, rewrote only the block between the `generated: conformance-pass-table` markers and refused to write if a leg was missing, and the regenerated page passed markdownlint in the same run.

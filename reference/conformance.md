@@ -1,6 +1,6 @@
 ---
 title: MCP Conformance
-description: The official MCP conformance suite's verdict on Hangar as a server and as a client, on protocol 2026-07-28 and 2025-11-25, generated from core's CI.
+description: The official MCP conformance suite's verdict on Hangar as a server, in the egress and front_door topologies, and as a client, on protocol 2026-07-28 and 2025-11-25, generated from core's CI.
 sidebar_label: Conformance
 sidebar_order: 6
 ---
@@ -15,11 +15,25 @@ Hangar's own tests assert what its maintainers believe the protocol requires. Th
 | Server | 2025-11-25 | The same gateway, judged on the revision it still serves for older clients |
 | Client | 2026-07-28 | Hangar's upstream connection: the suite's test server is registered as a remote upstream and called through the gateway |
 | Client | 2025-11-25 | The same, on the older revision |
+| Server, front_door | 2026-07-28 | A `front_door` gateway with auth on and the suite's reference server behind it, judged as one authenticated caller sees it |
+| Server, front_door | 2025-11-25 | The same gateway, judged on the older revision |
 
-Not covered yet:
+The page shows the tables in that order.
 
-- The `front_door` topology with an authenticated caller and the suite's reference server behind it ([mcp-hangar#2307](https://github.com/mcp-hangar/mcp-hangar/issues/2307)). Until it runs, the server tables mark the scenarios that need that setup as known non-passes tracked by #2307: they were not evaluated, which is not the same as failed.
-- stdio. The suite's `server` command reaches a server only through a URL, and its client scenarios serve HTTP, so neither role is judged over stdio.
+### The front_door topology
+
+The egress server tables judge a gateway whose only backend serves a handful of math tools. A scenario that needs the suite's own fixtures (an image tool, a prompt, a resource, an eliciting tool) cannot pass there, and its egress line says what the front_door run found instead.
+
+The front_door tables judge the topology that serves upstream tools under their own names. `serve --http` runs with `tool_access.mode: front_door` and authentication on, with one API-key principal holding the `developer` role. Its only upstream is the suite's reference everything-server, taken from the conformance repository at the commit the pinned suite version was built from. Every tool that server lists is projected flat. A front door serves an anonymous caller no tool, and the suite's `server` command cannot present a credential. So a loopback proxy adds the principal's `X-API-Key` header to every request and changes nothing else. The proxy is test plumbing; what is judged is the gateway answering an authenticated caller. Each front_door table names the reference server's commit next to the suite version.
+
+Two things about that setup shape what the front_door tables can judge:
+
+- Hangar opens the reference server with `upstream_protocol: auto` and finds it serves 2026-07-28. So it speaks to it statelessly on both revisions. On 2025-11-25 that upstream asks for sampling and elicitation with an input-required result rather than a server-to-client request, and has no `resources/subscribe` to relay.
+- The front door namespaces every resource URI it hands out as `hangar://<upstream>/<the upstream's URI>`. A scenario that reads the reference server's fixed URI directly therefore gets an unknown resource. This is a recorded design decision, not a failed read.
+
+The reference server alone passes every scenario either revision scores, with one exception: on 2026-07-28 it warns on its own in `input-required-result-validate-input`. So a non-pass in a front_door table is Hangar's (`Tracked by` names the issue), a recorded decision, or a fixture the reference server lacks at that commit.
+
+Not covered: stdio. The suite's `server` command reaches a server only through a URL, and its client scenarios serve HTTP, so neither role is judged over stdio. This was accepted in [mcp-hangar#1902](https://github.com/mcp-hangar/mcp-hangar/issues/1902) rather than bridged, and core's ecosystem watch reports when the suite can reach a stdio peer.
 
 ## How to read the tables
 

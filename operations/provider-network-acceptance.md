@@ -32,7 +32,10 @@ procedure.
 Selectors in both: the gateway is namespace `mcp-hangar` and pod label
 `app.kubernetes.io/name=mcp-hangar`; the provider is pod label
 `mcp-hangar.io/provider: <server>` on TCP/8080; every probe is a new TCP
-connection from a new pod. The e2e runs the operator built from the commit,
+connection. In the e2e each probe comes from a new pod. In the walkthrough,
+step 7's probe runs in the server's pod, which was already running when the
+backstop was written, and step 8's knock is a new pod outside the fence. The
+e2e runs the operator built from the commit,
 without core, so it does not exercise MCP calls; the walkthrough runs core and
 the published operator, so it does.
 
@@ -81,9 +84,9 @@ to distinguish these cases. Treat unexpected success in a deny case as failure.
 | Source | Expected result with opt-in | Recorded result |
 | --- | --- | --- |
 | Real gateway namespace and matching pod labels | Allow | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e) |
-| Ordinary client in provider namespace | Deny | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e) and kindnet (walkthrough step 8, `after: blocked`) |
+| Ordinary client in provider namespace | Deny | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e) and kindnet (walkthrough step 8, `after: blocked`; the fenced provider pod was already running) |
 | Matching gateway labels in a different namespace | Deny | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e); NOT RUN on kindnet |
-| Wrong pod labels in gateway namespace | Deny | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e) and kindnet (walkthrough step 8; there the gateway and provider share a namespace) |
+| Wrong pod labels in gateway namespace | Deny | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e) and kindnet (walkthrough step 8; there the gateway and provider share a namespace, and the fenced provider pod was already running) |
 | Actual gateway MCP call to the test provider | Success for an allowed operation | PASS on kindnet (walkthrough step 8, `add` answers 5 behind the fence); NOT RUN on Calico or Cilium |
 | Gateway and provider health/readiness checks | Remain healthy | PASS on kindnet (walkthrough step 8, `MCPServer` Ready after the fence); NOT RUN on Calico or Cilium |
 
@@ -107,7 +110,7 @@ For each transition, wait for `status.observedGeneration` to match and record
 | Policy stage | Expected policy-owned behavior | Recorded result |
 | --- | --- | --- |
 | Audit with default Deny | No blocking backstop; baseline destination reachable | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 0) |
-| Enforce with default Deny | Destination outside the allow-list blocked | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 1) and kindnet (walkthrough step 7, `blocked`) |
+| Enforce with default Deny | Destination outside the allow-list blocked | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 1) and kindnet (walkthrough step 7, `blocked`, from the server's pod that was already running; a just-started pod's first connections get through, see below) |
 | Return to Audit | Owned blocking backstop removed; baseline reachable again | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 2) |
 | Enforce with default Allow | No policy-owned restrictive backstop | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 3) |
 | Same Allow stage with a separately owned deny | Independent deny still blocks | PASS on Calico, Cilium, Cilium with NodeLocal DNSCache (e2e stage 4) |
@@ -133,11 +136,21 @@ Record node/host traffic, pre-existing connections, other additive allow policie
 remote providers and opted-out servers as unverified unless separately exercised.
 The recorded acceptance above leaves all of them unverified, along with
 hostname (`toFQDNs`) egress outside the Cilium legs and any CNI not named
-here. kindnet's egress enforcement holds for the walkthrough's kind version only:
-on the hosted runner's kind (`kindest/node:v1.37.0`, pod subnet
-`192.168.0.0/16`) the operator's egress tests saw denied destinations get
-through while the ingress fence held
+here. kindnet enforces NetworkPolicy, but not on a pod's first connections
+right after it starts (about one second): a new pod that connects at once gets
+through a default-deny egress policy, and the same pod a second later, or a pod
+that already ran when the policy was applied, is blocked. The operator's egress
+tests probe from new pods that connect at once, so on kindnet they saw denied
+destinations get through while the ingress fence held
 ([operator run](https://github.com/mcp-hangar/mcp-hangar-operator/actions/runs/42522227476)).
+The window reproduced on kind v0.33.0 with pod subnet `192.168.0.0/16` and
+both `kindest/node:v1.34.0` and `kindest/node:v1.37.0`. On that cluster a new
+pod got through and the same pod one second later was blocked, so the cause is
+timing, not the node image or the pod subnet. Calico and Cilium do not have it
+([diagnosis](https://github.com/mcp-hangar/mcp-hangar-operator/pull/395#issuecomment-6899128663)).
+The walkthrough's kindnet rows therefore hold for pods that were already
+running only. Record a just-started pod's first egress connections on kindnet
+as not enforced; ingress to a just-started provider is NOT RUN.
 Do not extend a result for container pods to remote endpoints. NodeLocal DNS and
 Cilium hostname egress require their own allowed/denied DNS and upstream probes;
 the ingress test does not qualify hostname egress.
@@ -150,7 +163,10 @@ Attach the completed record to [docs #471](https://github.com/mcp-hangar/docs/is
 On the status side, operator releases before the one with
 [mcp-hangar-operator#393](https://github.com/mcp-hangar/mcp-hangar-operator/issues/393)
 report kindnet's backstop and fence as unenforced although the probes above
-show them blocking; status there is not acceptance evidence either way.
+show them blocking; status there is not acceptance evidence either way. From
+that release, operator 0.17.37, the probe waits until its policy and canary
+pods are 30 seconds old before it connects, so on kindnet it reads `Enforcing`;
+that verdict does not cover a just-started pod's first connections either.
 Report PASS, FAIL or INCONCLUSIVE per row and identify every untested boundary.
 Closing the architecture follow-up requires a maintainer decision on the retained
 ADR boundary and acceptance evidence for the deployment scope being claimed.

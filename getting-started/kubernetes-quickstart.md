@@ -308,8 +308,14 @@ notes-no-env   Enforce   Unenforced   True   notes    Deny      30s
 
 The `NetworkPolicy` selects `mcp-hangar.io/provider: notes` and allows egress
 to `kube-dns` on port 53 and to `192.0.2.0/24`. The probe that printed
-`reachable` before now prints `blocked`: kind's network plugin enforces the
-backstop.
+`reachable` before now prints `blocked`: kind's network plugin, kindnet,
+enforces the backstop. It does so here because the probe runs in the server's
+pod, which was already running when the policy was written. kindnet does not
+enforce NetworkPolicy on a pod's first connections right after it starts
+(about one second): a server pod that restarts and connects at once gets past
+the backstop, and the same pod a second later is blocked. Calico and Cilium
+do not have that window
+([diagnosis](https://github.com/mcp-hangar/mcp-hangar-operator/pull/395#issuecomment-6899128663)).
 
 `BACKSTOP` still reads `Unenforced`, and the policy reports `Degraded=True`
 with reason `EnforcementNotObserved`. The operator decides whether anything

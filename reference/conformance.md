@@ -23,12 +23,13 @@ Not covered yet:
 
 ## How to read the tables
 
-Each table is one run of one role on one revision. A row is one scenario of the suite.
+Each table is one run of one role on one revision. A row is one scenario of the suite, and its checks are counted the way the suite counts them: a `FAILURE` or a `WARNING` fails the scenario, while a `SKIPPED` check (the suite had nothing to judge, for example because the client never sent that request) counts neither way and has its own column.
 
-- `pass`: every check of the scenario passed.
-- `known`: the scenario did not pass and its baseline in core lists it, so the run is still green.
-- `stale`: the scenario passes but its baseline still lists it. The suite fails such a run until the line is deleted.
-- `REGRESSION`: the scenario did not pass and nothing expects it. The run is red.
+- `pass`: no check of the scenario failed.
+- `known`: a check failed and the scenario's baseline in core lists it, so the run is still green.
+- `stale`: no check failed but the baseline still lists the scenario. The suite fails such a run until the line is deleted.
+- `REGRESSION`: a check failed and nothing expects it. The run is red.
+- `pass, not scored: <reason>` or `fail, not scored: <reason>`: the suite runs the scenario for this revision but does not score it, so it moves neither the pass count nor the run's result. The list and the reasons are the suite's own frozen `requirements/<revision>.yaml`: `extension` (an optional protocol extension), `pending` (the suite's own reference fixture cannot pass it yet) or `added-after-release` (added to the suite after the revision shipped). The client 2025-11-25 run selects its scenarios by version rather than by that file, so every row in it is scored.
 
 `Tracked by` names the issue (`#N`, in [mcp-hangar](https://github.com/mcp-hangar/mcp-hangar/issues)) or the specification change (`SEP-N`) that the baseline line cites. Each table names the suite version and the core commit it was run against.
 

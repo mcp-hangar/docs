@@ -716,14 +716,27 @@ the `MCPEgressPolicy` `BackstopEnforceable` condition (see
 | Probe could not tell | `Unknown` / `PolicyWrittenUnverified` |
 
 Before 0.17.6 the condition read `True` / `PolicyApplied` as soon as the policy
-was written, including on CNIs that do not enforce NetworkPolicy (kindnet,
-flannel, a vcluster without policy sync). The policy is still written in every
+was written, including on CNIs that do not enforce NetworkPolicy (flannel, a
+vcluster without policy sync). The policy is still written in every
 case. The other reasons are unchanged: `False` / `NoPolicyNeeded` when no
 network capabilities are declared, and `False` / `EgressWithheldUnpinnedImage`
 for an unpinned image in a governed namespace. Since operator 0.17.7 adding or
 removing the `mcp-hangar.io/enforce-egress` label reconciles every MCPServer in
 the namespace within seconds; before, an unpinned server's egress was withheld
 or restored only at its next poll, up to ten minutes later.
+
+kindnet, kind's default CNI, enforces NetworkPolicy, but not on a pod's first
+connections right after it starts (about one second): a new pod that connects
+at once gets through a default-deny egress policy, and the same pod a second
+later is blocked. Calico and Cilium do not have that window
+([diagnosis](https://github.com/mcp-hangar/mcp-hangar-operator/pull/395#issuecomment-6899128663)).
+From operator 0.17.37 the probe is a connection between two canary pods of the
+operator's image behind their own NetworkPolicy, and it waits until that
+policy and both canaries are 30 seconds old, so on kindnet the condition reads
+`True` / `PolicyApplied`. From 0.17.6 to 0.17.36 the probe looked for a known
+CNI and read `False` / `PolicyWrittenUnenforced` there. Neither verdict covers
+the window: on kindnet a server pod's first connections after it starts or
+restarts are not held to its policy.
 
 A server reading `PolicyWrittenUnenforced` or `PolicyWrittenUnverified` is not
 recorded as a `capability_drift` violation: the policy exists, and the

@@ -1,6 +1,6 @@
 # Cookbook
 
-From zero to production in 25 recipes. Start at 01 and go in order, or jump to
+From zero to production in 26 recipes. Start at 01 and go in order, or jump to
 what you need.
 
 ## The Path (sequential)
@@ -42,6 +42,7 @@ recipe 01.
 | 23 | [Harden a Public Authenticated Gateway](23-harden-public-gateway.md) | 22 |
 | 24 | [L7 Egress Policy Language](24-egress-policy-language.md) | 11 |
 | 25 | [Running More Than One Replica](25-multiple-replicas.md) | 23 |
+| 26 | [Hangar behind kube-agentic-networking](26-kube-agentic-networking-xbackend.md) | 16, 18 |
 
 ## How to Use This Cookbook
 

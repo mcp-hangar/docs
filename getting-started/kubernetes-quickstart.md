@@ -97,8 +97,10 @@ helm install mcp-hangar-operator oci://ghcr.io/mcp-hangar/charts/mcp-hangar-oper
   --namespace mcp-hangar -f values.yaml --wait --timeout 5m
 ```
 
-The operator chart 0.12.52 and later defaults to operator 0.17.36, the first
-release that registers container servers in core itself.
+The walkthrough needs operator 0.17.36 or later, the first release that
+registers container servers in core itself. Chart 0.12.52 was the first to
+ship it; the operator each chart ships is in the
+[chart release history](../operations/RELEASE_COMPATIBILITY.md#chart-release-history).
 
 ## 3. Run an MCP server in a pod
 

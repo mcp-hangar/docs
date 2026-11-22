@@ -3,7 +3,7 @@
 <!-- verified-against: 2.40.0 -->
 
 > **Prerequisite:** [16 -- Front-Door Multi-Tenant](16-front-door-multi-tenant.md), [18 -- Per-Tenant Digest Pins](18-tenant-digest-pins.md)
-> **You will need:** MCP Hangar 2.40.0, [kube-agentic-networking](https://github.com/kubernetes-sigs/kube-agentic-networking) v0.2.0 with its reference controller, an OIDC issuer that puts a `tenant_id` claim in its tokens
+> **You will need:** MCP Hangar 2.40.0; [kube-agentic-networking](https://github.com/kubernetes-sigs/kube-agentic-networking) v0.2.0 with its reference controller built from the `v0.2.0` tag (commit `cff53a3`), because the tag's `k8s/deploy/deployment.yaml` pulls the controller image tagged `main`; Kubernetes 1.35 with Pod certificates and cluster trust bundles enabled, set up as the project's `dev/ci/setup-cluster.sh` does; an OIDC issuer that puts a `tenant_id` claim in its tokens
 > **Adds:** Hangar as the MCP backend a kube-agentic-networking `Gateway` routes to, with an `XAccessPolicy` in front and a NetworkPolicy behind
 
 ## The Problem
@@ -38,7 +38,7 @@ tool-level policy in Hangar, which also serves the listing. Two tool lists
 disagree in ways a client cannot see: Hangar lists a tool the gateway refuses,
 and a gateway tool list refuses Hangar's own `hangar_whoami` unless it names it.
 
-Hangar must run `tool_access.mode: front_door`. In `egress` mode the client
+Hangar must run `tool_access.mode: front_door` (reasoned from how `egress` mode works, not tested). In `egress` mode the client
 calls `hangar_call` with the real tool in its arguments, so the gateway's tool
 rules would see one name for every call.
 
@@ -93,7 +93,9 @@ mcp_servers:
 ```
 
 Run `mcp-hangar pin --write` against the real upstream to add `pins:` to the
-`records` entry; without pins there is nothing to withhold on drift.
+`records` entry; without pins there is nothing to withhold on drift. Then load
+the file with
+`kubectl -n agent-gateway create configmap hangar-config --from-file=config.yaml`.
 
 The Deployment passes the gateway's address in `MCP_TRUSTED_HOSTS`. The gateway
 forwards the `Host` the agent used, `<gateway address>:10001`, and Hangar
@@ -125,6 +127,13 @@ spec:
       volumes:
         - {name: config, configMap: {name: hangar-config}}
         - {name: data, persistentVolumeClaim: {claimName: hangar-data}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: hangar-data, namespace: agent-gateway}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 100Mi}}
 ---
 apiVersion: v1
 kind: Service
@@ -191,10 +200,20 @@ spec:
             - {name: tools/call, params: ["lookup_record", "archive_record", "hangar_whoami"]}
 ```
 
-The agent pod gets its SPIFFE certificate from the controller's signer through
-a projected volume, and presents it to the gateway with its JWT for Hangar:
+The agent pod runs as the ServiceAccount the policy names
+(`kubectl -n agent-gateway create serviceaccount agent-a`), gets its SPIFFE
+certificate from the controller's signer through a projected volume, and
+presents it to the gateway with its JWT for Hangar. The relevant part of its
+spec:
 
 ```yaml
+spec:
+  serviceAccountName: agent-a
+  containers:
+    - name: agent
+      image: <your agent image>
+      volumeMounts:
+        - {name: agent-identity-mtls, mountPath: /run/agent-identity-mtls, readOnly: true}
   volumes:
     - name: agent-identity-mtls
       projected:

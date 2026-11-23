@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.84](https://github.com/mcp-hangar/docs/compare/v1.2.83...v1.2.84) (2026-11-23)
+
+
+### Changed
+
+* **architecture:** adr-020 -- a row the file claimed is an overlay, not a registration ([68f9f93](https://github.com/mcp-hangar/docs/commit/68f9f93ae20d91f5d4a30beffa6ed1efd973c1b9))
+* **reference:** regenerate the conformance pass table from core's run on main ([2802117](https://github.com/mcp-hangar/docs/commit/280211783d67aab341b6f66cbef9f49e52eabe8b))
+
 ## [1.2.83](https://github.com/mcp-hangar/docs/compare/v1.2.82...v1.2.83) (2026-11-23)
 
 

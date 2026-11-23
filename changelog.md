@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.83](https://github.com/mcp-hangar/docs/compare/v1.2.82...v1.2.83) (2026-11-23)
+
+
+### Changed
+
+* **guides:** add a recipe for hangar as the xbackend behind kube-agentic-networking ([#674](https://github.com/mcp-hangar/docs/issues/674)) ([d27a403](https://github.com/mcp-hangar/docs/commit/d27a4039396ac89c6869ae14688b120b1703d307))
+* **guides:** bring over upgrade notes for the latest release ([e307945](https://github.com/mcp-hangar/docs/commit/e30794537efb8ac61315ba3a4271632a563b70a0))
+* **guides:** describe the observed-block backstop probe and its quickstart output ([75ca788](https://github.com/mcp-hangar/docs/commit/75ca78857e554423bf538a9f468b6807f7bfe1a1))
+* **guides:** say what kindnet enforces and where its first-connection window applies ([#676](https://github.com/mcp-hangar/docs/issues/676)) ([78db533](https://github.com/mcp-hangar/docs/commit/78db533e9628ab20156ec3ef9171b01bcad4c37e))
+* **guides:** state the quickstart operator chart version as history, not as the current default ([f81f7e1](https://github.com/mcp-hangar/docs/commit/f81f7e1ba9b69b8915b904a6edb70eb05cd9261d)), closes [#684](https://github.com/mcp-hangar/docs/issues/684)
+* **reference:** publish the front_door server legs on the conformance page ([#681](https://github.com/mcp-hangar/docs/issues/681)) ([d22655a](https://github.com/mcp-hangar/docs/commit/d22655ae544b72bd60a353953d31fda0f09cdd42))
+* **reference:** publish the generated MCP conformance pass table ([0b3a5d6](https://github.com/mcp-hangar/docs/commit/0b3a5d6c3cc6884f0d3988923fc45d0716584a91))
+* **reference:** regenerate the released-artifacts matrix from GHCR ([297eacd](https://github.com/mcp-hangar/docs/commit/297eacd2679175aa5932ce061f63ddc1e5fd6e23))
+* **reference:** say that approvals are tenant-scoped and a global grant does not widen them ([#678](https://github.com/mcp-hangar/docs/issues/678)) ([4c1516f](https://github.com/mcp-hangar/docs/commit/4c1516f4786ce1d67984d04f99646ec3f33240de)), closes [#677](https://github.com/mcp-hangar/docs/issues/677)
+
 ## [1.2.82](https://github.com/mcp-hangar/docs/compare/v1.2.81...v1.2.82) (2026-11-21)
 
 

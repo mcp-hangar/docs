@@ -247,6 +247,13 @@ start servers it did not register.
 enforced, so a caller without it receives `403` where it previously received
 `200`; `approval:read` alone lists and reads approvals but cannot decide one.
 
+Neither permission crosses tenants, whatever the grant's scope. An approval
+belongs to the tenant of the caller whose call was held, and only a principal in
+that tenant sees or resolves it. A `global` grant to a principal with no tenant,
+the bootstrap admin included, sees none of a tenant's held calls. See
+[Approvals](../reference/rest-api.md#approvals) and
+[#688](https://github.com/mcp-hangar/mcp-hangar/issues/688).
+
 ### Assigning Roles
 
 #### Static (in config.yaml)

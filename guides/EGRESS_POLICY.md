@@ -297,9 +297,9 @@ drops the policy on restart shows it on every reconcile.
 | ----------- | --------- |
 | `Compiled` | The policy was structurally compiled. |
 | `BackstopApplied` | The L3/L4 backstop is in place (`False` with `BackstopGenerationDisabled` when `generate: false`, `False` with `RemoteTargetHasNoPods` when the target is a `mode: remote` server, operator 0.17.28, and `True` with `RemoteMembersNotCovered` for a group whose remote members it does not cover, operator 0.17.39). |
-| `BackstopEnforceable` | Whether anything in the cluster enforces the written backstop: `True` / `EnforcerObserved` when the operator finds a policy-enforcing API or a known CNI agent, `False` / `NoEnforcerObserved` when it finds neither (`status.backstopEnforcement: Unenforced`; the `Backstop` column of `kubectl get`), `Unknown` / `EnforcementUnverified` when it could not tell, for example because it may not list DaemonSets (`status.backstopEnforcement: Unverified`). |
+| `BackstopEnforceable` | Whether a NetworkPolicy written in this cluster is seen to block traffic (see [the enforcement probe](#the-enforcement-probe)): `True` / `EnforcerObserved` when the operator's probe saw its own NetworkPolicy block a connection (`status.backstopEnforcement: Enforcing`; the `Backstop` column of `kubectl get`), `False` / `NoEnforcerObserved` when a connection that policy denies went through (`Unenforced`), `Unknown` / `EnforcementUnverified` while the probe has no answer, for example in the first minute after the operator starts or when its canary pods cannot run (`Unverified`). |
 | `L7Delivered` | Whether core took the compiled L7 policy (operator 0.17.5). `True` / `Delivered` once every target server accepted the push; `True` / `DeliveredNotPersisted` when core took it but has no persistence backend (see [Surviving a gateway restart](#surviving-a-gateway-restart)); `False` / `CoreAuthRejected`, `CoreUnreachable` or `PushFailed`, naming the server whose push failed, or `GatewayPodMissingPolicy` when a gateway pod accepted the push but did not return the policy on read-back (operator 0.17.38); `Unknown` / `CoreIntegrationOff` when the operator runs without `--hangar-url`. Shown as the `L7` column of `kubectl get mcpegresspolicies`. |
-| `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), `CiliumAgentNotObserved` (Cilium requested, CRD present, no `cilium` agent observed; operator 0.17.7 and later), `TargetNotFound`, `EnforcementNotObserved` (nothing observed to enforce the backstop), or `L7PushFailed` (`L7Delivered=False`). |
+| `Degraded` | An at-risk state: `FQDNUpstreamsUnenforceable` (FQDN upstreams under the Vanilla flavor), `CiliumUnavailable` (Cilium requested, CRD absent), `CiliumAgentNotObserved` (Cilium requested, CRD present, no `cilium` agent observed; operator 0.17.7 and later), `TargetNotFound`, `EnforcementNotObserved` (the probe saw a connection its NetworkPolicy denies go through), or `L7PushFailed` (`L7Delivered=False`). |
 
 `Compiled` and `BackstopApplied` say nothing about core. Before operator 0.17.5 a policy whose L7 push core refused -- an API key without `policy:write`, a core that was down, a payload core rejected -- read `Compiled=True` and `Degraded=False`, with a Warning Event as the only trace. It now reads `L7Delivered=False` and `Degraded=True` / `L7PushFailed`, so an alert on `Degraded` may fire on a policy that has been undelivered since it was created. Fix the key's permissions or core's reachability; the next reconcile clears it.
 
@@ -325,30 +325,57 @@ with an older CRD the API server rejects the status write of such a policy. An
 alert or script that treats anything but `Enforcing` as a problem will now see
 these policies.
 
-**One enforcement probe for every NetworkPolicy the operator writes.** The
-probe behind `BackstopEnforceable` looks for a policy-enforcing API (Calico,
-Antrea, AWS VPC CNI, Kube-OVN, OVN-Kubernetes) and, failing that, for
-a known CNI agent DaemonSet (`azure-npm`, `calico-node`, `canal`, `cilium`,
-`kube-ovn-cni`, `kube-router`, `ovnkube-node`, `weave-net`); it re-asks at most
-once every five minutes. Cilium is recognized by its agent only: before
-operator 0.17.7 the `CiliumNetworkPolicy` CRD alone counted, and it outlives
-an uninstall. Since operator 0.17.6 the same verdict also drives the
-MCPServer `NetworkPolicyApplied` condition and the namespace default-deny
-Warning (see
-[Kubernetes: NetworkPolicy enforcement status](KUBERNETES.md#networkpolicy-enforcement-status)).
-The agent check lists DaemonSets, which the Helm chart grants (`apps/daemonsets`
-`get`, `list`) from chart 0.12.19; the operator repository's own RBAC manifests
-already carry it. With an older chart the list is refused, so every cluster
-that serves none of those APIs reads `Unknown` -- one with no enforcer as well
-as one whose enforcer ships no CRD -- and the `False` / unenforced states and
-their Warnings never fire. If your CNI enforces NetworkPolicy and
-the probe does not recognize it, start the operator with
+### The enforcement probe
+
+One probe answers for every NetworkPolicy the operator writes. Since operator
+0.17.37 its verdict comes from a blocked connection, not from the CNI's name.
+The operator keeps two canary pods of its own image in its namespace (the
+Deployment `mcp-hangar-enforcement-probe`, owned by the operator's pod, with no
+service account token) behind a NetworkPolicy that lets them reach each other on
+TCP 6443 only. It asks one canary to dial the other on 6443 and on 6444:
+
+| 6443 (allowed) | 6444 (denied) | Verdict |
+| --- | --- | --- |
+| connects | blocked | `Enforcing` |
+| connects | connects | `Unenforced` |
+| fails, or the canaries are not running | -- | `Unverified` |
+
+The probe trusts no answer until its NetworkPolicy and both canaries are 30
+seconds old, so the CNI has had time to program them. While it has no answer it
+asks again every 15 seconds; once it has one, every five minutes. A change of
+verdict reconciles every `MCPEgressPolicy` at once. The same verdict drives the
+MCPServer `NetworkPolicyApplied` and `ProviderIngressApplied` conditions and the
+namespace default-deny Warning (see
+[Kubernetes: NetworkPolicy enforcement status](KUBERNETES.md#networkpolicy-enforcement-status)),
+which pick it up at their next reconcile. The verdict is evidence about the
+canaries' own policy, not a test of each backstop: kindnet, for one, blocks the
+canaries but not a pod's first connections right after it starts (see
+[Limitations](#limitations-and-notes)).
+
+Up to operator 0.17.36 the verdict came from names: a policy-enforcing API
+(Calico, Antrea, AWS VPC CNI, Kube-OVN, OVN-Kubernetes) or a known CNI agent
+DaemonSet (`azure-npm`, `calico-node`, `canal`, `cilium`, `kube-ovn-cni`,
+`kube-router`, `ovnkube-node`, `weave-net`). An enforcing CNI on neither list,
+kindnet among them, read `Unenforced`, and a listed one read `Enforcing` whether
+it blocked or not. The operator still runs that lookup, at most once every five
+minutes, and appends what it found to the condition message after `by name:`,
+but it no longer sets the verdict. It still decides the `Auto` flavor: Cilium
+is recognized by its agent only (before operator 0.17.7 the
+`CiliumNetworkPolicy` CRD alone counted, and it outlives an uninstall). The
+agent check lists DaemonSets, which the Helm chart grants (`apps/daemonsets`
+`get`, `list`) from chart 0.12.19; with an older chart the list is refused and
+`Auto` picks Vanilla.
+
+If the canaries cannot run or be reached in your cluster, for example because
+admission refuses their pods or another NetworkPolicy in the operator's
+namespace stops the operator reaching them on 6443, start the operator with
 `--networkpolicy-enforcement=enforced` (chart value
-`operator.networkPolicyEnforcement`, chart 0.12.21 and later); the flag now
-applies to all three writers. It changes only what status reports: the
-policies are written either way. Since operator 0.17.7 it no longer stands in
-for the agent check: the backstop flavor is chosen from the DaemonSets actually
-running, whatever the flag says.
+`operator.networkPolicyEnforcement`, chart 0.12.21 and later), or `unenforced`
+to assert the opposite. The flag asserts the verdict for all three writers and
+runs no canaries. It changes only what status reports: the policies are written
+either way. Since operator 0.17.7 it no longer stands in for the agent check:
+the backstop flavor is chosen from the DaemonSets actually running, whatever
+the flag says.
 
 ## Limitations and notes
 
@@ -358,6 +385,7 @@ running, whatever the flag says.
 - **L7 rules are merged per server.** Because the core enforces one policy per server (not per upstream connection), a policy's upstream `tools`/`arguments` rules are flattened together (see [above](#l7-semantics)). Scope host-specific tool rules with separate policies if you need them kept apart.
 - **`requireApproval` needs the approval gate to be interactive** — since core 2.11.0 a gated call blocks on the approval gate (typed pending approval, `approval:resolve` chokepoint, dispatch-time revalidation), delivered on the default `event_stream` channel when nothing else is configured; on a deployment with the gate turned off (`approvals: {enabled: false}`) it fails closed, as it always did. `Audit` mode records the would-be verdict and never asks a human.
 - **`Enforce` governs new connections only — it does not cut established ones.** This is normal NetworkPolicy behaviour: the CNI keeps established conntrack entries, so a server holding a TCP session opened *before* the policy landed keeps talking through it until that connection closes. Measured live (kind + Calico): data sent after a restrictive policy applied still flowed through the pre-existing session. Flipping `Audit` → `Enforce` and seeing `BackstopApplied: True` therefore means *"no new disallowed connections"*, not *"all disallowed traffic stopped now"*. To guarantee existing sessions are cut, roll the server's pods after switching to `Enforce` (`kubectl rollout restart`).
+- **On kindnet a restarted pod's first connections are not held to the backstop.** kind's default CNI enforces NetworkPolicy, but not on a pod's first connections right after it starts (about one second): a new pod that connects at once gets through a default-deny egress policy, and the same pod a second later is blocked. A pod rolled by `kubectl rollout restart` lands in that window. Calico and Cilium do not have it ([diagnosis](https://github.com/mcp-hangar/mcp-hangar-operator/pull/395#issuecomment-6899128663)).
 - **stdio servers are out of scope of the L3/L4 backstop.** An in-pod stdio MCP server generates no network traffic of its own, so an `MCPEgressPolicy` backstop has nothing to act on — your transport choice decides whether the network half of this feature applies to you at all. The L7 half (tool/argument rules) still applies, because it is enforced in the data plane Hangar operates, not on the wire.
 - **NodeLocal DNSCache on Cilium needs Cilium's setup and one operator flag.** In the usual NodeLocal topology, kubelet points at `169.254.20.10` and the cache runs on the host network. Cilium's DNS proxy then never sees a lookup, the `toFQDNs` allow-list stays empty, and every hostname upstream is denied. This fails closed: a name outside the allow-list stays blocked too. From operator 0.17.20 the policy reports it as `Degraded` with reason `FQDNLookupsUnobserved`, naming the cache and the denied upstreams. The supported setup, which the operator's reachability e2e runs on every PR:
   - Run the cache as an ordinary pod behind a `CiliumLocalRedirectPolicy`: Cilium's own `examples/kubernetes-local-redirect/node-local-dns.yaml` and `node-local-dns-lrp.yaml`, with `localRedirectPolicies.enabled=true` in Cilium. Pods keep the kube-dns service IP, and Cilium redirects each lookup to the cache on the same node.

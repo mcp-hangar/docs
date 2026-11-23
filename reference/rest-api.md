@@ -1481,6 +1481,20 @@ These routes became usable in **2.1.0**. Before that they read an application-st
 
 Something has to put a tool behind the gate before anything appears here: see [`approval_list`](configuration.md#holding-a-tool-for-a-human-approval_list).
 
+**Approvals are tenant-scoped.** An approval records the tenant of the caller
+whose call was held, and only a principal in that same tenant can list, read or
+resolve it: for anyone else it is left out of the list, and get and resolve
+answer `404`. A global grant does not widen this. A principal with no tenant,
+such as a global `provider-admin` API key or the admin that
+`mcp-hangar auth bootstrap-admin` creates, sees and resolves none of a tenant's
+held calls. A grant scoped to `tenant:<id>` covers only approvals that name that
+tenant. An approval with no tenant (single-tenant, or auth off) is visible to
+any holder of the permission with a global grant. To approve a tenant's calls,
+authenticate the approver in that tenant, for example with a token that carries
+the tenant claim. The same rule holds for `mcp-hangar approvals`. This was
+decided in [#688](https://github.com/mcp-hangar/mcp-hangar/issues/688): tenant
+isolation, with no central cross-tenant approver.
+
 ### List Approvals
 
 ```

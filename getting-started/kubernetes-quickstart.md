@@ -97,8 +97,10 @@ helm install mcp-hangar-operator oci://ghcr.io/mcp-hangar/charts/mcp-hangar-oper
   --namespace mcp-hangar -f values.yaml --wait --timeout 5m
 ```
 
-The operator chart 0.12.52 and later defaults to operator 0.17.36, the first
-release that registers container servers in core itself.
+The walkthrough needs operator 0.17.36 or later, the first release that
+registers container servers in core itself. Chart 0.12.52 was the first to
+ship it; the operator each chart ships is in the
+[chart release history](../operations/RELEASE_COMPATIBILITY.md#chart-release-history).
 
 ## 3. Run an MCP server in a pod
 
@@ -303,24 +305,37 @@ probe
 
 ```text
 NAME           MODE      BACKSTOP     L7     TARGET   DEFAULT   AGE
-notes-no-env   Enforce   Unenforced   True   notes    Deny      30s
+notes-no-env   Enforce   Unverified   True   notes    Deny      1s
 ```
 
 The `NetworkPolicy` selects `mcp-hangar.io/provider: notes` and allows egress
 to `kube-dns` on port 53 and to `192.0.2.0/24`. The probe that printed
-`reachable` before now prints `blocked`: kind's network plugin enforces the
-backstop.
+`reachable` before now prints `blocked`: kind's network plugin, kindnet,
+enforces the backstop. It does so here because the probe runs in the server's
+pod, which was already running when the policy was written. kindnet does not
+enforce NetworkPolicy on a pod's first connections right after it starts
+(about one second): a server pod that restarts and connects at once gets past
+the backstop, and the same pod a second later is blocked. Calico and Cilium
+do not have that window
+([diagnosis](https://github.com/mcp-hangar/mcp-hangar-operator/pull/395#issuecomment-6899128663)).
 
-`BACKSTOP` still reads `Unenforced`, and the policy reports `Degraded=True`
-with reason `EnforcementNotObserved`. The operator decides whether anything
-enforces a `NetworkPolicy` by looking for a CNI it recognises, and it does not
-recognise kind's. It reports what it could establish rather than assume. On a
-cluster whose CNI it does not recognise but you know enforces policy, set
-`operator.networkPolicyEnforcement: enforced` in the operator chart's values.
-On Calico or Cilium it reads `Enforcing` by itself. An operator release with
-[mcp-hangar-operator#393](https://github.com/mcp-hangar/mcp-hangar-operator/issues/393)
-decides this from a block its own probe observes instead of the CNI's name,
-and then reads `Enforcing` here too.
+`BACKSTOP` reads `Unverified`: the operator does not know yet whether a
+`NetworkPolicy` is enforced in this cluster. It decides that from a block it
+observes, not from the CNI's name. Two canary pods,
+`mcp-hangar-enforcement-probe-*` in the `mcp-hangar` namespace, try to reach
+each other on a port their own `NetworkPolicy` allows and on one it denies,
+and the operator trusts the answer only once that policy and both canaries are
+30 seconds old. This step runs about half a minute after the operator was
+installed, so the answer is not in yet. Doubt is not a fault, so `Degraded`
+stays `False`. Within about a minute of the operator starting,
+`kubectl -n mcp-hangar get mcpegresspolicies` reads `Enforcing` and
+`BackstopEnforceable` reads `True (EnforcerObserved)`: kindnet blocks the
+canaries' denied connection, which they open long past its first-connection
+window. If your machine took longer to get here, you see that already. On a
+cluster where the canaries cannot run, set
+`operator.networkPolicyEnforcement: enforced` in the operator chart's values
+to assert the answer instead
+([the enforcement probe](../guides/EGRESS_POLICY.md#the-enforcement-probe)).
 
 <!-- ci:walkthrough -->
 ```bash
@@ -331,8 +346,8 @@ kubectl -n mcp-hangar get mcpegresspolicy notes-no-env \
 ```text
 Compiled=True (Compiled)
 BackstopApplied=True (BackstopApplied)
-BackstopEnforceable=False (NoEnforcerObserved)
-Degraded=True (EnforcementNotObserved)
+BackstopEnforceable=Unknown (EnforcementUnverified)
+Degraded=False (NotDegraded)
 L7Delivered=True (Delivered)
 ```
 
@@ -402,10 +417,14 @@ kubectl -n mcp-hangar get mcpserver notes \
 
 <!-- ci:expect "result": 5 -->
 
-`add` answers `5` as before. `ProviderIngressApplied` reports whether the
-fence is enforced on the same evidence as the backstop's `BACKSTOP` column, so
-on kind it reads `False (EnforcementNotObserved)` until the operator release
-above, although the knock shows the block.
+`add` answers `5` as before. The last line reads
+`ProviderIngressApplied=Unknown (EnforcementUnverified)`, although the knock
+shows the block. The condition rests on the same evidence as the backstop's
+`BACKSTOP` column, and the `helm upgrade` replaced the operator's pod, which
+owns the canaries, so the probe started over. `BACKSTOP` reads `Enforcing`
+again within about a minute; the `MCPServer` picks the answer up at its next
+reconcile, up to five minutes later, and then reads
+`ProviderIngressApplied=True (PolicyApplied)`.
 
 The fence is opt-in for the whole operator, and one server can opt out with
 the annotation `mcp-hangar.io/provider-ingress: "false"`. Other
